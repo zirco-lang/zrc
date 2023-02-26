@@ -1,0 +1,177 @@
+use crate::ast::Expr;
+use crate::lexer;
+use crate::box_arguments;
+
+grammar;
+
+pub Expr: Expr = {
+    <Expr> "," <Assignment> => box_arguments!(Expr::new_comma, <>),
+    <Assignment>
+};
+
+Assignment: Expr = {
+    <Unary> "=" <Assignment> => box_arguments!(Expr::new_assignment, <>),
+    <Unary> "+=" <Assignment> => box_arguments!(Expr::new_addition_assignment, <>),
+    <Unary> "-=" <Assignment> => box_arguments!(Expr::new_subtraction_assignment, <>),
+    <Unary> "*=" <Assignment> => box_arguments!(Expr::new_multiplication_assignment, <>),
+    <Unary> "/=" <Assignment> => box_arguments!(Expr::new_division_assignment, <>),
+    <Unary> "%=" <Assignment> => box_arguments!(Expr::new_modulo_assignment, <>),
+    <Unary> "&=" <Assignment> => box_arguments!(Expr::new_bitwise_and_assignment, <>),
+    <Unary> "|=" <Assignment> => box_arguments!(Expr::new_bitwise_or_assignment, <>),
+    <Unary> "^=" <Assignment> => box_arguments!(Expr::new_bitwise_xor_assignment, <>),
+    <Unary> "<<=" <Assignment> => box_arguments!(Expr::new_bitwise_left_shift_assignment, <>),
+    <Unary> ">>=" <Assignment> => box_arguments!(Expr::new_bitwise_right_shift_assignment, <>),
+    <Ternary>
+};
+
+Unary: Expr = {
+    "!" <Unary> => box_arguments!(Expr::new_unary_not, <>),
+    "-" <Unary> => box_arguments!(Expr::new_unary_minus, <>),
+    "++" <Unary> => box_arguments!(Expr::new_pre_increment, <>),
+    "--" <Unary> => box_arguments!(Expr::new_pre_decrement, <>),
+    <Postfix>
+};
+
+Postfix: Expr = {
+    <Postfix> "[" <Expr> "]" => box_arguments!(Expr::new_index, <>),
+    <l:Postfix> "." <r:IDENTIFIER> => Expr::new_dot(Box::new(l), r),
+    <Postfix> "++" => box_arguments!(Expr::new_post_increment, <>),
+    <Postfix> "--" => box_arguments!(Expr::new_post_decrement, <>),
+    <i:Postfix> "(" <l:ArgumentList> ")" => Expr::new_call(Box::new(i), l),
+    <Postfix> "(" ")" => Expr::new_call(Box::new(<>), vec![]),
+    <Primary>
+};
+
+ArgumentList: Vec<Expr> = {
+    <left:ArgumentList> "," <right:Assignment> => {
+        let mut new = left.clone();
+        new.push(right);
+        new
+    },
+    <Assignment> => vec![<>]
+};
+
+Ternary: Expr = {
+    <Logical> "?" <Expr> ":" <Ternary> => box_arguments!(Expr::new_ternary, <>),
+    <Logical>
+};
+
+Logical: Expr = {
+    <Logical> "&&" <Equality> => box_arguments!(Expr::new_logical_and, <>),
+    <Logical> "||" <Equality> => box_arguments!(Expr::new_logical_or, <>),
+    <Equality>
+};
+
+Equality: Expr = {
+    <Equality> "==" <Bitwise> => box_arguments!(Expr::new_equals, <>),
+    <Equality> "!=" <Bitwise> => box_arguments!(Expr::new_not_equals, <>),
+    <Comparison>,
+};
+
+Bitwise: Expr = {
+    <Bitwise> "&" <Comparison> => box_arguments!(Expr::new_bitwise_and, <>),
+    <Bitwise> "|" <Comparison> => box_arguments!(Expr::new_bitwise_or, <>),
+    <Bitwise> "^" <Comparison> => box_arguments!(Expr::new_bitwise_xor, <>),
+    <Comparison>
+};
+
+Comparison: Expr = {
+    <Comparison> ">" <BitShift> => box_arguments!(Expr::new_greater_than, <>),
+    <Comparison> ">=" <BitShift> => box_arguments!(Expr::new_greater_than_or_equal_to, <>),
+    <Comparison> "<" <BitShift> => box_arguments!(Expr::new_less_than, <>),
+    <Comparison> "<=" <BitShift> => box_arguments!(Expr::new_less_than_or_equal_to, <>),
+    <Term>
+};
+
+BitShift: Expr = {
+    <BitShift> ">>" <Term> => box_arguments!(Expr::new_bitwise_right_shift, <>),
+    <BitShift> "<<" <Term> => box_arguments!(Expr::new_bitwise_left_shift, <>),
+    <Term>
+};
+
+Term: Expr = {
+    <Term> "+" <Factor> => box_arguments!(Expr::new_addition, <>),
+    <Term> "-" <Factor> => box_arguments!(Expr::new_subtraction, <>),
+    <Factor>
+};
+
+Factor: Expr = {
+    <Factor> "/" <Unary> => box_arguments!(Expr::new_division, <>),
+    <Factor> "*" <Unary> => box_arguments!(Expr::new_multiplication, <>),
+    <Factor> "%" <Unary> => box_arguments!(Expr::new_modulo, <>),
+    <Unary>
+};
+
+Primary: Expr = {
+    NUMBER => Expr::new_number_literal(<>),
+    STRING => Expr::new_string_literal(<>),
+    IDENTIFIER => Expr::new_identifier(<>),
+    "true" => Expr::new_boolean_literal(true),
+    "false" => Expr::new_boolean_literal(false),
+    "(" <Expr> ")" => box_arguments!(Expr::new_parenthesized, <>),
+};
+
+extern {
+    type Location = usize;
+    type Error = lexer::LexicalError;
+
+    enum lexer::Tok {
+        "+" => lexer::Tok::Plus,
+        "-" => lexer::Tok::Minus,
+        "*" => lexer::Tok::Star,
+        "/" => lexer::Tok::Slash,
+        "%" => lexer::Tok::Percent,
+        "++" => lexer::Tok::PlusPlus,
+        "--" => lexer::Tok::MinusMinus,
+
+        "==" => lexer::Tok::EqEq,
+        "!=" => lexer::Tok::NotEq,
+        ">" => lexer::Tok::Greater,
+        ">=" => lexer::Tok::GreaterEq,
+        "<" => lexer::Tok::Less,
+        "<=" => lexer::Tok::LessEq,
+
+        "&&" => lexer::Tok::LogicalAnd,
+        "||" => lexer::Tok::LogicalOr,
+        "!" => lexer::Tok::LogicalNot,
+
+        "&" => lexer::Tok::BitwiseAnd,
+        "|" => lexer::Tok::BitwiseOr,
+        "^" => lexer::Tok::BitwiseXor,
+        "~" => lexer::Tok::BitwiseNot,
+        "<<" => lexer::Tok::BitwiseLeftShift,
+        ">>" => lexer::Tok::BitwiseRightShift,
+
+        "=" => lexer::Tok::Assign,
+        "+=" => lexer::Tok::PlusAssign,
+        "-=" => lexer::Tok::MinusAssign,
+        "*=" => lexer::Tok::StarAssign,
+        "/=" => lexer::Tok::SlashAssign,
+        "%=" => lexer::Tok::PercentAssign,
+        "&=" => lexer::Tok::BitwiseAndAssign,
+        "|=" => lexer::Tok::BitwiseOrAssign,
+        "^=" => lexer::Tok::BitwiseXorAssign,
+        "<<=" => lexer::Tok::BitwiseLeftShiftAssign,
+        ">>=" => lexer::Tok::BitwiseRightShiftAssign,
+
+        ";" => lexer::Tok::Semicolon,
+        "," => lexer::Tok::Comma,
+        "." => lexer::Tok::Dot,
+        "?" => lexer::Tok::QuestionMark,
+        ":" => lexer::Tok::Colon,
+
+        "(" => lexer::Tok::LeftParen,
+        ")" => lexer::Tok::RightParen,
+        "{" => lexer::Tok::LeftBrace,
+        "}" => lexer::Tok::RightBrace,
+        "[" => lexer::Tok::LeftBracket,
+        "]" => lexer::Tok::RightBracket,
+
+        STRING => lexer::Tok::StringLiteral(<String>),
+        NUMBER => lexer::Tok::NumberLiteral(<String>),
+        IDENTIFIER => lexer::Tok::Identifier(<String>),
+
+        "true" => lexer::Tok::True,
+        "false" => lexer::Tok::False,
+    }
+}

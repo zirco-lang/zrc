@@ -1,0 +1,15 @@
+[package]
+name = "zrc"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+derive-new = "0.5.9"
+lalrpop-util = { version = "0.19.8", features = ["lexer"] }
+peekmore = "1.0.0"
+regex = "1.7.1"
+
+[build-dependencies]
+lalrpop = "0.19.8"
