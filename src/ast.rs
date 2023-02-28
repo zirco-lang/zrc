@@ -18,6 +18,7 @@ pub enum Expr {
     PreDecrement(Box<Expr>),
     Index(Box<Expr>, Box<Expr>),
     Dot(Box<Expr>, String),
+    NamespaceAccess(Box<Expr>, String),
     PostIncrement(Box<Expr>),
     PostDecrement(Box<Expr>),
     Call(Box<Expr>, Vec<Expr>),

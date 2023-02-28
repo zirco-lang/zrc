@@ -36,6 +36,7 @@ Unary: Expr = {
 Postfix: Expr = {
     <Postfix> "[" <Expr> "]" => box_arguments!(Expr::new_index, <>),
     <l:Postfix> "." <r:IDENTIFIER> => Expr::new_dot(Box::new(l), r),
+    <l:Postfix> "::" <r:IDENTIFIER> => Expr::new_namespace_access(Box::new(l), r),
     <Postfix> "++" => box_arguments!(Expr::new_post_increment, <>),
     <Postfix> "--" => box_arguments!(Expr::new_post_decrement, <>),
     <i:Postfix> "(" <l:ArgumentList> ")" => Expr::new_call(Box::new(i), l),
@@ -161,6 +162,7 @@ extern {
         "." => lexer::Tok::Dot,
         "?" => lexer::Tok::QuestionMark,
         ":" => lexer::Tok::Colon,
+        "::" => lexer::Tok::ColonColon,
 
         "(" => lexer::Tok::LeftParen,
         ")" => lexer::Tok::RightParen,
