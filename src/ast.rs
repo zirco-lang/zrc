@@ -47,4 +47,6 @@ pub enum Expr {
     BooleanLiteral(bool),
 
     Parenthesized(Box<Expr>),
+
+    Error,
 }

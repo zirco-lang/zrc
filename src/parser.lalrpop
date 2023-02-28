@@ -1,8 +1,9 @@
 use crate::ast::Expr;
 use crate::lexer;
 use crate::box_arguments;
+use lalrpop_util::ErrorRecovery;
 
-grammar;
+grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
 
 pub Expr: Expr = {
     <Expr> "," <Assignment> => box_arguments!(Expr::new_comma, <>),
@@ -109,6 +110,7 @@ Primary: Expr = {
     "true" => Expr::new_boolean_literal(true),
     "false" => Expr::new_boolean_literal(false),
     "(" <Expr> ")" => box_arguments!(Expr::new_parenthesized, <>),
+    ! => { errors.push(<>); Expr::Error }
 };
 
 extern {
