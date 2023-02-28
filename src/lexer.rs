@@ -10,7 +10,7 @@ pub enum LexicalError {
     UnterminatedStringLiteral(usize),
 }
 
-fn string_slice<'input>(lex: &mut Lexer<'input, Tok>) -> String {
+fn string_slice(lex: &mut Lexer<'_, Tok>) -> String {
     lex.slice().to_string()
 }
 
@@ -219,7 +219,7 @@ impl<'input> Iterator for ZircoLexer<'input> {
         let slice = self.lex.slice().to_string();
         match token {
             Err(LexicalError::NoMatchingRule) => {
-                let char = slice.chars().nth(0).unwrap();
+                let char = slice.chars().next().unwrap();
                 Some(Err(LexicalError::IDK(
                     (span.start, char),
                     format!("Internal error: Unknown token '{char}'"),
