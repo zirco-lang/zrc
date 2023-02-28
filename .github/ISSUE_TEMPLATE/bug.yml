@@ -1,0 +1,72 @@
+name: Bug report
+description: Found a bug in zrc? Report it here!
+title: "bug: Describe your issue here..."
+labels:
+    - bug
+    - "severity: unknown"
+    - "scope: unknown"
+body:
+    - type: checkboxes
+      id: confirmations
+      attributes:
+          label: "Please double-check the following:"
+          description: Before you create an issue, we ask that you verify the following.
+          options:
+              - label: I am using the latest version of zrc
+                required: true
+              - label: I am using a supported Node.js version
+                required: true
+              - label: I have checked existing issues to ensure this is not a duplicate
+                required: true
+    - type: input
+      id: zrc-version
+      attributes:
+          label: What version of zrc are you using?
+          description: This could be a commit SHA, a SemVer version like `v1.0.0`, etc.
+          placeholder: vX.Y.Z
+      validations:
+          required: true
+    - type: input
+      id: node
+      attributes:
+          label: What version of Node.js are you using?
+          description: Examples are `v18.12.1` or `v12`
+          placeholder: v18.12.1
+    - type: textarea
+      id: description
+      attributes:
+          label: Describe your issue.
+          description: Provide a short and concise description of your problem.
+          placeholder: When I provide X, the compiler errors with Y.
+      validations:
+          required: true
+    - type: textarea
+      id: expected
+      attributes:
+          label: What did you expect to happen?
+          description: Describe the intended behavior.
+          placeholder: The compiler would do X.
+      validations:
+          required: true
+    - type: textarea
+      id: actual
+      attributes:
+          label: What actually happened?
+          description: What did zrc actually do?
+          placeholder: The compiler errored with Y.
+      validations:
+          required: true
+    - type: textarea
+      id: code
+      attributes:
+          label: If applicable, provide code to reproduce the bug.
+          description: >-
+              Otherwise, leave this section empty. Read about [Minimal, Reproducible
+              Examples](https://stackoverflow.com/help/minimal-reproducible-example)
+              at StackOverflow.
+    - type: textarea
+      id: other
+      attributes:
+          label: Additional Context
+          description: Provide any other context that could help us reproduce this bug.
+          placeholder: I am using Ubuntu 22.04 with Node v18.12.1.

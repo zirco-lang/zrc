@@ -1,0 +1,31 @@
+name: "build"
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v3
+              with:
+                  # Make sure the actual branch is checked out when running on pull requests
+                  ref: ${{ github.head_ref }}
+                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+            - name: Set up Rust
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
+                  override: true
+                  components: rustfmt, clippy
+            - name: Install Rust problem matchers
+              uses: r7kamura/rust-problem-matchers@v1
+            - name: cargo build
+              uses: actions-rs/cargo@v1
+              with:
+                  command: build

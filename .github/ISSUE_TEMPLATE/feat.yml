@@ -1,0 +1,34 @@
+name: Feature request
+description: Do you have a feature you'd like added to zrc or Zirco?
+title: "feat: Describe your request here..."
+labels:
+    - "scope: unknown"
+    - enhancement
+body:
+    - type: checkboxes
+      id: confirmations
+      attributes:
+          label: "Please double-check the following:"
+          description: Before you create an issue, we ask that you verify the following.
+          options:
+              - label: I have checked existing issues to ensure this is not a duplicate
+                required: true
+    - type: textarea
+      id: description
+      attributes:
+          label: Describe your suggestion.
+          description: Provide a short and concise description of your idea..
+          placeholder: When displaying errors, show X instead of Y.
+      validations:
+          required: true
+    - type: textarea
+      id: code
+      attributes:
+          label: If applicable, provide example code.
+          description: Otherwise, leave this section empty.
+    - type: textarea
+      id: other
+      attributes:
+          label: Additional Context
+          description: Provide any other context that could help us implement your feature.
+          placeholder: "The current renderer shows Y in this format:"

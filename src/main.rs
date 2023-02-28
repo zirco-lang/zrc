@@ -5,7 +5,7 @@ mod parser_tests;
 #[macro_use]
 extern crate lalrpop_util;
 
-lalrpop_mod!(pub parser);
+lalrpop_mod!(#[allow(clippy::all)] pub parser);
 
 #[macro_use]
 extern crate derive_new;
