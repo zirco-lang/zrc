@@ -11,7 +11,7 @@ mod tests {
     #[test]
     fn test_parser() {
         let input = "1 + 2 * 3";
-        let result = parser::ExprParser::new().parse(lexer::Lexer::new(input));
+        let result = parser::ExprParser::new().parse(lexer::ZircoLexer::new(input));
         assert_eq!(
             result,
             Ok(box_arguments!(

@@ -1,362 +1,232 @@
-use peekmore::{PeekMore, PeekMoreIterator};
-use std::str::CharIndices;
+use logos::{Lexer, Logos};
 
 pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum LexicalError {
+    #[default]
+    NoMatchingRule,
     IDK((usize, char), String),
     UnterminatedStringLiteral(usize),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+fn string_slice<'input>(lex: &mut Lexer<'input, Tok>) -> String {
+    lex.slice().to_string()
+}
+
+#[derive(Logos, Debug, Clone, PartialEq)]
+#[logos(error = LexicalError)]
 pub enum Tok {
     // === ARITHMETIC OPERATORS ===
     /// The token `+`
+    #[token("+")]
     Plus,
-    /// The token `-`
+    /// The token `-`s
+    #[token("-")]
     Minus,
     /// The token `*`
+    #[token("*")]
     Star,
     /// The token `/`
+    #[token("/")]
     Slash,
     /// The token `%`
+    #[token("%")]
     Percent,
     /// The token `++`
+    #[token("++")]
     PlusPlus,
     /// The token `--`
+    #[token("--")]
     MinusMinus,
 
     // === COMPARISON OPERATORS ===
     /// The token `==`
+    #[token("==")]
     EqEq,
     /// The token `!=`
+    #[token("!=")]
     NotEq,
     /// The token `>`
+    #[token(">")]
     Greater,
     /// The token `>=`
+    #[token(">=")]
     GreaterEq,
     /// The token `<`
+    #[token("<")]
     Less,
     /// The token `<=`
+    #[token("<=")]
     LessEq,
 
     // === LOGICAL OPERATORS ===
     /// The token `&&`
+    #[token("&&")]
     LogicalAnd,
     /// The token `||`
+    #[token("||")]
     LogicalOr,
     /// The token `!`
+    #[token("!")]
     LogicalNot,
 
     // === BITWISE OPERATORS ===
     /// The token `&`
+    #[token("&")]
     BitwiseAnd,
     /// The token `|`
+    #[token("|")]
     BitwiseOr,
     /// The token `^`
+    #[token("^")]
     BitwiseXor,
     /// The token `~`
+    #[token("~")]
     BitwiseNot,
     /// The token `<<`
+    #[token("<<")]
     BitwiseLeftShift,
     // FIXME: The lexer could treat Foo<Bar>> as Foo < Bar >>, not Foo < Bar > >.
     //        This is the classic Java generics problem.
     /// The token `>>`
+    #[token(">>")]
     BitwiseRightShift,
 
     // === ASSIGNMENT OPERATORS ===
     /// The token `=`
+    #[token("=")]
     Assign,
     /// The token `+=`
+    #[token("+=")]
     PlusAssign,
     /// The token `-=`
+    #[token("-=")]
     MinusAssign,
     /// The token `*=`
+    #[token("*=")]
     StarAssign,
     /// The token `/=`
+    #[token("/=")]
     SlashAssign,
     /// The token `%=`
+    #[token("%=")]
     PercentAssign,
     /// The token `&=`
+    #[token("&=")]
     BitwiseAndAssign,
     /// The token `|=`
+    #[token("|=")]
     BitwiseOrAssign,
     /// The token `^=`
+    #[token("^=")]
     BitwiseXorAssign,
     /// The token `<<=`
+    #[token("<<=")]
     BitwiseLeftShiftAssign,
     /// The token `>>=`
+    #[token(">>=")]
     BitwiseRightShiftAssign,
 
     // === OTHER TOKENS ===
     /// The token `;`
+    #[token(";")]
     Semicolon,
     /// The token `,`
+    #[token(",")]
     Comma,
     /// The token `.`
+    #[token(".")]
     Dot,
     /// The token `:`
+    #[token(":")]
     Colon,
     /// The token `::`
+    #[token("::")]
     ColonColon,
     /// The token `?`
+    #[token("?")]
     QuestionMark,
 
     // === GROUPING ===
     /// The token `(` (left parenthesis)
+    #[token("(")]
     LeftParen,
     /// The token `)` (right parenthesis)
+    #[token(")")]
     RightParen,
     /// The token `[` (left square bracket)
+    #[token("[")]
     LeftBracket,
     /// The token `]` (right square bracket)
+    #[token("]")]
     RightBracket,
     /// The token `{` (left curly brace)
+    #[token("{")]
     LeftBrace,
     /// The token `}` (right curly brace)
+    #[token("}")]
     RightBrace,
 
     // === KEYWORDS & BUILTINS ===
     /// The boolean `true`
-    True, // TODO
+    #[token("true")]
+    True,
     /// The boolean `false`
-    False, // TODO
+    #[token("false")]
+    False,
 
     // === SPECIAL ===
     /// Any string literal
+    #[regex(r#""([^"\\]|\\.)*""#, string_slice)]
+    #[regex(r#""([^"\\]|\\.)*"#, |lex| {
+        Err(LexicalError::UnterminatedStringLiteral(lex.span().start))
+    })]
     StringLiteral(String),
     /// Any number literal
+    // FIXME: Do not accept multiple decimal points like "123.456.789"
+    #[regex(r"[0-9][0-9\._]*", string_slice)]
+    #[regex(r"0x[0-9a-fA-F_]+", string_slice)]
+    #[regex(r"0b[01_]+", string_slice)]
     NumberLiteral(String),
     /// Any identifier
-    Identifier(String), // TODO
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", string_slice)]
+    Identifier(String),
+
+    /// Whitespace
+    #[regex(r"[ \t\r\n\f]+", logos::skip)]
+    Ignored,
 }
 
-pub struct Lexer<'input> {
-    chars: PeekMoreIterator<CharIndices<'input>>,
+pub struct ZircoLexer<'input> {
+    lex: Lexer<'input, Tok>,
 }
 
-impl<'input> Lexer<'input> {
+impl<'input> ZircoLexer<'input> {
     pub fn new(input: &'input str) -> Self {
-        Lexer {
-            chars: input.char_indices().peekmore(),
+        ZircoLexer {
+            lex: Tok::lexer(input),
         }
     }
 }
 
-impl<'input> Iterator for Lexer<'input> {
+impl<'input> Iterator for ZircoLexer<'input> {
     type Item = Spanned<Tok, usize, LexicalError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.chars.next() {
-                None => return None, // handle EOF
-
-                // Skip whitespace
-                Some((_, ' ')) => continue,
-                Some((_, '\n')) => continue,
-                Some((_, '\t')) => continue,
-                Some((_, '\r')) => continue,
-
-                Some((i, '(')) => return Some(Ok((i, Tok::LeftParen, i + 1))),
-                Some((i, ')')) => return Some(Ok((i, Tok::RightParen, i + 1))),
-                Some((i, '[')) => return Some(Ok((i, Tok::LeftBracket, i + 1))),
-                Some((i, ']')) => return Some(Ok((i, Tok::RightBracket, i + 1))),
-                Some((i, '{')) => return Some(Ok((i, Tok::LeftBrace, i + 1))),
-                Some((i, '}')) => return Some(Ok((i, Tok::RightBrace, i + 1))),
-
-                Some((i, ';')) => return Some(Ok((i, Tok::LeftParen, i + 1))),
-                Some((i, '.')) => return Some(Ok((i, Tok::Dot, i + 1))),
-                Some((i, '?')) => return Some(Ok((i, Tok::QuestionMark, i + 1))),
-                Some((i, ',')) => return Some(Ok((i, Tok::Comma, i + 1))),
-
-                Some((i, '~')) => return Some(Ok((i, Tok::BitwiseNot, i + 1))),
-
-                Some((i, '!')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::NotEq, i + 2)));
-                }
-                Some((i, '!')) => return Some(Ok((i, Tok::LogicalNot, i + 1))),
-
-                Some((i, '=')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::EqEq, i + 2)));
-                }
-                Some((i, '=')) => return Some(Ok((i, Tok::Assign, i + 1))),
-
-                // FIXME: I think this changes `:::` into `:: :` which might not be what we want
-                Some((i, ':')) if self.chars.peek() == Some(&(i + 1, ':')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::ColonColon, i + 2)));
-                }
-                Some((i, ':')) => return Some(Ok((i, Tok::Colon, i + 1))),
-
-                Some((i, '+')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::PlusAssign, i + 2)));
-                }
-                Some((i, '+')) if self.chars.peek() == Some(&(i + 1, '+')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::PlusPlus, i + 2)));
-                }
-                Some((i, '+')) => return Some(Ok((i, Tok::Plus, i + 1))),
-
-                Some((i, '-')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::MinusAssign, i + 2)));
-                }
-                Some((i, '-')) if self.chars.peek() == Some(&(i + 1, '-')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::MinusMinus, i + 2)));
-                }
-                Some((i, '-')) => return Some(Ok((i, Tok::Minus, i + 1))),
-
-                Some((i, '*')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::StarAssign, i + 2)));
-                }
-                Some((i, '*')) => return Some(Ok((i, Tok::Star, i + 1))),
-
-                Some((i, '/')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::SlashAssign, i + 2)));
-                }
-                Some((i, '/')) => return Some(Ok((i, Tok::Slash, i + 1))),
-
-                Some((i, '%')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::PercentAssign, i + 2)));
-                }
-                Some((i, '%')) => return Some(Ok((i, Tok::Percent, i + 1))),
-
-                Some((i, '^')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::BitwiseXorAssign, i + 2)));
-                }
-                Some((i, '^')) => return Some(Ok((i, Tok::BitwiseXor, i + 1))),
-
-                Some((i, '<')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::LessEq, i + 2)));
-                }
-                Some((i, '<')) if self.chars.peek() == Some(&(i + 1, '<')) => {
-                    self.chars.next();
-                    self.chars.advance_cursor();
-                    if let Some((_, '=')) = self.chars.peek() {
-                        self.chars.next();
-                        return Some(Ok((i, Tok::BitwiseLeftShiftAssign, i + 3)));
-                    }
-                    self.chars.move_cursor_back().unwrap();
-                    return Some(Ok((i, Tok::BitwiseLeftShift, i + 2)));
-                }
-
-                Some((i, '<')) => return Some(Ok((i, Tok::Less, i + 1))),
-
-                Some((i, '>')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::GreaterEq, i + 2)));
-                }
-                Some((i, '>')) if self.chars.peek() == Some(&(i + 1, '>')) => {
-                    self.chars.next();
-                    self.chars.advance_cursor();
-                    if let Some((_, '=')) = self.chars.peek() {
-                        self.chars.next();
-                        return Some(Ok((i, Tok::BitwiseRightShiftAssign, i + 3)));
-                    }
-                    self.chars.move_cursor_back().unwrap();
-                    return Some(Ok((i, Tok::BitwiseRightShift, i + 2)));
-                }
-                Some((i, '>')) => return Some(Ok((i, Tok::Greater, i + 1))),
-
-                Some((i, '&')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::BitwiseAndAssign, i + 2)));
-                }
-                Some((i, '&')) if self.chars.peek() == Some(&(i + 1, '&')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::LogicalAnd, i + 2)));
-                }
-                Some((i, '&')) => return Some(Ok((i, Tok::BitwiseAnd, i + 1))),
-
-                Some((i, '|')) if self.chars.peek() == Some(&(i + 1, '=')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::BitwiseOrAssign, i + 2)));
-                }
-                Some((i, '|')) if self.chars.peek() == Some(&(i + 1, '|')) => {
-                    self.chars.next();
-                    return Some(Ok((i, Tok::LogicalOr, i + 2)));
-                }
-                Some((i, '|')) => return Some(Ok((i, Tok::BitwiseOr, i + 1))),
-
-                Some((i, '"')) => {
-                    let mut s = String::new();
-                    loop {
-                        match self.chars.next() {
-                            None => return Some(Err(LexicalError::UnterminatedStringLiteral(i))),
-                            Some((_, '\\')) => {
-                                // Account for this character AND whatever follows it, even if it's a ".
-                                s.push('\\');
-                                if let Some((_, c)) = self.chars.next() {
-                                    s.push(c);
-                                } else {
-                                    return Some(Err(LexicalError::UnterminatedStringLiteral(i)));
-                                }
-                            }
-                            Some((_, '"')) => return Some(Ok((i, Tok::StringLiteral(s), i + 1))),
-                            Some((_, c)) => s.push(c),
-                        }
-                    }
-                }
-
-                Some((i, '0')) => {
-                    let base = match self.chars.next() {
-                        Some((_, 'x')) => 16,
-                        Some((_, 'o')) => 8,
-                        Some((_, 'b')) => 2,
-                        Some((_, '0'..='9')) => 10,
-                        Some((_, c)) => {
-                            return Some(Err(LexicalError::IDK(
-                                (i, c),
-                                format!("I have no idea what the token '{}' should mean!", c),
-                            )))
-                        }
-                        None => return Some(Ok((i, Tok::NumberLiteral("0".to_string()), i + 1))),
-                    };
-                    let mut s = String::new();
-                    s.push('0');
-                    while let Some((_, c)) = self.chars.peek() {
-                        if c.is_digit(base) {
-                            s.push(*c);
-                            self.chars.next();
-                        } else {
-                            break;
-                        }
-                    }
-                }
-
-                Some((i, c)) if c.is_digit(10) => {
-                    let mut s = String::new();
-                    s.push(c);
-                    while let Some((_, c)) = self.chars.peek() {
-                        if c.is_digit(10) {
-                            s.push(*c);
-                            self.chars.next();
-                        } else {
-                            break;
-                        }
-                    }
-                    return Some(Ok((i, Tok::NumberLiteral(s), i + 1)));
-                }
-
-                // TODO: Identifiers
-                // TODO: true/false
-                Some((i, c)) => {
-                    return Some(Err(LexicalError::IDK(
-                        (i, c),
-                        format!("I have no idea what the token '{}' should mean!", c),
-                    )))
-                }
+        let token = self.lex.next()?;
+        let span = self.lex.span();
+        let slice = self.lex.slice().to_string();
+        match token {
+            Err(LexicalError::NoMatchingRule) => {
+                let char = slice.chars().nth(0).unwrap();
+                Some(Err(LexicalError::IDK(
+                    (span.start, char),
+                    format!("Internal error: Unknown token '{char}'"),
+                )))
             }
+            Err(e) => Some(Err(e)),
+            Ok(token) => Some(Ok((span.start, token, span.end))),
         }
     }
 }
@@ -368,7 +238,7 @@ mod tests {
     /// Whitespace skipping works as expected
     #[test]
     fn whitespace_skipping() {
-        let lexer = Lexer::new(" t\t e \n\ns\nt\r\n  s");
+        let lexer = ZircoLexer::new(" t\t e \n\ns\nt\r\n  s");
         let tokens: Vec<_> = lexer.map(|x| x.unwrap().1).collect();
         assert_eq!(
             tokens,
@@ -379,6 +249,17 @@ mod tests {
                 Tok::Identifier("t".to_string()),
                 Tok::Identifier("s".to_string()),
             ]
+        );
+    }
+
+    /// Unclosed strings
+    #[test]
+    fn unclosed_string() {
+        let lexer = ZircoLexer::new("\"abc");
+        let tokens: Vec<_> = lexer.collect();
+        assert_eq!(
+            tokens,
+            vec![Err(LexicalError::UnterminatedStringLiteral(0))]
         );
     }
 }
