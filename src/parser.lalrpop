@@ -4,11 +4,15 @@ use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
 
+pub Stmt: Stmt = {
+    <Expr> ";" => Stmt::ExprStmt(<>),
+}
+
 pub Expr: Expr = {
     <Comma> => Expr::from(<>)
 };
 
-pub Comma: Comma = {
+Comma: Comma = {
     <Comma> "," <Assignment> => box_arguments!(Comma::Comma, <>),
     <Assignment> => into_expr_type!(Comma, <>)
 }

@@ -203,3 +203,8 @@ pub enum Expr {
     )]
     Error,
 }
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum Stmt {
+    ExprStmt(Expr),
+}
