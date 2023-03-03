@@ -50,6 +50,11 @@ pub enum Expr {
         Comma, Assignment, Unary, Postfix, Ternary, Logical, Equality, Bitwise, Comparison, Shift,
         Term, Factor
     )]
+    UnaryBitwiseNot(Box<Unary>),
+    #[subenum(
+        Comma, Assignment, Unary, Postfix, Ternary, Logical, Equality, Bitwise, Comparison, Shift,
+        Term, Factor
+    )]
     UnaryMinus(Box<Unary>),
     #[subenum(
         Comma, Assignment, Unary, Postfix, Ternary, Logical, Equality, Bitwise, Comparison, Shift,

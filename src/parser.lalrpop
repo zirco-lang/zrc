@@ -31,6 +31,7 @@ Assignment: Assignment = {
 Unary: Unary = {
     "!" <Unary> => box_arguments!(Unary::UnaryNot, <>),
     "-" <Unary> => box_arguments!(Unary::UnaryMinus, <>),
+    "~" <Unary> => box_arguments!(Unary::UnaryBitwiseNot, <>),
     "++" <Unary> => box_arguments!(Unary::PreIncrement, <>),
     "--" <Unary> => box_arguments!(Unary::PreDecrement, <>),
     <Postfix> => into_expr_type!(Unary, <>)
