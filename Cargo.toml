@@ -10,6 +10,7 @@ derive-new = "0.5.9"
 lalrpop-util = { version = "0.19.8", features = ["lexer"] }
 logos = { git = "https://github.com/maciejhirsz/logos", version = "0.12.1" }
 regex = "1.7.1"
+subenum = "1.0.1"
 
 [build-dependencies]
 lalrpop = "0.19.8"

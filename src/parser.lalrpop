@@ -1,50 +1,53 @@
-use crate::ast::Expr;
-use crate::lexer;
-use crate::box_arguments;
+use crate::ast::*;
+use crate::{lexer, box_arguments, into_expr_type};
 use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
 
 pub Expr: Expr = {
-    <Expr> "," <Assignment> => box_arguments!(Expr::new_comma, <>),
-    <Assignment>
+    <Comma> => Expr::from(<>)
 };
 
-Assignment: Expr = {
-    <Unary> "=" <Assignment> => box_arguments!(Expr::new_assignment, <>),
-    <Unary> "+=" <Assignment> => box_arguments!(Expr::new_addition_assignment, <>),
-    <Unary> "-=" <Assignment> => box_arguments!(Expr::new_subtraction_assignment, <>),
-    <Unary> "*=" <Assignment> => box_arguments!(Expr::new_multiplication_assignment, <>),
-    <Unary> "/=" <Assignment> => box_arguments!(Expr::new_division_assignment, <>),
-    <Unary> "%=" <Assignment> => box_arguments!(Expr::new_modulo_assignment, <>),
-    <Unary> "&=" <Assignment> => box_arguments!(Expr::new_bitwise_and_assignment, <>),
-    <Unary> "|=" <Assignment> => box_arguments!(Expr::new_bitwise_or_assignment, <>),
-    <Unary> "^=" <Assignment> => box_arguments!(Expr::new_bitwise_xor_assignment, <>),
-    <Unary> "<<=" <Assignment> => box_arguments!(Expr::new_bitwise_left_shift_assignment, <>),
-    <Unary> ">>=" <Assignment> => box_arguments!(Expr::new_bitwise_right_shift_assignment, <>),
-    <Ternary>
+pub Comma: Comma = {
+    <Comma> "," <Assignment> => box_arguments!(Comma::new_comma, <>),
+    <Assignment> => into_expr_type!(Comma, <>)
+}
+
+Assignment: Assignment = {
+    <Unary> "=" <Assignment> => box_arguments!(Assignment::new_assignment, <>),
+    <Unary> "+=" <Assignment> => box_arguments!(Assignment::new_addition_assignment, <>),
+    <Unary> "-=" <Assignment> => box_arguments!(Assignment::new_subtraction_assignment, <>),
+    <Unary> "*=" <Assignment> => box_arguments!(Assignment::new_multiplication_assignment, <>),
+    <Unary> "/=" <Assignment> => box_arguments!(Assignment::new_division_assignment, <>),
+    <Unary> "%=" <Assignment> => box_arguments!(Assignment::new_modulo_assignment, <>),
+    <Unary> "&=" <Assignment> => box_arguments!(Assignment::new_bitwise_and_assignment, <>),
+    <Unary> "|=" <Assignment> => box_arguments!(Assignment::new_bitwise_or_assignment, <>),
+    <Unary> "^=" <Assignment> => box_arguments!(Assignment::new_bitwise_xor_assignment, <>),
+    <Unary> "<<=" <Assignment> => box_arguments!(Assignment::new_bitwise_left_shift_assignment, <>),
+    <Unary> ">>=" <Assignment> => box_arguments!(Assignment::new_bitwise_right_shift_assignment, <>),
+    <Ternary> => into_expr_type!(Assignment, <>)
 };
 
-Unary: Expr = {
-    "!" <Unary> => box_arguments!(Expr::new_unary_not, <>),
-    "-" <Unary> => box_arguments!(Expr::new_unary_minus, <>),
-    "++" <Unary> => box_arguments!(Expr::new_pre_increment, <>),
-    "--" <Unary> => box_arguments!(Expr::new_pre_decrement, <>),
-    <Postfix>
+Unary: Unary = {
+    "!" <Unary> => box_arguments!(Unary::new_unary_not, <>),
+    "-" <Unary> => box_arguments!(Unary::new_unary_minus, <>),
+    "++" <Unary> => box_arguments!(Unary::new_pre_increment, <>),
+    "--" <Unary> => box_arguments!(Unary::new_pre_decrement, <>),
+    <Postfix> => into_expr_type!(Unary, <>)
 };
 
-Postfix: Expr = {
-    <Postfix> "[" <Expr> "]" => box_arguments!(Expr::new_index, <>),
-    <l:Postfix> "." <r:IDENTIFIER> => Expr::new_dot(Box::new(l), r),
-    <l:Postfix> "::" <r:IDENTIFIER> => Expr::new_namespace_access(Box::new(l), r),
-    <Postfix> "++" => box_arguments!(Expr::new_post_increment, <>),
-    <Postfix> "--" => box_arguments!(Expr::new_post_decrement, <>),
-    <i:Postfix> "(" <l:ArgumentList> ")" => Expr::new_call(Box::new(i), l),
-    <Postfix> "(" ")" => Expr::new_call(Box::new(<>), vec![]),
-    <Primary>
+Postfix: Postfix = {
+    <Postfix> "[" <Expr> "]" => box_arguments!(Postfix::new_index, <>),
+    <l:Postfix> "." <r:IDENTIFIER> => box_arguments!(Postfix::new_dot, l, IDENTIFIER::new_identifier(r)),
+    <l:Postfix> "::" <r:IDENTIFIER> => box_arguments!(Postfix::new_namespace_access, l, IDENTIFIER::new_identifier(r)),
+    <Postfix> "++" => box_arguments!(Postfix::new_post_increment, <>),
+    <Postfix> "--" => box_arguments!(Postfix::new_post_decrement, <>),
+    <i:Postfix> "(" <l:ArgumentList> ")" => Postfix::new_call(Box::new(i), l),
+    <Postfix> "(" ")" => Postfix::new_call(Box::new(<>), vec![]),
+    <Primary> => into_expr_type!(Postfix, <>)
 };
 
-ArgumentList: Vec<Expr> = {
+ArgumentList: Vec<Assignment> = {
     <left:ArgumentList> "," <right:Assignment> => {
         let mut new = left.clone();
         new.push(right);
@@ -53,65 +56,65 @@ ArgumentList: Vec<Expr> = {
     <Assignment> => vec![<>]
 };
 
-Ternary: Expr = {
-    <Logical> "?" <Expr> ":" <Ternary> => box_arguments!(Expr::new_ternary, <>),
-    <Logical>
+Ternary: Ternary = {
+    <Logical> "?" <Expr> ":" <Ternary> => box_arguments!(Ternary::new_ternary, <>),
+    <Logical> => into_expr_type!(Ternary, <>)
 };
 
-Logical: Expr = {
-    <Logical> "&&" <Equality> => box_arguments!(Expr::new_logical_and, <>),
-    <Logical> "||" <Equality> => box_arguments!(Expr::new_logical_or, <>),
-    <Equality>
+Logical: Logical = {
+    <Logical> "&&" <Equality> => box_arguments!(Logical::new_logical_and, <>),
+    <Logical> "||" <Equality> => box_arguments!(Logical::new_logical_or, <>),
+    <Equality> => into_expr_type!(Logical, <>)
 };
 
-Equality: Expr = {
-    <Equality> "==" <Bitwise> => box_arguments!(Expr::new_equals, <>),
-    <Equality> "!=" <Bitwise> => box_arguments!(Expr::new_not_equals, <>),
-    <Comparison>,
+Equality: Equality = {
+    <Equality> "==" <Bitwise> => box_arguments!(Equality::new_equals, <>),
+    <Equality> "!=" <Bitwise> => box_arguments!(Equality::new_not_equals, <>),
+    <Comparison> => into_expr_type!(Equality, <>)
 };
 
-Bitwise: Expr = {
-    <Bitwise> "&" <Comparison> => box_arguments!(Expr::new_bitwise_and, <>),
-    <Bitwise> "|" <Comparison> => box_arguments!(Expr::new_bitwise_or, <>),
-    <Bitwise> "^" <Comparison> => box_arguments!(Expr::new_bitwise_xor, <>),
-    <Comparison>
+Bitwise: Bitwise = {
+    <Bitwise> "&" <Comparison> => box_arguments!(Bitwise::new_bitwise_and, <>),
+    <Bitwise> "|" <Comparison> => box_arguments!(Bitwise::new_bitwise_or, <>),
+    <Bitwise> "^" <Comparison> => box_arguments!(Bitwise::new_bitwise_xor, <>),
+    <Comparison> => into_expr_type!(Bitwise, <>)
 };
 
-Comparison: Expr = {
-    <Comparison> ">" <BitShift> => box_arguments!(Expr::new_greater_than, <>),
-    <Comparison> ">=" <BitShift> => box_arguments!(Expr::new_greater_than_or_equal_to, <>),
-    <Comparison> "<" <BitShift> => box_arguments!(Expr::new_less_than, <>),
-    <Comparison> "<=" <BitShift> => box_arguments!(Expr::new_less_than_or_equal_to, <>),
-    <Term>
+Comparison: Comparison = {
+    <Comparison> ">" <BitShift> => box_arguments!(Comparison::new_greater_than, <>),
+    <Comparison> ">=" <BitShift> => box_arguments!(Comparison::new_greater_than_or_equal_to, <>),
+    <Comparison> "<" <BitShift> => box_arguments!(Comparison::new_less_than, <>),
+    <Comparison> "<=" <BitShift> => box_arguments!(Comparison::new_less_than_or_equal_to, <>),
+    <Term> => into_expr_type!(Comparison, <>)
 };
 
-BitShift: Expr = {
-    <BitShift> ">>" <Term> => box_arguments!(Expr::new_bitwise_right_shift, <>),
-    <BitShift> "<<" <Term> => box_arguments!(Expr::new_bitwise_left_shift, <>),
-    <Term>
+BitShift: Shift = {
+    <BitShift> ">>" <Term> => box_arguments!(Shift::new_bitwise_right_shift, <>),
+    <BitShift> "<<" <Term> => box_arguments!(Shift::new_bitwise_left_shift, <>),
+    <Term> => into_expr_type!(Shift, <>)
 };
 
-Term: Expr = {
-    <Term> "+" <Factor> => box_arguments!(Expr::new_addition, <>),
-    <Term> "-" <Factor> => box_arguments!(Expr::new_subtraction, <>),
-    <Factor>
+Term: Term = {
+    <Term> "+" <Factor> => box_arguments!(Term::new_addition, <>),
+    <Term> "-" <Factor> => box_arguments!(Term::new_subtraction, <>),
+    <Factor> => into_expr_type!(Term, <>)
 };
 
-Factor: Expr = {
-    <Factor> "/" <Unary> => box_arguments!(Expr::new_division, <>),
-    <Factor> "*" <Unary> => box_arguments!(Expr::new_multiplication, <>),
-    <Factor> "%" <Unary> => box_arguments!(Expr::new_modulo, <>),
-    <Unary>
+Factor: Factor = {
+    <Factor> "/" <Unary> => box_arguments!(Factor::new_division, <>),
+    <Factor> "*" <Unary> => box_arguments!(Factor::new_multiplication, <>),
+    <Factor> "%" <Unary> => box_arguments!(Factor::new_modulo, <>),
+    <Unary> => into_expr_type!(Factor, <>)
 };
 
-Primary: Expr = {
-    NUMBER => Expr::new_number_literal(<>),
-    STRING => Expr::new_string_literal(<>),
-    IDENTIFIER => Expr::new_identifier(<>),
-    "true" => Expr::new_boolean_literal(true),
-    "false" => Expr::new_boolean_literal(false),
-    "(" <Expr> ")" => box_arguments!(Expr::new_parenthesized, <>),
-    ! => { errors.push(<>); Expr::Error }
+Primary: Primary = {
+    NUMBER => Primary::new_number_literal(<>),
+    STRING => Primary::new_string_literal(<>),
+    IDENTIFIER => Primary::new_identifier(<>),
+    "true" => Primary::new_boolean_literal(true),
+    "false" => Primary::new_boolean_literal(false),
+    "(" <Expr> ")" => box_arguments!(Primary::new_parenthesized, <>),
+    ! => { errors.push(<>); Primary::Error }
 };
 
 extern {
