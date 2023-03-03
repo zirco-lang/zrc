@@ -16,12 +16,4 @@ macro_rules! box_arguments {
     ($f:expr,$($a:expr),+) => ( $f($(Box::new($a)),+) );
 }
 
-/// Translate into a different sub-enum of Expr
-#[macro_export]
-macro_rules! into_expr_type {
-    ($to:tt,$val:expr) => {
-        crate::ast::$to::try_from(crate::ast::Expr::from($val)).unwrap()
-    };
-}
-
 fn main() {}

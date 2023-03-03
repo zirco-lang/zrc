@@ -1,6 +1,14 @@
 #![allow(ambiguous_associated_items)]
 use subenum::subenum;
 
+/// Translate into a different sub-enum of Expr
+#[macro_export]
+macro_rules! into_expr_type {
+    ($to:tt,$val:expr) => {
+        $crate::ast::$to::try_from($crate::ast::Expr::from($val)).unwrap()
+    };
+}
+
 #[subenum(
     Comma, Assignment, Unary, Postfix, Ternary, Logical, Equality, Bitwise, Comparison, Shift,
     Term, Factor, Primary, IDENTIFIER
