@@ -175,6 +175,27 @@ pub enum Tok {
     /// The boolean `false`
     #[token("false")]
     False,
+    /// The keyword `if`
+    #[token("if")]
+    If,
+    /// The keyword `else`
+    #[token("else")]
+    Else,
+    /// The keyword `while`
+    #[token("while")]
+    While,
+    /// The keyword `for`
+    #[token("for")]
+    For,
+    /// The keyword `break`
+    #[token("break")]
+    Break,
+    /// The keyword `continue`
+    #[token("continue")]
+    Continue,
+    /// The keyword `return`
+    #[token("return")]
+    Return,
 
     // === SPECIAL ===
     /// Any string literal

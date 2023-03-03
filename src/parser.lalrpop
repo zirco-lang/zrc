@@ -6,7 +6,46 @@ grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::Lexi
 
 pub Stmt: Stmt = {
     <Expr> ";" => Stmt::ExprStmt(<>),
-}
+    ";" => Stmt::EmptyStmt,
+    <IfStmt> => Stmt::IfStmt(<>),
+    <WhileStmt> => Stmt::WhileStmt(<>),
+    <ForStmt> => Stmt::ForStmt(<>),
+    <FlowStmt>
+};
+
+FlowStmt: Stmt = {
+    "continue" ";" => Stmt::ContinueStmt,
+    "break" ";" => Stmt::BreakStmt,
+    "return" <Expr> ";" => Stmt::ReturnStmt(<>),
+    "return" ";" => Stmt::EmptyReturnStmt,
+};
+
+IfStmt: Stmt = {
+    "if" "(" <condition:Expr> ")" <then:Stmt> => Stmt::IfStmt(<>),
+    "if" "(" <Expr> ")" <Stmt> "else" <Stmt> => Stmt::IfElseStmt(<>),
+};
+
+WhileStmt: Stmt = {
+    "while" "(" <Expr> ")" <Stmt> => Stmt::WhileStmt(<>),
+};
+
+ForStmt: Stmt = {
+    "for" "(" <Expr> ";" <Expr> ";" <Expr> ")" <Stmt> => Stmt::ForStmt(<>),
+};
+
+BlockStmt: Stmt = {
+    "{" <StmtList> "}" => Stmt::BlockStmt(<>),
+    "{" "}" => Stmt::BlockStmt(vec![]),
+};
+
+StmtList: Vec<Stmt> = {
+    <left:StmtList> <right:Stmt> => {
+        let mut new = left.clone();
+        new.push(right);
+        new
+    },
+    <Stmt> => vec![<>]
+};
 
 pub Expr: Expr = {
     <Comma> => Expr::from(<>)
@@ -185,5 +224,13 @@ extern {
 
         "true" => lexer::Tok::True,
         "false" => lexer::Tok::False,
+        "if" => lexer::Tok::If,
+        "else" => lexer::Tok::Else,
+        "while" => lexer::Tok::While,
+        "for" => lexer::Tok::For,
+        "break" => lexer::Tok::Break,
+        "continue" => lexer::Tok::Continue,
+        "return" => lexer::Tok::Return,
+        
     }
 }
