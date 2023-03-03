@@ -17,12 +17,12 @@ mod tests {
         assert_eq!(
             result,
             Ok(box_arguments!(
-                Expr::new_addition,
-                crate::ast::Term::new_number_literal("1".to_string()),
+                Expr::Addition,
+                crate::ast::Term::NumberLiteral("1".to_string()),
                 box_arguments!(
-                    crate::ast::Factor::new_multiplication,
-                    crate::ast::Factor::new_number_literal("2".to_string()),
-                    crate::ast::Unary::new_number_literal("3".to_string())
+                    crate::ast::Factor::Multiplication,
+                    crate::ast::Factor::NumberLiteral("2".to_string()),
+                    crate::ast::Unary::NumberLiteral("3".to_string())
                 )
             ))
         );
@@ -37,9 +37,9 @@ mod tests {
         assert_eq!(
             result,
             Ok(box_arguments!(
-                Expr::new_addition,
-                crate::ast::Term::new_number_literal("1".to_string()),
-                crate::ast::Factor::new_error()
+                Expr::Addition,
+                crate::ast::Term::NumberLiteral("1".to_string()),
+                crate::ast::Factor::Error
             ))
         );
 
@@ -59,11 +59,11 @@ mod tests {
         let result = parser::ExprParser::new().parse(&mut errors, lexer::ZircoLexer::new(input));
         assert_eq!(
             result,
-            Ok(Expr::new_call(
+            Ok(Expr::Call(
                 Box::new(box_arguments!(
-                    crate::ast::Postfix::new_namespace_access,
-                    crate::ast::Postfix::new_identifier("io".to_string()),
-                    crate::ast::IDENTIFIER::new_identifier("println".to_string())
+                    crate::ast::Postfix::NamespaceAccess,
+                    crate::ast::Postfix::Identifier("io".to_string()),
+                    crate::ast::IDENTIFIER::Identifier("println".to_string())
                 )),
                 vec![crate::ast::Assignment::StringLiteral("\"hi\"".to_string())]
             ))

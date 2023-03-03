@@ -7,9 +7,6 @@ extern crate lalrpop_util;
 
 lalrpop_mod!(#[allow(clippy::all)] pub parser);
 
-#[macro_use]
-extern crate derive_new;
-
 /// Call the function $f with the passed arguments wrapped in Box-es
 #[macro_export]
 macro_rules! box_arguments {

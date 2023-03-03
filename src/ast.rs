@@ -13,7 +13,7 @@ macro_rules! into_expr_type {
     Comma, Assignment, Unary, Postfix, Ternary, Logical, Equality, Bitwise, Comparison, Shift,
     Term, Factor, Primary, IDENTIFIER
 )]
-#[derive(PartialEq, Debug, Clone, new)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Expr {
     #[subenum(Comma)]
     Comma(Box<Comma>, Box<Assignment>),
