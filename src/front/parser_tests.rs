@@ -1,8 +1,8 @@
 #![cfg(test)]
 
-use crate::ast::*;
 use crate::box_arguments;
-use crate::lexer;
+use crate::front::ast::*;
+use crate::front::lexer;
 use crate::parser;
 use lalrpop_util::ParseError;
 

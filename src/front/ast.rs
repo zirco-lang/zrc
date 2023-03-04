@@ -5,7 +5,7 @@ use subenum::subenum;
 #[macro_export]
 macro_rules! into_expr_type {
     ($to:tt,$val:expr) => {
-        $crate::ast::$to::try_from($crate::ast::Expr::from($val)).unwrap()
+        $crate::front::ast::$to::try_from($crate::front::ast::Expr::from($val)).unwrap()
     };
 }
 

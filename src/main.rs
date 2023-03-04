@@ -1,6 +1,4 @@
-pub mod ast;
-pub mod lexer;
-mod parser_tests;
+pub mod front;
 
 #[macro_use]
 extern crate lalrpop_util;

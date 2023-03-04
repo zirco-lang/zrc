@@ -1,5 +1,6 @@
-use crate::ast::*;
-use crate::{lexer, box_arguments, into_expr_type};
+use crate::front::ast::*;
+use crate::front::lexer;
+use crate::{box_arguments, into_expr_type};
 use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
