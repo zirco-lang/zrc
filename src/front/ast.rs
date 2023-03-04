@@ -260,7 +260,7 @@ impl Display for Expr {
                 f,
                 "{}({})",
                 a,
-                b.into_iter()
+                b.iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
