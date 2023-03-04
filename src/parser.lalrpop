@@ -4,13 +4,36 @@ use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
 
+// See https://en.wikipedia.org/wiki/Dangling_else#Avoiding_the_conflict_in_LR_parsers for why this is necessary.
+// The ClosedStmt rule REQUIRES that an 'else' clause is used, meaning that it will attach to the inner 'if' statement.
+// TODO: Forbid this case
 pub Stmt: Stmt = {
+    <OpenStmt>,
+    <ClosedStmt>
+}
+
+OpenStmt: Stmt = {
+    "if" "(" <e:Expr> ")" <s:Stmt> => Stmt::IfStmt(e, Box::new(s)),
+    "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:OpenStmt> => Stmt::IfElseStmt(a, Box::new(b), Box::new(c)),
+    "while" "(" <a:Expr> ")" <b:OpenStmt> => Stmt::WhileStmt(a, Box::new(b)),
+    // FIXME: First condition should be declaration not expr
+    "for" "(" <a:Expr> ";" <b:Expr> ";" <c:Expr> ")" <d:OpenStmt> => Stmt::ForStmt(a, b, c, Box::new(d)),
+};
+
+ClosedStmt: Stmt = {
+    <SimpleStmt>,
+    "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:ClosedStmt> => Stmt::IfElseStmt(a, Box::new(b), Box::new(c)),
+    "while" "(" <a:Expr> ")" <b:ClosedStmt> => Stmt::WhileStmt(a, Box::new(b)),
+    // FIXME: First condition should be declaration not expr
+    "for" "(" <a:Expr> ";" <b:Expr> ";" <c:Expr> ")" <d:ClosedStmt> => Stmt::ForStmt(a, b, c, Box::new(d)),
+};
+
+SimpleStmt: Stmt = {
     <Expr> ";" => Stmt::ExprStmt(<>),
     ";" => Stmt::EmptyStmt,
-    <IfStmt> => Stmt::IfStmt(<>),
-    <WhileStmt> => Stmt::WhileStmt(<>),
-    <ForStmt> => Stmt::ForStmt(<>),
-    <FlowStmt>
+    "{" <StmtList> "}" => Stmt::BlockStmt(<>),
+    "{" "}" => Stmt::BlockStmt(vec![]),
+    <FlowStmt>,
 };
 
 FlowStmt: Stmt = {
@@ -18,24 +41,6 @@ FlowStmt: Stmt = {
     "break" ";" => Stmt::BreakStmt,
     "return" <Expr> ";" => Stmt::ReturnStmt(<>),
     "return" ";" => Stmt::EmptyReturnStmt,
-};
-
-IfStmt: Stmt = {
-    "if" "(" <condition:Expr> ")" <then:Stmt> => Stmt::IfStmt(<>),
-    "if" "(" <Expr> ")" <Stmt> "else" <Stmt> => Stmt::IfElseStmt(<>),
-};
-
-WhileStmt: Stmt = {
-    "while" "(" <Expr> ")" <Stmt> => Stmt::WhileStmt(<>),
-};
-
-ForStmt: Stmt = {
-    "for" "(" <Expr> ";" <Expr> ";" <Expr> ")" <Stmt> => Stmt::ForStmt(<>),
-};
-
-BlockStmt: Stmt = {
-    "{" <StmtList> "}" => Stmt::BlockStmt(<>),
-    "{" "}" => Stmt::BlockStmt(vec![]),
 };
 
 StmtList: Vec<Stmt> = {

@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::ast::Expr;
+use crate::ast::*;
 use crate::box_arguments;
 use crate::lexer;
 use crate::parser;
@@ -18,11 +18,11 @@ mod tests {
             result,
             Ok(box_arguments!(
                 Expr::Addition,
-                crate::ast::Term::NumberLiteral("1".to_string()),
+                Term::NumberLiteral("1".to_string()),
                 box_arguments!(
-                    crate::ast::Factor::Multiplication,
-                    crate::ast::Factor::NumberLiteral("2".to_string()),
-                    crate::ast::Unary::NumberLiteral("3".to_string())
+                    Factor::Multiplication,
+                    Factor::NumberLiteral("2".to_string()),
+                    Unary::NumberLiteral("3".to_string())
                 )
             ))
         );
@@ -38,8 +38,8 @@ mod tests {
             result,
             Ok(box_arguments!(
                 Expr::Addition,
-                crate::ast::Term::NumberLiteral("1".to_string()),
-                crate::ast::Factor::Error
+                Term::NumberLiteral("1".to_string()),
+                Factor::Error
             ))
         );
 
@@ -61,13 +61,31 @@ mod tests {
             result,
             Ok(Expr::Call(
                 Box::new(box_arguments!(
-                    crate::ast::Postfix::NamespaceAccess,
-                    crate::ast::Postfix::Identifier("io".to_string()),
-                    crate::ast::IDENTIFIER::Identifier("println".to_string())
+                    Postfix::NamespaceAccess,
+                    Postfix::Identifier("io".to_string()),
+                    IDENTIFIER::Identifier("println".to_string())
                 )),
-                vec![crate::ast::Assignment::StringLiteral("\"hi\"".to_string())]
+                vec![Assignment::StringLiteral("\"hi\"".to_string())]
             ))
         );
         assert_eq!(errors, vec![]);
+    }
+
+    #[test]
+    fn ambiguous_test() {
+        let mut errors = Vec::new();
+        let input = "if (a) if (b) c; else d;";
+        let result = parser::StmtParser::new().parse(&mut errors, lexer::ZircoLexer::new(input));
+        assert_eq!(
+            result,
+            Ok(Stmt::IfStmt(
+                Expr::Identifier("a".to_string()),
+                Box::new(Stmt::IfElseStmt(
+                    Expr::Identifier("b".to_string()),
+                    Box::new(Stmt::ExprStmt(Expr::Identifier("c".to_string()))),
+                    Box::new(Stmt::ExprStmt(Expr::Identifier("d".to_string())))
+                ))
+            ))
+        )
     }
 }
