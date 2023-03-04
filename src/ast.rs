@@ -217,6 +217,4 @@ pub enum Stmt {
     BreakStmt,
     ReturnStmt(Expr),
     EmptyReturnStmt,
-    // TODO: Types are IDENTIFIER for now
-    DeclarationList(IDENTIFIER, Vec<IDENTIFIER>),
 }
