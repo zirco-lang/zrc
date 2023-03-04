@@ -1,4 +1,6 @@
 #![allow(ambiguous_associated_items)]
+use std::fmt::Display;
+
 use subenum::subenum;
 
 /// Translate into a different sub-enum of Expr
@@ -204,6 +206,94 @@ pub enum Expr {
     Error,
 }
 
+impl Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::NumberLiteral(n) => write!(f, "{}", n),
+            Expr::StringLiteral(s) => write!(f, "{}", s),
+            Expr::Identifier(i) => write!(f, "{}", i),
+            Expr::BooleanLiteral(b) => write!(f, "{}", b),
+            Expr::Parenthesized(e) => write!(f, "({})", e),
+            Expr::Error => write!(f, "error"),
+            Expr::Assignment(l, r) => write!(f, "{} = {}", l, r),
+            Expr::Addition(l, r) => write!(f, "{} + {}", l, r),
+            Expr::Subtraction(l, r) => write!(f, "{} - {}", l, r),
+            Expr::Multiplication(l, r) => write!(f, "{} * {}", l, r),
+            Expr::Division(l, r) => write!(f, "{} / {}", l, r),
+            Expr::Modulo(l, r) => write!(f, "{} % {}", l, r),
+            Expr::BitwiseAnd(l, r) => write!(f, "{} & {}", l, r),
+            Expr::BitwiseOr(l, r) => write!(f, "{} | {}", l, r),
+            Expr::BitwiseXor(l, r) => write!(f, "{} ^ {}", l, r),
+            Expr::BitwiseLeftShift(l, r) => write!(f, "{} << {}", l, r),
+            Expr::BitwiseRightShift(l, r) => write!(f, "{} >> {}", l, r),
+            Expr::GreaterThan(l, r) => write!(f, "{} > {}", l, r),
+            Expr::GreaterThanOrEqualTo(l, r) => write!(f, "{} >= {}", l, r),
+            Expr::LessThan(l, r) => write!(f, "{} < {}", l, r),
+            Expr::LessThanOrEqualTo(l, r) => write!(f, "{} <= {}", l, r),
+            Expr::Equals(l, r) => write!(f, "{} == {}", l, r),
+            Expr::NotEquals(l, r) => write!(f, "{} != {}", l, r),
+            Expr::LogicalAnd(l, r) => write!(f, "{} && {}", l, r),
+            Expr::LogicalOr(l, r) => write!(f, "{} || {}", l, r),
+            Expr::Comma(l, r) => write!(f, "{}, {}", l, r),
+            Expr::AdditionAssignment(l, r) => write!(f, "{} += {}", l, r),
+            Expr::SubtractionAssignment(l, r) => write!(f, "{} -= {}", l, r),
+            Expr::MultiplicationAssignment(l, r) => write!(f, "{} *= {}", l, r),
+            Expr::DivisionAssignment(l, r) => write!(f, "{} /= {}", l, r),
+            Expr::ModuloAssignment(l, r) => write!(f, "{} %= {}", l, r),
+            Expr::BitwiseAndAssignment(l, r) => write!(f, "{} &= {}", l, r),
+            Expr::BitwiseOrAssignment(l, r) => write!(f, "{} |= {}", l, r),
+            Expr::BitwiseXorAssignment(l, r) => write!(f, "{} ^= {}", l, r),
+            Expr::BitwiseLeftShiftAssignment(l, r) => write!(f, "{} <<= {}", l, r),
+            Expr::BitwiseRightShiftAssignment(l, r) => write!(f, "{} >>= {}", l, r),
+            Expr::UnaryNot(e) => write!(f, "!{}", e),
+            Expr::UnaryBitwiseNot(e) => write!(f, "~{}", e),
+            Expr::UnaryMinus(e) => write!(f, "-{}", e),
+            Expr::PostIncrement(e) => write!(f, "{}++", e),
+            Expr::PostDecrement(e) => write!(f, "{}--", e),
+            Expr::PreIncrement(e) => write!(f, "++{}", e),
+            Expr::PreDecrement(e) => write!(f, "--{}", e),
+            Expr::Ternary(l, m, r) => write!(f, "{} ? {} : {}", l, m, r),
+            Expr::Index(a, b) => write!(f, "{}[{}]", a, b),
+            Expr::Dot(a, b) => write!(f, "{}.{}", a, b),
+            Expr::NamespaceAccess(a, b) => write!(f, "{}::{}", a, b),
+            Expr::Call(a, b) => write!(
+                f,
+                "{}({})",
+                a,
+                b.into_iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+        }
+    }
+}
+
+macro_rules! impl_display_for_subenum {
+    ($n:ident) => {
+        impl Display for $n {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", Expr::from(self.clone()))
+            }
+        }
+    };
+}
+
+impl_display_for_subenum!(Comma);
+impl_display_for_subenum!(Assignment);
+impl_display_for_subenum!(Unary);
+impl_display_for_subenum!(Postfix);
+impl_display_for_subenum!(Ternary);
+impl_display_for_subenum!(Logical);
+impl_display_for_subenum!(Equality);
+impl_display_for_subenum!(Bitwise);
+impl_display_for_subenum!(Comparison);
+impl_display_for_subenum!(Shift);
+impl_display_for_subenum!(Term);
+impl_display_for_subenum!(Factor);
+impl_display_for_subenum!(Primary);
+impl_display_for_subenum!(IDENTIFIER);
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum Stmt {
     IfStmt(Expr, Box<Stmt>),
@@ -222,4 +312,35 @@ pub enum Stmt {
     BreakStmt,
     ReturnStmt(Expr),
     EmptyReturnStmt,
+}
+
+impl Display for Stmt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Stmt::IfStmt(e, s) => write!(f, "if ({}) {}", e, s),
+            Stmt::IfElseStmt(e, s1, s2) => write!(f, "if ({}) {} else {}", e, s1, s2),
+            Stmt::WhileStmt(e, s) => write!(f, "while ({}) {}", e, s),
+            Stmt::ForStmt {
+                init,
+                cond,
+                post,
+                body,
+            } => {
+                write!(f, "for ({};= {}; {}) {}", init, cond, post, body)
+            }
+            Stmt::BlockStmt(s) => {
+                write!(f, "{{")?;
+                for stmt in s {
+                    write!(f, "{}", stmt)?;
+                }
+                write!(f, "}}")
+            }
+            Stmt::ExprStmt(e) => write!(f, "{};", e),
+            Stmt::EmptyStmt => write!(f, ";"),
+            Stmt::ContinueStmt => write!(f, "continue;"),
+            Stmt::BreakStmt => write!(f, "break;"),
+            Stmt::ReturnStmt(e) => write!(f, "return {};", e),
+            Stmt::EmptyReturnStmt => write!(f, "return;"),
+        }
+    }
 }
