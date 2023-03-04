@@ -209,7 +209,12 @@ pub enum Stmt {
     IfStmt(Expr, Box<Stmt>),
     IfElseStmt(Expr, Box<Stmt>, Box<Stmt>),
     WhileStmt(Expr, Box<Stmt>),
-    ForStmt(Expr, Expr, Expr, Box<Stmt>),
+    ForStmt {
+        init: Expr,
+        cond: Expr,
+        post: Expr,
+        body: Box<Stmt>,
+    },
     BlockStmt(Vec<Stmt>),
     ExprStmt(Expr),
     EmptyStmt,

@@ -17,7 +17,7 @@ OpenStmt: Stmt = {
     "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:OpenStmt> => Stmt::IfElseStmt(a, Box::new(b), Box::new(c)),
     "while" "(" <a:Expr> ")" <b:OpenStmt> => Stmt::WhileStmt(a, Box::new(b)),
     // FIXME: First condition should be declaration not expr
-    "for" "(" <a:Expr> ";" <b:Expr> ";" <c:Expr> ")" <d:OpenStmt> => Stmt::ForStmt(a, b, c, Box::new(d)),
+    "for" "(" <a:Expr> ";" <b:Expr> ";" <c:Expr> ")" <d:OpenStmt> => Stmt::ForStmt { init: a, cond: b, post: c, body: Box::new(d) },
 };
 
 ClosedStmt: Stmt = {
@@ -25,7 +25,7 @@ ClosedStmt: Stmt = {
     "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:ClosedStmt> => Stmt::IfElseStmt(a, Box::new(b), Box::new(c)),
     "while" "(" <a:Expr> ")" <b:ClosedStmt> => Stmt::WhileStmt(a, Box::new(b)),
     // FIXME: First condition should be declaration not expr
-    "for" "(" <a:Expr> ";" <b:Expr> ";" <c:Expr> ")" <d:ClosedStmt> => Stmt::ForStmt(a, b, c, Box::new(d)),
+    "for" "(" <a:Expr> ";" <b:Expr> ";" <c:Expr> ")" <d:ClosedStmt> => Stmt::ForStmt { init: a, cond: b, post: c, body: Box::new(d) },
 };
 
 SimpleStmt: Stmt = {
