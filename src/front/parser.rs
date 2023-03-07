@@ -1,4 +1,4 @@
-use super::{ast::*, lexer};
+use super::{ast::expr::*, ast::stmt::*, ast::ty::Type, lexer};
 use crate::parser;
 use lalrpop_util::{ErrorRecovery, ParseError};
 

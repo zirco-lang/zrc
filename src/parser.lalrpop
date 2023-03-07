@@ -1,5 +1,5 @@
 // DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY front::parser INSTEAD
-use crate::front::ast::*;
+use crate::front::ast::{expr::*, stmt::*, ty::*};
 use crate::front::lexer;
 use crate::{box_arguments, into_expr_type};
 use lalrpop_util::ErrorRecovery;
