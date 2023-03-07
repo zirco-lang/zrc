@@ -13,9 +13,6 @@ pub enum ZircoParserError<T> {
     Fatal(ParseError<usize, lexer::Tok, lexer::LexicalError>),
 }
 
-/// Describes a parser that can be used with [parse_internal]
-trait BasicParser<T> {}
-
 /// More generic macro for [parse_expr] and [parse_stmt]
 macro_rules! parse_internal {
     ($parser: ty, $input: expr) => {{
