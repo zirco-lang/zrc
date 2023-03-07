@@ -18,16 +18,14 @@ OpenStmt: Stmt = {
     "if" "(" <e:Expr> ")" <s:Stmt> => Stmt::IfStmt(e, Box::new(s)),
     "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:OpenStmt> => Stmt::IfElseStmt(a, Box::new(b), Box::new(c)),
     "while" "(" <a:Expr> ")" <b:OpenStmt> => Stmt::WhileStmt(a, Box::new(b)),
-    // FIXME: First condition should be declaration not expr
-    "for" "(" <a:Expr> ";" <b:Expr> ";" <c:Expr> ")" <d:OpenStmt> => Stmt::ForStmt { init: a, cond: b, post: c, body: Box::new(d) },
+    "for" "(" <a:Declaration> ";" <b:Expr> ";" <c:Expr> ")" <d:OpenStmt> => Stmt::ForStmt { init: Box::new(a), cond: b, post: c, body: Box::new(d) },
 };
 
 ClosedStmt: Stmt = {
     <SimpleStmt>,
     "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:ClosedStmt> => Stmt::IfElseStmt(a, Box::new(b), Box::new(c)),
     "while" "(" <a:Expr> ")" <b:ClosedStmt> => Stmt::WhileStmt(a, Box::new(b)),
-    // FIXME: First condition should be declaration not expr
-    "for" "(" <a:Expr> ";" <b:Expr> ";" <c:Expr> ")" <d:ClosedStmt> => Stmt::ForStmt { init: a, cond: b, post: c, body: Box::new(d) },
+    "for" "(" <a:Declaration> ";" <b:Expr> ";" <c:Expr> ")" <d:ClosedStmt> => Stmt::ForStmt { init: Box::new(a), cond: b, post: c, body: Box::new(d) },
 };
 
 SimpleStmt: Stmt = {
@@ -36,30 +34,30 @@ SimpleStmt: Stmt = {
     "{" <StmtList> "}" => Stmt::BlockStmt(<>),
     "{" "}" => Stmt::BlockStmt(vec![]),
     <FlowStmt>,
-    <Declaration>,
+    <Declaration> => Stmt::from(<>),
 };
 
-Declaration: Stmt = {
+Declaration: Declaration = {
     <LetDeclaration>,
 };
 
-LetDeclaration: Stmt = {
-    "let" <i:IDENTIFIER> ":" <t:Type> "=" <v:Expr> ";" => Stmt::LetDeclaration {
+LetDeclaration: Declaration = {
+    "let" <i:IDENTIFIER> ":" <t:Type> "=" <v:Expr> ";" => Declaration::LetDeclaration {
         name: IDENTIFIER::Identifier(i),
         ty: Some(t),
         value: Some(v),
     },
-    "let" <i:IDENTIFIER> "=" <v:Expr> ";" => Stmt::LetDeclaration {
+    "let" <i:IDENTIFIER> "=" <v:Expr> ";" => Declaration::LetDeclaration {
         name: IDENTIFIER::Identifier(i),
         ty: None,
         value: Some(v),
     },
-    "let" <i:IDENTIFIER> ":" <t:Type> ";" => Stmt::LetDeclaration {
+    "let" <i:IDENTIFIER> ":" <t:Type> ";" => Declaration::LetDeclaration {
         name: IDENTIFIER::Identifier(i),
         ty: Some(t),
         value: None,
     },
-    "let" <i:IDENTIFIER> ";" => Stmt::LetDeclaration {
+    "let" <i:IDENTIFIER> ";" => Declaration::LetDeclaration {
         name: IDENTIFIER::Identifier(i),
         ty: None,
         value: None,

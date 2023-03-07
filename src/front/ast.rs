@@ -269,7 +269,7 @@ impl Display for Expr {
     }
 }
 
-macro_rules! impl_display_for_subenum {
+macro_rules! impl_display_for_expr_subenum {
     ($n:ident) => {
         impl Display for $n {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -279,28 +279,29 @@ macro_rules! impl_display_for_subenum {
     };
 }
 
-impl_display_for_subenum!(Comma);
-impl_display_for_subenum!(Assignment);
-impl_display_for_subenum!(Unary);
-impl_display_for_subenum!(Postfix);
-impl_display_for_subenum!(Ternary);
-impl_display_for_subenum!(Logical);
-impl_display_for_subenum!(Equality);
-impl_display_for_subenum!(Bitwise);
-impl_display_for_subenum!(Comparison);
-impl_display_for_subenum!(Shift);
-impl_display_for_subenum!(Term);
-impl_display_for_subenum!(Factor);
-impl_display_for_subenum!(Primary);
-impl_display_for_subenum!(IDENTIFIER);
+impl_display_for_expr_subenum!(Comma);
+impl_display_for_expr_subenum!(Assignment);
+impl_display_for_expr_subenum!(Unary);
+impl_display_for_expr_subenum!(Postfix);
+impl_display_for_expr_subenum!(Ternary);
+impl_display_for_expr_subenum!(Logical);
+impl_display_for_expr_subenum!(Equality);
+impl_display_for_expr_subenum!(Bitwise);
+impl_display_for_expr_subenum!(Comparison);
+impl_display_for_expr_subenum!(Shift);
+impl_display_for_expr_subenum!(Term);
+impl_display_for_expr_subenum!(Factor);
+impl_display_for_expr_subenum!(Primary);
+impl_display_for_expr_subenum!(IDENTIFIER);
 
+#[subenum(Declaration)]
 #[derive(PartialEq, Debug, Clone)]
 pub enum Stmt {
     IfStmt(Expr, Box<Stmt>),
     IfElseStmt(Expr, Box<Stmt>, Box<Stmt>),
     WhileStmt(Expr, Box<Stmt>),
     ForStmt {
-        init: Expr,
+        init: Box<Declaration>,
         cond: Expr,
         post: Expr,
         body: Box<Stmt>,
@@ -312,6 +313,7 @@ pub enum Stmt {
     BreakStmt,
     ReturnStmt(Expr),
     EmptyReturnStmt,
+    #[subenum(Declaration)]
     LetDeclaration {
         name: IDENTIFIER,
         ty: Option<Type>,
@@ -369,6 +371,18 @@ impl Display for Stmt {
         }
     }
 }
+
+macro_rules! impl_display_for_stmt_subenum {
+    ($n:ident) => {
+        impl Display for $n {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}", Stmt::from(self.clone()))
+            }
+        }
+    };
+}
+
+impl_display_for_stmt_subenum!(Declaration);
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Type {
