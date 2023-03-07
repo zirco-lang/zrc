@@ -39,9 +39,48 @@ SimpleStmt: Stmt = {
 
 Declaration: Declaration = {
     <LetDeclaration>,
+    // FIXME: This might allow code like for (fn foo() {};;) {} to work. Do we want this?
+    <FunctionDeclaration>,
+};
+
+FunctionDeclaration: Declaration = {
+    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "->" <r:Type> "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: a,
+        return_type: Some(r),
+        body: s,
+    },
+    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: a,
+        return_type: None,
+        body: s,
+    },
+    // TODO: External declarations
+};
+
+ArgumentDeclarationList: Vec<ArgumentDeclaration> = {
+    <left:ArgumentDeclarationList> "," <right:ArgumentDeclaration> => {
+        let mut new = left.clone();
+        new.push(right);
+        new
+    },
+    <ArgumentDeclaration> => vec![<>]
+};
+
+ArgumentDeclaration: ArgumentDeclaration = {
+    <i:IDENTIFIER> ":" <t:Type> => ArgumentDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: Some(t),
+    },
+    <i:IDENTIFIER> => ArgumentDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: None,
+    },
 };
 
 LetDeclaration: Declaration = {
+    // TODO: Multiple declarations, like 'let a, b;'
     "let" <i:IDENTIFIER> ":" <t:Type> "=" <v:Expr> ";" => Declaration::LetDeclaration {
         name: IDENTIFIER::Identifier(i),
         ty: Some(t),
@@ -269,6 +308,7 @@ extern {
         "continue" => lexer::Tok::Continue,
         "return" => lexer::Tok::Return,
         "let" => lexer::Tok::Let,
-        
+        "fn" => lexer::Tok::Fn,
+        "->" => lexer::Tok::SmallArrow,
     }
 }

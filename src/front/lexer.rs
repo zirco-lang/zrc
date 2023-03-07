@@ -199,6 +199,12 @@ pub enum Tok {
     /// The keyword `let`
     #[token("let")]
     Let,
+    /// The keyword `fn`
+    #[token("fn")]
+    Fn,
+    /// The operator `->`
+    #[token("->")]
+    SmallArrow,
 
     // === SPECIAL ===
     /// Any string literal

@@ -319,6 +319,13 @@ pub enum Stmt {
         ty: Option<Type>,
         value: Option<Expr>,
     },
+    #[subenum(Declaration)]
+    FunctionDefinition {
+        name: IDENTIFIER,
+        parameters: Vec<ArgumentDeclaration>,
+        return_type: Option<Type>,
+        body: Vec<Stmt>,
+    },
 }
 
 impl Display for Stmt {
@@ -368,6 +375,42 @@ impl Display for Stmt {
                 ty: Some(t),
                 value: Some(v),
             } => write!(f, "let {name}: {t} = {v};"),
+            Stmt::FunctionDefinition {
+                name,
+                parameters,
+                return_type: Some(r),
+                body,
+            } => write!(
+                f,
+                "fn {name}({}) -> {r} {}",
+                parameters
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                body.iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            ),
+            Stmt::FunctionDefinition {
+                name,
+                parameters,
+                return_type: None,
+                body,
+            } => write!(
+                f,
+                "fn {name}({}) {}",
+                parameters
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                body.iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            ),
         }
     }
 }
@@ -393,6 +436,21 @@ impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Type::Identifier(i) => write!(f, "{}", i),
+        }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct ArgumentDeclaration {
+    pub name: IDENTIFIER,
+    pub ty: Option<Type>,
+}
+
+impl Display for ArgumentDeclaration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.ty {
+            None => write!(f, "{}", self.name),
+            Some(t) => write!(f, "{}: {}", self.name, t),
         }
     }
 }

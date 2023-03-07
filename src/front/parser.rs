@@ -126,4 +126,29 @@ mod tests {
             })
         )
     }
+
+    #[test]
+    fn fn_test() {
+        assert_eq!(
+            parse_stmt("fn add(a: int, b: int) -> int { return a + b; }"),
+            Ok(Stmt::FunctionDefinition {
+                name: IDENTIFIER::Identifier("add".to_string()),
+                parameters: vec![
+                    ArgumentDeclaration {
+                        name: IDENTIFIER::Identifier("a".to_string()),
+                        ty: Some(Type::Identifier(IDENTIFIER::Identifier("int".to_string())))
+                    },
+                    ArgumentDeclaration {
+                        name: IDENTIFIER::Identifier("b".to_string()),
+                        ty: Some(Type::Identifier(IDENTIFIER::Identifier("int".to_string())))
+                    }
+                ],
+                return_type: Some(Type::Identifier(IDENTIFIER::Identifier("int".to_string()))),
+                body: vec![Stmt::ReturnStmt(Expr::Addition(
+                    Box::new(Term::Identifier("a".to_string())),
+                    Box::new(Factor::Identifier("b".to_string()))
+                ))]
+            })
+        )
+    }
 }
