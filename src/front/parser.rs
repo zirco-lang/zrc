@@ -144,10 +144,10 @@ mod tests {
                     }
                 ],
                 return_type: Some(Type::Identifier(IDENTIFIER::Identifier("int".to_string()))),
-                body: vec![Stmt::ReturnStmt(Expr::Addition(
+                body: vec![Stmt::ReturnStmt(Some(Expr::Addition(
                     Box::new(Term::Identifier("a".to_string())),
                     Box::new(Factor::Identifier("b".to_string()))
-                ))]
+                )))]
             })
         )
     }

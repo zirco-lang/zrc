@@ -311,8 +311,7 @@ pub enum Stmt {
     EmptyStmt,
     ContinueStmt,
     BreakStmt,
-    ReturnStmt(Expr),
-    EmptyReturnStmt,
+    ReturnStmt(Option<Expr>),
     #[subenum(Declaration)]
     LetDeclaration {
         name: IDENTIFIER,
@@ -353,8 +352,8 @@ impl Display for Stmt {
             Stmt::EmptyStmt => write!(f, ";"),
             Stmt::ContinueStmt => write!(f, "continue;"),
             Stmt::BreakStmt => write!(f, "break;"),
-            Stmt::ReturnStmt(e) => write!(f, "return {e};",),
-            Stmt::EmptyReturnStmt => write!(f, "return;"),
+            Stmt::ReturnStmt(Some(e)) => write!(f, "return {e};",),
+            Stmt::ReturnStmt(None) => write!(f, "return;"),
             Stmt::LetDeclaration {
                 name,
                 ty: None,

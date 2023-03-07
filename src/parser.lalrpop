@@ -110,8 +110,8 @@ Type: Type = {
 FlowStmt: Stmt = {
     "continue" ";" => Stmt::ContinueStmt,
     "break" ";" => Stmt::BreakStmt,
-    "return" <Expr> ";" => Stmt::ReturnStmt(<>),
-    "return" ";" => Stmt::EmptyReturnStmt,
+    "return" <Expr> ";" => Stmt::ReturnStmt(Some(<>)),
+    "return" ";" => Stmt::ReturnStmt(None),
 };
 
 StmtList: Vec<Stmt> = {
