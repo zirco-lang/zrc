@@ -312,6 +312,11 @@ pub enum Stmt {
     BreakStmt,
     ReturnStmt(Expr),
     EmptyReturnStmt,
+    LetDeclaration {
+        name: IDENTIFIER,
+        ty: Option<Type>,
+        value: Option<Expr>,
+    },
 }
 
 impl Display for Stmt {
@@ -331,16 +336,49 @@ impl Display for Stmt {
             Stmt::BlockStmt(s) => {
                 write!(f, "{{")?;
                 for stmt in s {
-                    write!(f, "{}", stmt)?;
+                    write!(f, "{stmt}")?;
                 }
                 write!(f, "}}")
             }
-            Stmt::ExprStmt(e) => write!(f, "{};", e),
+            Stmt::ExprStmt(e) => write!(f, "{e};"),
             Stmt::EmptyStmt => write!(f, ";"),
             Stmt::ContinueStmt => write!(f, "continue;"),
             Stmt::BreakStmt => write!(f, "break;"),
-            Stmt::ReturnStmt(e) => write!(f, "return {};", e),
+            Stmt::ReturnStmt(e) => write!(f, "return {e};",),
             Stmt::EmptyReturnStmt => write!(f, "return;"),
+            Stmt::LetDeclaration {
+                name,
+                ty: None,
+                value: None,
+            } => write!(f, "let {name};"),
+            Stmt::LetDeclaration {
+                name,
+                ty: None,
+                value: Some(v),
+            } => write!(f, "let {name} = {v};"),
+            Stmt::LetDeclaration {
+                name,
+                ty: Some(t),
+                value: None,
+            } => write!(f, "let {name}: {t};"),
+            Stmt::LetDeclaration {
+                name,
+                ty: Some(t),
+                value: Some(v),
+            } => write!(f, "let {name}: {t} = {v};"),
+        }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum Type {
+    Identifier(IDENTIFIER),
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Identifier(i) => write!(f, "{}", i),
         }
     }
 }

@@ -1,3 +1,4 @@
+// DO NOT IMPORT DIRECTLY -- USE front::parser INSTEAD
 use crate::front::ast::*;
 use crate::front::lexer;
 use crate::{box_arguments, into_expr_type};
@@ -35,7 +36,39 @@ SimpleStmt: Stmt = {
     "{" <StmtList> "}" => Stmt::BlockStmt(<>),
     "{" "}" => Stmt::BlockStmt(vec![]),
     <FlowStmt>,
+    <Declaration>,
 };
+
+Declaration: Stmt = {
+    <LetDeclaration>,
+};
+
+LetDeclaration: Stmt = {
+    "let" <i:IDENTIFIER> ":" <t:Type> "=" <v:Expr> ";" => Stmt::LetDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: Some(t),
+        value: Some(v),
+    },
+    "let" <i:IDENTIFIER> "=" <v:Expr> ";" => Stmt::LetDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: None,
+        value: Some(v),
+    },
+    "let" <i:IDENTIFIER> ":" <t:Type> ";" => Stmt::LetDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: Some(t),
+        value: None,
+    },
+    "let" <i:IDENTIFIER> ";" => Stmt::LetDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: None,
+        value: None,
+    },
+};
+
+Type: Type = {
+    <IDENTIFIER> => Type::Identifier(IDENTIFIER::Identifier(<>)),
+}
 
 FlowStmt: Stmt = {
     "continue" ";" => Stmt::ContinueStmt,
@@ -237,6 +270,7 @@ extern {
         "break" => lexer::Tok::Break,
         "continue" => lexer::Tok::Continue,
         "return" => lexer::Tok::Return,
+        "let" => lexer::Tok::Let,
         
     }
 }

@@ -196,6 +196,9 @@ pub enum Tok {
     /// The keyword `return`
     #[token("return")]
     Return,
+    /// The keyword `let`
+    #[token("let")]
+    Let,
 
     // === SPECIAL ===
     /// Any string literal
