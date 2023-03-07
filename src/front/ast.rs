@@ -322,16 +322,16 @@ pub enum Stmt {
 impl Display for Stmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Stmt::IfStmt(e, s) => write!(f, "if ({}) {}", e, s),
-            Stmt::IfElseStmt(e, s1, s2) => write!(f, "if ({}) {} else {}", e, s1, s2),
-            Stmt::WhileStmt(e, s) => write!(f, "while ({}) {}", e, s),
+            Stmt::IfStmt(e, s) => write!(f, "if ({e}) {s}"),
+            Stmt::IfElseStmt(e, s1, s2) => write!(f, "if ({e}) {s1} else {s2}"),
+            Stmt::WhileStmt(e, s) => write!(f, "while ({e}) {s}"),
             Stmt::ForStmt {
                 init,
                 cond,
                 post,
                 body,
             } => {
-                write!(f, "for ({};= {}; {}) {}", init, cond, post, body)
+                write!(f, "for ({init}; {cond}; {post}) {body}")
             }
             Stmt::BlockStmt(s) => {
                 write!(f, "{{")?;
