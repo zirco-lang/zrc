@@ -131,20 +131,20 @@ mod tests {
     #[test]
     fn fn_test() {
         assert_eq!(
-            parse_stmt("fn add(a: int, b: int) -> int { return a + b; }"),
+            parse_stmt("fn add(a: i32, b: i32) -> i32 { return a + b; }"),
             Ok(Stmt::FunctionDefinition {
                 name: IDENTIFIER::Identifier("add".to_string()),
                 parameters: vec![
                     ArgumentDeclaration {
                         name: IDENTIFIER::Identifier("a".to_string()),
-                        ty: Some(Type::Identifier(IDENTIFIER::Identifier("int".to_string())))
+                        ty: Some(Type::Identifier(IDENTIFIER::Identifier("i32".to_string())))
                     },
                     ArgumentDeclaration {
                         name: IDENTIFIER::Identifier("b".to_string()),
-                        ty: Some(Type::Identifier(IDENTIFIER::Identifier("int".to_string())))
+                        ty: Some(Type::Identifier(IDENTIFIER::Identifier("i32".to_string())))
                     }
                 ],
-                return_type: Some(Type::Identifier(IDENTIFIER::Identifier("int".to_string()))),
+                return_type: Some(Type::Identifier(IDENTIFIER::Identifier("i32".to_string()))),
                 body: vec![Stmt::ReturnStmt(Some(Expr::Addition(
                     Box::new(Term::Identifier("a".to_string())),
                     Box::new(Factor::Identifier("b".to_string()))
