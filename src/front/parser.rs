@@ -29,6 +29,11 @@ macro_rules! parse_internal {
     }};
 }
 
+/// Parse a program with the Zirco parser.
+pub fn parse_program(input: &str) -> Result<Vec<Declaration>, ZircoParserError<Vec<Declaration>>> {
+    parse_internal!(parser::ProgramParser, input)
+}
+
 /// Parse a string as an expression with the Zirco parser.
 pub fn parse_expr(input: &str) -> Result<Expr, ZircoParserError<Expr>> {
     parse_internal!(parser::ExprParser, input)
@@ -150,6 +155,106 @@ mod tests {
                     Box::new(Factor::Identifier("b".to_string()))
                 )))]
             })
+        )
+    }
+
+    #[test]
+    fn large_test() {
+        assert_eq!(
+            parse_program(concat!(
+                "fn add(a: i32, b: i32) -> i32 {\n",
+                "    return a + b;\n",
+                "}\n",
+                "\n",
+                "fn subtract(a: i32, b: i32) -> i32 {\n",
+                "    return a - b;\n",
+                "}\n",
+                "\n",
+                "fn main() {\n",
+                "    let a = 1;\n",
+                "    let b = 2;\n",
+                "    let c = add(a, b);\n",
+                "    let d = subtract(a, b);\n",
+                "    return c + d;\n",
+                "}",
+            )),
+            Ok(vec![
+                Declaration::FunctionDefinition {
+                    name: IDENTIFIER::Identifier("add".to_string()),
+                    parameters: vec![
+                        ArgumentDeclaration {
+                            name: IDENTIFIER::Identifier("a".to_string()),
+                            ty: Some(Type::Identifier(IDENTIFIER::Identifier("i32".to_string())))
+                        },
+                        ArgumentDeclaration {
+                            name: IDENTIFIER::Identifier("b".to_string()),
+                            ty: Some(Type::Identifier(IDENTIFIER::Identifier("i32".to_string())))
+                        }
+                    ],
+                    return_type: Some(Type::Identifier(IDENTIFIER::Identifier("i32".to_string()))),
+                    body: vec![Stmt::ReturnStmt(Some(Expr::Addition(
+                        Box::new(Term::Identifier("a".to_string())),
+                        Box::new(Factor::Identifier("b".to_string()))
+                    )))]
+                },
+                Declaration::FunctionDefinition {
+                    name: IDENTIFIER::Identifier("subtract".to_string()),
+                    parameters: vec![
+                        ArgumentDeclaration {
+                            name: IDENTIFIER::Identifier("a".to_string()),
+                            ty: Some(Type::Identifier(IDENTIFIER::Identifier("i32".to_string())))
+                        },
+                        ArgumentDeclaration {
+                            name: IDENTIFIER::Identifier("b".to_string()),
+                            ty: Some(Type::Identifier(IDENTIFIER::Identifier("i32".to_string())))
+                        }
+                    ],
+                    return_type: Some(Type::Identifier(IDENTIFIER::Identifier("i32".to_string()))),
+                    body: vec![Stmt::ReturnStmt(Some(Expr::Subtraction(
+                        Box::new(Term::Identifier("a".to_string())),
+                        Box::new(Factor::Identifier("b".to_string()))
+                    )))]
+                },
+                Declaration::FunctionDefinition {
+                    name: IDENTIFIER::Identifier("main".to_string()),
+                    parameters: vec![],
+                    return_type: None,
+                    body: vec![
+                        Stmt::LetDeclaration {
+                            name: IDENTIFIER::Identifier("a".to_string()),
+                            ty: None,
+                            value: Some(Assignment::NumberLiteral("1".to_string()).into())
+                        },
+                        Stmt::LetDeclaration {
+                            name: IDENTIFIER::Identifier("b".to_string()),
+                            ty: None,
+                            value: Some(Assignment::NumberLiteral("2".to_string()).into())
+                        },
+                        Stmt::LetDeclaration {
+                            name: IDENTIFIER::Identifier("c".to_string()),
+                            ty: None,
+                            value: Some(Expr::Call(
+                                Box::new(Postfix::Identifier("add".to_string())),
+                                vec![
+                                    Assignment::Identifier("a".to_string()),
+                                    Assignment::Identifier("b".to_string())
+                                ]
+                            ))
+                        },
+                        Stmt::LetDeclaration {
+                            name: IDENTIFIER::Identifier("d".to_string()),
+                            ty: None,
+                            value: Some(Expr::Call(
+                                Box::new(Postfix::Identifier("subtract".to_string())),
+                                vec![
+                                    Assignment::Identifier("a".to_string()),
+                                    Assignment::Identifier("b".to_string())
+                                ]
+                            ))
+                        }
+                    ]
+                }
+            ])
         )
     }
 }

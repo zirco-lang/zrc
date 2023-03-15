@@ -6,9 +6,21 @@ use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
 
+pub Program: Vec<Declaration> = {
+    <DeclarationList>,
+};
+
+DeclarationList: Vec<Declaration> = {
+    <left:DeclarationList> <right:Declaration> => {
+        let mut new = left.clone();
+        new.push(right);
+        new
+    },
+    <Declaration> => vec![<>],
+};
+
 // See https://en.wikipedia.org/wiki/Dangling_else#Avoiding_the_conflict_in_LR_parsers for why this is necessary.
 // The ClosedStmt rule REQUIRES that an 'else' clause is used, meaning that it will attach to the inner 'if' statement.
-// TODO: Forbid this case
 pub Stmt: Stmt = {
     <OpenStmt>,
     <ClosedStmt>
@@ -55,6 +67,42 @@ FunctionDeclaration: Declaration = {
         parameters: a,
         return_type: None,
         body: s,
+    },
+    "fn" <i:IDENTIFIER> "(" ")" "->" <r:Type> "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: vec![],
+        return_type: Some(r),
+        body: s,
+    },
+    "fn" <i:IDENTIFIER> "(" ")" "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: vec![],
+        return_type: None,
+        body: s,
+    },
+    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "->" <r:Type> "{" "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: a,
+        return_type: Some(r),
+        body: vec![],
+    },
+    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "{" "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: a,
+        return_type: None,
+        body: vec![],
+    },
+    "fn" <i:IDENTIFIER> "(" ")" "->" <r:Type> "{" "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: vec![],
+        return_type: Some(r),
+        body: vec![],
+    },
+    "fn" <i:IDENTIFIER> "(" ")" "{" "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: vec![],
+        return_type: None,
+        body: vec![],
     },
     // TODO: External declarations
 };
