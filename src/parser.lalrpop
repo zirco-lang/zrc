@@ -6,17 +6,20 @@ use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
 
+CommaSeparated<T>: Vec<T> = {
+    <e:T> <mut v:("," <T>)*> ","? => {
+        let mut new = vec![e];
+        new.append(&mut v);
+        new
+    }
+};
+
 pub Program: Vec<Declaration> = {
     <DeclarationList>,
 };
 
 DeclarationList: Vec<Declaration> = {
-    <left:DeclarationList> <right:Declaration> => {
-        let mut new = left.clone();
-        new.push(right);
-        new
-    },
-    <Declaration> => vec![<>],
+    (<Declaration>)*,
 };
 
 // See https://en.wikipedia.org/wiki/Dangling_else#Avoiding_the_conflict_in_LR_parsers for why this is necessary.
@@ -43,8 +46,7 @@ ClosedStmt: Stmt = {
 SimpleStmt: Stmt = {
     <Expr> ";" => Stmt::ExprStmt(<>),
     ";" => Stmt::EmptyStmt,
-    "{" <StmtList> "}" => Stmt::BlockStmt(<>),
-    "{" "}" => Stmt::BlockStmt(vec![]),
+    "{" <l:StmtList?> "}" => Stmt::BlockStmt(l.unwrap_or(Vec::new())),
     <FlowStmt>,
     <Declaration> => Stmt::from(<>),
 };
@@ -56,99 +58,31 @@ Declaration: Declaration = {
 };
 
 FunctionDeclaration: Declaration = {
-    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "->" <r:Type> "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
+    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList?> ")" <r:("->" <Type>)?> "{" <s:StmtList?> "}" => Declaration::FunctionDefinition {
         name: IDENTIFIER::Identifier(i),
-        parameters: a,
-        return_type: Some(r),
-        body: s,
-    },
-    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
-        name: IDENTIFIER::Identifier(i),
-        parameters: a,
-        return_type: None,
-        body: s,
-    },
-    "fn" <i:IDENTIFIER> "(" ")" "->" <r:Type> "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
-        name: IDENTIFIER::Identifier(i),
-        parameters: vec![],
-        return_type: Some(r),
-        body: s,
-    },
-    "fn" <i:IDENTIFIER> "(" ")" "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
-        name: IDENTIFIER::Identifier(i),
-        parameters: vec![],
-        return_type: None,
-        body: s,
-    },
-    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "->" <r:Type> "{" "}" => Declaration::FunctionDefinition {
-        name: IDENTIFIER::Identifier(i),
-        parameters: a,
-        return_type: Some(r),
-        body: vec![],
-    },
-    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "{" "}" => Declaration::FunctionDefinition {
-        name: IDENTIFIER::Identifier(i),
-        parameters: a,
-        return_type: None,
-        body: vec![],
-    },
-    "fn" <i:IDENTIFIER> "(" ")" "->" <r:Type> "{" "}" => Declaration::FunctionDefinition {
-        name: IDENTIFIER::Identifier(i),
-        parameters: vec![],
-        return_type: Some(r),
-        body: vec![],
-    },
-    "fn" <i:IDENTIFIER> "(" ")" "{" "}" => Declaration::FunctionDefinition {
-        name: IDENTIFIER::Identifier(i),
-        parameters: vec![],
-        return_type: None,
-        body: vec![],
-    },
+        parameters: a.unwrap_or(Vec::new()),
+        return_type: r,
+        body: s.unwrap_or(Vec::new())
+    }
     // TODO: External declarations
 };
 
-ArgumentDeclarationList: Vec<ArgumentDeclaration> = {
-    <left:ArgumentDeclarationList> "," <right:ArgumentDeclaration> => {
-        let mut new = left.clone();
-        new.push(right);
-        new
-    },
-    <ArgumentDeclaration> => vec![<>]
-};
+ArgumentDeclarationList = CommaSeparated<ArgumentDeclaration>;
 
 ArgumentDeclaration: ArgumentDeclaration = {
-    <i:IDENTIFIER> ":" <t:Type> => ArgumentDeclaration {
+    <i:IDENTIFIER> <t:(":" <Type>)?> => ArgumentDeclaration {
         name: IDENTIFIER::Identifier(i),
-        ty: Some(t),
-    },
-    <i:IDENTIFIER> => ArgumentDeclaration {
-        name: IDENTIFIER::Identifier(i),
-        ty: None,
-    },
+        ty: t
+    }
 };
 
 LetDeclaration: Declaration = {
     // TODO: Multiple declarations, like 'let a, b;'
-    "let" <i:IDENTIFIER> ":" <t:Type> "=" <v:Expr> ";" => Declaration::LetDeclaration {
+    "let" <i:IDENTIFIER> <t:(":" <Type>)?> <v:("=" <Expr>)?> ";" => Declaration::LetDeclaration {
         name: IDENTIFIER::Identifier(i),
-        ty: Some(t),
-        value: Some(v),
-    },
-    "let" <i:IDENTIFIER> "=" <v:Expr> ";" => Declaration::LetDeclaration {
-        name: IDENTIFIER::Identifier(i),
-        ty: None,
-        value: Some(v),
-    },
-    "let" <i:IDENTIFIER> ":" <t:Type> ";" => Declaration::LetDeclaration {
-        name: IDENTIFIER::Identifier(i),
-        ty: Some(t),
-        value: None,
-    },
-    "let" <i:IDENTIFIER> ";" => Declaration::LetDeclaration {
-        name: IDENTIFIER::Identifier(i),
-        ty: None,
-        value: None,
-    },
+        ty: t,
+        value: v,
+    }
 };
 
 Type: Type = {
@@ -162,14 +96,7 @@ FlowStmt: Stmt = {
     "return" ";" => Stmt::ReturnStmt(None),
 };
 
-StmtList: Vec<Stmt> = {
-    <left:StmtList> <right:Stmt> => {
-        let mut new = left.clone();
-        new.push(right);
-        new
-    },
-    <Stmt> => vec![<>]
-};
+StmtList: Vec<Stmt> = (<Stmt>)+;
 
 pub Expr: Expr = {
     <Comma> => Expr::from(<>)
@@ -210,19 +137,11 @@ Postfix: Postfix = {
     <l:Postfix> "::" <r:IDENTIFIER> => box_arguments!(Postfix::NamespaceAccess, l, IDENTIFIER::Identifier(r)),
     <Postfix> "++" => box_arguments!(Postfix::PostIncrement, <>),
     <Postfix> "--" => box_arguments!(Postfix::PostDecrement, <>),
-    <i:Postfix> "(" <l:ArgumentList> ")" => Postfix::Call(Box::new(i), l),
-    <Postfix> "(" ")" => Postfix::Call(Box::new(<>), vec![]),
+    <i:Postfix> "(" <l:ArgumentList?> ")" => Postfix::Call(Box::new(i), l.unwrap_or(Vec::new())),
     <Primary> => into_expr_type!(Postfix, <>)
 };
 
-ArgumentList: Vec<Assignment> = {
-    <left:ArgumentList> "," <right:Assignment> => {
-        let mut new = left.clone();
-        new.push(right);
-        new
-    },
-    <Assignment> => vec![<>]
-};
+ArgumentList: Vec<Assignment> = CommaSeparated<Assignment>;
 
 Ternary: Ternary = {
     <Logical> "?" <Expr> ":" <Ternary> => box_arguments!(Ternary::Ternary, <>),
