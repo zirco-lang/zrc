@@ -251,7 +251,11 @@ mod tests {
                                     Assignment::Identifier("b".to_string())
                                 ]
                             ))
-                        }
+                        },
+                        Stmt::ReturnStmt(Some(Expr::Addition(
+                            Box::new(Term::Identifier("c".to_string())),
+                            Box::new(Factor::Identifier("d".to_string()))
+                        )))
                     ]
                 }
             ])
