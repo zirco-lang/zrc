@@ -1,9 +1,31 @@
 use std::fmt::Display;
 use subenum::subenum;
 
-use super::expr;
 use super::expr::Expr;
+use super::expr::{self, Assignment};
 use super::ty::Type;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LetDeclaration {
+    pub name: expr::IDENTIFIER,
+    pub ty: Option<Type>,
+    pub value: Option<Assignment>,
+}
+
+impl Display for LetDeclaration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.ty {
+            None => match &self.value {
+                None => write!(f, "{}", self.name),
+                Some(v) => write!(f, "{} = {}", self.name, v),
+            },
+            Some(t) => match &self.value {
+                None => write!(f, "{}: {}", self.name, t),
+                Some(v) => write!(f, "{}: {} = {}", self.name, t, v),
+            },
+        }
+    }
+}
 
 #[subenum(Declaration)]
 #[derive(PartialEq, Debug, Clone)]
@@ -24,11 +46,7 @@ pub enum Stmt {
     BreakStmt,
     ReturnStmt(Option<Expr>),
     #[subenum(Declaration)]
-    LetDeclaration {
-        name: expr::IDENTIFIER,
-        ty: Option<Type>,
-        value: Option<Expr>,
-    },
+    DeclarationList(Vec<LetDeclaration>),
     #[subenum(Declaration)]
     FunctionDefinition {
         name: expr::IDENTIFIER,
@@ -65,26 +83,16 @@ impl Display for Stmt {
             Stmt::BreakStmt => write!(f, "break;"),
             Stmt::ReturnStmt(Some(e)) => write!(f, "return {e};",),
             Stmt::ReturnStmt(None) => write!(f, "return;"),
-            Stmt::LetDeclaration {
-                name,
-                ty: None,
-                value: None,
-            } => write!(f, "let {name};"),
-            Stmt::LetDeclaration {
-                name,
-                ty: None,
-                value: Some(v),
-            } => write!(f, "let {name} = {v};"),
-            Stmt::LetDeclaration {
-                name,
-                ty: Some(t),
-                value: None,
-            } => write!(f, "let {name}: {t};"),
-            Stmt::LetDeclaration {
-                name,
-                ty: Some(t),
-                value: Some(v),
-            } => write!(f, "let {name}: {t} = {v};"),
+            Stmt::DeclarationList(l) => {
+                write!(
+                    f,
+                    "let {};",
+                    l.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
             Stmt::FunctionDefinition {
                 name,
                 parameters,

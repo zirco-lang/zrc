@@ -14,6 +14,14 @@ CommaSeparated<T>: Vec<T> = {
     }
 };
 
+CommaSeparatedWithoutTrailing<T>: Vec<T> = {
+    <e:T> <mut v:("," <T>)*> => {
+        let mut new = vec![e];
+        new.append(&mut v);
+        new
+    }
+}
+
 pub Program: Vec<Declaration> = {
     <DeclarationList>,
 };
@@ -77,12 +85,13 @@ ArgumentDeclaration: ArgumentDeclaration = {
 };
 
 LetDeclaration: Declaration = {
-    // TODO: Multiple declarations, like 'let a, b;'
-    "let" <i:IDENTIFIER> <t:(":" <Type>)?> <v:("=" <Expr>)?> ";" => Declaration::LetDeclaration {
+    "let" <l:CommaSeparatedWithoutTrailing<
+        (IDENTIFIER (":" <Type>)? ("=" <Assignment>)?)
+    >> ";" => Declaration::DeclarationList(l.into_iter().map(|(i, t, v)| LetDeclaration {
         name: IDENTIFIER::Identifier(i),
         ty: t,
         value: v,
-    }
+    }).collect::<Vec<_>>()),
 };
 
 Type: Type = {
