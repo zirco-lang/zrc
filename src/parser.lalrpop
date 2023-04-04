@@ -1,14 +1,181 @@
-use crate::ast::*;
-use crate::{lexer, box_arguments, into_expr_type};
+// DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY front::parser INSTEAD
+use crate::front::ast::{expr::*, stmt::*, ty::*};
+use crate::front::lexer;
+use crate::{box_arguments, into_expr_type};
 use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
+
+pub Program: Vec<Declaration> = {
+    <DeclarationList>,
+};
+
+DeclarationList: Vec<Declaration> = {
+    <left:DeclarationList> <right:Declaration> => {
+        let mut new = left.clone();
+        new.push(right);
+        new
+    },
+    <Declaration> => vec![<>],
+};
+
+// See https://en.wikipedia.org/wiki/Dangling_else#Avoiding_the_conflict_in_LR_parsers for why this is necessary.
+// The ClosedStmt rule REQUIRES that an 'else' clause is used, meaning that it will attach to the inner 'if' statement.
+pub Stmt: Stmt = {
+    <OpenStmt>,
+    <ClosedStmt>
+}
+
+OpenStmt: Stmt = {
+    "if" "(" <e:Expr> ")" <s:Stmt> => Stmt::IfStmt(e, Box::new(s)),
+    "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:OpenStmt> => Stmt::IfElseStmt(a, Box::new(b), Box::new(c)),
+    "while" "(" <a:Expr> ")" <b:OpenStmt> => Stmt::WhileStmt(a, Box::new(b)),
+    "for" "(" <a:Declaration> ";" <b:Expr> ";" <c:Expr> ")" <d:OpenStmt> => Stmt::ForStmt { init: Box::new(a), cond: b, post: c, body: Box::new(d) },
+};
+
+ClosedStmt: Stmt = {
+    <SimpleStmt>,
+    "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:ClosedStmt> => Stmt::IfElseStmt(a, Box::new(b), Box::new(c)),
+    "while" "(" <a:Expr> ")" <b:ClosedStmt> => Stmt::WhileStmt(a, Box::new(b)),
+    "for" "(" <a:Declaration> ";" <b:Expr> ";" <c:Expr> ")" <d:ClosedStmt> => Stmt::ForStmt { init: Box::new(a), cond: b, post: c, body: Box::new(d) },
+};
+
+SimpleStmt: Stmt = {
+    <Expr> ";" => Stmt::ExprStmt(<>),
+    ";" => Stmt::EmptyStmt,
+    "{" <StmtList> "}" => Stmt::BlockStmt(<>),
+    "{" "}" => Stmt::BlockStmt(vec![]),
+    <FlowStmt>,
+    <Declaration> => Stmt::from(<>),
+};
+
+Declaration: Declaration = {
+    <LetDeclaration>,
+    // FIXME: This might allow code like for (fn foo() {};;) {} to work. Do we want this?
+    <FunctionDeclaration>,
+};
+
+FunctionDeclaration: Declaration = {
+    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "->" <r:Type> "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: a,
+        return_type: Some(r),
+        body: s,
+    },
+    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: a,
+        return_type: None,
+        body: s,
+    },
+    "fn" <i:IDENTIFIER> "(" ")" "->" <r:Type> "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: vec![],
+        return_type: Some(r),
+        body: s,
+    },
+    "fn" <i:IDENTIFIER> "(" ")" "{" <s:StmtList> "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: vec![],
+        return_type: None,
+        body: s,
+    },
+    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "->" <r:Type> "{" "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: a,
+        return_type: Some(r),
+        body: vec![],
+    },
+    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList> ")" "{" "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: a,
+        return_type: None,
+        body: vec![],
+    },
+    "fn" <i:IDENTIFIER> "(" ")" "->" <r:Type> "{" "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: vec![],
+        return_type: Some(r),
+        body: vec![],
+    },
+    "fn" <i:IDENTIFIER> "(" ")" "{" "}" => Declaration::FunctionDefinition {
+        name: IDENTIFIER::Identifier(i),
+        parameters: vec![],
+        return_type: None,
+        body: vec![],
+    },
+    // TODO: External declarations
+};
+
+ArgumentDeclarationList: Vec<ArgumentDeclaration> = {
+    <left:ArgumentDeclarationList> "," <right:ArgumentDeclaration> => {
+        let mut new = left.clone();
+        new.push(right);
+        new
+    },
+    <ArgumentDeclaration> => vec![<>]
+};
+
+ArgumentDeclaration: ArgumentDeclaration = {
+    <i:IDENTIFIER> ":" <t:Type> => ArgumentDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: Some(t),
+    },
+    <i:IDENTIFIER> => ArgumentDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: None,
+    },
+};
+
+LetDeclaration: Declaration = {
+    // TODO: Multiple declarations, like 'let a, b;'
+    "let" <i:IDENTIFIER> ":" <t:Type> "=" <v:Expr> ";" => Declaration::LetDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: Some(t),
+        value: Some(v),
+    },
+    "let" <i:IDENTIFIER> "=" <v:Expr> ";" => Declaration::LetDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: None,
+        value: Some(v),
+    },
+    "let" <i:IDENTIFIER> ":" <t:Type> ";" => Declaration::LetDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: Some(t),
+        value: None,
+    },
+    "let" <i:IDENTIFIER> ";" => Declaration::LetDeclaration {
+        name: IDENTIFIER::Identifier(i),
+        ty: None,
+        value: None,
+    },
+};
+
+Type: Type = {
+    <IDENTIFIER> => Type::Identifier(IDENTIFIER::Identifier(<>)),
+}
+
+FlowStmt: Stmt = {
+    "continue" ";" => Stmt::ContinueStmt,
+    "break" ";" => Stmt::BreakStmt,
+    "return" <Expr> ";" => Stmt::ReturnStmt(Some(<>)),
+    "return" ";" => Stmt::ReturnStmt(None),
+};
+
+StmtList: Vec<Stmt> = {
+    <left:StmtList> <right:Stmt> => {
+        let mut new = left.clone();
+        new.push(right);
+        new
+    },
+    <Stmt> => vec![<>]
+};
 
 pub Expr: Expr = {
     <Comma> => Expr::from(<>)
 };
 
-pub Comma: Comma = {
+Comma: Comma = {
     <Comma> "," <Assignment> => box_arguments!(Comma::Comma, <>),
     <Assignment> => into_expr_type!(Comma, <>)
 }
@@ -181,5 +348,15 @@ extern {
 
         "true" => lexer::Tok::True,
         "false" => lexer::Tok::False,
+        "if" => lexer::Tok::If,
+        "else" => lexer::Tok::Else,
+        "while" => lexer::Tok::While,
+        "for" => lexer::Tok::For,
+        "break" => lexer::Tok::Break,
+        "continue" => lexer::Tok::Continue,
+        "return" => lexer::Tok::Return,
+        "let" => lexer::Tok::Let,
+        "fn" => lexer::Tok::Fn,
+        "->" => lexer::Tok::SmallArrow,
     }
 }
