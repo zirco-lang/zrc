@@ -86,7 +86,7 @@ ArgumentDeclaration: ArgumentDeclaration = {
 
 LetDeclaration: Declaration = {
     "let" <l:CommaSeparatedWithoutTrailing<
-        (IDENTIFIER (":" <Type>)? ("=" <Assignment>)?)
+        (<IDENTIFIER> <(":" <Type>)?> <("=" <Assignment>)?>)
     >> ";" => Declaration::DeclarationList(l.into_iter().map(|(i, t, v)| LetDeclaration {
         name: IDENTIFIER::Identifier(i),
         ty: t,
