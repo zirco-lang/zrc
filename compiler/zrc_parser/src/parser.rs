@@ -2,7 +2,7 @@ use super::{
     ast::{expr::*, stmt::*},
     lexer,
 };
-use crate::parser;
+use crate::internal_parser;
 use lalrpop_util::{ErrorRecovery, ParseError};
 
 #[derive(Debug, PartialEq)]
@@ -31,17 +31,17 @@ macro_rules! parse_internal {
 
 /// Parse a program with the Zirco parser.
 pub fn parse_program(input: &str) -> Result<Vec<Declaration>, ZircoParserError<Vec<Declaration>>> {
-    parse_internal!(parser::ProgramParser, input)
+    parse_internal!(internal_parser::ProgramParser, input)
 }
 
 /// Parse a string as an expression with the Zirco parser.
 pub fn parse_expr(input: &str) -> Result<Expr, ZircoParserError<Expr>> {
-    parse_internal!(parser::ExprParser, input)
+    parse_internal!(internal_parser::ExprParser, input)
 }
 
 /// Parse a string as a statement with the Zirco parser.
 pub fn parse_stmt(input: &str) -> Result<Stmt, ZircoParserError<Stmt>> {
-    parse_internal!(parser::StmtParser, input)
+    parse_internal!(internal_parser::StmtParser, input)
 }
 
 #[cfg(test)]

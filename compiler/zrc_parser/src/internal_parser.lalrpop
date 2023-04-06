@@ -1,7 +1,7 @@
-// DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY front::parser INSTEAD
-use crate::front::ast::{expr::*, stmt::*, ty::*};
-use crate::front::lexer;
-use crate::{box_arguments, into_expr_type};
+// DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY MODULE parser INSTEAD
+use super::ast::{expr::*, stmt::*, ty::*};
+use super::lexer;
+use super::{box_arguments, into_expr_type};
 use lalrpop_util::ErrorRecovery;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);

@@ -1,0 +1,15 @@
+[package]
+name = "zrc_parser"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lalrpop-util = { version = "0.19.9" }
+logos = { git = "https://github.com/maciejhirsz/logos", version = "0.12.1" }
+regex = "1.7.3"
+subenum = "1.0.1"
+
+[build-dependencies]
+lalrpop = "0.19.9"
