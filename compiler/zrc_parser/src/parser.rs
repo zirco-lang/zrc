@@ -1,6 +1,6 @@
 use super::{
-    ast::{expr::*, stmt::*},
     lexer,
+    parse_tree::{expr::*, stmt::*},
 };
 use crate::internal_parser;
 use lalrpop_util::{ErrorRecovery, ParseError};
@@ -46,7 +46,7 @@ pub fn parse_stmt(input: &str) -> Result<Stmt, ZircoParserError<Stmt>> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::ast::ty::Type;
+    use super::super::parse_tree::ty::Type;
     use super::*;
     use crate::box_arguments;
 

@@ -1,5 +1,5 @@
 // DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY MODULE parser INSTEAD
-use super::ast::{expr::*, stmt::*, ty::*};
+use super::parse_tree::{expr::*, stmt::*, ty::*};
 use super::lexer;
 use super::{box_arguments, into_expr_type};
 use lalrpop_util::ErrorRecovery;

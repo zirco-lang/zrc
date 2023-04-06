@@ -13,6 +13,6 @@ macro_rules! box_arguments {
     ($f:expr,$($a:expr),+) => ( $f($(Box::new($a)),+) );
 }
 
-pub mod ast;
 pub mod lexer;
+pub mod parse_tree;
 pub mod parser;
