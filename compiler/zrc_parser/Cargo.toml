@@ -12,4 +12,4 @@ regex = "1.8.1"
 subenum = "1.0.1"
 
 [build-dependencies]
-lalrpop = "0.19.10"
+lalrpop = "0.20.0"
