@@ -80,7 +80,7 @@ mod tests {
                 )
             );
             assert_eq!(errors.len(), 1);
-            if let ParseError::UnrecognizedEOF { location, .. } = &errors[0].error {
+            if let ParseError::UnrecognizedEof { location, .. } = &errors[0].error {
                 assert_eq!(location, &2);
             } else {
                 panic!("Unexpected error type");
