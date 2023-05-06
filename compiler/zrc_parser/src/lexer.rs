@@ -6,6 +6,7 @@ pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
 pub enum LexicalError {
     #[default]
     NoMatchingRule,
+    // TODO: Better rename IDK to something a little more descriptive
     IDK((usize, char), String),
     UnterminatedStringLiteral(usize),
 }
@@ -15,7 +16,12 @@ fn string_slice(lex: &mut Lexer<'_, Tok>) -> String {
 }
 
 #[derive(Logos, Debug, Clone, PartialEq)]
-#[logos(error = LexicalError)]
+#[logos(
+    error = LexicalError,
+    skip r"[ \t\r\n\f]+",         // whitespace
+    skip r"//[^\r\n]*(\r\n|\n)?", // single-line comments
+    skip r"/\*([^*]|\*[^/])+\*/"  // multi-line comments (no nesting) TODO: support nesting
+)]
 pub enum Tok {
     // === ARITHMETIC OPERATORS ===
     /// The token `+`
@@ -88,7 +94,9 @@ pub enum Tok {
     #[token("<<")]
     BitwiseLeftShift,
     // FIXME: The lexer could treat Foo<Bar>> as Foo < Bar >>, not Foo < Bar > >.
-    //        This is the classic Java generics problem.
+    //        This is the classic Java generics problem. This might be a Logos
+    //        limitation and might require a custom state-machine lexer integrated
+    //        into the parser -- we'll see when we get to generics.
     /// The token `>>`
     #[token(">>")]
     BitwiseRightShift,
@@ -222,29 +230,15 @@ pub enum Tok {
     /// Any identifier
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", string_slice)]
     Identifier(String),
-
-    /// Whitespace
-    #[regex(r"[ \t\r\n\f]+", logos::skip)]
-    // C-style single-line comments
-    #[regex(r"//[^\r\n]*(\r\n|\n)?", logos::skip)]
-    // C-style multi-line comments
-    // TODO: I'm unable to figure out how to implement nested comments:
-    // Real behavior:    /* /* abc */ */
-    //                   ------------ ^^
-    //                   comment      normal tokens
-    // Desired behavior: /* /* abc */ */
-    //                   -- ^^^^^^^^^ --
-    //                   |  \nested-/  |
-    //                   \- outer -----/
-    #[regex(r"/\*([^*]|\*[^/])+\*/", logos::skip)]
-    Ignored,
 }
 
+/// A lexer for the Zirco programming language
 pub struct ZircoLexer<'input> {
     lex: Lexer<'input, Tok>,
 }
 
 impl<'input> ZircoLexer<'input> {
+    /// Create a new [ZircoLexer] given an input string
     pub fn new(input: &'input str) -> Self {
         ZircoLexer {
             lex: Tok::lexer(input),
