@@ -225,6 +225,18 @@ pub enum Tok {
 
     /// Whitespace
     #[regex(r"[ \t\r\n\f]+", logos::skip)]
+    // C-style single-line comments
+    #[regex(r"//[^\r\n]*(\r\n|\n)?", logos::skip)]
+    // C-style multi-line comments
+    // TODO: I'm unable to figure out how to implement nested comments:
+    // Real behavior:    /* /* abc */ */
+    //                   ------------ ^^
+    //                   comment      normal tokens
+    // Desired behavior: /* /* abc */ */
+    //                   -- ^^^^^^^^^ --
+    //                   |  \nested-/  |
+    //                   \- outer -----/
+    #[regex(r"/\*([^*]|\*[^/])+\*/", logos::skip)]
     Ignored,
 }
 
@@ -292,4 +304,64 @@ mod tests {
             vec![Err(LexicalError::UnterminatedStringLiteral(0))]
         );
     }
+
+    /// Simple line comments
+    #[test]
+    fn comments_1() {
+        let lexer = ZircoLexer::new(concat!(
+            "a\n",
+            "//abc\n",
+            "b\n",
+            "// def\n",
+            "c // ghi\n",
+            "// jkl",
+        ));
+        let tokens: Vec<_> = lexer.collect();
+        assert_eq!(
+            tokens,
+            vec![
+                Ok((0, Tok::Identifier("a".to_string()), 1)),
+                Ok((8, Tok::Identifier("b".to_string()), 9)),
+                Ok((17, Tok::Identifier("c".to_string()), 18)),
+            ]
+        );
+    }
+
+    /// Multiline comments
+    #[test]
+    fn comments_2() {
+        let lexer = ZircoLexer::new(concat!("a\n", "/* abc */ b\n", "c /* def */ d",));
+        let tokens: Vec<_> = lexer.collect();
+        assert_eq!(
+            tokens,
+            vec![
+                Ok((0, Tok::Identifier("a".to_string()), 1)),
+                Ok((12, Tok::Identifier("b".to_string()), 13)),
+                Ok((14, Tok::Identifier("c".to_string()), 15)),
+                Ok((26, Tok::Identifier("d".to_string()), 27))
+            ]
+        );
+    }
+
+    /// Nested comments
+    /// This test is to test for a regression reguarding the current behavior
+    /// of nested comments. Currently, comment nesting is not supported -- in the future,
+    /// we'd like this to be a feature.
+    #[test]
+    fn comments_3() {
+        let lexer = ZircoLexer::new("a/* /* */b"); // should lex OK
+        let tokens: Vec<_> = lexer.collect();
+        assert_eq!(
+            tokens,
+            vec![
+                Ok((0, Tok::Identifier("a".to_string()), 1)),
+                Ok((9, Tok::Identifier("b".to_string()), 10))
+            ]
+        );
+        // Future expected case:
+        // a/* /*  */ *b/ with this failing
+    }
+
+    // TODO: What does the error look like for an unclosed comment? It might be
+    // an ugly IDK() error and I don't like that.
 }
