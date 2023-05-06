@@ -26,6 +26,8 @@ jobs:
                   components: rustfmt, clippy
             - name: Install Rust problem matchers
               uses: r7kamura/rust-problem-matchers@v1
+            - name: Use dependency cache
+              uses: Swatinem/rust-cache@v2
             - name: cargo test
               uses: actions-rs/cargo@v1
               with:
