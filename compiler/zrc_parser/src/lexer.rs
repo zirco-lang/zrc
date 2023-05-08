@@ -39,7 +39,7 @@ fn handle_block_comment_start(lex: &mut Lexer<'_, Tok>) -> logos::FilterResult<(
             ('/', Some(&'*')) => {
                 chars.next();
                 lex.bump(1);
-                depth += 1
+                depth += 1;
             }
             // And the inverse for */...
             ('*', Some(&'/')) => {
