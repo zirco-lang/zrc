@@ -359,69 +359,74 @@ mod tests {
         );
     }
 
-    /// Simple line comments
-    #[test]
-    fn comments_1() {
-        let lexer = ZircoLexer::new(concat!(
-            "a\n",
-            "//abc\n",
-            "b\n",
-            "// def\n",
-            "c // ghi\n",
-            "// jkl",
-        ));
-        let tokens: Vec<_> = lexer.collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Ok((0, Tok::Identifier("a".to_string()), 1)),
-                Ok((8, Tok::Identifier("b".to_string()), 9)),
-                Ok((17, Tok::Identifier("c".to_string()), 18)),
-            ]
-        );
-    }
+    /// Comment support
+    mod comments {
+        use super::*;
 
-    /// Multiline comments
-    #[test]
-    fn comments_2() {
-        let lexer = ZircoLexer::new(concat!("a\n", "/* abc */ b\n", "c /* def */ d",));
-        let tokens: Vec<_> = lexer.collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Ok((0, Tok::Identifier("a".to_string()), 1)),
-                Ok((12, Tok::Identifier("b".to_string()), 13)),
-                Ok((14, Tok::Identifier("c".to_string()), 15)),
-                Ok((26, Tok::Identifier("d".to_string()), 27))
-            ]
-        );
-    }
+        /// Simple single-line comments should work as expected
+        #[test]
+        fn single_line_comments_are_skipped() {
+            let lexer = ZircoLexer::new(concat!(
+                "a\n",
+                "//abc\n",
+                "b\n",
+                "// def\n",
+                "c // ghi\n",
+                "// jkl",
+            ));
+            let tokens: Vec<_> = lexer.collect();
+            assert_eq!(
+                tokens,
+                vec![
+                    Ok((0, Tok::Identifier("a".to_string()), 1)),
+                    Ok((8, Tok::Identifier("b".to_string()), 9)),
+                    Ok((17, Tok::Identifier("c".to_string()), 18)),
+                ]
+            );
+        }
 
-    /// Nested comments
-    #[test]
-    fn comments_3() {
-        let lexer = ZircoLexer::new("a/* /* */ */b"); // should lex OK
-        let tokens: Vec<_> = lexer.collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Ok((0, Tok::Identifier("a".to_string()), 1)),
-                Ok((12, Tok::Identifier("b".to_string()), 13))
-            ]
-        );
-    }
+        /// Non-nested multi-line comments work as expected
+        #[test]
+        fn multiline_comments_are_skipped() {
+            let lexer = ZircoLexer::new("a\nb/* abc */c/*\naaa\n*/d");
+            let tokens: Vec<_> = lexer.collect();
+            assert_eq!(
+                tokens,
+                vec![
+                    Ok((0, Tok::Identifier("a".to_string()), 1)),
+                    Ok((2, Tok::Identifier("b".to_string()), 3)),
+                    Ok((12, Tok::Identifier("c".to_string()), 13)),
+                    Ok((22, Tok::Identifier("d".to_string()), 23))
+                ]
+            );
+        }
 
-    /// Unclosed nested comment
-    #[test]
-    fn comments_4() {
-        let lexer = ZircoLexer::new("a /* /*");
-        let tokens: Vec<_> = lexer.collect();
-        assert_eq!(
-            tokens,
-            vec![
-                Ok((0, Tok::Identifier("a".to_string()), 1)),
-                Err(LexicalError::UnterminatedBlockComment)
-            ]
-        )
+        /// Nested multi-line comments work as expected
+        #[test]
+        fn nested_multiline_comments_are_skipped() {
+            let lexer = ZircoLexer::new("a/* /* */ */b"); // should lex OK
+            let tokens: Vec<_> = lexer.collect();
+            assert_eq!(
+                tokens,
+                vec![
+                    Ok((0, Tok::Identifier("a".to_string()), 1)),
+                    Ok((12, Tok::Identifier("b".to_string()), 13))
+                ]
+            );
+        }
+
+        /// Unclosed nested comments produce the correct error
+        #[test]
+        fn unclosed_multiline_comments_fail() {
+            let lexer = ZircoLexer::new("a /* /*");
+            let tokens: Vec<_> = lexer.collect();
+            assert_eq!(
+                tokens,
+                vec![
+                    Ok((0, Tok::Identifier("a".to_string()), 1)),
+                    Err(LexicalError::UnterminatedBlockComment)
+                ]
+            )
+        }
     }
 }
