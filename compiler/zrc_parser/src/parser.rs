@@ -129,14 +129,14 @@ mod tests {
                 parameters: vec![
                     ArgumentDeclaration {
                         name: ("a".to_string()),
-                        ty: Some(Type::Identifier(("i32".to_string())))
+                        ty: Some(Type::Identifier("i32".to_string()))
                     },
                     ArgumentDeclaration {
                         name: ("b".to_string()),
-                        ty: Some(Type::Identifier(("i32".to_string())))
+                        ty: Some(Type::Identifier("i32".to_string()))
                     }
                 ],
-                return_type: Some(Type::Identifier(("i32".to_string()))),
+                return_type: Some(Type::Identifier("i32".to_string())),
                 body: vec![Stmt::ReturnStmt(Some(Expr::Addition(
                     Box::new(Expr::Identifier("a".to_string())),
                     Box::new(Expr::Identifier("b".to_string()))
@@ -170,14 +170,14 @@ mod tests {
                     parameters: vec![
                         ArgumentDeclaration {
                             name: ("a".to_string()),
-                            ty: Some(Type::Identifier(("i32".to_string())))
+                            ty: Some(Type::Identifier("i32".to_string()))
                         },
                         ArgumentDeclaration {
                             name: ("b".to_string()),
-                            ty: Some(Type::Identifier(("i32".to_string())))
+                            ty: Some(Type::Identifier("i32".to_string()))
                         }
                     ],
-                    return_type: Some(Type::Identifier(("i32".to_string()))),
+                    return_type: Some(Type::Identifier("i32".to_string())),
                     body: vec![Stmt::ReturnStmt(Some(Expr::Addition(
                         Box::new(Expr::Identifier("a".to_string())),
                         Box::new(Expr::Identifier("b".to_string()))
@@ -188,14 +188,14 @@ mod tests {
                     parameters: vec![
                         ArgumentDeclaration {
                             name: ("a".to_string()),
-                            ty: Some(Type::Identifier(("i32".to_string())))
+                            ty: Some(Type::Identifier("i32".to_string()))
                         },
                         ArgumentDeclaration {
                             name: ("b".to_string()),
-                            ty: Some(Type::Identifier(("i32".to_string())))
+                            ty: Some(Type::Identifier("i32".to_string()))
                         }
                     ],
-                    return_type: Some(Type::Identifier(("i32".to_string()))),
+                    return_type: Some(Type::Identifier("i32".to_string())),
                     body: vec![Stmt::ReturnStmt(Some(Expr::Subtraction(
                         Box::new(Expr::Identifier("a".to_string())),
                         Box::new(Expr::Identifier("b".to_string()))
@@ -214,7 +214,7 @@ mod tests {
                             },
                             LetDeclaration {
                                 name: ("b".to_string()),
-                                ty: Some(Type::Identifier(("i32".to_string()))),
+                                ty: Some(Type::Identifier("i32".to_string())),
                                 value: Some(Expr::NumberLiteral("2".to_string()).into())
                             },
                         ])),
