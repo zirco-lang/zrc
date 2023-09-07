@@ -22,13 +22,9 @@ CommaSeparatedWithoutTrailing<T>: Vec<T> = {
     }
 }
 
-pub Program: Vec<Declaration> = {
-    <DeclarationList>,
-};
+pub Program: Vec<Declaration> = DeclarationList;
 
-DeclarationList: Vec<Declaration> = {
-    (<Declaration>)*,
-};
+DeclarationList: Vec<Declaration> = Declaration*;
 
 // See https://en.wikipedia.org/wiki/Dangling_else#Avoiding_the_conflict_in_LR_parsers for why this
 // is necessary. The ClosedStmt rule REQUIRES that an 'else' clause is used, meaning that it will
@@ -94,7 +90,7 @@ ArgumentDeclarationList = CommaSeparated<ArgumentDeclaration>;
 
 ArgumentDeclaration: ArgumentDeclaration = {
     <i:IDENTIFIER> <t:(":" <Type>)?> => ArgumentDeclaration {
-        name: (i),
+        name: i,
         ty: t
     }
 };
@@ -119,7 +115,7 @@ FlowStmt: Stmt = {
     "return" <e:Expr?> ";" => Stmt::ReturnStmt(e),
 };
 
-StmtList: Vec<Stmt> = (<Stmt>)+;
+StmtList: Vec<Stmt> = Stmt+;
 
 pub Expr: Expr = Comma;
 
@@ -148,22 +144,33 @@ Ternary: Expr = {
     <Logical>
 };
 
-Logical: Expr = {
-    <Logical> "&&" <Equality> => box_arguments!(Expr::LogicalAnd, <>),
-    <Logical> "||" <Equality> => box_arguments!(Expr::LogicalOr, <>),
-    <Equality>
+Logical: Expr = LogicalOr;
+LogicalOr: Expr = {
+    <LogicalOr> "||" <LogicalAnd> => box_arguments!(Expr::LogicalOr, <>),
+    <LogicalAnd>,
 };
-
-Equality: Expr = {
-    <Equality> "==" <Bitwise> => box_arguments!(Expr::Equals, <>),
-    <Equality> "!=" <Bitwise> => box_arguments!(Expr::NotEquals, <>),
+LogicalAnd: Expr = {
+    <LogicalAnd> "&&" <Equality> => box_arguments!(Expr::LogicalAnd, <>),
     <Bitwise>
 };
 
-Bitwise: Expr = {
-    <Bitwise> "&" <Comparison> => box_arguments!(Expr::BitwiseAnd, <>),
-    <Bitwise> "|" <Comparison> => box_arguments!(Expr::BitwiseOr, <>),
-    <Bitwise> "^" <Comparison> => box_arguments!(Expr::BitwiseXor, <>),
+Bitwise: Expr = BitwiseOr;
+BitwiseOr: Expr = {
+    <BitwiseOr> "|" <BitwiseXor> => box_arguments!(Expr::BitwiseOr, <>),
+    <BitwiseXor>
+};
+BitwiseXor: Expr = {
+    <BitwiseXor> "^" <BitwiseAnd> => box_arguments!(Expr::BitwiseXor, <>),
+    <BitwiseAnd>,
+};
+BitwiseAnd: Expr = {
+    <BitwiseAnd> "&" <Equality> => box_arguments!(Expr::BitwiseAnd, <>),
+    <Equality>,
+}
+
+Equality: Expr = {
+    <Equality> "==" <Comparison> => box_arguments!(Expr::Equals, <>),
+    <Equality> "!=" <Comparison> => box_arguments!(Expr::NotEquals, <>),
     <Comparison>
 };
 
@@ -198,12 +205,15 @@ Unary: Expr = {
     "!" <Unary> => box_arguments!(Expr::UnaryNot, <>),
     "-" <Unary> => box_arguments!(Expr::UnaryMinus, <>),
     "~" <Unary> => box_arguments!(Expr::UnaryBitwiseNot, <>),
+    "&" <Unary> => box_arguments!(Expr::UnaryAddressOf, <>),
+    "*" <Unary> => box_arguments!(Expr::UnaryDereference, <>),
     <Postfix>
 };
 
 Postfix: Expr = {
     <Postfix> "[" <Expr> "]" => box_arguments!(Expr::Index, <>),
     <l:Postfix> "." <r:IDENTIFIER> => Expr::Dot(Box::new(l), r),
+    <l:Postfix> "->" <r:IDENTIFIER> => Expr::Arrow(Box::new(l), r),
     <i:Postfix> "(" <l:ArgumentList?> ")" => Expr::Call(Box::new(i), l.unwrap_or(Vec::new())),
     <Primary>
 };

@@ -19,9 +19,12 @@ pub enum Expr {
     UnaryNot(Box<Expr>),
     UnaryBitwiseNot(Box<Expr>),
     UnaryMinus(Box<Expr>),
+    UnaryAddressOf(Box<Expr>),
+    UnaryDereference(Box<Expr>),
 
     Index(Box<Expr>, Box<Expr>),
     Dot(Box<Expr>, String),
+    Arrow(Box<Expr>, String),
     Call(Box<Expr>, Vec<Expr>),
 
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -101,6 +104,9 @@ impl Display for Expr {
             Expr::UnaryNot(e) => write!(f, "!{}", e),
             Expr::UnaryBitwiseNot(e) => write!(f, "~{}", e),
             Expr::UnaryMinus(e) => write!(f, "-{}", e),
+            Expr::UnaryAddressOf(e) => write!(f, "&{}", e),
+            Expr::UnaryDereference(e) => write!(f, "*{}", e),
+            Expr::Arrow(l, r) => write!(f, "{}->{}", l, r),
             Expr::Ternary(l, m, r) => write!(f, "{} ? {} : {}", l, m, r),
             Expr::Index(a, b) => write!(f, "{}[{}]", a, b),
             Expr::Dot(a, b) => write!(f, "{}.{}", a, b),
