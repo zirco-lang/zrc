@@ -51,7 +51,7 @@ mod tests {
     use crate::box_arguments;
 
     #[test]
-    fn test_parser() {
+    fn basic_expr_works_as_expected() {
         assert_eq!(
             parse_expr("1 + 2 * 3"),
             Ok(box_arguments!(
@@ -67,7 +67,7 @@ mod tests {
     }
 
     #[test]
-    fn test_error() {
+    fn unexpected_eof_errors() {
         let result = parse_expr("1+").unwrap_err();
 
         if let ZircoParserError::Recoverable { errors, partial } = result {
@@ -92,7 +92,7 @@ mod tests {
     }
 
     #[test]
-    fn namespace_test() {
+    fn namespace_access_works_as_expected() {
         assert_eq!(
             parse_expr("io::println(\"hi\")"),
             Ok(Expr::Call(
@@ -107,7 +107,7 @@ mod tests {
     }
 
     #[test]
-    fn ambiguous_test() {
+    fn dangling_else_binds_correctly() {
         assert_eq!(
             parse_stmt("if (a) if (b) c; else d;"),
             Ok(Stmt::IfStmt(
@@ -122,7 +122,7 @@ mod tests {
     }
 
     #[test]
-    fn let_test() {
+    fn simple_declaration_parses() {
         assert_eq!(
             parse_stmt("let a = 1;"),
             Ok(Stmt::DeclarationList(vec![LetDeclaration {
@@ -134,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    fn fn_test() {
+    fn small_function_declaration_parses() {
         assert_eq!(
             parse_stmt("fn add(a: i32, b: i32) -> i32 { return a + b; }"),
             Ok(Stmt::FunctionDefinition {
@@ -159,7 +159,7 @@ mod tests {
     }
 
     #[test]
-    fn large_test() {
+    fn larger_program_parses() {
         assert_eq!(
             parse_program(concat!(
                 "fn add(a: i32, b: i32) -> i32 {\n",
