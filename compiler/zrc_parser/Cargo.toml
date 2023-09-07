@@ -9,7 +9,6 @@ edition = "2021"
 lalrpop-util = { version = "0.20.0" }
 logos = "0.13.0"
 regex = "1.9.5"
-subenum = "1.0.1"
 
 [build-dependencies]
 lalrpop = "0.20.0"

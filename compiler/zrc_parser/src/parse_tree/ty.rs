@@ -1,9 +1,8 @@
-use super::expr;
 use std::fmt::Display;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Type {
-    Identifier(expr::IDENTIFIER),
+    Identifier(String),
 }
 
 impl Display for Type {

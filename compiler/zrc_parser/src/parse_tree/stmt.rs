@@ -1,15 +1,13 @@
 use std::fmt::Display;
-use subenum::subenum;
 
 use super::expr::Expr;
-use super::expr::{self, Assignment};
 use super::ty::Type;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LetDeclaration {
-    pub name: expr::IDENTIFIER,
+    pub name: String,
     pub ty: Option<Type>,
-    pub value: Option<Assignment>,
+    pub value: Option<Expr>,
 }
 
 impl Display for LetDeclaration {
@@ -27,7 +25,7 @@ impl Display for LetDeclaration {
     }
 }
 
-#[subenum(Declaration)]
+// FIXME: There should be a separate enum for declarations present at the top-level of a file
 #[derive(PartialEq, Debug, Clone)]
 pub enum Stmt {
     IfStmt(Expr, Box<Stmt>),
@@ -45,15 +43,72 @@ pub enum Stmt {
     ContinueStmt,
     BreakStmt,
     ReturnStmt(Option<Expr>),
-    #[subenum(Declaration)]
+    Declaration(Declaration),
+}
+
+/// Any declaration valid to be present at the top level of a file
+#[derive(PartialEq, Debug, Clone)]
+pub enum Declaration {
     DeclarationList(Vec<LetDeclaration>),
-    #[subenum(Declaration)]
     FunctionDefinition {
-        name: expr::IDENTIFIER,
+        name: String,
         parameters: Vec<ArgumentDeclaration>,
         return_type: Option<Type>,
         body: Vec<Stmt>,
     },
+}
+
+impl Display for Declaration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Declaration::DeclarationList(l) => {
+                write!(
+                    f,
+                    "let {};",
+                    l.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            Declaration::FunctionDefinition {
+                name,
+                parameters,
+                return_type: Some(r),
+                body,
+            } => write!(
+                f,
+                "fn {name}({}) -> {r} {}",
+                parameters
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                body.iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            ),
+            Declaration::FunctionDefinition {
+                name,
+                parameters,
+                return_type: None,
+                body,
+            } => write!(
+                f,
+                "fn {name}({}) {}",
+                parameters
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", "),
+                body.iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            ),
+        }
+    }
 }
 
 impl Display for Stmt {
@@ -83,71 +138,14 @@ impl Display for Stmt {
             Stmt::BreakStmt => write!(f, "break;"),
             Stmt::ReturnStmt(Some(e)) => write!(f, "return {e};",),
             Stmt::ReturnStmt(None) => write!(f, "return;"),
-            Stmt::DeclarationList(l) => {
-                write!(
-                    f,
-                    "let {};",
-                    l.iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            }
-            Stmt::FunctionDefinition {
-                name,
-                parameters,
-                return_type: Some(r),
-                body,
-            } => write!(
-                f,
-                "fn {name}({}) -> {r} {}",
-                parameters
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", "),
-                body.iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(" ")
-            ),
-            Stmt::FunctionDefinition {
-                name,
-                parameters,
-                return_type: None,
-                body,
-            } => write!(
-                f,
-                "fn {name}({}) {}",
-                parameters
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", "),
-                body.iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(" ")
-            ),
+            Stmt::Declaration(d) => write!(f, "{}", d),
         }
     }
 }
 
-macro_rules! impl_display_for_stmt_subenum {
-    ($n:ident) => {
-        impl Display for $n {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}", Stmt::from(self.clone()))
-            }
-        }
-    };
-}
-
-impl_display_for_stmt_subenum!(Declaration);
-
 #[derive(PartialEq, Debug, Clone)]
 pub struct ArgumentDeclaration {
-    pub name: expr::IDENTIFIER,
+    pub name: String,
     pub ty: Option<Type>,
 }
 
