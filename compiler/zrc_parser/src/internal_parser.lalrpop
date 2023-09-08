@@ -1,5 +1,5 @@
 // DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY MODULE parser INSTEAD
-use super::parse_tree::{expr::Expr, stmt::{Stmt, ArgumentDeclaration, LetDeclaration, Declaration}, ty::Type};
+use super::ast::{expr::Expr, stmt::{Stmt, ArgumentDeclaration, LetDeclaration, Declaration}, ty::Type};
 use super::lexer;
 use super::box_arguments;
 use lalrpop_util::ErrorRecovery;
