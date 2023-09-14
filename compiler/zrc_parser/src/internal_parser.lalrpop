@@ -3,6 +3,7 @@ use super::ast::{expr::Expr, stmt::{Stmt, ArgumentDeclaration, LetDeclaration, D
 use super::lexer;
 use super::box_arguments;
 use lalrpop_util::ErrorRecovery;
+use std::collections::HashMap;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
 
@@ -89,7 +90,7 @@ FunctionDeclaration: Declaration = {
 ArgumentDeclarationList = CommaSeparated<ArgumentDeclaration>;
 
 ArgumentDeclaration: ArgumentDeclaration = {
-    <i:IDENTIFIER> <t:(":" <Type>)?> => ArgumentDeclaration {
+    <i:IDENTIFIER> ":" <t:Type> => ArgumentDeclaration {
         name: i,
         ty: t
     }
@@ -107,6 +108,9 @@ LetDeclaration: Declaration = {
 
 Type: Type = {
     <IDENTIFIER> => Type::Identifier(<>),
+    "*" <Type> => Type::Ptr(Box::new(<>)),
+    "struct" "{" <l:CommaSeparated<
+        (<IDENTIFIER> ":" <Type>)>?> "}" => Type::Struct(l.unwrap_or(Vec::new()).into_iter().collect::<HashMap<_, _>>()),
 }
 
 FlowStmt: Stmt = {
@@ -195,11 +199,16 @@ Term: Expr = {
 };
 
 Factor: Expr = {
-    <Factor> "/" <Unary> => box_arguments!(Expr::Division, <>),
-    <Factor> "*" <Unary> => box_arguments!(Expr::Multiplication, <>),
-    <Factor> "%" <Unary> => box_arguments!(Expr::Modulo, <>),
-    <Unary>
+    <Factor> "/" <Cast> => box_arguments!(Expr::Division, <>),
+    <Factor> "*" <Cast> => box_arguments!(Expr::Multiplication, <>),
+    <Factor> "%" <Cast> => box_arguments!(Expr::Modulo, <>),
+    <Cast>
 };
+
+Cast: Expr = {
+    <e:Unary> "as" <t:Type> => Expr::Cast(Box::new(e), t),
+    <Unary>,
+}
 
 Unary: Expr = {
     "!" <Unary> => box_arguments!(Expr::UnaryNot, <>),
@@ -240,8 +249,6 @@ extern {
         "*" => lexer::Tok::Star,
         "/" => lexer::Tok::Slash,
         "%" => lexer::Tok::Percent,
-        "++" => lexer::Tok::PlusPlus,
-        "--" => lexer::Tok::MinusMinus,
 
         "==" => lexer::Tok::EqEq,
         "!=" => lexer::Tok::NotEq,
@@ -278,7 +285,6 @@ extern {
         "." => lexer::Tok::Dot,
         "?" => lexer::Tok::QuestionMark,
         ":" => lexer::Tok::Colon,
-        "::" => lexer::Tok::ColonColon,
 
         "(" => lexer::Tok::LeftParen,
         ")" => lexer::Tok::RightParen,
@@ -302,6 +308,8 @@ extern {
         "return" => lexer::Tok::Return,
         "let" => lexer::Tok::Let,
         "fn" => lexer::Tok::Fn,
+        "as" => lexer::Tok::As,
+        "struct" => lexer::Tok::Struct,
         "->" => lexer::Tok::SmallArrow,
     }
 }

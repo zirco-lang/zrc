@@ -54,6 +54,8 @@ pub enum Expr {
     Division(Box<Expr>, Box<Expr>),
     Modulo(Box<Expr>, Box<Expr>),
 
+    Cast(Box<Expr>, super::ty::Type),
+
     NumberLiteral(String),
     StringLiteral(String),
     Identifier(String),
@@ -87,6 +89,7 @@ impl Display for Expr {
             Expr::LessThan(l, r) => write!(f, "{} < {}", l, r),
             Expr::LessThanOrEqualTo(l, r) => write!(f, "{} <= {}", l, r),
             Expr::Equals(l, r) => write!(f, "{} == {}", l, r),
+            Expr::Cast(x, t) => write!(f, "{x} as {t}"),
             Expr::NotEquals(l, r) => write!(f, "{} != {}", l, r),
             Expr::LogicalAnd(l, r) => write!(f, "{} && {}", l, r),
             Expr::LogicalOr(l, r) => write!(f, "{} || {}", l, r),

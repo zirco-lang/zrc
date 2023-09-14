@@ -29,10 +29,10 @@ impl Display for LetDeclaration {
 #[derive(PartialEq, Debug, Clone)]
 pub enum Stmt {
     IfStmt(Expr, Box<Stmt>),
-    IfElseStmt(Expr, Box<Stmt>, Box<Stmt>),
+    IfElseStmt(Expr, Box<Stmt>, Box<Stmt>), // TODO: Maybe this should be within IfStmt with an optional else branch?
     WhileStmt(Expr, Box<Stmt>),
     ForStmt {
-        init: Box<Declaration>,
+        init: Box<Declaration>, // FIXME: Should this be option? Is for(;;) valid?
         cond: Expr,
         post: Expr,
         body: Box<Stmt>,
@@ -78,7 +78,7 @@ impl Display for Declaration {
                 body,
             } => write!(
                 f,
-                "fn {name}({}) -> {r} {}",
+                "fn {name}({}) -> {r} {{ {} }}",
                 parameters
                     .iter()
                     .map(|x| x.to_string())
@@ -96,7 +96,7 @@ impl Display for Declaration {
                 body,
             } => write!(
                 f,
-                "fn {name}({}) {}",
+                "fn {name}({}) {{ {} }}",
                 parameters
                     .iter()
                     .map(|x| x.to_string())
@@ -146,14 +146,11 @@ impl Display for Stmt {
 #[derive(PartialEq, Debug, Clone)]
 pub struct ArgumentDeclaration {
     pub name: String,
-    pub ty: Option<Type>,
+    pub ty: Type,
 }
 
 impl Display for ArgumentDeclaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.ty {
-            None => write!(f, "{}", self.name),
-            Some(t) => write!(f, "{}: {}", self.name, t),
-        }
+        write!(f, "{}: {}", self.name, self.ty)
     }
 }

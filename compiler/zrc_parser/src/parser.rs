@@ -129,11 +129,11 @@ mod tests {
                 parameters: vec![
                     ArgumentDeclaration {
                         name: ("a".to_string()),
-                        ty: Some(Type::Identifier("i32".to_string()))
+                        ty: Type::Identifier("i32".to_string())
                     },
                     ArgumentDeclaration {
                         name: ("b".to_string()),
-                        ty: Some(Type::Identifier("i32".to_string()))
+                        ty: Type::Identifier("i32".to_string())
                     }
                 ],
                 return_type: Some(Type::Identifier("i32".to_string())),
@@ -170,11 +170,11 @@ mod tests {
                     parameters: vec![
                         ArgumentDeclaration {
                             name: ("a".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
+                            ty: Type::Identifier("i32".to_string())
                         },
                         ArgumentDeclaration {
                             name: ("b".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
+                            ty: Type::Identifier("i32".to_string())
                         }
                     ],
                     return_type: Some(Type::Identifier("i32".to_string())),
@@ -188,11 +188,11 @@ mod tests {
                     parameters: vec![
                         ArgumentDeclaration {
                             name: ("a".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
+                            ty: Type::Identifier("i32".to_string())
                         },
                         ArgumentDeclaration {
                             name: ("b".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
+                            ty: Type::Identifier("i32".to_string())
                         }
                     ],
                     return_type: Some(Type::Identifier("i32".to_string())),

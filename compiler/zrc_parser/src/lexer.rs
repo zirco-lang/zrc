@@ -99,12 +99,6 @@ pub enum Tok {
     /// The token `%`
     #[token("%")]
     Percent,
-    /// The token `++`
-    #[token("++")]
-    PlusPlus,
-    /// The token `--`
-    #[token("--")]
-    MinusMinus,
 
     // === COMPARISON OPERATORS ===
     /// The token `==`
@@ -270,6 +264,12 @@ pub enum Tok {
     /// The keyword `fn`
     #[token("fn")]
     Fn,
+    /// The keyword `as`
+    #[token("as")]
+    As,
+    /// The keyword `struct`
+    #[token("struct")]
+    Struct,
     /// The operator `->`
     #[token("->")]
     SmallArrow,

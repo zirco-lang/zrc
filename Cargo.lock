@@ -741,3 +741,10 @@ dependencies = [
  "logos",
  "regex",
 ]
+
+[[package]]
+name = "zrc_typeck"
+version = "0.1.0"
+dependencies = [
+ "zrc_parser",
+]
