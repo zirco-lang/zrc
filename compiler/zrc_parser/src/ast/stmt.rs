@@ -1,7 +1,6 @@
 use std::fmt::Display;
 
-use super::expr::Expr;
-use super::ty::Type;
+use super::{expr::Expr, ty::Type};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LetDeclaration {
