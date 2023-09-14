@@ -39,7 +39,8 @@ OpenStmt: Stmt = {
     "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:OpenStmt> => 
         Stmt::IfElseStmt(a, Box::new(b), Box::new(c)),
     "while" "(" <a:Expr> ")" <b:OpenStmt> => Stmt::WhileStmt(a, Box::new(b)),
-    "for" "(" <a:Declaration> ";" <b:Expr> ";" <c:Expr> ")" <d:OpenStmt> => Stmt::ForStmt {
+    // The declarations include the semicolon for us.
+    "for" "(" <a:Declaration> <b:Expr> ";" <c:Expr> ")" <d:OpenStmt> => Stmt::ForStmt {
         init: Box::new(a),
         cond: b,
         post: c,
@@ -52,7 +53,8 @@ ClosedStmt: Stmt = {
     "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:ClosedStmt> =>
         Stmt::IfElseStmt(a, Box::new(b), Box::new(c)),
     "while" "(" <a:Expr> ")" <b:ClosedStmt> => Stmt::WhileStmt(a, Box::new(b)),
-    "for" "(" <a:Declaration> ";" <b:Expr> ";" <c:Expr> ")" <d:ClosedStmt> => Stmt::ForStmt {
+    // The declarations include the semicolon for us.
+    "for" "(" <a:Declaration> <b:Expr> ";" <c:Expr> ")" <d:ClosedStmt> => Stmt::ForStmt {
         init: Box::new(a),
         cond: b,
         post: c,

@@ -733,6 +733,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "zrc_hir"
+version = "0.1.0"
+dependencies = [
+ "zrc_parser",
+]
+
+[[package]]
 name = "zrc_parser"
 version = "0.1.0"
 dependencies = [
