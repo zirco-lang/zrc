@@ -1,13 +1,19 @@
+//! Lexer for the Zirco programming language
+
 use logos::{Lexer, Logos};
 
+/// Represents some token within a certain span
 pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
 
+/// An error possibly encountered during lexing
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum LexicalError {
+    /// A generic lexing error. Other more specialized errors are more common.
     #[default]
     NoMatchingRule,
-    // TODO: Better rename IDK to something a little more descriptive
-    IDK((usize, char), String),
+    /// An unknown token was encountered.
+    UnknownToken((usize, char), String),
+    /// A string literal was left unterminated.
     UnterminatedStringLiteral(usize),
     /// A block comment ran to the end of the file. Remind the user that block comments nest.
     UnterminatedBlockComment,
@@ -70,6 +76,7 @@ fn handle_block_comment_start(lex: &mut Lexer<'_, Tok>) -> logos::FilterResult<(
     }
 }
 
+/// Enum representing all of the result tokens in the Zirco lexer
 #[derive(Logos, Debug, Clone, PartialEq)]
 #[logos(
     error = LexicalError,
@@ -316,7 +323,7 @@ impl<'input> Iterator for ZircoLexer<'input> {
         match token {
             Err(LexicalError::NoMatchingRule) => {
                 let char = slice.chars().next().unwrap();
-                Some(Err(LexicalError::IDK(
+                Some(Err(LexicalError::UnknownToken(
                     (span.start, char),
                     format!("Internal error: Unknown token '{char}'"),
                 )))

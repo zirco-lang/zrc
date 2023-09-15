@@ -1,3 +1,5 @@
+//! The Zirco compiler
+
 #![warn(
     clippy::cargo,
     clippy::nursery,

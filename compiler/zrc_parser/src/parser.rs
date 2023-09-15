@@ -1,3 +1,5 @@
+//! Functions to parse Zirco into an Abstract Syntax Tree
+
 use lalrpop_util::{ErrorRecovery, ParseError};
 
 use super::{
@@ -6,11 +8,14 @@ use super::{
 };
 use crate::internal_parser;
 
+/// An error returned from one of the Zirco parsing functions, like [`parse_program`].
 #[derive(Debug, PartialEq)]
 pub enum ZircoParserError<T> {
     /// An error we were able to recover from
     Recoverable {
+        /// The list of recoverable errors
         errors: Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>,
+        /// The partial AST
         partial: T,
     },
     /// An error that stopped the parser.

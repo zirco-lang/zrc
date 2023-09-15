@@ -1,64 +1,116 @@
+//! Expression representation for the Zirco AST
+//!
+//! The main thing within this module you will need is the [`Expr`] enum. It contains all the different expression kinds in Zirco.
+
 use std::fmt::Display;
 
+/// The enum representing the different kinds of expressions in Zirco
+///
+/// This enum represents all the different kinds of expressions in Zirco. It is used by the parser to represent the AST in the expression position.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Expr {
+    /// `a, b`
     Comma(Box<Expr>, Box<Expr>),
 
+    /// `a = b`
     Assignment(Box<Expr>, Box<Expr>),
+    /// `a += b`
     AdditionAssignment(Box<Expr>, Box<Expr>),
+    /// `a -= b`
     SubtractionAssignment(Box<Expr>, Box<Expr>),
+    /// `a *= b`
     MultiplicationAssignment(Box<Expr>, Box<Expr>),
+    /// `a /= b`
     DivisionAssignment(Box<Expr>, Box<Expr>),
+    /// `a %= b`
     ModuloAssignment(Box<Expr>, Box<Expr>),
+    /// `a &= b`
     BitwiseAndAssignment(Box<Expr>, Box<Expr>),
+    /// `a |= b`
     BitwiseOrAssignment(Box<Expr>, Box<Expr>),
+    /// `a ^= b`
     BitwiseXorAssignment(Box<Expr>, Box<Expr>),
+    /// `a <<= b`
     BitwiseLeftShiftAssignment(Box<Expr>, Box<Expr>),
+    /// `a >>= b`
     BitwiseRightShiftAssignment(Box<Expr>, Box<Expr>),
 
+    /// `!x`
     UnaryNot(Box<Expr>),
+    /// `~x`
     UnaryBitwiseNot(Box<Expr>),
+    /// `-x`
     UnaryMinus(Box<Expr>),
+    /// `&x`
     UnaryAddressOf(Box<Expr>),
+    /// `*x`
     UnaryDereference(Box<Expr>),
 
+    /// `a[b]`
     Index(Box<Expr>, Box<Expr>),
+    /// `a.b`
     Dot(Box<Expr>, String),
+    /// `a->b`
     Arrow(Box<Expr>, String),
+    /// `a(b, c, d, ...)`
     Call(Box<Expr>, Vec<Expr>),
 
+    /// `a ? b : c`
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
 
+    /// `a && b`
     LogicalAnd(Box<Expr>, Box<Expr>),
+    /// `a || b`
     LogicalOr(Box<Expr>, Box<Expr>),
 
+    /// `a == b`
     Equals(Box<Expr>, Box<Expr>),
+    /// `a != b`
     NotEquals(Box<Expr>, Box<Expr>),
 
+    /// `a & b`
     BitwiseAnd(Box<Expr>, Box<Expr>),
+    /// `a | b`
     BitwiseOr(Box<Expr>, Box<Expr>),
+    /// `a ^ b`
     BitwiseXor(Box<Expr>, Box<Expr>),
 
+    /// `a > b`
     GreaterThan(Box<Expr>, Box<Expr>),
+    /// `a >= b`
     GreaterThanOrEqualTo(Box<Expr>, Box<Expr>),
+    /// `a < b`
     LessThan(Box<Expr>, Box<Expr>),
+    /// `a <= b`
     LessThanOrEqualTo(Box<Expr>, Box<Expr>),
 
+    /// `a >> b`
     BitwiseRightShift(Box<Expr>, Box<Expr>),
+    /// `a << b`
     BitwiseLeftShift(Box<Expr>, Box<Expr>),
 
+    /// `a + b`
     Addition(Box<Expr>, Box<Expr>),
+    /// `a - b`
     Subtraction(Box<Expr>, Box<Expr>),
 
+    /// `a * b`
     Multiplication(Box<Expr>, Box<Expr>),
+    /// `a / b`
     Division(Box<Expr>, Box<Expr>),
+    /// `a % b`
     Modulo(Box<Expr>, Box<Expr>),
 
+    /// Any numeric literal.
     NumberLiteral(String),
+    /// Any string literal.
     StringLiteral(String),
+    /// Any identifier.
     Identifier(String),
+    /// Any boolean literal.
     BooleanLiteral(bool),
 
+    /// An error occurred while parsing.
     Error,
 }
 
@@ -115,7 +167,7 @@ impl Display for Expr {
                 "{}({})",
                 a,
                 b.iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
