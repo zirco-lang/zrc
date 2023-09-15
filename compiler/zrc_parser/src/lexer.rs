@@ -6,7 +6,7 @@ use logos::{Lexer, Logos};
 pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
 
 /// An error possibly encountered during lexing
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum LexicalError {
     /// A generic lexing error. Other more specialized errors are more common.
     #[default]
@@ -19,6 +19,7 @@ pub enum LexicalError {
     UnterminatedBlockComment,
 }
 
+/// A lexer callback helper to obtain the currently matched token slice.
 fn string_slice(lex: &mut Lexer<'_, Tok>) -> String {
     lex.slice().to_string()
 }
@@ -26,8 +27,8 @@ fn string_slice(lex: &mut Lexer<'_, Tok>) -> String {
 /// Zirco uses nested block comments -- a regular expression can't match this without recursion,
 /// so our approach is to use a custom callback which takes the lexer and basically consumes
 /// characters in our input until we reach the end of the comment.
-/// See also: https://github.com/maciejhirsz/logos/issues/307
-/// See also: https://github.com/zirco-lang/zrc/pull/14
+/// See also: [logos#307](https://github.com/maciejhirsz/logos/issues/307)
+/// See also: [zrc#14](https://github.com/zirco-lang/zrc/pull/14)
 fn handle_block_comment_start(lex: &mut Lexer<'_, Tok>) -> logos::FilterResult<(), LexicalError> {
     let mut depth = 1;
     // This contains all of the remaining tokens in our input except for the opening to this comment
@@ -77,7 +78,7 @@ fn handle_block_comment_start(lex: &mut Lexer<'_, Tok>) -> logos::FilterResult<(
 }
 
 /// Enum representing all of the result tokens in the Zirco lexer
-#[derive(Logos, Debug, Clone, PartialEq)]
+#[derive(Logos, Debug, Clone, PartialEq, Eq)]
 #[logos(
     error = LexicalError,
     skip r"[ \t\r\n\f]+",         // whitespace
@@ -300,12 +301,15 @@ pub enum Tok {
 }
 
 /// A lexer for the Zirco programming language
+#[allow(clippy::module_name_repetitions)]
 pub struct ZircoLexer<'input> {
+    /// The internal [`Lexer`] we wrap
     lex: Lexer<'input, Tok>,
 }
 
 impl<'input> ZircoLexer<'input> {
-    /// Create a new [ZircoLexer] given an input string
+    /// Create a new [`ZircoLexer`] given an input string
+    #[must_use]
     pub fn new(input: &'input str) -> Self {
         ZircoLexer {
             lex: Tok::lexer(input),

@@ -91,7 +91,7 @@ pub enum Declaration {
 impl Display for Declaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Declaration::DeclarationList(l) => {
+            Self::DeclarationList(l) => {
                 write!(
                     f,
                     "let {};",
@@ -101,7 +101,7 @@ impl Display for Declaration {
                         .join(", ")
                 )
             }
-            Declaration::FunctionDefinition {
+            Self::FunctionDefinition {
                 name,
                 parameters,
                 return_type: Some(r),
@@ -119,7 +119,7 @@ impl Display for Declaration {
                     .collect::<Vec<String>>()
                     .join(" ")
             ),
-            Declaration::FunctionDefinition {
+            Self::FunctionDefinition {
                 name,
                 parameters,
                 return_type: None,
@@ -144,10 +144,10 @@ impl Display for Declaration {
 impl Display for Stmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Stmt::IfStmt(e, s) => write!(f, "if ({e}) {s}"),
-            Stmt::IfElseStmt(e, s1, s2) => write!(f, "if ({e}) {s1} else {s2}"),
-            Stmt::WhileStmt(e, s) => write!(f, "while ({e}) {s}"),
-            Stmt::ForStmt {
+            Self::IfStmt(e, s) => write!(f, "if ({e}) {s}"),
+            Self::IfElseStmt(e, s1, s2) => write!(f, "if ({e}) {s1} else {s2}"),
+            Self::WhileStmt(e, s) => write!(f, "while ({e}) {s}"),
+            Self::ForStmt {
                 init,
                 cond,
                 post,
@@ -155,26 +155,26 @@ impl Display for Stmt {
             } => {
                 write!(f, "for ({init}; {cond}; {post}) {body}")
             }
-            Stmt::BlockStmt(s) => {
+            Self::BlockStmt(s) => {
                 write!(f, "{{")?;
                 for stmt in s {
                     write!(f, "{stmt}")?;
                 }
                 write!(f, "}}")
             }
-            Stmt::ExprStmt(e) => write!(f, "{e};"),
-            Stmt::EmptyStmt => write!(f, ";"),
-            Stmt::ContinueStmt => write!(f, "continue;"),
-            Stmt::BreakStmt => write!(f, "break;"),
-            Stmt::ReturnStmt(Some(e)) => write!(f, "return {e};",),
-            Stmt::ReturnStmt(None) => write!(f, "return;"),
-            Stmt::Declaration(d) => write!(f, "{}", d),
+            Self::ExprStmt(e) => write!(f, "{e};"),
+            Self::EmptyStmt => write!(f, ";"),
+            Self::ContinueStmt => write!(f, "continue;"),
+            Self::BreakStmt => write!(f, "break;"),
+            Self::ReturnStmt(Some(e)) => write!(f, "return {e};",),
+            Self::ReturnStmt(None) => write!(f, "return;"),
+            Self::Declaration(d) => write!(f, "{d}"),
         }
     }
 }
 
 /// A special form of [`LetDeclaration`] used for function parameters.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ArgumentDeclaration {
     /// The name of the parameter.
     pub name: String,
