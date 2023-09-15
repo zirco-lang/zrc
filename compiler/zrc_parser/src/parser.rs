@@ -1,9 +1,10 @@
+use lalrpop_util::{ErrorRecovery, ParseError};
+
 use super::{
     ast::{expr::*, stmt::*},
     lexer,
 };
 use crate::internal_parser;
-use lalrpop_util::{ErrorRecovery, ParseError};
 
 #[derive(Debug, PartialEq)]
 pub enum ZircoParserError<T> {
@@ -46,8 +47,7 @@ pub fn parse_stmt(input: &str) -> Result<Stmt, ZircoParserError<Stmt>> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::ast::ty::Type;
-    use super::*;
+    use super::{super::ast::ty::Type, *};
     use crate::box_arguments;
 
     #[test]
