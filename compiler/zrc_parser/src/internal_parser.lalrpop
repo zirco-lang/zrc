@@ -39,8 +39,14 @@ OpenStmt: Stmt = {
     "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:OpenStmt> => 
         Stmt::IfStmt(a, Box::new(b), Some(Box::new(c))),
     "while" "(" <a:Expr> ")" <b:OpenStmt> => Stmt::WhileStmt(a, Box::new(b)),
-    "for" "(" <a:Declaration> ";" <b:Expr> ";" <c:Expr> ")" <d:OpenStmt> => Stmt::ForStmt {
-        init: Box::new(a),
+    "for" "(" <a:Declaration> <b:Expr?> ";" <c:Expr?> ")" <d:OpenStmt> => Stmt::ForStmt {
+        init: Some(Box::new(a)),
+        cond: b,
+        post: c,
+        body: Box::new(d)
+    },
+    "for" "(" ";" <b:Expr?> ";" <c:Expr?> ")" <d:OpenStmt> => Stmt::ForStmt {
+        init: None,
         cond: b,
         post: c,
         body: Box::new(d)
@@ -52,8 +58,14 @@ ClosedStmt: Stmt = {
     "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:ClosedStmt> =>
         Stmt::IfStmt(a, Box::new(b), Some(Box::new(c))),
     "while" "(" <a:Expr> ")" <b:ClosedStmt> => Stmt::WhileStmt(a, Box::new(b)),
-    "for" "(" <a:Declaration> ";" <b:Expr> ";" <c:Expr> ")" <d:ClosedStmt> => Stmt::ForStmt {
-        init: Box::new(a),
+    "for" "(" <a:Declaration> <b:Expr?> ";" <c:Expr?> ")" <d:ClosedStmt> => Stmt::ForStmt {
+        init: Some(Box::new(a)),
+        cond: b,
+        post: c,
+        body: Box::new(d)
+    },
+    "for" "(" ";" <b:Expr?> ";" <c:Expr?> ")" <d:ClosedStmt> => Stmt::ForStmt {
+        init: None,
         cond: b,
         post: c,
         body: Box::new(d)

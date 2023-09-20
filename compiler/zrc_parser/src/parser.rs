@@ -170,6 +170,30 @@ mod tests {
     }
 
     #[test]
+    fn for_loop_test() {
+        assert_eq!(
+            parse_program("fn main() { for (let i = 0;;) {} }"),
+            Ok(vec![Declaration::FunctionDefinition {
+                name: "main".to_string(),
+                parameters: vec![],
+                return_type: None,
+                body: vec![Stmt::ForStmt {
+                    init: Some(Box::new(Declaration::DeclarationList(vec![
+                        LetDeclaration {
+                            name: "i".to_string(),
+                            ty: None,
+                            value: Some(Expr::NumberLiteral("0".to_string()))
+                        }
+                    ]))),
+                    cond: None,
+                    post: None,
+                    body: Box::new(Stmt::BlockStmt(vec![]))
+                }]
+            }])
+        )
+    }
+
+    #[test]
     fn larger_program_parses() {
         assert_eq!(
             parse_program(concat!(

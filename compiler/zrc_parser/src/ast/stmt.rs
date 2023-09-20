@@ -44,11 +44,13 @@ pub enum Stmt {
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
-        init: Box<Declaration>,
+        // TODO: May also be able to be expressions?
+        init: Option<Box<Declaration>>,
         /// Runs before each iteration of the loop. If this evaluates to `false`, the loop will end.
-        cond: Expr,
+        /// If this is [`None`], the loop will run forever.
+        cond: Option<Expr>,
         /// Runs after each iteration of the loop.
-        post: Expr,
+        post: Option<Expr>,
         /// The body of the loop.
         body: Box<Stmt>,
     },
@@ -151,8 +153,15 @@ impl Display for Stmt {
                 post,
                 body,
             } => {
-                write!(f, "for ({init}; {cond}; {post}) {body}")
+                write!(
+                    f,
+                    "for ({} {}; {}) {body}",
+                    init.clone().map_or(String::new(), |x| x.to_string()),
+                    cond.clone().map_or(String::new(), |x| x.to_string()),
+                    post.clone().map_or(String::new(), |x| x.to_string()),
+                )
             }
+
             Self::BlockStmt(s) => {
                 write!(f, "{{")?;
                 for stmt in s {
