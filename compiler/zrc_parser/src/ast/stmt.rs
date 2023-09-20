@@ -37,10 +37,8 @@ impl Display for LetDeclaration {
 /// This enum represents all the different kinds of statements in Zirco. It is used by the parser to represent the AST in the statement position.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Stmt {
-    /// `if (x) y`
-    IfStmt(Expr, Box<Stmt>),
-    /// `if (x) y else z`
-    IfElseStmt(Expr, Box<Stmt>, Box<Stmt>),
+    /// `if (x) y` or `if (x) y else z`
+    IfStmt(Expr, Box<Stmt>, Option<Box<Stmt>>),
     /// `while (x) y`
     WhileStmt(Expr, Box<Stmt>),
     /// `for (init; cond; post) body`
@@ -144,8 +142,8 @@ impl Display for Declaration {
 impl Display for Stmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::IfStmt(e, s) => write!(f, "if ({e}) {s}"),
-            Self::IfElseStmt(e, s1, s2) => write!(f, "if ({e}) {s1} else {s2}"),
+            Self::IfStmt(e, s, None) => write!(f, "if ({e}) {s}"),
+            Self::IfStmt(e, s1, Some(s2)) => write!(f, "if ({e}) {s1} else {s2}"),
             Self::WhileStmt(e, s) => write!(f, "while ({e}) {s}"),
             Self::ForStmt {
                 init,

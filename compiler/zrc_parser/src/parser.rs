@@ -64,7 +64,13 @@ pub fn parse_stmt(input: &str) -> Result<Stmt, ZircoParserError<Stmt>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::ast::ty::Type, *};
+    use super::{
+        super::ast::{
+            stmt::{ArgumentDeclaration, LetDeclaration},
+            ty::Type,
+        },
+        *,
+    };
     use crate::box_arguments;
 
     #[test]
@@ -114,11 +120,12 @@ mod tests {
             parse_stmt("if (a) if (b) c; else d;"),
             Ok(Stmt::IfStmt(
                 Expr::Identifier("a".to_string()),
-                Box::new(Stmt::IfElseStmt(
+                Box::new(Stmt::IfStmt(
                     Expr::Identifier("b".to_string()),
                     Box::new(Stmt::ExprStmt(Expr::Identifier("c".to_string()))),
-                    Box::new(Stmt::ExprStmt(Expr::Identifier("d".to_string())))
-                ))
+                    Some(Box::new(Stmt::ExprStmt(Expr::Identifier("d".to_string()))))
+                )),
+                None
             ))
         )
     }
