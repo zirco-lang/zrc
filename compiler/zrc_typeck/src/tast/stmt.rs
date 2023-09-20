@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
-use super::{expr::TypedExpr, ty::Type};
 use zrc_parser::ast::stmt::ArgumentDeclaration;
+
+use super::{expr::TypedExpr, ty::Type};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LetDeclaration {

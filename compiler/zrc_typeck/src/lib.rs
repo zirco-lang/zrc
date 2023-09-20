@@ -11,8 +11,10 @@ use std::collections::HashMap;
 
 pub mod tast;
 
-use tast::expr::{TypedExpr, TypedExprKind};
-use tast::ty::Type as TastType;
+use tast::{
+    expr::{TypedExpr, TypedExprKind},
+    ty::Type as TastType,
+};
 use zrc_parser::ast::{expr::Expr, ty::Type as ParserType};
 
 fn resolve_type(
