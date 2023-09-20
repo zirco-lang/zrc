@@ -1,18 +1,25 @@
+//! Lexer for the Zirco programming language
+
 use logos::{Lexer, Logos};
 
+/// Represents some token within a certain span
 pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
 
-#[derive(Debug, Clone, PartialEq, Default)]
+/// An error possibly encountered during lexing
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum LexicalError {
+    /// A generic lexing error. Other more specialized errors are more common.
     #[default]
     NoMatchingRule,
-    // TODO: Better rename IDK to something a little more descriptive
-    IDK((usize, char), String),
+    /// An unknown token was encountered.
+    UnknownToken((usize, char), String),
+    /// A string literal was left unterminated.
     UnterminatedStringLiteral(usize),
     /// A block comment ran to the end of the file. Remind the user that block comments nest.
     UnterminatedBlockComment,
 }
 
+/// A lexer callback helper to obtain the currently matched token slice.
 fn string_slice(lex: &mut Lexer<'_, Tok>) -> String {
     lex.slice().to_string()
 }
@@ -20,8 +27,8 @@ fn string_slice(lex: &mut Lexer<'_, Tok>) -> String {
 /// Zirco uses nested block comments -- a regular expression can't match this without recursion,
 /// so our approach is to use a custom callback which takes the lexer and basically consumes
 /// characters in our input until we reach the end of the comment.
-/// See also: https://github.com/maciejhirsz/logos/issues/307
-/// See also: https://github.com/zirco-lang/zrc/pull/14
+/// See also: [logos#307](https://github.com/maciejhirsz/logos/issues/307)
+/// See also: [zrc#14](https://github.com/zirco-lang/zrc/pull/14)
 fn handle_block_comment_start(lex: &mut Lexer<'_, Tok>) -> logos::FilterResult<(), LexicalError> {
     let mut depth = 1;
     // This contains all of the remaining tokens in our input except for the opening to this comment
@@ -70,7 +77,8 @@ fn handle_block_comment_start(lex: &mut Lexer<'_, Tok>) -> logos::FilterResult<(
     }
 }
 
-#[derive(Logos, Debug, Clone, PartialEq)]
+/// Enum representing all of the result tokens in the Zirco lexer
+#[derive(Logos, Debug, Clone, PartialEq, Eq)]
 #[logos(
     error = LexicalError,
     skip r"[ \t\r\n\f]+",         // whitespace
@@ -293,12 +301,15 @@ pub enum Tok {
 }
 
 /// A lexer for the Zirco programming language
+#[allow(clippy::module_name_repetitions)]
 pub struct ZircoLexer<'input> {
+    /// The internal [`Lexer`] we wrap
     lex: Lexer<'input, Tok>,
 }
 
 impl<'input> ZircoLexer<'input> {
-    /// Create a new [ZircoLexer] given an input string
+    /// Create a new [`ZircoLexer`] given an input string
+    #[must_use]
     pub fn new(input: &'input str) -> Self {
         ZircoLexer {
             lex: Tok::lexer(input),
@@ -316,7 +327,7 @@ impl<'input> Iterator for ZircoLexer<'input> {
         match token {
             Err(LexicalError::NoMatchingRule) => {
                 let char = slice.chars().next().unwrap();
-                Some(Err(LexicalError::IDK(
+                Some(Err(LexicalError::UnknownToken(
                     (span.start, char),
                     format!("Internal error: Unknown token '{char}'"),
                 )))
