@@ -1,3 +1,7 @@
+//! Type checker and TAST for the Zirco programming language
+//!
+//! This crate contains functions for generating the [Typed AST](tast) and check program types in the process.
+
 #![warn(
     clippy::cargo,
     clippy::nursery,
@@ -5,7 +9,7 @@
     clippy::missing_docs_in_private_items,
     missing_docs
 )]
-#![allow(clippy::multiple_crate_versions)]
+#![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
 use std::collections::HashMap;
 
@@ -17,8 +21,12 @@ use tast::{
 };
 use zrc_parser::ast::{expr::Expr, ty::Type as ParserType};
 
-fn resolve_type(
-    type_scope: &HashMap<String, TastType>,
+/// Resolve an identifier to its corresponding [`tast::ty::Type`].
+///
+/// # Errors
+/// Errors if the identifier is not found in the type scope.
+fn resolve_type<S: std::hash::BuildHasher>(
+    type_scope: &HashMap<String, TastType, S>,
     ty: ParserType,
 ) -> Result<TastType, String> {
     Ok(match ty {
@@ -38,7 +46,7 @@ fn resolve_type(
                 if let Some(t) = type_scope.get(&x) {
                     t.clone()
                 } else {
-                    return Err(format!("Unknown type {}", x));
+                    return Err(format!("Unknown type {x}"));
                 }
             }
         },
@@ -52,10 +60,15 @@ fn resolve_type(
     })
 }
 
-// FIXME: this NEEDS to be rewritten to use references almost everywhere and be no-clone. We stack overflow which is BAD.
-fn type_expr(
-    value_scope: &HashMap<String, TastType>, // X:i32 represents "let X: i32;"
-    type_scope: &HashMap<String, TastType>,  // X:i32 represents "typedef X = i32;"
+// FIXME: this NEEDS to be rewritten to use references almost everywhere and be no-clone. We stack overflow for deep expressions which is VERY VERY BAD.
+/// Type check and infer an [AST expression](Expr) to a [TAST expression](TypedExpr).
+///
+/// # Errors
+/// Errors if a type checker error is encountered.
+#[allow(clippy::too_many_lines)] // FIXME: make this fn shorter
+pub fn type_expr<S: std::hash::BuildHasher>(
+    value_scope: &HashMap<String, TastType, S>, // X:i32 represents "let X: i32;"
+    type_scope: &HashMap<String, TastType, S>,  // X:i32 represents "typedef X = i32;"
     expr: Expr,
 ) -> Result<TypedExpr, String> {
     Ok(match expr {
@@ -72,11 +85,7 @@ fn type_expr(
             let value_t = type_expr(value_scope, type_scope, *value)?;
 
             if place_t.0 != value_t.0 {
-                return Err(format!(
-                    "Type mismatch: {:?} != {:?}",
-                    place_t.clone().0,
-                    value_t.clone().0
-                ));
+                return Err(format!("Type mismatch: {:?} != {:?}", place_t.0, value_t.0));
             }
 
             TypedExpr(
@@ -198,7 +207,7 @@ fn type_expr(
         }
 
         Expr::Dot(obj, key) => {
-            let obj_t = type_expr(value_scope, type_scope, *obj.clone())?;
+            let obj_t = type_expr(value_scope, type_scope, *obj)?;
 
             if let TastType::Struct(fields) = obj_t.0.clone() {
                 if let Some(t) = fields.get(&key) {
@@ -216,7 +225,7 @@ fn type_expr(
         Expr::Arrow(obj, key) => {
             let obj_t = type_expr(value_scope, type_scope, *obj.clone())?;
 
-            if let TastType::Ptr(_) = obj_t.0.clone() {
+            if let TastType::Ptr(_) = obj_t.0 {
                 type_expr(
                     value_scope,
                     type_scope,
@@ -254,10 +263,7 @@ fn type_expr(
                     }
                 }
 
-                TypedExpr(
-                    *ret_type,
-                    TypedExprKind::Call(Box::new(ft), args_t.iter().cloned().collect()),
-                )
+                TypedExpr(*ret_type, TypedExprKind::Call(Box::new(ft), args_t))
             } else {
                 return Err(format!("Cannot call non-function type {:?}", ft.0));
             }
@@ -738,7 +744,7 @@ fn type_expr(
 
         Expr::Cast(x, t) => {
             let xt = type_expr(value_scope, type_scope, *x)?;
-            let tt = resolve_type(value_scope, t)?;
+            let tt = resolve_type(type_scope, t)?;
 
             if xt.0.is_integer() && tt.is_integer() {
                 // int -> int cast is valid
@@ -759,21 +765,13 @@ fn type_expr(
         Expr::Identifier(i) => {
             let t = value_scope
                 .get(&i)
-                .ok_or(format!("Unknown identifier {}", i))?;
+                .ok_or(format!("Unknown identifier {i}"))?;
             TypedExpr(t.clone(), TypedExprKind::Identifier(i))
         }
         Expr::BooleanLiteral(b) => TypedExpr(TastType::Bool, TypedExprKind::BooleanLiteral(b)),
 
         Expr::Error => return Err("Parse error encountered".to_string()),
     })
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum BlockReturnKind {
-    /// Does not return at all
-    NoReturn,
-    Void,
-    Returns(TastType),
 }
 
 // Considerations when designing the type_block function:

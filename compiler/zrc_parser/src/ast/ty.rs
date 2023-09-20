@@ -9,15 +9,17 @@ use std::{collections::HashMap, fmt::Display};
 pub enum Type {
     /// An identifier, such as `i32`
     Identifier(String),
+    /// `*T`
     Ptr(Box<Type>),
+    /// A direct struct type
     Struct(HashMap<String, Type>),
 }
 
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Identifier(i) => write!(f, "{}", i),
-            Self::Ptr(t) => write!(f, "*{}", t),
+            Self::Identifier(i) => write!(f, "{i}"),
+            Self::Ptr(t) => write!(f, "*{t}"),
             Self::Struct(members) => {
                 write!(f, "struct {{ ")?;
                 for (i, m) in members.iter().enumerate() {

@@ -101,7 +101,7 @@ pub enum Expr {
     /// `a % b`
     Modulo(Box<Expr>, Box<Expr>),
 
-    // `x as T`
+    /// `x as T`
     Cast(Box<Expr>, super::ty::Type),
 
     /// Any numeric literal.

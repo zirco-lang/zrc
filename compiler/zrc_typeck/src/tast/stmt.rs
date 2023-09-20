@@ -1,13 +1,19 @@
+//! Statement representation for the Zirco [TAST](super)
+
 use std::fmt::Display;
 
 use zrc_parser::ast::stmt::ArgumentDeclaration;
 
 use super::{expr::TypedExpr, ty::Type};
 
+/// A declaration created with `let`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LetDeclaration {
+    /// The name of the identifier.
     pub name: String,
-    pub ty: Type, // in contrast to the parser, the type of a declaration is definite by this step
+    /// The type of the new symbol. If set to [`None`], the type will be inferred.
+    pub ty: Type, // types are definite after inference
+    /// The value to associate with the new symbol.
     pub value: Option<TypedExpr>,
 }
 
@@ -20,29 +26,57 @@ impl Display for LetDeclaration {
     }
 }
 
+/// The enum representing all of the different kinds of statements in Zirco after type checking
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::module_name_repetitions)]
 pub enum TypedStmt {
     // all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here (basically if (x) y has become if (x) {y})
-    IfStmt(TypedExpr, Vec<TypedStmt>),
-    IfElseStmt(TypedExpr, Vec<TypedStmt>, Vec<TypedStmt>),
-    // For statements are desugared into while statements here
+    /// `if (x) y` or `if (x) y else z`
+    IfStmt(TypedExpr, Vec<TypedStmt>, Option<Vec<TypedStmt>>),
+    /// `while (x) y`
     WhileStmt(TypedExpr, Vec<TypedStmt>),
+    /// `for (init; cond; post) body`
+    ForStmt {
+        /// Runs once before the loop starts.
+        init: Option<Box<TypedDeclaration>>,
+        /// Runs before each iteration of the loop. If this evaluates to `false`, the loop will end.
+        /// If this is [`None`], the loop will run forever.
+        cond: Option<TypedExpr>,
+        /// Runs after each iteration of the loop.
+        post: Option<TypedExpr>,
+        /// The body of the loop.
+        body: Box<TypedStmt>,
+    },
+    /// `{ ... }`
     BlockStmt(Vec<TypedStmt>),
+    /// `x;`
     ExprStmt(TypedExpr),
+    /// `;`
     EmptyStmt,
+    /// `continue;`
     ContinueStmt,
+    /// `break;`
     BreakStmt,
+    /// `return;` or `return x;`
     ReturnStmt(Option<TypedExpr>),
+    /// Any kind of declaration
     Declaration(TypedDeclaration),
 }
 
+/// Any declaration valid to be present at the top level of a file. May also be used from the [`TypedStmt::Declaration`] variant.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypedDeclaration {
+    /// A list of [`LetDeclaration`]s.
     DeclarationList(Vec<LetDeclaration>),
+    /// A definition for a function
     FunctionDefinition {
+        /// The name of the function.
         name: String,
+        /// The parameters of the function.
         parameters: Vec<ArgumentDeclaration>,
-        return_type: Option<Type>, // none is void
+        /// The return type of the function. If set to [`None`], the function is void.
+        return_type: Option<Type>,
+        /// The body of the function.
         body: Vec<TypedStmt>,
     },
 }
@@ -50,15 +84,15 @@ pub enum TypedDeclaration {
 impl Display for TypedDeclaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TypedDeclaration::DeclarationList(l) => write!(
+            Self::DeclarationList(l) => write!(
                 f,
                 "let {};",
                 l.iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            TypedDeclaration::FunctionDefinition {
+            Self::FunctionDefinition {
                 name,
                 parameters,
                 return_type: Some(return_type),
@@ -68,15 +102,15 @@ impl Display for TypedDeclaration {
                 "fn {name}({}) -> {return_type} {{ {} }}",
                 parameters
                     .iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", "),
                 body.iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
-            TypedDeclaration::FunctionDefinition {
+            Self::FunctionDefinition {
                 name,
                 parameters,
                 return_type: None,
@@ -86,11 +120,11 @@ impl Display for TypedDeclaration {
                 "fn {name}({}) {{ {} }}",
                 parameters
                     .iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", "),
                 body.iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
@@ -101,49 +135,61 @@ impl Display for TypedDeclaration {
 impl Display for TypedStmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TypedStmt::IfStmt(e, s) => write!(
+            Self::IfStmt(e, s, None) => write!(
                 f,
                 "if ({e}) {{ {} }}",
                 s.iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
-            TypedStmt::IfElseStmt(e, s1, s2) => write!(
+            Self::IfStmt(e, s1, Some(s2)) => write!(
                 f,
                 "if ({e}) {{ {} }} else {{ {} }}",
                 s1.iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(" "),
                 s2.iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
-            TypedStmt::WhileStmt(e, s) => write!(
+            Self::WhileStmt(e, s) => write!(
                 f,
                 "while ({e}) {{ {} }}",
                 s.iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
-            TypedStmt::BlockStmt(s) => write!(
+            Self::ForStmt {
+                init,
+                cond,
+                post,
+                body,
+            } => write!(
+                f,
+                "for ({} {}; {}) {body}",
+                init.clone().map_or(String::new(), |x| x.to_string()),
+                cond.clone().map_or(String::new(), |x| x.to_string()),
+                post.clone().map_or(String::new(), |x| x.to_string())
+            ),
+            Self::BlockStmt(s) => write!(
                 f,
                 "{{ {} }}",
                 s.iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
-            TypedStmt::ExprStmt(e) => write!(f, "{e};"),
-            TypedStmt::EmptyStmt => write!(f, ";"),
-            TypedStmt::ContinueStmt => write!(f, "continue;"),
-            TypedStmt::BreakStmt => write!(f, "break;"),
-            TypedStmt::ReturnStmt(Some(e)) => write!(f, "return {e};",),
-            TypedStmt::ReturnStmt(None) => write!(f, "return;"),
-            TypedStmt::Declaration(d) => write!(f, "{}", d),
+            Self::ExprStmt(e) => write!(f, "{e};"),
+            Self::EmptyStmt => write!(f, ";"),
+            Self::ContinueStmt => write!(f, "continue;"),
+            Self::BreakStmt => write!(f, "break;"),
+            Self::ReturnStmt(Some(e)) => write!(f, "return {e};",),
+            Self::ReturnStmt(None) => write!(f, "return;"),
+            Self::Declaration(d) => write!(f, "{d}"),
         }
     }
 }

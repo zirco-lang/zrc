@@ -1,53 +1,70 @@
+//! Type representation for the Zirco [TAST](super)
+
 use std::{collections::HashMap, fmt::Display};
 
+/// The possible Zirco types
 #[derive(PartialEq, Debug, Clone)]
 pub enum Type {
+    /// `i8`
     I8,
+    /// `u8`
     U8,
+    /// `i16`
     I16,
+    /// `u16`
     U16,
+    /// `i32`
     I32,
+    /// `u32`
     U32,
+    /// `i64`
     I64,
+    /// `u64`
     U64,
+    /// `isize`
     Isize,
+    /// `usize`
     Usize,
+    /// `bool`
     Bool, // TODO: need an "any Int" type that implicitly casts to all int types but becomes i32 when assigned to a value
+    /// `*T`
     Ptr(Box<Type>),
+    /// `fn(A, B) -> T`
     Fn(Vec<Type>, Box<Type>),
+    /// Struct type literals
     Struct(HashMap<String, Type>),
 }
 
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.clone() {
-            Type::I8 => write!(f, "i8"),
-            Type::U8 => write!(f, "u8"),
-            Type::I16 => write!(f, "i16"),
-            Type::U16 => write!(f, "u16"),
-            Type::I32 => write!(f, "i32"),
-            Type::U32 => write!(f, "u32"),
-            Type::I64 => write!(f, "i64"),
-            Type::U64 => write!(f, "u64"),
-            Type::Isize => write!(f, "isize"),
-            Type::Usize => write!(f, "usize"),
-            Type::Bool => write!(f, "bool"),
-            Type::Ptr(t) => write!(f, "*({})", t),
-            Type::Fn(args, ret) => write!(
+            Self::I8 => write!(f, "i8"),
+            Self::U8 => write!(f, "u8"),
+            Self::I16 => write!(f, "i16"),
+            Self::U16 => write!(f, "u16"),
+            Self::I32 => write!(f, "i32"),
+            Self::U32 => write!(f, "u32"),
+            Self::I64 => write!(f, "i64"),
+            Self::U64 => write!(f, "u64"),
+            Self::Isize => write!(f, "isize"),
+            Self::Usize => write!(f, "usize"),
+            Self::Bool => write!(f, "bool"),
+            Self::Ptr(t) => write!(f, "*({t})"),
+            Self::Fn(args, ret) => write!(
                 f,
                 "(fn({}) -> {})",
                 args.iter()
-                    .map(|x| x.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", "),
                 ret
             ),
-            Type::Struct(fields) => write!(
+            Self::Struct(fields) => write!(
                 f,
                 "(struct {{ {} }})",
                 fields
                     .iter()
-                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .map(|(k, v)| format!("{k}: {v}"))
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -56,19 +73,20 @@ impl Display for Type {
 }
 
 impl Type {
-    pub fn is_integer(&self) -> bool {
-        use Type::*;
-        match self {
-            I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64 | Isize | Usize => true,
-            _ => false,
-        }
+    /// Returns `true` if this is an integer type like [`Type::I8`].
+    #[must_use]
+    pub const fn is_integer(&self) -> bool {
+        use Type::{Isize, Usize, I16, I32, I64, I8, U16, U32, U64, U8};
+        matches!(
+            self,
+            I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64 | Isize | Usize
+        )
     }
 
-    pub fn is_signed_integer(&self) -> bool {
-        use Type::*;
-        match self {
-            I8 | I16 | I32 | I64 | Isize => true,
-            _ => false,
-        }
+    /// Returns `true` if this is a signed integer type like [`Type::I8`].
+    #[must_use]
+    pub const fn is_signed_integer(&self) -> bool {
+        use Type::{Isize, I16, I32, I64, I8};
+        matches!(self, I8 | I16 | I32 | I64 | Isize)
     }
 }
