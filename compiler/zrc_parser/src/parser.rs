@@ -64,7 +64,13 @@ pub fn parse_stmt(input: &str) -> Result<Stmt, ZircoParserError<Stmt>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::ast::ty::Type, *};
+    use super::{
+        super::ast::{
+            stmt::{ArgumentDeclaration, LetDeclaration},
+            ty::Type,
+        },
+        *,
+    };
     use crate::box_arguments;
 
     #[test]
@@ -114,11 +120,12 @@ mod tests {
             parse_stmt("if (a) if (b) c; else d;"),
             Ok(Stmt::IfStmt(
                 Expr::Identifier("a".to_string()),
-                Box::new(Stmt::IfElseStmt(
+                Box::new(Stmt::IfStmt(
                     Expr::Identifier("b".to_string()),
                     Box::new(Stmt::ExprStmt(Expr::Identifier("c".to_string()))),
-                    Box::new(Stmt::ExprStmt(Expr::Identifier("d".to_string())))
-                ))
+                    Some(Box::new(Stmt::ExprStmt(Expr::Identifier("d".to_string()))))
+                )),
+                None
             ))
         )
     }
@@ -159,6 +166,30 @@ mod tests {
                     Box::new(Expr::Identifier("b".to_string()))
                 )))]
             }))
+        )
+    }
+
+    #[test]
+    fn for_loop_test() {
+        assert_eq!(
+            parse_program("fn main() { for (let i = 0;;) {} }"),
+            Ok(vec![Declaration::FunctionDefinition {
+                name: "main".to_string(),
+                parameters: vec![],
+                return_type: None,
+                body: vec![Stmt::ForStmt {
+                    init: Some(Box::new(Declaration::DeclarationList(vec![
+                        LetDeclaration {
+                            name: "i".to_string(),
+                            ty: None,
+                            value: Some(Expr::NumberLiteral("0".to_string()))
+                        }
+                    ]))),
+                    cond: None,
+                    post: None,
+                    body: Box::new(Stmt::BlockStmt(vec![]))
+                }]
+            }])
         )
     }
 

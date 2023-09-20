@@ -37,20 +37,20 @@ impl Display for LetDeclaration {
 /// This enum represents all the different kinds of statements in Zirco. It is used by the parser to represent the AST in the statement position.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Stmt {
-    /// `if (x) y`
-    IfStmt(Expr, Box<Stmt>),
-    /// `if (x) y else z`
-    IfElseStmt(Expr, Box<Stmt>, Box<Stmt>), // TODO: Maybe this should be within IfStmt with an optional else branch?
+    /// `if (x) y` or `if (x) y else z`
+    IfStmt(Expr, Box<Stmt>, Option<Box<Stmt>>),
     /// `while (x) y`
     WhileStmt(Expr, Box<Stmt>),
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
-        init: Box<Declaration>, // FIXME: Should this be option? Is for(;;) valid?
+        // TODO: May also be able to be expressions?
+        init: Option<Box<Declaration>>,
         /// Runs before each iteration of the loop. If this evaluates to `false`, the loop will end.
-        cond: Expr,
+        /// If this is [`None`], the loop will run forever.
+        cond: Option<Expr>,
         /// Runs after each iteration of the loop.
-        post: Expr,
+        post: Option<Expr>,
         /// The body of the loop.
         body: Box<Stmt>,
     },
@@ -144,8 +144,8 @@ impl Display for Declaration {
 impl Display for Stmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::IfStmt(e, s) => write!(f, "if ({e}) {s}"),
-            Self::IfElseStmt(e, s1, s2) => write!(f, "if ({e}) {s1} else {s2}"),
+            Self::IfStmt(e, s, None) => write!(f, "if ({e}) {s}"),
+            Self::IfStmt(e, s1, Some(s2)) => write!(f, "if ({e}) {s1} else {s2}"),
             Self::WhileStmt(e, s) => write!(f, "while ({e}) {s}"),
             Self::ForStmt {
                 init,
@@ -153,8 +153,15 @@ impl Display for Stmt {
                 post,
                 body,
             } => {
-                write!(f, "for ({init}; {cond}; {post}) {body}")
+                write!(
+                    f,
+                    "for ({} {}; {}) {body}",
+                    init.clone().map_or(String::new(), |x| x.to_string()),
+                    cond.clone().map_or(String::new(), |x| x.to_string()),
+                    post.clone().map_or(String::new(), |x| x.to_string()),
+                )
             }
+
             Self::BlockStmt(s) => {
                 write!(f, "{{")?;
                 for stmt in s {
