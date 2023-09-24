@@ -893,6 +893,7 @@ fn coerce_stmt_into_block(stmt: Stmt) -> Vec<Stmt> {
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
+#[allow(clippy::too_many_lines)]
 pub fn process_declaration(
     scope: &mut Scope,
     declaration: AstDeclaration,
