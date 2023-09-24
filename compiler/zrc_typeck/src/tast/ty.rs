@@ -1,5 +1,6 @@
 //! Type representation for the Zirco [TAST](super)
 
+use super::super::BlockReturnType;
 use std::{collections::HashMap, fmt::Display};
 
 /// The possible Zirco types
@@ -25,12 +26,14 @@ pub enum Type {
     Isize,
     /// `usize`
     Usize,
+    /// `void`, only producible by calling a void function (`fn()`)
+    Void,
     /// `bool`
     Bool, // TODO: need an "any Int" type that implicitly casts to all int types but becomes i32 when assigned to a value
     /// `*T`
     Ptr(Box<Type>),
     /// `fn(A, B) -> T`
-    Fn(Vec<Type>, Box<Type>),
+    Fn(Vec<Type>, Box<BlockReturnType>),
     /// Struct type literals
     Struct(HashMap<String, Type>),
 }
@@ -50,14 +53,18 @@ impl Display for Type {
             Self::Usize => write!(f, "usize"),
             Self::Bool => write!(f, "bool"),
             Self::Ptr(t) => write!(f, "*({t})"),
-            Self::Fn(args, ret) => write!(
+            Self::Void => write!(f, "void"),
+            Self::Fn(args, brt) => write!(
                 f,
-                "(fn({}) -> {})",
+                "(fn({}){})",
                 args.iter()
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", "),
-                ret
+                match *brt {
+                    BlockReturnType::Return(ret) => format!(" -> {ret}"),
+                    BlockReturnType::Void => String::new(),
+                }
             ),
             Self::Struct(fields) => write!(
                 f,

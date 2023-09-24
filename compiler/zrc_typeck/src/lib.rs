@@ -17,16 +17,81 @@ pub mod tast;
 
 use tast::{
     expr::{TypedExpr, TypedExprKind},
+    stmt::{
+        ArgumentDeclaration as TastArgumentDeclaration, LetDeclaration as TastLetDeclaration,
+        TypedDeclaration, TypedStmt,
+    },
     ty::Type as TastType,
 };
-use zrc_parser::ast::{expr::Expr, ty::Type as ParserType};
+use zrc_parser::ast::{
+    expr::Expr,
+    stmt::{
+        Declaration as AstDeclaration, Stmt,
+    },
+    ty::Type as ParserType,
+};
+
+/// Contains scoping information during type checking.
+/// 
+/// Cloning it resembles the creation of a subscope.
+#[derive(Debug,Clone)]
+pub struct Scope {
+    /// Maps identifiers for values to their types.
+    value_scope: HashMap<String,TastType>,
+    /// Maps type names to their actual type representations.
+    type_scope: HashMap<String,TastType>
+}
+impl Scope {
+    /// Creates a new Scope with no values or types.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            value_scope: HashMap::new(),
+            type_scope: HashMap::new()
+        }
+    }
+
+    /// Creates a new Scope from two [`HashMap`]s.
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn from_scopes(value_scope:HashMap<String,TastType>,type_scope:HashMap<String,TastType>)->Self{
+        Self{value_scope,type_scope}
+    }
+
+    /// Gets a value-identifier's type from this [`Scope`]
+    #[must_use]
+    pub fn get_value(&self, identifier: &String) -> Option<&TastType> {
+        self.value_scope.get(identifier)
+    }
+
+    /// Gets a type-identifier's type from this [`Scope`]
+    #[must_use]
+    pub fn get_type(&self, identifier: &String) -> Option<&TastType> {
+        self.type_scope.get(identifier)
+    }
+
+    /// Sets a value-identifier's type in this [`Scope`]
+    pub fn set_value(&mut self, identifier: String, ty: TastType) {
+        self.value_scope.insert(identifier, ty);
+    }
+
+    /// Sets a type-identifier's type in this [`Scope`]
+    pub fn set_type(&mut self, identifier: String, ty: TastType) {
+        self.type_scope.insert(identifier, ty);
+    }
+}
+impl Default for Scope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Resolve an identifier to its corresponding [`tast::ty::Type`].
 ///
 /// # Errors
 /// Errors if the identifier is not found in the type scope.
-fn resolve_type<S: std::hash::BuildHasher>(
-    type_scope: &HashMap<String, TastType, S>,
+fn resolve_type(
+    scope: &Scope,
     ty: ParserType,
 ) -> Result<TastType, String> {
     Ok(match ty {
@@ -43,21 +108,76 @@ fn resolve_type<S: std::hash::BuildHasher>(
             "usize" => TastType::Usize,
             "bool" => TastType::Bool,
             _ => {
-                if let Some(t) = type_scope.get(&x) {
+                if let Some(t) = scope.get_type(&x) {
                     t.clone()
                 } else {
                     return Err(format!("Unknown type {x}"));
                 }
             }
         },
-        ParserType::Ptr(t) => TastType::Ptr(Box::new(resolve_type(type_scope, *t)?)),
+        ParserType::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t)?)),
         ParserType::Struct(members) => TastType::Struct(
             members
                 .iter()
-                .map(|(k, v)| Ok((k.clone(), resolve_type(type_scope, v.clone())?)))
+                .map(|(k, v)| Ok((k.clone(), resolve_type(scope, v.clone())?)))
                 .collect::<Result<HashMap<String, TastType>, String>>()?,
         ),
     })
+}
+
+/// Describes whether a block returns void or a type.
+#[derive(Debug,Clone,PartialEq)]
+pub enum BlockReturnType {
+    /// The function/block returns void (`fn()`)
+    Void,
+    /// The function/block returns T (`fn() -> T`)
+    Return(TastType),
+}
+
+impl BlockReturnType {
+    /// Converts this [`BlockReturnType`] into None for void and Some(t) for Return(t).
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // I think clippy's high.
+    pub fn into_option(self) -> Option<TastType> {
+        match self {
+            Self::Void => None,
+            Self::Return(t) => Some(t),
+        }
+    }
+}
+
+/// Describes if a block MAY, MUST, or MUST NOT return.
+#[derive(Debug,Clone,PartialEq)]
+pub enum BlockReturnAbility {
+    /// The block MUST NOT return at any point.
+    MustNotReturn,
+
+    /// The block MAY return, but it is not required.
+    ///
+    /// Any sub-blocks of this block MAY return.
+    MayReturn(BlockReturnType),
+
+    /// The block MUST return.
+    ///
+    /// Any sub-blocks of this block MAY return. At least one MUST return.
+    MustReturn(BlockReturnType),
+}
+
+/// Describes if a block labeled [MAY return](BlockReturnAbility::MayReturn) actually returns.
+///
+/// This is necessary for determining the fulfillment of a [MUST return](BlockReturnAbility::MustReturn) when a block
+/// contains a nested block (because the outer block must have at least *one* path which is guaranteed to return)
+#[derive(Debug,Clone,PartialEq,Eq)]
+pub enum BlockReturnActuality {
+    /// The block is guaranteed to never return on any path.
+    DoesNotReturn,
+
+    /// The block will return on some paths but not all. In some cases, this may be selected even if the block
+    /// will always return, as it is sometimes unknown.
+    MightReturn,
+
+    /// The block is guaranteed to return on any path.
+    WillReturn,
 }
 
 // FIXME: this NEEDS to be rewritten to use references almost everywhere and be no-clone. We stack overflow for deep expressions which is VERY VERY BAD.
@@ -66,26 +186,25 @@ fn resolve_type<S: std::hash::BuildHasher>(
 /// # Errors
 /// Errors if a type checker error is encountered.
 #[allow(clippy::too_many_lines)] // FIXME: make this fn shorter
-pub fn type_expr<S: std::hash::BuildHasher>(
-    value_scope: &HashMap<String, TastType, S>, // X:i32 represents "let X: i32;"
-    type_scope: &HashMap<String, TastType, S>,  // X:i32 represents "typedef X = i32;"
+pub fn type_expr(
+    scope: &Scope,
     expr: Expr,
 ) -> Result<TypedExpr, String> {
     Ok(match expr {
         Expr::Comma(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
             TypedExpr(
                 bt.clone().0,
                 TypedExprKind::Comma(Box::new(at), Box::new(bt)),
             )
         }
         Expr::Assignment(place, value) => {
-            let place_t = type_expr(value_scope, type_scope, *place)?;
-            let value_t = type_expr(value_scope, type_scope, *value)?;
+            let place_t = type_expr(scope, *place)?;
+            let value_t = type_expr(scope, *value)?;
 
             if place_t.0 != value_t.0 {
-                return Err(format!("Type mismatch: {:?} != {:?}", place_t.0, value_t.0));
+                return Err(format!("Type mismatch: {} != {}", place_t.0, value_t.0));
             }
 
             TypedExpr(
@@ -95,56 +214,46 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::AdditionAssignment(place, value) => type_expr(
-            value_scope,
-            type_scope,
+           scope,
             Expr::Assignment(place.clone(), Box::new(Expr::Addition(place, value))),
         )?,
         Expr::SubtractionAssignment(place, value) => type_expr(
-            value_scope,
-            type_scope,
+            scope,
             Expr::Assignment(place.clone(), Box::new(Expr::Subtraction(place, value))),
         )?,
         Expr::MultiplicationAssignment(place, value) => type_expr(
-            value_scope,
-            type_scope,
+            scope,
             Expr::Assignment(place.clone(), Box::new(Expr::Multiplication(place, value))),
         )?,
         Expr::DivisionAssignment(place, value) => type_expr(
-            value_scope,
-            type_scope,
+            scope,
             Expr::Assignment(place.clone(), Box::new(Expr::Division(place, value))),
         )?,
         Expr::ModuloAssignment(place, value) => type_expr(
-            value_scope,
-            type_scope,
+            scope,
             Expr::Assignment(place.clone(), Box::new(Expr::Modulo(place, value))),
         )?,
         Expr::BitwiseAndAssignment(place, value) => type_expr(
-            value_scope,
-            type_scope,
+            scope,
             Expr::Assignment(place.clone(), Box::new(Expr::BitwiseAnd(place, value))),
         )?,
         Expr::BitwiseOrAssignment(place, value) => type_expr(
-            value_scope,
-            type_scope,
+            scope,
             Expr::Assignment(place.clone(), Box::new(Expr::BitwiseOr(place, value))),
         )?,
         Expr::BitwiseXorAssignment(place, value) => type_expr(
-            value_scope,
-            type_scope,
+            scope,
             Expr::Assignment(place.clone(), Box::new(Expr::BitwiseXor(place, value))),
         )?,
         Expr::BitwiseLeftShiftAssignment(place, value) => type_expr(
-            value_scope,
-            type_scope,
+            scope,
             Expr::Assignment(
                 place.clone(),
                 Box::new(Expr::BitwiseLeftShift(place, value)),
             ),
         )?,
         Expr::BitwiseRightShiftAssignment(place, value) => type_expr(
-            value_scope,
-            type_scope,
+            scope,
             Expr::Assignment(
                 place.clone(),
                 Box::new(Expr::BitwiseRightShift(place, value)),
@@ -153,47 +262,47 @@ pub fn type_expr<S: std::hash::BuildHasher>(
 
         Expr::UnaryNot(x) => TypedExpr(
             TastType::Bool,
-            TypedExprKind::UnaryNot(Box::new(type_expr(value_scope, type_scope, *x)?)),
+            TypedExprKind::UnaryNot(Box::new(type_expr(scope, *x)?)),
         ),
         Expr::UnaryBitwiseNot(x) => {
-            let t = type_expr(value_scope, type_scope, *x)?;
+            let t = type_expr(scope, *x)?;
             if !t.0.is_integer() {
-                return Err(format!("Cannot bitwise not {:?}", t.0));
+                return Err(format!("Cannot bitwise not {}", t.0));
             }
             TypedExpr(t.0.clone(), TypedExprKind::UnaryBitwiseNot(Box::new(t)))
         }
         Expr::UnaryMinus(x) => {
-            let t = type_expr(value_scope, type_scope, *x)?;
+            let t = type_expr(scope, *x)?;
             if !t.0.is_integer() {
-                return Err(format!("Cannot unary minus {:?}", t.0));
+                return Err(format!("Cannot unary minus {}", t.0));
             }
             if !t.0.is_signed_integer() {
-                return Err(format!("Cannot unary minus unsigned integer {:?}", t.0));
+                return Err(format!("Cannot unary minus unsigned integer {}", t.0));
             }
             TypedExpr(t.0.clone(), TypedExprKind::UnaryMinus(Box::new(t)))
         }
         Expr::UnaryAddressOf(x) => {
-            let t = type_expr(value_scope, type_scope, *x)?;
+            let t = type_expr(scope, *x)?;
             TypedExpr(
                 TastType::Ptr(Box::new(t.0.clone())),
                 TypedExprKind::UnaryAddressOf(Box::new(t)),
             )
         }
         Expr::UnaryDereference(x) => {
-            let t = type_expr(value_scope, type_scope, *x)?;
+            let t = type_expr(scope, *x)?;
             if let TastType::Ptr(tt) = t.clone().0 {
                 TypedExpr(*tt, TypedExprKind::UnaryDereference(Box::new(t)))
             } else {
-                return Err(format!("Cannot dereference {:?}", t.0));
+                return Err(format!("Cannot dereference {}", t.0));
             }
         }
 
         Expr::Index(ptr, offset) => {
-            let ptr_t = type_expr(value_scope, type_scope, *ptr)?;
-            let offset_t = type_expr(value_scope, type_scope, *offset)?;
+            let ptr_t = type_expr(scope, *ptr)?;
+            let offset_t = type_expr(scope, *offset)?;
 
             if offset_t.0 != TastType::Usize {
-                return Err(format!("Index offset must be usize, not {:?}", offset_t.0));
+                return Err(format!("Index offset must be usize, not {}", offset_t.0));
             }
 
             if let TastType::Ptr(t) = ptr_t.0.clone() {
@@ -202,47 +311,45 @@ pub fn type_expr<S: std::hash::BuildHasher>(
                     TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_t)),
                 )
             } else {
-                return Err(format!("Cannot index {:?}", ptr_t.0));
+                return Err(format!("Cannot index {}", ptr_t.0));
             }
         }
 
         Expr::Dot(obj, key) => {
-            let obj_t = type_expr(value_scope, type_scope, *obj)?;
+            let obj_t = type_expr(scope, *obj)?;
 
             if let TastType::Struct(fields) = obj_t.0.clone() {
                 if let Some(t) = fields.get(&key) {
                     TypedExpr(t.clone(), TypedExprKind::Dot(Box::new(obj_t), key.clone()))
                 } else {
                     return Err(format!(
-                        "Struct {:?} does not have field {:?}",
+                        "Struct {} does not have field {}",
                         obj_t.0, key
                     ));
                 }
             } else {
-                return Err(format!("Cannot dot into non-struct type {:?}", obj_t.0));
+                return Err(format!("Cannot dot into non-struct type {}", obj_t.0));
             }
         }
         Expr::Arrow(obj, key) => {
-            let obj_t = type_expr(value_scope, type_scope, *obj.clone())?;
+            let obj_t = type_expr(scope, *obj.clone())?;
 
             if let TastType::Ptr(_) = obj_t.0 {
-                type_expr(
-                    value_scope,
-                    type_scope,
+                type_expr(scope,
                     Expr::Dot(Box::new(Expr::UnaryDereference(obj)), key),
                 )?
             } else {
                 return Err(format!(
-                    "Cannot deref to access into non-pointer type {:?}",
+                    "Cannot deref to access into non-pointer type {}",
                     obj_t.0
                 ));
             }
         }
         Expr::Call(f, args) => {
-            let ft = type_expr(value_scope, type_scope, *f)?;
+            let ft = type_expr(scope, *f)?;
             let args_t = args
                 .iter()
-                .map(|x| type_expr(value_scope, type_scope, x.clone()))
+                .map(|x| type_expr(scope, x.clone()))
                 .collect::<Result<Vec<TypedExpr>, String>>()?;
 
             if let TastType::Fn(arg_types, ret_type) = ft.0.clone() {
@@ -257,33 +364,33 @@ pub fn type_expr<S: std::hash::BuildHasher>(
                 for (i, (arg_type, arg_t)) in arg_types.iter().zip(args_t.iter()).enumerate() {
                     if arg_type != &arg_t.0 {
                         return Err(format!(
-                            "Argument {} must be {:?}, not {:?}",
+                            "Argument {} must be {}, not {}",
                             i, arg_type, arg_t.0
                         ));
                     }
                 }
 
-                TypedExpr(*ret_type, TypedExprKind::Call(Box::new(ft), args_t))
+                TypedExpr(ret_type.into_option().unwrap_or(TastType::Void), TypedExprKind::Call(Box::new(ft), args_t))
             } else {
-                return Err(format!("Cannot call non-function type {:?}", ft.0));
+                return Err(format!("Cannot call non-function type {}", ft.0));
             }
         }
 
         Expr::Ternary(cond, if_true, if_false) => {
-            let cond_t = type_expr(value_scope, type_scope, *cond)?;
-            let if_true_t = type_expr(value_scope, type_scope, *if_true)?;
-            let if_false_t = type_expr(value_scope, type_scope, *if_false)?;
+            let cond_t = type_expr(scope, *cond)?;
+            let if_true_t = type_expr(scope, *if_true)?;
+            let if_false_t = type_expr(scope, *if_false)?;
 
             if cond_t.0 != TastType::Bool {
                 return Err(format!(
-                    "Ternary condition must be bool, not {:?}",
+                    "Ternary condition must be bool, not {}",
                     cond_t.0
                 ));
             }
 
             if if_true_t.0 != if_false_t.0 {
                 return Err(format!(
-                    "Ternary branches must have same type, not {:?} and {:?}",
+                    "Ternary branches must have same type, not {} and {}",
                     if_true_t.0, if_false_t.0
                 ));
             }
@@ -295,15 +402,15 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::LogicalAnd(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if at.0 != TastType::Bool {
-                return Err(format!("Logical AND lhs must be bool, not {:?}", at.0));
+                return Err(format!("Logical AND lhs must be bool, not {}", at.0));
             }
 
             if bt.0 != TastType::Bool {
-                return Err(format!("Logical AND rhs must be bool, not {:?}", bt.0));
+                return Err(format!("Logical AND rhs must be bool, not {}", bt.0));
             }
 
             TypedExpr(
@@ -313,15 +420,15 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::LogicalOr(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if at.0 != TastType::Bool {
-                return Err(format!("Logical OR lhs must be bool, not {:?}", at.0));
+                return Err(format!("Logical OR lhs must be bool, not {}", at.0));
             }
 
             if bt.0 != TastType::Bool {
-                return Err(format!("Logical OR rhs must be bool, not {:?}", bt.0));
+                return Err(format!("Logical OR rhs must be bool, not {}", bt.0));
             }
 
             TypedExpr(
@@ -331,12 +438,12 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::Equals(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "Equals lhs and rhs must have same type, not {:?} and {:?}",
+                    "Equals lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -348,12 +455,12 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::NotEquals(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "NotEquals lhs and rhs must have same type, not {:?} and {:?}",
+                    "NotEquals lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -365,20 +472,20 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::BitwiseAnd(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("BitwiseAnd lhs must be integer, not {:?}", at.0));
+                return Err(format!("BitwiseAnd lhs must be integer, not {}", at.0));
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("BitwiseAnd rhs must be integer, not {:?}", bt.0));
+                return Err(format!("BitwiseAnd rhs must be integer, not {}", bt.0));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "BitwiseAnd lhs and rhs must have same type, not {:?} and {:?}",
+                    "BitwiseAnd lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -389,20 +496,20 @@ pub fn type_expr<S: std::hash::BuildHasher>(
             )
         }
         Expr::BitwiseOr(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("BitwiseOr lhs must be integer, not {:?}", at.0));
+                return Err(format!("BitwiseOr lhs must be integer, not {}", at.0));
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("BitwiseOr rhs must be integer, not {:?}", bt.0));
+                return Err(format!("BitwiseOr rhs must be integer, not {}", bt.0));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "BitwiseOr lhs and rhs must have same type, not {:?} and {:?}",
+                    "BitwiseOr lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -413,20 +520,20 @@ pub fn type_expr<S: std::hash::BuildHasher>(
             )
         }
         Expr::BitwiseXor(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("BitwiseXor lhs must be integer, not {:?}", at.0));
+                return Err(format!("BitwiseXor lhs must be integer, not {}", at.0));
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("BitwiseXor rhs must be integer, not {:?}", bt.0));
+                return Err(format!("BitwiseXor rhs must be integer, not {}", bt.0));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "BitwiseXor lhs and rhs must have same type, not {:?} and {:?}",
+                    "BitwiseXor lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -438,20 +545,20 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::GreaterThan(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("GreaterThan lhs must be integer, not {:?}", at.0));
+                return Err(format!("GreaterThan lhs must be integer, not {}", at.0));
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("GreaterThan rhs must be integer, not {:?}", bt.0));
+                return Err(format!("GreaterThan rhs must be integer, not {}", bt.0));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "GreaterThan lhs and rhs must have same type, not {:?} and {:?}",
+                    "GreaterThan lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -463,26 +570,26 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::GreaterThanOrEqualTo(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
                 return Err(format!(
-                    "GreaterThanOrEqualTo lhs must be integer, not {:?}",
+                    "GreaterThanOrEqualTo lhs must be integer, not {}",
                     at.0
                 ));
             }
 
             if !bt.0.is_integer() {
                 return Err(format!(
-                    "GreaterThanOrEqualTo rhs must be integer, not {:?}",
+                    "GreaterThanOrEqualTo rhs must be integer, not {}",
                     bt.0
                 ));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "GreaterThanOrEqualTo lhs and rhs must have same type, not {:?} and {:?}",
+                    "GreaterThanOrEqualTo lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -494,20 +601,20 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::LessThan(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("LessThan lhs must be integer, not {:?}", at.0));
+                return Err(format!("LessThan lhs must be integer, not {}", at.0));
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("LessThan rhs must be integer, not {:?}", bt.0));
+                return Err(format!("LessThan rhs must be integer, not {}", bt.0));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "LessThan lhs and rhs must have same type, not {:?} and {:?}",
+                    "LessThan lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -519,26 +626,26 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::LessThanOrEqualTo(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
                 return Err(format!(
-                    "LessThanOrEqualTo lhs must be integer, not {:?}",
+                    "LessThanOrEqualTo lhs must be integer, not {}",
                     at.0
                 ));
             }
 
             if !bt.0.is_integer() {
                 return Err(format!(
-                    "LessThanOrEqualTo rhs must be integer, not {:?}",
+                    "LessThanOrEqualTo rhs must be integer, not {}",
                     bt.0
                 ));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "LessThanOrEqualTo lhs and rhs must have same type, not {:?} and {:?}",
+                    "LessThanOrEqualTo lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -550,26 +657,26 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::BitwiseRightShift(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
                 return Err(format!(
-                    "BitwiseRightShift lhs must be integer, not {:?}",
+                    "BitwiseRightShift lhs must be integer, not {}",
                     at.0
                 ));
             }
 
             if !bt.0.is_integer() {
                 return Err(format!(
-                    "BitwiseRightShift rhs must be integer, not {:?}",
+                    "BitwiseRightShift rhs must be integer, not {}",
                     bt.0
                 ));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "BitwiseRightShift lhs and rhs must have same type, not {:?} and {:?}",
+                    "BitwiseRightShift lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -581,26 +688,26 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::BitwiseLeftShift(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
                 return Err(format!(
-                    "BitwiseLeftShift lhs must be integer, not {:?}",
+                    "BitwiseLeftShift lhs must be integer, not {}",
                     at.0
                 ));
             }
 
             if !bt.0.is_integer() {
                 return Err(format!(
-                    "BitwiseLeftShift rhs must be integer, not {:?}",
+                    "BitwiseLeftShift rhs must be integer, not {}",
                     bt.0
                 ));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "BitwiseLeftShift lhs and rhs must have same type, not {:?} and {:?}",
+                    "BitwiseLeftShift lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -612,20 +719,20 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::Addition(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("Addition lhs must be integer, not {:?}", at.0));
+                return Err(format!("Addition lhs must be integer, not {}", at.0));
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("Addition rhs must be integer, not {:?}", bt.0));
+                return Err(format!("Addition rhs must be integer, not {}", bt.0));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "Addition lhs and rhs must have same type, not {:?} and {:?}",
+                    "Addition lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -637,20 +744,20 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::Subtraction(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("Subtraction lhs must be integer, not {:?}", at.0));
+                return Err(format!("Subtraction lhs must be integer, not {}", at.0));
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("Subtraction rhs must be integer, not {:?}", bt.0));
+                return Err(format!("Subtraction rhs must be integer, not {}", bt.0));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "Subtraction lhs and rhs must have same type, not {:?} and {:?}",
+                    "Subtraction lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -662,26 +769,26 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::Multiplication(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
                 return Err(format!(
-                    "Multiplication lhs must be integer, not {:?}",
+                    "Multiplication lhs must be integer, not {}",
                     at.0
                 ));
             }
 
             if !bt.0.is_integer() {
                 return Err(format!(
-                    "Multiplication rhs must be integer, not {:?}",
+                    "Multiplication rhs must be integer, not {}",
                     bt.0
                 ));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "Multiplication lhs and rhs must have same type, not {:?} and {:?}",
+                    "Multiplication lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -693,20 +800,20 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::Division(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("Division lhs must be integer, not {:?}", at.0));
+                return Err(format!("Division lhs must be integer, not {}", at.0));
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("Division rhs must be integer, not {:?}", bt.0));
+                return Err(format!("Division rhs must be integer, not {}", bt.0));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "Division lhs and rhs must have same type, not {:?} and {:?}",
+                    "Division lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -718,20 +825,20 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::Modulo(a, b) => {
-            let at = type_expr(value_scope, type_scope, *a)?;
-            let bt = type_expr(value_scope, type_scope, *b)?;
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("Modulo lhs must be integer, not {:?}", at.0));
+                return Err(format!("Modulo lhs must be integer, not {}", at.0));
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("Modulo rhs must be integer, not {:?}", bt.0));
+                return Err(format!("Modulo rhs must be integer, not {}", bt.0));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "Modulo lhs and rhs must have same type, not {:?} and {:?}",
+                    "Modulo lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -743,8 +850,8 @@ pub fn type_expr<S: std::hash::BuildHasher>(
         }
 
         Expr::Cast(x, t) => {
-            let xt = type_expr(value_scope, type_scope, *x)?;
-            let tt = resolve_type(type_scope, t)?;
+            let xt = type_expr(scope, *x)?;
+            let tt = resolve_type(scope, t)?;
 
             if xt.0.is_integer() && tt.is_integer() {
                 // int -> int cast is valid
@@ -753,7 +860,7 @@ pub fn type_expr<S: std::hash::BuildHasher>(
                 // *T -> *U cast is valid
                 TypedExpr(tt.clone(), TypedExprKind::Cast(Box::new(xt), tt))
             } else {
-                return Err(format!("Cannot cast {:?} to {:?}", xt.0, tt));
+                return Err(format!("Cannot cast {} to {}", xt.0, tt));
             }
         }
 
@@ -763,8 +870,8 @@ pub fn type_expr<S: std::hash::BuildHasher>(
             TypedExprKind::StringLiteral(s),
         ),
         Expr::Identifier(i) => {
-            let t = value_scope
-                .get(&i)
+            let t = scope
+                .get_value(&i)
                 .ok_or(format!("Unknown identifier {i}"))?;
             TypedExpr(t.clone(), TypedExprKind::Identifier(i))
         }
@@ -774,119 +881,327 @@ pub fn type_expr<S: std::hash::BuildHasher>(
     })
 }
 
-// Considerations when designing the type_block function:
-// Must take an argument for the parent scopes
-// Takes a block (Vec<Stmt>), statements make no sense on their own
-// Desugars for to while
-// Desugars "if (x) y;" to "if (x) {y;}"
-// Takes an argument listing how its return behavior works. It either can't, may, or must return, and it is either void or of type T.
-// The function must also provide a value to the caller indicating if this block ALWAYS returns or has some cases where it may not return (if it is passed the "may return") option. Because if in a block that must return, all of its sub-blocks *may* return, but one of them must be guaranteed to return if it does not include its own return statement. For example:
-//
-// { // This block must return.
-//     { // This block MAY return.
-//         if (x) return; // This MAY return.
-//     } // This block WILL SOMETIMES return.
-//     // Because the above block is not GUARANTEED to return, the "must return" is not yet satisfied.
-//
-// Some work is needed to determine what the behavior of MAY/WILL is in most cases. For example, if WILL else WILL is WILL, but if MAY else WILL is MAY.
-// TODO: Add typeck_stmt. This might be done after (if) we add a HIR.
+/// Convert a single [AST statement](Stmt) like `x;` to a block statement `{ x; }` without converting
+/// `{ x; }` to `{ { x; } }`. This is preferred instead of `vec![x]` as it prevents extra nesting layers.
+fn coerce_stmt_into_block(stmt: Stmt) -> Vec<Stmt> {
+    match stmt {
+        Stmt::BlockStmt(stmts) => stmts,
+        _ => vec![stmt],
+    }
+}
+
+/// Process an [AST declaration](AstDeclaration) and place it in the appropriate scope, returning a [TAST declaration](TypedDeclaration).
+/// 
+/// This mutates `value_scope` and `type_scope` to add the new declaration.
+/// 
+/// # Errors
+/// Errors if a type checker error is encountered.
+pub fn process_declaration(scope: &mut Scope, declaration:AstDeclaration) -> Result<TypedDeclaration, String> {
+    match declaration {
+        AstDeclaration::DeclarationList(declarations) => Ok(TypedDeclaration::DeclarationList(
+                declarations
+                    .into_iter()
+                    .map(|let_declaration| -> Result<TastLetDeclaration, String> {
+                        let typed_expr = let_declaration
+                            .value
+                            .map(|expr| type_expr(scope, expr))
+                            .transpose()?;
+                        let resolved_ty = let_declaration
+                            .ty
+                            .map(|ty| resolve_type(scope, ty))
+                            .transpose()?;
+
+                        let result_decl= match (typed_expr, resolved_ty) {
+                            (None, None) => Err("No explicit variable type present and no value to infer from".to_string()),
+
+                            // Explicitly typed with no value
+                            (None, Some(ty)) => Ok(TastLetDeclaration{name:let_declaration.name,ty,value:None}),
+
+                            // Infer type from value
+                            (Some(TypedExpr(ty, ex)), None) => {
+                                Ok(TastLetDeclaration{name:let_declaration.name,ty:ty.clone(),value:Some(TypedExpr(ty,ex))})
+                            }
+
+                            // Both explicitly typed and inferable
+                            (Some(TypedExpr(ty, ex)), Some(resolved_ty)) => {
+                                if ty == resolved_ty {
+                                    Ok(TastLetDeclaration{name:let_declaration.name,ty:ty.clone(),value:Some(TypedExpr(ty,ex))})
+                                } else {
+                                    Err(format!("Cannot assign value of type {ty} to binding of type {resolved_ty}"))
+                                }
+                            }
+                        };
+                        if let Ok(TastLetDeclaration { name, ty, .. }) = &result_decl {
+                            scope.set_value(name.clone(), ty.clone());
+                        }
+
+                        result_decl
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            
+        )),
+        AstDeclaration::FunctionDefinition {
+            name,
+            parameters,
+            return_type,
+            body,
+        } => {
+            let resolved_return_type = return_type.map(|ty| resolve_type(scope, ty)).transpose()?.map_or(BlockReturnType::Void, BlockReturnType::Return);
+
+            let resolved_parameters = parameters
+                .into_iter()
+                .map(|parameter| -> Result<TastArgumentDeclaration, String> {
+                    Ok(TastArgumentDeclaration {
+                        name: parameter.name,
+                        ty: resolve_type(scope, parameter.ty)?
+                    })
+                }).collect::<Result<Vec<_>, _>>()?;
+            
+            // functions run in their own value scope because identifiers from the parent scope are not accessible
+            // the type scope is kept, however.
+            let function_scope = Scope::from_scopes(resolved_parameters.iter().map(|x| (x.name.clone(), x.ty.clone())).collect::<HashMap<_, _>>(), scope.type_scope.clone());
+
+
+            // discard return actuality as it's guaranteed
+            let (typed_body, _) = type_block(&function_scope, body, false, BlockReturnAbility::MustReturn(resolved_return_type.clone()))?;
+
+            scope.set_value(name.clone(), TastType::Fn(resolved_parameters.iter().map(|x| x.ty.clone()).collect::<Vec<_>>(), Box::new(resolved_return_type.clone())));
+
+            Ok(TypedDeclaration::FunctionDefinition {
+                    name,
+                    parameters: resolved_parameters,
+                    return_type: resolved_return_type.into_option(),
+                    body: typed_body,
+                })
+        }
+    }
+}
+
+/// Type check a block of [AST statement](Stmt)s and return a block of [TAST statement](TypedStmt)s.
+///
+/// It performs a small desugaring where all statements become implicit blocks.
+///
+/// This function must be provided a block of statements, and a few bits of information about the parent scope
+/// in form of booleans that toggle certain statements like `break` and a [`BlockReturnAbility`].
+///
+/// # Behavior of block returns
+/// In many cases, a block [MUST return](BlockReturnAbility::MustReturn). For example, this is done in
+/// the main block of a function. When a function contains sub-blocks, those blocks [*may* return](BlockReturnAbility::MayReturn)
+/// but are not required to. However, at least one of the blocks within must be guaranteed to return in order to
+/// fulfill a MUST return, otherwise the function is not guaranteed to return. So, if you pass this function
+/// a **may** return order, it will return a [`BlockReturnActuality`] which can be used to determine if a
+/// MUST return is fulfilled.
+///
+/// ```rs
+/// { // This block must return.
+///     { // This block MAY return.
+///         if (x) return; // This MAY return.
+///     } // This block WILL SOMETIMES return.
+///     // Because the above block is not GUARANTEED to return, the "must return" is not yet satisfied.
+/// }
+/// ```
+///
+/// # Errors
+/// Errors if a type checker error is encountered.
+// TODO: Maybe the TAST should attach the BlockReturnActuality in each BlockStmt itself and preserve it on sub-blocks in the TAST (this may be helpful in control flow analysis)
+#[allow(clippy::too_many_lines)]
+pub fn type_block(
+    parent_scope:&Scope,
+    input_block: Vec<Stmt>,
+    can_use_break_continue: bool,
+    return_ability: BlockReturnAbility,
+) -> Result<(Vec<TypedStmt>, BlockReturnActuality), String> {
+    let mut scope=parent_scope.clone();
+
+    // At first, the block does not return.
+    let (tast_block, return_actualities): (Vec<_>, Vec<_>) = input_block
+        .into_iter()
+        .map(
+            |stmt| -> Result<(TypedStmt, BlockReturnActuality), String> {
+                match stmt {
+                    Stmt::EmptyStmt => {
+                        Ok((TypedStmt::EmptyStmt, BlockReturnActuality::DoesNotReturn))
+                    }
+                    Stmt::BreakStmt if can_use_break_continue => Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn)),
+                    Stmt::BreakStmt => Err("Cannot use break statement here".to_string()),
+                    
+                    Stmt::ContinueStmt if can_use_break_continue => Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn)),
+                    Stmt::ContinueStmt => Err("Cannot use continue statement here".to_string()),
+
+                    Stmt::Declaration(declaration) => Ok((TypedStmt::Declaration(process_declaration(&mut scope, declaration)?), BlockReturnActuality::DoesNotReturn /* because expressions can't return */)),
+                    
+                    Stmt::IfStmt(cond, then, then_else) => {
+                        // TODO: if `cond` is always true at compile-time, we can prove the if branch is always taken (hence if it's WillReturn we can be WillReturn instead of MayReturn)
+
+                        // else branch implicitly becomes {}
+                        let then_else = then_else.unwrap_or(Box::new(Stmt::BlockStmt(vec![])));
+
+                        let typed_cond = type_expr(&scope, cond)?;
+
+                        if typed_cond.0 != TastType::Bool {
+                            return Err(format!(
+                                "If condition must be bool, not {}",
+                                typed_cond.0
+                            ));
+                        }
+
+                        let (typed_then, then_return_actuality) = type_block(&scope, coerce_stmt_into_block(*then), can_use_break_continue, 
+                    // return ability of a sub-block is determined by this match:
+                    match return_ability.clone() {
+                        BlockReturnAbility::MustNotReturn => BlockReturnAbility::MustNotReturn,
+                        BlockReturnAbility::MustReturn(x) | BlockReturnAbility::MayReturn(x) => BlockReturnAbility::MayReturn(x),
+                    }
+                    )?;
+
+                        let (typed_then_else, then_else_return_actuality) = type_block(&scope, coerce_stmt_into_block(*then_else), can_use_break_continue,
+                        // return ability of a sub-block is determined by this match:
+                        match return_ability.clone() {
+                            BlockReturnAbility::MustNotReturn => BlockReturnAbility::MustNotReturn,
+                            BlockReturnAbility::MustReturn(x) | BlockReturnAbility::MayReturn(x) => BlockReturnAbility::MayReturn(x),
+                        })?;
+
+                        
+                        Ok((TypedStmt::IfStmt(typed_cond, typed_then, typed_then_else), match (then_return_actuality, then_else_return_actuality) {
+                            (BlockReturnActuality::DoesNotReturn, BlockReturnActuality::DoesNotReturn) => BlockReturnActuality::DoesNotReturn,
+                            (BlockReturnActuality::DoesNotReturn, BlockReturnActuality::WillReturn) | (BlockReturnActuality::WillReturn, BlockReturnActuality::DoesNotReturn)|(BlockReturnActuality::MightReturn, _) | (_, BlockReturnActuality::MightReturn) => BlockReturnActuality::MightReturn,
+                            (BlockReturnActuality::WillReturn, BlockReturnActuality::WillReturn) => BlockReturnActuality::WillReturn,
+                        }))
+                    },
+                    Stmt::WhileStmt(cond, body) => {
+                        // TODO: we might be able to prove that the body runs at least once or an infinite loop making this won't/will return statically
+
+                        let typed_cond = type_expr(&scope, cond)?;
+
+                        if typed_cond.0 != TastType::Bool {
+                            return Err(format!(
+                                "While condition must be bool, not {}",
+                                typed_cond.0
+                            ));
+                        }
+
+                        let (typed_body, body_return_actuality) = type_block(&scope, coerce_stmt_into_block(*body), true,
+                        // return ability of a sub-block is determined by this match:
+                        match return_ability.clone() {
+                            BlockReturnAbility::MustNotReturn => BlockReturnAbility::MustNotReturn,
+                            BlockReturnAbility::MustReturn(x) | BlockReturnAbility::MayReturn(x) => BlockReturnAbility::MayReturn(x),
+                        })?;
+
+                        Ok((TypedStmt::WhileStmt(typed_cond, typed_body), match body_return_actuality {
+                            BlockReturnActuality::DoesNotReturn => BlockReturnActuality::DoesNotReturn,
+
+                            // in case the loop does not run at all or runs infinitely, WillReturn counts too
+                            BlockReturnActuality::MightReturn | BlockReturnActuality::WillReturn => BlockReturnActuality::MightReturn,
+                        }))
+                    },
+                    Stmt::ForStmt { init, cond, post, body } => {
+                        // TODO: same logic as the TODO comment on the while loop applies here.
+
+                        // the declaration made in the for loop's init is scoped to *only* the loop
+                        // so we need to make a subscope for it
+                        let mut loop_scope = scope.clone();
+
+                        // if present, evaluate the declaration
+                        let typed_init = init.map(|decl| process_declaration(&mut loop_scope, *decl)).transpose()?;
+
+                        let typed_cond = cond.map(|cond| type_expr(&loop_scope, cond)).transpose()?;
+                        let typed_post = post.map(|post| type_expr(&loop_scope, post)).transpose()?;
+
+                        let (typed_body, body_return_actuality) = type_block(&loop_scope, coerce_stmt_into_block(*body), true,
+                                                // return ability of a sub-block is determined by this match:
+                                                match return_ability.clone() {
+                                                    BlockReturnAbility::MustNotReturn => BlockReturnAbility::MustNotReturn,
+                                                    BlockReturnAbility::MustReturn(x) | BlockReturnAbility::MayReturn(x) => BlockReturnAbility::MayReturn(x),
+                                                })?;
+
+                        Ok((TypedStmt::ForStmt {
+                            init: typed_init.map(Box::new),
+                            cond: typed_cond,
+                            post: typed_post,
+                            body: typed_body,
+                        }, match body_return_actuality {
+                            BlockReturnActuality::DoesNotReturn => BlockReturnActuality::DoesNotReturn,
+
+                            // in case the loop does not run at all or runs infinitely, WillReturn counts too
+                            BlockReturnActuality::MightReturn | BlockReturnActuality::WillReturn => BlockReturnActuality::MightReturn,
+                        }))
+                    }
+
+                    Stmt::BlockStmt(body) => {
+                        let (typed_body, return_actuality) = type_block(&scope, body, can_use_break_continue, 
+                        // return ability of a sub-block is determined by this match:
+                        match return_ability.clone() {
+                            BlockReturnAbility::MustNotReturn => BlockReturnAbility::MustNotReturn,
+                            BlockReturnAbility::MustReturn(x) | BlockReturnAbility::MayReturn(x) => BlockReturnAbility::MayReturn(x),
+                        }
+                        )?;
+                        Ok((TypedStmt::BlockStmt(typed_body), return_actuality))
+                    },
+
+                    Stmt::ExprStmt(expr) => 
+                        Ok((TypedStmt::ExprStmt(type_expr(&scope, expr)?), BlockReturnActuality::DoesNotReturn))
+                    ,
+                    Stmt::ReturnStmt(value) => {
+                        let resolved_value = value.map(|expr| type_expr(&scope, expr)).transpose()?;
+                        match (resolved_value, return_ability.clone()) {
+
+                            // expects no return
+                            (_, BlockReturnAbility::MustNotReturn) => Err("Cannot return from a block that must not return".to_string()),
+
+                            // return; in void fn
+                            (None, BlockReturnAbility::MayReturn(BlockReturnType::Void) | BlockReturnAbility::MustReturn(BlockReturnType::Void)) => Ok((TypedStmt::ReturnStmt(None), BlockReturnActuality::WillReturn)),
+
+                            // return; in fn with required return type
+                            (None, BlockReturnAbility::MayReturn(BlockReturnType::Return(t)) | BlockReturnAbility::MustReturn(BlockReturnType::Return(t))) => Err(format!("Cannot return void from a block expecting a return type of {t}")),
+
+                            // return x; in fn expecting to return void
+                            (Some(TypedExpr(ty, _)), BlockReturnAbility::MustReturn(BlockReturnType::Void) | BlockReturnAbility::MayReturn(BlockReturnType::Void)) => Err(format!("Cannot return value of type {ty} from a block that must return void")),
+
+                            // return x; in fn expecting to return x
+                            (Some(TypedExpr(ty, ex)), BlockReturnAbility::MustReturn(BlockReturnType::Return(t)) | BlockReturnAbility::MayReturn(BlockReturnType::Return(t))) => {
+                                if ty == t {
+                                    Ok((TypedStmt::ReturnStmt(Some(TypedExpr(ty, ex))), BlockReturnActuality::WillReturn))
+                                } else {
+                                    Err(format!("Cannot return value of type {ty} from a block that must return type {t}"))
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+        )
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .unzip();
+
+    let might_return = return_actualities
+        .iter()
+        .any(|x| matches!(x, BlockReturnActuality::MightReturn | BlockReturnActuality::WillReturn));
+    let will_return = return_actualities
+        .iter()
+        .any(|x| matches!(x, BlockReturnActuality::WillReturn));
+
+    let return_actuality = match (might_return, will_return) {
+        (_, true) => BlockReturnActuality::WillReturn,
+        (true, false) => BlockReturnActuality::MightReturn,
+        (false, false) => BlockReturnActuality::DoesNotReturn,
+    };
+
+    #[allow(clippy::match_same_arms)] // for clarity
+    match (return_ability, return_actuality) {
+        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::DoesNotReturn) => Ok((tast_block, BlockReturnActuality::DoesNotReturn)),
+        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::WillReturn) => Ok((tast_block, BlockReturnActuality::WillReturn)),
+        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::WillReturn) => Ok((tast_block, BlockReturnActuality::WillReturn)),
+        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::MightReturn) => Ok((tast_block, BlockReturnActuality::MightReturn)),
+        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::DoesNotReturn) => Ok((tast_block, BlockReturnActuality::DoesNotReturn)),
+        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::MightReturn) => Err("Block must return, but no sub-block is guaranteed to return".to_string()),
+        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::DoesNotReturn) => Err("Block must return, but no sub-block is guaranteed to return".to_string()),
+        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => Err("Block must not return, but a sub-block may return".to_string()),
+        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::WillReturn) => Err("Block must not return, but a sub-block may return".to_string()),
+    }
+}
 
 #[cfg(test)]
 mod tests {
     // TODO: Tests
     use super::*;
-
-    #[test]
-    fn test() {
-        let mut value_scope: HashMap<String, TastType> = HashMap::new();
-        value_scope.insert("int".to_string(), TastType::I32);
-        value_scope.insert("intptr".to_string(), TastType::Ptr(Box::new(TastType::I32)));
-        value_scope.insert(
-            "struct".to_string(),
-            TastType::Struct(HashMap::from([
-                ("int".to_string(), TastType::I32),
-                ("intptr".to_string(), TastType::Ptr(Box::new(TastType::I32))),
-            ])),
-        );
-        value_scope.insert(
-            "structptr".to_string(),
-            TastType::Ptr(Box::new(TastType::Struct(HashMap::from([
-                ("int".to_string(), TastType::I32),
-                ("intptr".to_string(), TastType::Ptr(Box::new(TastType::I32))),
-            ])))),
-        );
-        value_scope.insert(
-            "add3".to_string(),
-            TastType::Fn(
-                vec![TastType::I32, TastType::I32, TastType::I32],
-                Box::new(TastType::I32),
-            ),
-        );
-
-        let mut type_scope: HashMap<String, TastType> = HashMap::new();
-
-        let result = type_expr(
-            &value_scope,
-            &type_scope,
-            zrc_parser::parser::parse_expr(concat!(
-                "int = 5,",
-                "int += 5,",
-                "int -= 5,",
-                "int *= 5,",
-                "int /= 5,",
-                "int %= 5,",
-                "int &= 5,",
-                "int |= 5,",
-                "int ^= 5,",
-                "int <<= 5,",
-                "int >>= 5,",
-                "!int,",
-                "~int,",
-                "-int,",
-                "&int,",
-                "*intptr,",
-                "*(&int),",
-                "&intptr,",
-                "intptr[5 as usize],",
-                "intptr[*intptr as usize],",
-                "struct.int,",
-                "*struct.intptr,",
-                "struct.intptr[5 as usize],",
-                "(&struct)->int,",
-                "(*structptr).int,",
-                "structptr->int,",
-                "add3(int, *intptr, structptr->int),",
-                "add3(5, 6, 4),",
-                "int > 10 ? 5 : 6,",
-                "(int > 10 && int < 20) ? struct.intptr[structptr->int as usize] : int",
-                // "int == 7 || int != 7,",
-                // "(int & 32) | 17 ^ 3,",
-                // "int >> 7,",
-                // "int + 32,",
-                // "*intptr - 4,",
-                // "int * 32,",
-                // "int % int == 0,",
-                // "(!int) == true"
-            ))
-            .unwrap(),
-        )
-        .unwrap();
-        // dbg!(result);
-        println!("{}", result);
-
-        assert_eq!(true, false);
-        // assert_eq!(
-        //     type_expr(&scope, zrc_parser::parser::parse_expr("x,5").unwrap()),
-        //     Ok(TypedExpr(
-        //         ZrType::I32,
-        //         TypedExprKind::Comma(
-        //             Box::new(TypedExpr(ZrType::I32, TypedExprKind::Identifier("x".to_string()))),
-        //             Box::new(TypedExpr(
-        //                 ZrType::I32,
-        //                 TypedExprKind::NumberLiteral("5".to_string())
-        //             )),
-        //         )
-        //     ))
-        // );
-    }
 }

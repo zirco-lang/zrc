@@ -9,11 +9,32 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
-use zrc_parser::parser;
-
-fn main() {
+fn main(
+) -> Result<(), zrc_parser::parser::ZircoParserError<Vec<zrc_parser::ast::stmt::Declaration>>> {
     println!(
-        "{:?}",
-        parser::parse_program("fn main() -> struct{x:i32} { let x: struct{} = 5; }")
+        "{}",
+        zrc_typeck::type_block(
+            &zrc_typeck::Scope::new(),
+            zrc_parser::parser::parse_program(
+                "fn main(argc: u8, argv: *u8) -> u8 {
+                    let x = 7;
+                    if (x == 2 + 2) return 3 as u8;
+                    return 0 as u8;
+                }"
+            )?
+            .into_iter()
+            .map(zrc_parser::ast::stmt::Stmt::Declaration)
+            .collect(),
+            false,
+            zrc_typeck::BlockReturnAbility::MustNotReturn
+        )
+        .unwrap()
+        .0
+        .into_iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
     );
+
+    Ok(())
 }

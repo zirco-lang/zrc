@@ -2,8 +2,6 @@
 
 use std::fmt::Display;
 
-use zrc_parser::ast::stmt::ArgumentDeclaration;
-
 use super::{expr::TypedExpr, ty::Type};
 
 /// A declaration created with `let`.
@@ -32,7 +30,8 @@ impl Display for LetDeclaration {
 pub enum TypedStmt {
     // all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here (basically if (x) y has become if (x) {y})
     /// `if (x) y` or `if (x) y else z`
-    IfStmt(TypedExpr, Vec<TypedStmt>, Option<Vec<TypedStmt>>),
+    // if (x) y; desugars to if (x) y; else {} here.
+    IfStmt(TypedExpr, Vec<TypedStmt>, Vec<TypedStmt>),
     /// `while (x) y`
     WhileStmt(TypedExpr, Vec<TypedStmt>),
     /// `for (init; cond; post) body`
@@ -45,7 +44,7 @@ pub enum TypedStmt {
         /// Runs after each iteration of the loop.
         post: Option<TypedExpr>,
         /// The body of the loop.
-        body: Box<TypedStmt>,
+        body: Vec<TypedStmt>,
     },
     /// `{ ... }`
     BlockStmt(Vec<TypedStmt>),
@@ -99,16 +98,21 @@ impl Display for TypedDeclaration {
                 body,
             } => write!(
                 f,
-                "fn {name}({}) -> {return_type} {{ {} }}",
+                "fn {name}({}) -> {return_type} {{\n{}\n}}",
                 parameters
                     .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", "),
                 body.iter()
-                    .map(ToString::to_string)
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
                     .collect::<Vec<_>>()
-                    .join(" ")
+                    .join("\n")
             ),
             Self::FunctionDefinition {
                 name,
@@ -117,16 +121,21 @@ impl Display for TypedDeclaration {
                 body,
             } => write!(
                 f,
-                "fn {name}({}) {{ {} }}",
+                "fn {name}({}) {{\n{}\n}}",
                 parameters
                     .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", "),
                 body.iter()
-                    .map(ToString::to_string)
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
                     .collect::<Vec<_>>()
-                    .join(" ")
+                    .join("\n")
             ),
         }
     }
@@ -135,33 +144,40 @@ impl Display for TypedDeclaration {
 impl Display for TypedStmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::IfStmt(e, s, None) => write!(
+            Self::IfStmt(e, s1, s2) => write!(
                 f,
-                "if ({e}) {{ {} }}",
-                s.iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            ),
-            Self::IfStmt(e, s1, Some(s2)) => write!(
-                f,
-                "if ({e}) {{ {} }} else {{ {} }}",
+                "if ({e}) {{\n{}\n}} else {{\n{}\n}}",
                 s1.iter()
-                    .map(ToString::to_string)
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
                     .collect::<Vec<_>>()
-                    .join(" "),
+                    .join("\n"),
                 s2.iter()
-                    .map(ToString::to_string)
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
                     .collect::<Vec<_>>()
-                    .join(" ")
+                    .join("\n")
             ),
             Self::WhileStmt(e, s) => write!(
                 f,
-                "while ({e}) {{ {} }}",
+                "while ({e}) {{\n{}\n}}",
                 s.iter()
-                    .map(ToString::to_string)
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
                     .collect::<Vec<_>>()
-                    .join(" ")
+                    .join("\n")
             ),
             Self::ForStmt {
                 init,
@@ -170,18 +186,32 @@ impl Display for TypedStmt {
                 body,
             } => write!(
                 f,
-                "for ({} {}; {}) {body}",
+                "for ({} {}; {}) {{\n{}\n}}",
                 init.clone().map_or(String::new(), |x| x.to_string()),
                 cond.clone().map_or(String::new(), |x| x.to_string()),
-                post.clone().map_or(String::new(), |x| x.to_string())
+                post.clone().map_or(String::new(), |x| x.to_string()),
+                body.iter()
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
             ),
             Self::BlockStmt(s) => write!(
                 f,
-                "{{ {} }}",
+                "{{\n{}\n}}",
                 s.iter()
-                    .map(ToString::to_string)
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
                     .collect::<Vec<_>>()
-                    .join(" ")
+                    .join("\n")
             ),
             Self::ExprStmt(e) => write!(f, "{e};"),
             Self::EmptyStmt => write!(f, ";"),
@@ -191,5 +221,19 @@ impl Display for TypedStmt {
             Self::ReturnStmt(None) => write!(f, "return;"),
             Self::Declaration(d) => write!(f, "{d}"),
         }
+    }
+}
+
+/// A special form of [`LetDeclaration`] used for function parameters.
+#[derive(PartialEq, Debug, Clone)]
+pub struct ArgumentDeclaration {
+    /// The name of the parameter.
+    pub name: String,
+    /// The type of the parameter.
+    pub ty: Type,
+}
+impl Display for ArgumentDeclaration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.name, self.ty)
     }
 }

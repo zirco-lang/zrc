@@ -15,26 +15,6 @@ pub enum TypedExprKind {
 
     /// `a = b`
     Assignment(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a += b`
-    AdditionAssignment(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a -= b`
-    SubtractionAssignment(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a *= b`
-    MultiplicationAssignment(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a /= b`
-    DivisionAssignment(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a %= b`
-    ModuloAssignment(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a &= b`
-    BitwiseAndAssignment(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a |= b`
-    BitwiseOrAssignment(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a ^= b`
-    BitwiseXorAssignment(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a <<= b`
-    BitwiseLeftShiftAssignment(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a >>= b`
-    BitwiseRightShiftAssignment(Box<TypedExpr>, Box<TypedExpr>),
 
     /// `!x`
     UnaryNot(Box<TypedExpr>),
@@ -142,16 +122,6 @@ impl Display for TypedExprKind {
             Self::LogicalAnd(l, r) => write!(f, "{l} && {r}"),
             Self::LogicalOr(l, r) => write!(f, "{l} || {r}"),
             Self::Comma(l, r) => write!(f, "{l}, {r}"),
-            Self::AdditionAssignment(l, r) => write!(f, "{l} += {r}"),
-            Self::SubtractionAssignment(l, r) => write!(f, "{l} -= {r}"),
-            Self::MultiplicationAssignment(l, r) => write!(f, "{l} *= {r}"),
-            Self::DivisionAssignment(l, r) => write!(f, "{l} /= {r}"),
-            Self::ModuloAssignment(l, r) => write!(f, "{l} %= {r}"),
-            Self::BitwiseAndAssignment(l, r) => write!(f, "{l} &= {r}"),
-            Self::BitwiseOrAssignment(l, r) => write!(f, "{l} |= {r}"),
-            Self::BitwiseXorAssignment(l, r) => write!(f, "{l} ^= {r}"),
-            Self::BitwiseLeftShiftAssignment(l, r) => write!(f, "{l} <<= {r}"),
-            Self::BitwiseRightShiftAssignment(l, r) => write!(f, "{l} >>= {r}"),
             Self::UnaryNot(e) => write!(f, "!{e}"),
             Self::Cast(x, t) => write!(f, "{x} as {t}"),
             Self::UnaryBitwiseNot(e) => write!(f, "~{e}"),
@@ -176,6 +146,6 @@ impl Display for TypedExprKind {
 
 impl Display for TypedExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}) ({})", self.0, self.1)
+        write!(f, "(({}) as ({}))", self.1, self.0)
     }
 }

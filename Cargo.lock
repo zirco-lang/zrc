@@ -730,6 +730,7 @@ name = "zrc"
 version = "0.1.0"
 dependencies = [
  "zrc_parser",
+ "zrc_typeck",
 ]
 
 [[package]]
