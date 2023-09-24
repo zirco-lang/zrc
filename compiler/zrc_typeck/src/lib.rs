@@ -25,21 +25,19 @@ use tast::{
 };
 use zrc_parser::ast::{
     expr::Expr,
-    stmt::{
-        Declaration as AstDeclaration, Stmt,
-    },
+    stmt::{Declaration as AstDeclaration, Stmt},
     ty::Type as ParserType,
 };
 
 /// Contains scoping information during type checking.
-/// 
+///
 /// Cloning it resembles the creation of a subscope.
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 pub struct Scope {
     /// Maps identifiers for values to their types.
-    value_scope: HashMap<String,TastType>,
+    value_scope: HashMap<String, TastType>,
     /// Maps type names to their actual type representations.
-    type_scope: HashMap<String,TastType>
+    type_scope: HashMap<String, TastType>,
 }
 impl Scope {
     /// Creates a new Scope with no values or types.
@@ -47,15 +45,21 @@ impl Scope {
     pub fn new() -> Self {
         Self {
             value_scope: HashMap::new(),
-            type_scope: HashMap::new()
+            type_scope: HashMap::new(),
         }
     }
 
     /// Creates a new Scope from two [`HashMap`]s.
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
-    pub fn from_scopes(value_scope:HashMap<String,TastType>,type_scope:HashMap<String,TastType>)->Self{
-        Self{value_scope,type_scope}
+    pub fn from_scopes(
+        value_scope: HashMap<String, TastType>,
+        type_scope: HashMap<String, TastType>,
+    ) -> Self {
+        Self {
+            value_scope,
+            type_scope,
+        }
     }
 
     /// Gets a value-identifier's type from this [`Scope`]
@@ -90,10 +94,7 @@ impl Default for Scope {
 ///
 /// # Errors
 /// Errors if the identifier is not found in the type scope.
-fn resolve_type(
-    scope: &Scope,
-    ty: ParserType,
-) -> Result<TastType, String> {
+fn resolve_type(scope: &Scope, ty: ParserType) -> Result<TastType, String> {
     Ok(match ty {
         ParserType::Identifier(x) => match x.as_str() {
             "i8" => TastType::I8,
@@ -126,7 +127,7 @@ fn resolve_type(
 }
 
 /// Describes whether a block returns void or a type.
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BlockReturnType {
     /// The function/block returns void (`fn()`)
     Void,
@@ -147,7 +148,7 @@ impl BlockReturnType {
 }
 
 /// Describes if a block MAY, MUST, or MUST NOT return.
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BlockReturnAbility {
     /// The block MUST NOT return at any point.
     MustNotReturn,
@@ -167,7 +168,7 @@ pub enum BlockReturnAbility {
 ///
 /// This is necessary for determining the fulfillment of a [MUST return](BlockReturnAbility::MustReturn) when a block
 /// contains a nested block (because the outer block must have at least *one* path which is guaranteed to return)
-#[derive(Debug,Clone,PartialEq,Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockReturnActuality {
     /// The block is guaranteed to never return on any path.
     DoesNotReturn,
@@ -186,10 +187,7 @@ pub enum BlockReturnActuality {
 /// # Errors
 /// Errors if a type checker error is encountered.
 #[allow(clippy::too_many_lines)] // FIXME: make this fn shorter
-pub fn type_expr(
-    scope: &Scope,
-    expr: Expr,
-) -> Result<TypedExpr, String> {
+pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
     Ok(match expr {
         Expr::Comma(a, b) => {
             let at = type_expr(scope, *a)?;
@@ -214,7 +212,7 @@ pub fn type_expr(
         }
 
         Expr::AdditionAssignment(place, value) => type_expr(
-           scope,
+            scope,
             Expr::Assignment(place.clone(), Box::new(Expr::Addition(place, value))),
         )?,
         Expr::SubtractionAssignment(place, value) => type_expr(
@@ -322,10 +320,7 @@ pub fn type_expr(
                 if let Some(t) = fields.get(&key) {
                     TypedExpr(t.clone(), TypedExprKind::Dot(Box::new(obj_t), key.clone()))
                 } else {
-                    return Err(format!(
-                        "Struct {} does not have field {}",
-                        obj_t.0, key
-                    ));
+                    return Err(format!("Struct {} does not have field {}", obj_t.0, key));
                 }
             } else {
                 return Err(format!("Cannot dot into non-struct type {}", obj_t.0));
@@ -335,9 +330,7 @@ pub fn type_expr(
             let obj_t = type_expr(scope, *obj.clone())?;
 
             if let TastType::Ptr(_) = obj_t.0 {
-                type_expr(scope,
-                    Expr::Dot(Box::new(Expr::UnaryDereference(obj)), key),
-                )?
+                type_expr(scope, Expr::Dot(Box::new(Expr::UnaryDereference(obj)), key))?
             } else {
                 return Err(format!(
                     "Cannot deref to access into non-pointer type {}",
@@ -370,7 +363,10 @@ pub fn type_expr(
                     }
                 }
 
-                TypedExpr(ret_type.into_option().unwrap_or(TastType::Void), TypedExprKind::Call(Box::new(ft), args_t))
+                TypedExpr(
+                    ret_type.into_option().unwrap_or(TastType::Void),
+                    TypedExprKind::Call(Box::new(ft), args_t),
+                )
             } else {
                 return Err(format!("Cannot call non-function type {}", ft.0));
             }
@@ -382,10 +378,7 @@ pub fn type_expr(
             let if_false_t = type_expr(scope, *if_false)?;
 
             if cond_t.0 != TastType::Bool {
-                return Err(format!(
-                    "Ternary condition must be bool, not {}",
-                    cond_t.0
-                ));
+                return Err(format!("Ternary condition must be bool, not {}", cond_t.0));
             }
 
             if if_true_t.0 != if_false_t.0 {
@@ -773,17 +766,11 @@ pub fn type_expr(
             let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!(
-                    "Multiplication lhs must be integer, not {}",
-                    at.0
-                ));
+                return Err(format!("Multiplication lhs must be integer, not {}", at.0));
             }
 
             if !bt.0.is_integer() {
-                return Err(format!(
-                    "Multiplication rhs must be integer, not {}",
-                    bt.0
-                ));
+                return Err(format!("Multiplication rhs must be integer, not {}", bt.0));
             }
 
             if at.0 != bt.0 {
@@ -891,12 +878,15 @@ fn coerce_stmt_into_block(stmt: Stmt) -> Vec<Stmt> {
 }
 
 /// Process an [AST declaration](AstDeclaration) and place it in the appropriate scope, returning a [TAST declaration](TypedDeclaration).
-/// 
+///
 /// This mutates `value_scope` and `type_scope` to add the new declaration.
-/// 
+///
 /// # Errors
 /// Errors if a type checker error is encountered.
-pub fn process_declaration(scope: &mut Scope, declaration:AstDeclaration) -> Result<TypedDeclaration, String> {
+pub fn process_declaration(
+    scope: &mut Scope,
+    declaration: AstDeclaration,
+) -> Result<TypedDeclaration, String> {
     match declaration {
         AstDeclaration::DeclarationList(declarations) => Ok(TypedDeclaration::DeclarationList(
                 declarations
@@ -1006,12 +996,12 @@ pub fn process_declaration(scope: &mut Scope, declaration:AstDeclaration) -> Res
 // TODO: Maybe the TAST should attach the BlockReturnActuality in each BlockStmt itself and preserve it on sub-blocks in the TAST (this may be helpful in control flow analysis)
 #[allow(clippy::too_many_lines)]
 pub fn type_block(
-    parent_scope:&Scope,
+    parent_scope: &Scope,
     input_block: Vec<Stmt>,
     can_use_break_continue: bool,
     return_ability: BlockReturnAbility,
 ) -> Result<(Vec<TypedStmt>, BlockReturnActuality), String> {
-    let mut scope=parent_scope.clone();
+    let mut scope = parent_scope.clone();
 
     // At first, the block does not return.
     let (tast_block, return_actualities): (Vec<_>, Vec<_>) = input_block
@@ -1173,9 +1163,12 @@ pub fn type_block(
         .into_iter()
         .unzip();
 
-    let might_return = return_actualities
-        .iter()
-        .any(|x| matches!(x, BlockReturnActuality::MightReturn | BlockReturnActuality::WillReturn));
+    let might_return = return_actualities.iter().any(|x| {
+        matches!(
+            x,
+            BlockReturnActuality::MightReturn | BlockReturnActuality::WillReturn
+        )
+    });
     let will_return = return_actualities
         .iter()
         .any(|x| matches!(x, BlockReturnActuality::WillReturn));
@@ -1188,15 +1181,33 @@ pub fn type_block(
 
     #[allow(clippy::match_same_arms)] // for clarity
     match (return_ability, return_actuality) {
-        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::DoesNotReturn) => Ok((tast_block, BlockReturnActuality::DoesNotReturn)),
-        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::WillReturn) => Ok((tast_block, BlockReturnActuality::WillReturn)),
-        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::WillReturn) => Ok((tast_block, BlockReturnActuality::WillReturn)),
-        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::MightReturn) => Ok((tast_block, BlockReturnActuality::MightReturn)),
-        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::DoesNotReturn) => Ok((tast_block, BlockReturnActuality::DoesNotReturn)),
-        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::MightReturn) => Err("Block must return, but no sub-block is guaranteed to return".to_string()),
-        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::DoesNotReturn) => Err("Block must return, but no sub-block is guaranteed to return".to_string()),
-        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => Err("Block must not return, but a sub-block may return".to_string()),
-        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::WillReturn) => Err("Block must not return, but a sub-block may return".to_string()),
+        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::DoesNotReturn) => {
+            Ok((tast_block, BlockReturnActuality::DoesNotReturn))
+        }
+        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::WillReturn) => {
+            Ok((tast_block, BlockReturnActuality::WillReturn))
+        }
+        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::WillReturn) => {
+            Ok((tast_block, BlockReturnActuality::WillReturn))
+        }
+        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::MightReturn) => {
+            Ok((tast_block, BlockReturnActuality::MightReturn))
+        }
+        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::DoesNotReturn) => {
+            Ok((tast_block, BlockReturnActuality::DoesNotReturn))
+        }
+        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::MightReturn) => {
+            Err("Block must return, but no sub-block is guaranteed to return".to_string())
+        }
+        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::DoesNotReturn) => {
+            Err("Block must return, but no sub-block is guaranteed to return".to_string())
+        }
+        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => {
+            Err("Block must not return, but a sub-block may return".to_string())
+        }
+        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::WillReturn) => {
+            Err("Block must not return, but a sub-block may return".to_string())
+        }
     }
 }
 

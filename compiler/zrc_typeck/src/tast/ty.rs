@@ -1,7 +1,8 @@
 //! Type representation for the Zirco [TAST](super)
 
-use super::super::BlockReturnType;
 use std::{collections::HashMap, fmt::Display};
+
+use super::super::BlockReturnType;
 
 /// The possible Zirco types
 #[derive(PartialEq, Debug, Clone)]
