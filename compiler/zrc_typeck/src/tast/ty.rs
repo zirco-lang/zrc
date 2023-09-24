@@ -30,7 +30,8 @@ pub enum Type {
     /// `void`, only producible by calling a void function (`fn()`)
     Void,
     /// `bool`
-    Bool, // TODO: need an "any Int" type that implicitly casts to all int types but becomes i32 when assigned to a value
+    Bool, /* TODO: need an "any Int" type that implicitly casts to all int types but becomes
+           * i32 when assigned to a value */
     /// `*T`
     Ptr(Box<Type>),
     /// `fn(A, B) -> T`

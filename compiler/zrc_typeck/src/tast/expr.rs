@@ -2,7 +2,8 @@
 
 use std::fmt::Display;
 
-/// An [expression kind](TypedExprKind) with its yielded [result type](super::ty::Type) attached to it.
+/// An [expression kind](TypedExprKind) with its yielded [result
+/// type](super::ty::Type) attached to it.
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
 pub struct TypedExpr(pub super::ty::Type, pub TypedExprKind);

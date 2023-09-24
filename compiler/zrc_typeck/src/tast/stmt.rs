@@ -9,7 +9,8 @@ use super::{expr::TypedExpr, ty::Type};
 pub struct LetDeclaration {
     /// The name of the identifier.
     pub name: String,
-    /// The type of the new symbol. If set to [`None`], the type will be inferred.
+    /// The type of the new symbol. If set to [`None`], the type will be
+    /// inferred.
     pub ty: Type, // types are definite after inference
     /// The value to associate with the new symbol.
     pub value: Option<TypedExpr>,
@@ -24,11 +25,13 @@ impl Display for LetDeclaration {
     }
 }
 
-/// The enum representing all of the different kinds of statements in Zirco after type checking
+/// The enum representing all of the different kinds of statements in Zirco
+/// after type checking
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::module_name_repetitions)]
 pub enum TypedStmt {
-    // all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here (basically if (x) y has become if (x) {y})
+    // all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here
+    // (basically if (x) y has become if (x) {y})
     /// `if (x) y` or `if (x) y else z`
     // if (x) y; desugars to if (x) y; else {} here.
     IfStmt(TypedExpr, Vec<TypedStmt>, Vec<TypedStmt>),
@@ -38,8 +41,9 @@ pub enum TypedStmt {
     ForStmt {
         /// Runs once before the loop starts.
         init: Option<Box<TypedDeclaration>>,
-        /// Runs before each iteration of the loop. If this evaluates to `false`, the loop will end.
-        /// If this is [`None`], the loop will run forever.
+        /// Runs before each iteration of the loop. If this evaluates to
+        /// `false`, the loop will end. If this is [`None`], the loop
+        /// will run forever.
         cond: Option<TypedExpr>,
         /// Runs after each iteration of the loop.
         post: Option<TypedExpr>,
@@ -62,7 +66,8 @@ pub enum TypedStmt {
     Declaration(TypedDeclaration),
 }
 
-/// Any declaration valid to be present at the top level of a file. May also be used from the [`TypedStmt::Declaration`] variant.
+/// Any declaration valid to be present at the top level of a file. May also be
+/// used from the [`TypedStmt::Declaration`] variant.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypedDeclaration {
     /// A list of [`LetDeclaration`]s.
@@ -73,7 +78,8 @@ pub enum TypedDeclaration {
         name: String,
         /// The parameters of the function.
         parameters: Vec<ArgumentDeclaration>,
-        /// The return type of the function. If set to [`None`], the function is void.
+        /// The return type of the function. If set to [`None`], the function is
+        /// void.
         return_type: Option<Type>,
         /// The body of the function.
         body: Vec<TypedStmt>,
