@@ -1,6 +1,7 @@
 //! Type representation for the Zirco AST
 //!
-//! The main thing within this module you will need is the [`Type`] enum. It contains all the different type kinds in Zirco.
+//! The main thing within this module you will need is the [`Type`] enum. It
+//! contains all the different type kinds in Zirco.
 
 use std::fmt::Display;
 

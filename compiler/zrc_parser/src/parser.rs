@@ -11,7 +11,8 @@ use super::{
 };
 use crate::internal_parser;
 
-/// An error returned from one of the Zirco parsing functions, like [`parse_program`].
+/// An error returned from one of the Zirco parsing functions, like
+/// [`parse_program`].
 #[derive(Debug, PartialEq, Eq)]
 pub enum ZircoParserError<T> {
     /// An error we were able to recover from

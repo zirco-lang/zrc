@@ -15,7 +15,8 @@ pub enum LexicalError {
     UnknownToken((usize, char), String),
     /// A string literal was left unterminated.
     UnterminatedStringLiteral(usize),
-    /// A block comment ran to the end of the file. Remind the user that block comments nest.
+    /// A block comment ran to the end of the file. Remind the user that block
+    /// comments nest.
     UnterminatedBlockComment,
 }
 
@@ -24,15 +25,15 @@ fn string_slice(lex: &mut Lexer<'_, Tok>) -> String {
     lex.slice().to_string()
 }
 
-/// Zirco uses nested block comments -- a regular expression can't match this without recursion,
-/// so our approach is to use a custom callback which takes the lexer and basically consumes
-/// characters in our input until we reach the end of the comment.
-/// See also: [logos#307](https://github.com/maciejhirsz/logos/issues/307)
+/// Zirco uses nested block comments -- a regular expression can't match this
+/// without recursion, so our approach is to use a custom callback which takes
+/// the lexer and basically consumes characters in our input until we reach the
+/// end of the comment. See also: [logos#307](https://github.com/maciejhirsz/logos/issues/307)
 /// See also: [zrc#14](https://github.com/zirco-lang/zrc/pull/14)
 fn handle_block_comment_start(lex: &mut Lexer<'_, Tok>) -> logos::FilterResult<(), LexicalError> {
     let mut depth = 1;
-    // This contains all of the remaining tokens in our input except for the opening to this comment
-    // -- that's already been consumed.
+    // This contains all of the remaining tokens in our input except for the opening
+    // to this comment -- that's already been consumed.
     let mut chars = lex.remainder().chars().peekable();
 
     // We iterate over all of the remaining characters in the input...
@@ -65,9 +66,10 @@ fn handle_block_comment_start(lex: &mut Lexer<'_, Tok>) -> logos::FilterResult<(
     }
 
     if depth == 0 {
-        // We've reached the end of this block comment - because we attach the handle_block_comment_start
-        // callback to basically any token variant (to keep the Tok enum clean of useless variants),
-        // we should simply skip this token. This will skip from the beginning of our Span to the end
+        // We've reached the end of this block comment - because we attach the
+        // handle_block_comment_start callback to basically any token variant
+        // (to keep the Tok enum clean of useless variants), we should simply
+        // skip this token. This will skip from the beginning of our Span to the end
         // that was given through all of the calls to lex.bump().
         logos::FilterResult::Skip
     } else {
@@ -87,8 +89,8 @@ fn handle_block_comment_start(lex: &mut Lexer<'_, Tok>) -> logos::FilterResult<(
 )]
 pub enum Tok {
     // Handle nested block comments -- this does not need its own token type and can be attached
-    // to whatever token is directly below this. The handle_block_comment_start will either Skip the
-    // matched characters or throw an error. It will never return a token.
+    // to whatever token is directly below this. The handle_block_comment_start will either Skip
+    // the matched characters or throw an error. It will never return a token.
     // Read the doc comment above handle_block_comment_start for more information.
     #[token("/*", handle_block_comment_start)]
     // === ARITHMETIC OPERATORS ===
