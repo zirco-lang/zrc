@@ -1,6 +1,8 @@
 //! Statement representation for the Zirco AST
 //!
-//! The main thing within this module you will need is the [`Stmt`] enum. It contains all the different statement kinds in Zirco. Some other structs and enums exist to supplement this enum.
+//! The main thing within this module you will need is the [`Stmt`] enum. It
+//! contains all the different statement kinds in Zirco. Some other structs and
+//! enums exist to supplement this enum.
 
 use std::fmt::Display;
 
@@ -11,7 +13,8 @@ use super::{expr::Expr, ty::Type};
 pub struct LetDeclaration {
     /// The name of the identifier.
     pub name: String,
-    /// The type of the new symbol. If set to [`None`], the type will be inferred.
+    /// The type of the new symbol. If set to [`None`], the type will be
+    /// inferred.
     pub ty: Option<Type>,
     /// The value to associate with the new symbol.
     pub value: Option<Expr>,
@@ -34,7 +37,8 @@ impl Display for LetDeclaration {
 
 /// The enum representing all the different kinds of statements in Zirco
 ///
-/// This enum represents all the different kinds of statements in Zirco. It is used by the parser to represent the AST in the statement position.
+/// This enum represents all the different kinds of statements in Zirco. It is
+/// used by the parser to represent the AST in the statement position.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Stmt {
     /// `if (x) y` or `if (x) y else z`
@@ -46,8 +50,9 @@ pub enum Stmt {
         /// Runs once before the loop starts.
         // TODO: May also be able to be expressions?
         init: Option<Box<Declaration>>,
-        /// Runs before each iteration of the loop. If this evaluates to `false`, the loop will end.
-        /// If this is [`None`], the loop will run forever.
+        /// Runs before each iteration of the loop. If this evaluates to
+        /// `false`, the loop will end. If this is [`None`], the loop
+        /// will run forever.
         cond: Option<Expr>,
         /// Runs after each iteration of the loop.
         post: Option<Expr>,
@@ -70,7 +75,8 @@ pub enum Stmt {
     Declaration(Declaration),
 }
 
-/// Any declaration valid to be present at the top level of a file. May also be used from the [`Stmt::Declaration`] variant.
+/// Any declaration valid to be present at the top level of a file. May also be
+/// used from the [`Stmt::Declaration`] variant.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Declaration {
     /// A list of [`LetDeclaration`]s.
@@ -81,7 +87,8 @@ pub enum Declaration {
         name: String,
         /// The parameters of the function.
         parameters: Vec<ArgumentDeclaration>,
-        /// The return type of the function. If set to [`None`], the function is void.
+        /// The return type of the function. If set to [`None`], the function is
+        /// void.
         return_type: Option<Type>,
         /// The body of the function.
         body: Vec<Stmt>,

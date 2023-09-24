@@ -1,12 +1,14 @@
 //! Expression representation for the Zirco AST
 //!
-//! The main thing within this module you will need is the [`Expr`] enum. It contains all the different expression kinds in Zirco.
+//! The main thing within this module you will need is the [`Expr`] enum. It
+//! contains all the different expression kinds in Zirco.
 
 use std::fmt::Display;
 
 /// The enum representing the different kinds of expressions in Zirco
 ///
-/// This enum represents all the different kinds of expressions in Zirco. It is used by the parser to represent the AST in the expression position.
+/// This enum represents all the different kinds of expressions in Zirco. It is
+/// used by the parser to represent the AST in the expression position.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Expr {
     /// `a, b`

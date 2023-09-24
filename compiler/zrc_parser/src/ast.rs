@@ -1,6 +1,7 @@
 //! Abstract Syntax Tree representation for the Zirco programming language
 //!
-//! This module contains the AST representation for the Zirco programming language, emitted by the parser.
+//! This module contains the AST representation for the Zirco programming
+//! language, emitted by the parser.
 
 #![allow(ambiguous_associated_items)]
 
