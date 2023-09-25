@@ -149,7 +149,7 @@ mod tests {
     fn small_function_declaration_parses() {
         assert_eq!(
             parse_stmt("fn add(a: i32, b: i32) -> i32 { return a + b; }"),
-            Ok(Stmt::Declaration(Declaration::FunctionDefinition {
+            Ok(Stmt::Declaration(Declaration::FunctionDeclaration {
                 name: ("add".to_string()),
                 parameters: vec![
                     ArgumentDeclaration {
@@ -162,10 +162,10 @@ mod tests {
                     }
                 ],
                 return_type: Some(Type::Identifier("i32".to_string())),
-                body: vec![Stmt::ReturnStmt(Some(Expr::Addition(
+                body: Some(vec![Stmt::ReturnStmt(Some(Expr::Addition(
                     Box::new(Expr::Identifier("a".to_string())),
                     Box::new(Expr::Identifier("b".to_string()))
-                )))]
+                )))])
             }))
         )
     }
@@ -174,11 +174,11 @@ mod tests {
     fn for_loop_test() {
         assert_eq!(
             parse_program("fn main() { for (let i = 0;;) {} }"),
-            Ok(vec![Declaration::FunctionDefinition {
+            Ok(vec![Declaration::FunctionDeclaration {
                 name: "main".to_string(),
                 parameters: vec![],
                 return_type: None,
-                body: vec![Stmt::ForStmt {
+                body: Some(vec![Stmt::ForStmt {
                     init: Some(Box::new(Declaration::DeclarationList(vec![
                         LetDeclaration {
                             name: "i".to_string(),
@@ -189,7 +189,7 @@ mod tests {
                     cond: None,
                     post: None,
                     body: Box::new(Stmt::BlockStmt(vec![]))
-                }]
+                }])
             }])
         )
     }
@@ -214,7 +214,7 @@ mod tests {
                 "}",
             )),
             Ok(vec![
-                Declaration::FunctionDefinition {
+                Declaration::FunctionDeclaration {
                     name: ("add".to_string()),
                     parameters: vec![
                         ArgumentDeclaration {
@@ -227,12 +227,12 @@ mod tests {
                         }
                     ],
                     return_type: Some(Type::Identifier("i32".to_string())),
-                    body: vec![Stmt::ReturnStmt(Some(Expr::Addition(
+                    body: Some(vec![Stmt::ReturnStmt(Some(Expr::Addition(
                         Box::new(Expr::Identifier("a".to_string())),
                         Box::new(Expr::Identifier("b".to_string()))
-                    )))]
+                    )))])
                 },
-                Declaration::FunctionDefinition {
+                Declaration::FunctionDeclaration {
                     name: ("subtract".to_string()),
                     parameters: vec![
                         ArgumentDeclaration {
@@ -245,16 +245,16 @@ mod tests {
                         }
                     ],
                     return_type: Some(Type::Identifier("i32".to_string())),
-                    body: vec![Stmt::ReturnStmt(Some(Expr::Subtraction(
+                    body: Some(vec![Stmt::ReturnStmt(Some(Expr::Subtraction(
                         Box::new(Expr::Identifier("a".to_string())),
                         Box::new(Expr::Identifier("b".to_string()))
-                    )))]
+                    )))])
                 },
-                Declaration::FunctionDefinition {
+                Declaration::FunctionDeclaration {
                     name: ("main".to_string()),
                     parameters: vec![],
                     return_type: None,
-                    body: vec![
+                    body: Some(vec![
                         Stmt::Declaration(Declaration::DeclarationList(vec![
                             LetDeclaration {
                                 name: ("a".to_string()),
@@ -293,7 +293,7 @@ mod tests {
                             Box::new(Expr::Identifier("c".to_string())),
                             Box::new(Expr::Identifier("d".to_string()))
                         )))
-                    ]
+                    ])
                 }
             ])
         )

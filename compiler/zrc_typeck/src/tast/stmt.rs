@@ -72,8 +72,8 @@ pub enum TypedStmt {
 pub enum TypedDeclaration {
     /// A list of [`LetDeclaration`]s.
     DeclarationList(Vec<LetDeclaration>),
-    /// A definition for a function
-    FunctionDefinition {
+    /// A declaration of a function
+    FunctionDeclaration {
         /// The name of the function.
         name: String,
         /// The parameters of the function.
@@ -81,8 +81,8 @@ pub enum TypedDeclaration {
         /// The return type of the function. If set to [`None`], the function is
         /// void.
         return_type: Option<Type>,
-        /// The body of the function.
-        body: Vec<TypedStmt>,
+        /// The body of the function. If set to [`None`], this is an extern declaration.
+        body: Option<Vec<TypedStmt>>,
     },
 }
 
@@ -97,51 +97,69 @@ impl Display for TypedDeclaration {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            Self::FunctionDefinition {
+            Self::FunctionDeclaration {
                 name,
                 parameters,
-                return_type: Some(return_type),
-                body,
+                return_type: Some(r),
+                body: Some(body),
             } => write!(
                 f,
-                "fn {name}({}) -> {return_type} {{\n{}\n}}",
+                "fn {name}({}) -> {r} {{ {} }}",
                 parameters
                     .iter()
                     .map(ToString::to_string)
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<String>>()
                     .join(", "),
                 body.iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<_>>()
-                    .join("\n")
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join(" ")
             ),
-            Self::FunctionDefinition {
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type: Some(r),
+                body: None,
+            } => write!(
+                f,
+                "fn {name}({}) -> {r};",
+                parameters
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Self::FunctionDeclaration {
                 name,
                 parameters,
                 return_type: None,
-                body,
+                body: Some(body),
             } => write!(
                 f,
-                "fn {name}({}) {{\n{}\n}}",
+                "fn {name}({}) {{ {} }}",
                 parameters
                     .iter()
                     .map(ToString::to_string)
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<String>>()
                     .join(", "),
                 body.iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<_>>()
-                    .join("\n")
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            ),
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type: None,
+                body: None,
+            } => write!(
+                f,
+                "fn {name}({});",
+                parameters
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join(", ")
             ),
         }
     }

@@ -81,8 +81,8 @@ pub enum Stmt {
 pub enum Declaration {
     /// A list of [`LetDeclaration`]s.
     DeclarationList(Vec<LetDeclaration>),
-    /// A definition for a function
-    FunctionDefinition {
+    /// A declaration of a function
+    FunctionDeclaration {
         /// The name of the function.
         name: String,
         /// The parameters of the function.
@@ -90,8 +90,8 @@ pub enum Declaration {
         /// The return type of the function. If set to [`None`], the function is
         /// void.
         return_type: Option<Type>,
-        /// The body of the function.
-        body: Vec<Stmt>,
+        /// The body of the function. If set to [`None`], this is an extern declaration.
+        body: Option<Vec<Stmt>>,
     },
 }
 
@@ -108,11 +108,11 @@ impl Display for Declaration {
                         .join(", ")
                 )
             }
-            Self::FunctionDefinition {
+            Self::FunctionDeclaration {
                 name,
                 parameters,
                 return_type: Some(r),
-                body,
+                body: Some(body),
             } => write!(
                 f,
                 "fn {name}({}) -> {r} {{ {} }}",
@@ -126,11 +126,25 @@ impl Display for Declaration {
                     .collect::<Vec<String>>()
                     .join(" ")
             ),
-            Self::FunctionDefinition {
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type: Some(r),
+                body: None,
+            } => write!(
+                f,
+                "fn {name}({}) -> {r};",
+                parameters
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Self::FunctionDeclaration {
                 name,
                 parameters,
                 return_type: None,
-                body,
+                body: Some(body),
             } => write!(
                 f,
                 "fn {name}({}) {{ {} }}",
@@ -143,6 +157,20 @@ impl Display for Declaration {
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(" ")
+            ),
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type: None,
+                body: None,
+            } => write!(
+                f,
+                "fn {name}({});",
+                parameters
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join(", ")
             ),
         }
     }

@@ -904,6 +904,14 @@ pub fn process_declaration(
                 declarations
                     .into_iter()
                     .map(|let_declaration| -> Result<TastLetDeclaration, String> {
+                        if scope.get_value(&let_declaration.name).is_some() {
+                            // TODO: In the future we may allow shadowing but currently no
+                            return Err(format!(
+                                "Identifier {} already in use",
+                                let_declaration.name
+                            ));
+                        }
+
                         let typed_expr = let_declaration
                             .value
                             .map(|expr| type_expr(scope, expr))
@@ -961,12 +969,16 @@ pub fn process_declaration(
                     .collect::<Result<Vec<_>, _>>()?,
             )
         }
-        AstDeclaration::FunctionDefinition {
+        AstDeclaration::FunctionDeclaration {
             name,
             parameters,
             return_type,
             body,
         } => {
+            if scope.get_value(&name).is_some() {
+                return Err(format!("Identifier {name} already in use"));
+            }
+
             let resolved_return_type = return_type
                 .map(|ty| resolve_type(scope, ty))
                 .transpose()?
@@ -982,24 +994,6 @@ pub fn process_declaration(
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            // functions run in their own value scope because identifiers from the parent
-            // scope are not accessible the type scope is kept, however.
-            let function_scope = Scope::from_scopes(
-                resolved_parameters
-                    .iter()
-                    .map(|x| (x.name.clone(), x.ty.clone()))
-                    .collect::<HashMap<_, _>>(),
-                scope.type_scope.clone(),
-            );
-
-            // discard return actuality as it's guaranteed
-            let (typed_body, _) = type_block(
-                &function_scope,
-                body,
-                false,
-                BlockReturnAbility::MustReturn(resolved_return_type.clone()),
-            )?;
-
             scope.set_value(
                 name.clone(),
                 TastType::Fn(
@@ -1011,11 +1005,34 @@ pub fn process_declaration(
                 ),
             );
 
-            TypedDeclaration::FunctionDefinition {
+            TypedDeclaration::FunctionDeclaration {
                 name,
-                parameters: resolved_parameters,
-                return_type: resolved_return_type.into_option(),
-                body: typed_body,
+                parameters: resolved_parameters.clone(),
+                return_type: resolved_return_type.clone().into_option(),
+                body: if let Some(body) = body {
+                    // functions run in their own value scope because identifiers from the parent
+                    // scope are not accessible the type scope is kept, however.
+                    let function_scope = Scope::from_scopes(
+                        resolved_parameters
+                            .iter()
+                            .map(|x| (x.name.clone(), x.ty.clone()))
+                            .collect::<HashMap<_, _>>(),
+                        scope.type_scope.clone(),
+                    );
+
+                    // discard return actuality as it's guaranteed
+                    Some(
+                        type_block(
+                            &function_scope,
+                            body,
+                            false,
+                            BlockReturnAbility::MustReturn(resolved_return_type),
+                        )?
+                        .0,
+                    )
+                } else {
+                    None
+                },
             }
         }
     })

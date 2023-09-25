@@ -90,13 +90,18 @@ Declaration: Declaration = {
 FunctionDeclaration: Declaration = {
     "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList?> ")" <r:("->" <Type>)?> "{"
         <s:StmtList?>
-    "}" => Declaration::FunctionDefinition {
+    "}" => Declaration::FunctionDeclaration {
         name: i,
         parameters: a.unwrap_or(Vec::new()),
         return_type: r,
-        body: s.unwrap_or(Vec::new())
+        body: Some(s.unwrap_or(Vec::new())),
+    },
+    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList?> ")" <r:("->" <Type>)?> ";" => Declaration::FunctionDeclaration {
+        name: i,
+        parameters: a.unwrap_or(Vec::new()),
+        return_type: r,
+        body: None,
     }
-    // TODO: External declarations
 };
 
 ArgumentDeclarationList = CommaSeparated<ArgumentDeclaration>;
