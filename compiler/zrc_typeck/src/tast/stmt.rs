@@ -1,6 +1,6 @@
 //! Statement representation for the Zirco [TAST](super)
 
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use super::{expr::TypedExpr, ty::Type};
 
@@ -85,6 +85,13 @@ pub enum TypedDeclaration {
         /// declaration.
         body: Option<Vec<TypedStmt>>,
     },
+    /// A named declaration for a `struct`.
+    StructDeclaration {
+        /// The name of the newtype.
+        name: String,
+        /// The key-value pairs of the struct
+        fields: HashMap<String, super::ty::Type>,
+    },
 }
 
 impl Display for TypedDeclaration {
@@ -162,6 +169,16 @@ impl Display for TypedDeclaration {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Self::StructDeclaration { name, fields } => {
+                write!(f, "struct {name} {{ ")?;
+                for (i, m) in fields.iter().enumerate() {
+                    write!(f, "{}: {}", m.0, m.1)?;
+                    if i < fields.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, " }}")
+            }
         }
     }
 }

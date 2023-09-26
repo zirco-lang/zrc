@@ -99,7 +99,7 @@ pub enum Declaration {
         /// The name of the newtype.
         name: String,
         /// The key-value pairs of the struct
-        pairs: HashMap<String, super::ty::Type>,
+        fields: HashMap<String, super::ty::Type>,
     },
 }
 
@@ -180,11 +180,11 @@ impl Display for Declaration {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Self::StructDeclaration { name, pairs } => {
+            Self::StructDeclaration { name, fields } => {
                 write!(f, "struct {name} {{ ")?;
-                for (i, m) in pairs.iter().enumerate() {
+                for (i, m) in fields.iter().enumerate() {
                     write!(f, "{}: {}", m.0, m.1)?;
-                    if i < pairs.len() - 1 {
+                    if i < fields.len() - 1 {
                         write!(f, ", ")?;
                     }
                 }
