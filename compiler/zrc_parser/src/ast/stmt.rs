@@ -90,7 +90,8 @@ pub enum Declaration {
         /// The return type of the function. If set to [`None`], the function is
         /// void.
         return_type: Option<Type>,
-        /// The body of the function. If set to [`None`], this is an extern declaration.
+        /// The body of the function. If set to [`None`], this is an extern
+        /// declaration.
         body: Option<Vec<Stmt>>,
     },
     /// A named declaration for a `struct`.
