@@ -1035,6 +1035,25 @@ pub fn process_declaration(
                 },
             }
         }
+        AstDeclaration::StructDeclaration { name, pairs } => {
+            if scope.get_type(&name).is_some() {
+                return Err(format!("Type name {} already in use", name));
+            }
+
+            let resolved_pairs = pairs
+                .into_iter()
+                .map(|(name, ty)| -> Result<(String, TastType), String> {
+                    Ok((name, resolve_type(scope, ty)?))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            scope.set_type(name.clone(), TastType::Struct(resolved_pairs.clone()));
+
+            TypedDeclaration::StructDeclaration {
+                name,
+                pairs: resolved_pairs,
+            }
+        }
     })
 }
 

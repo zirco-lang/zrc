@@ -4,7 +4,7 @@
 //! contains all the different statement kinds in Zirco. Some other structs and
 //! enums exist to supplement this enum.
 
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use super::{expr::Expr, ty::Type};
 
@@ -93,6 +93,13 @@ pub enum Declaration {
         /// The body of the function. If set to [`None`], this is an extern declaration.
         body: Option<Vec<Stmt>>,
     },
+    /// A named declaration for a `struct`.
+    StructDeclaration {
+        /// The name of the newtype.
+        name: String,
+        /// The key-value pairs of the struct
+        pairs: HashMap<String, super::ty::Type>,
+    },
 }
 
 impl Display for Declaration {
@@ -172,6 +179,16 @@ impl Display for Declaration {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Self::StructDeclaration { name, pairs } => {
+                write!(f, "struct {name} {{ ")?;
+                for (i, m) in pairs.iter().enumerate() {
+                    write!(f, "{}: {}", m.0, m.1)?;
+                    if i < pairs.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+                }
+                write!(f, " }}")
+            }
         }
     }
 }

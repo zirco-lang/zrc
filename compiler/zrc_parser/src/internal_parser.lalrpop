@@ -85,6 +85,7 @@ Declaration: Declaration = {
     <LetDeclaration>,
     // FIXME: This might allow code like for (fn foo() {};;) {} to work. Do we want this?
     <FunctionDeclaration>,
+    <StructDeclaration>,
 };
 
 FunctionDeclaration: Declaration = {
@@ -103,6 +104,13 @@ FunctionDeclaration: Declaration = {
         body: None,
     }
 };
+
+StructDeclaration: Declaration = {
+    "struct" <i:IDENTIFIER> "{" <l:CommaSeparated<(<IDENTIFIER> ":" <Type>)>?> "}" => Declaration::StructDeclaration {
+        name: i,
+        fields: l.unwrap_or(Vec::new()).into_iter().collect::<HashMap<_, _>>(),
+    }
+}
 
 ArgumentDeclarationList = CommaSeparated<ArgumentDeclaration>;
 
