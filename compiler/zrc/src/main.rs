@@ -17,8 +17,14 @@ fn main(
             &zrc_typeck::Scope::new(),
             zrc_parser::parser::parse_program(
                 "fn main(argc: u8, argv: *u8) -> u8 {
-                    let x = 7;
-                    if (x == 2 + 2) return 3 as u8;
+                    struct S {
+                        x: i32,
+                        y: i32,
+                    }
+                    let a: S;
+                    a.x = 7;
+                    a.y = 2;
+                    if (a.x + (&a)->y == 9) return 1 as u8;
                     return 0 as u8;
                 }"
             )?
