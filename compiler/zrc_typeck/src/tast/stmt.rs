@@ -112,16 +112,21 @@ impl Display for TypedDeclaration {
                 body: Some(body),
             } => write!(
                 f,
-                "fn {name}({}) -> {r} {{ {} }}",
+                "fn {name}({}) -> {r} {{\n{}\n}}",
                 parameters
                     .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", "),
                 body.iter()
-                    .map(ToString::to_string)
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
                     .collect::<Vec<String>>()
-                    .join(" ")
+                    .join("\n")
             ),
             Self::FunctionDeclaration {
                 name,
@@ -144,16 +149,21 @@ impl Display for TypedDeclaration {
                 body: Some(body),
             } => write!(
                 f,
-                "fn {name}({}) {{ {} }}",
+                "fn {name}({}) {{\n{}\n}}",
                 parameters
                     .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", "),
                 body.iter()
-                    .map(ToString::to_string)
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
                     .collect::<Vec<String>>()
-                    .join(" ")
+                    .join("\n")
             ),
             Self::FunctionDeclaration {
                 name,
@@ -169,16 +179,15 @@ impl Display for TypedDeclaration {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Self::StructDeclaration { name, fields } => {
-                write!(f, "struct {name} {{ ")?;
-                for (i, m) in fields.iter().enumerate() {
-                    write!(f, "{}: {}", m.0, m.1)?;
-                    if i < fields.len() - 1 {
-                        write!(f, ", ")?;
-                    }
-                }
-                write!(f, " }}")
-            }
+            Self::StructDeclaration { name, fields } => write!(
+                f,
+                "struct {name} {{\n{}\n}}",
+                fields
+                    .iter()
+                    .map(|(name, ty)| format!("    {name}: {ty}"))
+                    .collect::<Vec<_>>()
+                    .join(",\n")
+            ),
         }
     }
 }
