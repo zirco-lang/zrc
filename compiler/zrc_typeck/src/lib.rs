@@ -206,6 +206,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             )
         }
         Expr::Assignment(place, value) => {
+            // TODO: Check place is a valid lvalue so that 7 = 4; is invalid?
             let place_t = type_expr(scope, *place)?;
             let value_t = type_expr(scope, *value)?;
 
