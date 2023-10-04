@@ -97,17 +97,27 @@ impl Display for BinaryBitwise {
     }
 }
 
-/// Logical, comparison, and equality operators
+/// Logical operators
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Logic {
     /// `&&`
     And,
     /// `||`
     Or,
+}
+
+/// Equality checks
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum Equality {
     /// `==`
     Eq,
     /// `!=`
     Neq,
+}
+
+/// Comparison checks
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum Comparison {
     /// `>`
     Gt,
     /// `>=`
@@ -123,8 +133,20 @@ impl Display for Logic {
         match self {
             Self::And => write!(f, "&&"),
             Self::Or => write!(f, "||"),
+        }
+    }
+}
+impl Display for Equality {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
             Self::Eq => write!(f, "=="),
             Self::Neq => write!(f, "!="),
+        }
+    }
+}
+impl Display for Comparison {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
             Self::Gt => write!(f, ">"),
             Self::Gte => write!(f, ">="),
             Self::Lt => write!(f, "<"),
@@ -170,6 +192,8 @@ pub enum Expr {
     BinaryBitwise(BinaryBitwise, Box<Expr>, Box<Expr>),
 
     Logic(Logic, Box<Expr>, Box<Expr>),
+    Equality(Equality, Box<Expr>, Box<Expr>),
+    Comparison(Comparison, Box<Expr>, Box<Expr>),
     Arithmetic(Arithmetic, Box<Expr>, Box<Expr>),
 
     /// Any numeric literal.
@@ -194,14 +218,12 @@ impl Display for Expr {
             Self::Identifier(i) => write!(f, "{i}"),
             Self::BooleanLiteral(b) => write!(f, "{b}"),
             Self::Error => write!(f, "error"),
-
             Self::Assignment(op, l, r) => write!(f, "{l} {op} {r}"),
-
+            Self::Equality(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
+            Self::Comparison(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
             Self::Arithmetic(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-
             Self::BinaryBitwise(op, l, r) => write!(f, "{l} {op} {r}"),
             Self::Logic(op, l, r) => write!(f, "{l} {op} {r}"),
-
             Self::Comma(l, r) => write!(f, "{l}, {r}"),
             Self::UnaryNot(e) => write!(f, "!{e}"),
             Self::UnaryBitwiseNot(e) => write!(f, "~{e}"),
