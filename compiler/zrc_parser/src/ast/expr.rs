@@ -5,6 +5,134 @@
 
 use std::fmt::Display;
 
+/// Arithmetic operators
+///
+/// For an operator to fall under this enum, it must operate on two integers
+/// of the same type and yield that type, and performs some mathematical operation.
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum Arithmetic {
+    /// `+`
+    Addition,
+    /// `-`
+    Subtraction,
+    /// `*`
+    Multiplication,
+    /// `/`
+    Division,
+    /// `%`
+    Modulo,
+}
+
+impl Display for Arithmetic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Addition => write!(f, "+"),
+            Self::Subtraction => write!(f, "-"),
+            Self::Multiplication => write!(f, "*"),
+            Self::Division => write!(f, "/"),
+            Self::Modulo => write!(f, "%"),
+        }
+    }
+}
+
+/// Assignment operators
+///
+/// This enum defines all of the different types of assignments which may use another operation
+/// under the hood.
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum Assignment {
+    /// `=`
+    Standard,
+    /// `+=` etc.
+    Arithmetic(Arithmetic),
+    /// `|=` etc.
+    BinaryBitwise(BinaryBitwise),
+}
+
+impl Display for Assignment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Standard => write!(f, "="),
+            Self::Arithmetic(Arithmetic::Addition) => write!(f, "+="),
+            Self::Arithmetic(Arithmetic::Subtraction) => write!(f, "-="),
+            Self::Arithmetic(Arithmetic::Multiplication) => write!(f, "*="),
+            Self::Arithmetic(Arithmetic::Division) => write!(f, "/="),
+            Self::Arithmetic(Arithmetic::Modulo) => write!(f, "%="),
+            Self::BinaryBitwise(BinaryBitwise::And) => write!(f, "&="),
+            Self::BinaryBitwise(BinaryBitwise::Or) => write!(f, "|="),
+            Self::BinaryBitwise(BinaryBitwise::Xor) => write!(f, "^="),
+            Self::BinaryBitwise(BinaryBitwise::Shl) => write!(f, "<<="),
+            Self::BinaryBitwise(BinaryBitwise::Shr) => write!(f, ">>="),
+        }
+    }
+}
+
+/// Binary bitwise operators
+///
+/// For an operator to fall under this enum, it must operate on two integers
+/// of the same type and yield that type, and performs some bitwise operation.
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum BinaryBitwise {
+    /// `&`
+    And,
+    /// `|`
+    Or,
+    /// `^`
+    Xor,
+    /// `<<`
+    Shl,
+    /// `>>`
+    Shr,
+}
+
+impl Display for BinaryBitwise {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::And => write!(f, "&"),
+            Self::Or => write!(f, "|"),
+            Self::Xor => write!(f, "^"),
+            Self::Shl => write!(f, "<<"),
+            Self::Shr => write!(f, ">>"),
+        }
+    }
+}
+
+/// Logical, comparison, and equality operators
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum Logic {
+    /// `&&`
+    And,
+    /// `||`
+    Or,
+    /// `==`
+    Eq,
+    /// `!=`
+    Neq,
+    /// `>`
+    Gt,
+    /// `>=`
+    Gte,
+    /// `<`
+    Lt,
+    /// `<=`
+    Lte,
+}
+
+impl Display for Logic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::And => write!(f, "&&"),
+            Self::Or => write!(f, "||"),
+            Self::Eq => write!(f, "=="),
+            Self::Neq => write!(f, "!="),
+            Self::Gt => write!(f, ">"),
+            Self::Gte => write!(f, ">="),
+            Self::Lt => write!(f, "<"),
+            Self::Lte => write!(f, "<="),
+        }
+    }
+}
+
 /// The enum representing the different kinds of expressions in Zirco
 ///
 /// This enum represents all the different kinds of expressions in Zirco. It is
@@ -14,28 +142,7 @@ pub enum Expr {
     /// `a, b`
     Comma(Box<Expr>, Box<Expr>),
 
-    /// `a = b`
-    Assignment(Box<Expr>, Box<Expr>),
-    /// `a += b`
-    AdditionAssignment(Box<Expr>, Box<Expr>),
-    /// `a -= b`
-    SubtractionAssignment(Box<Expr>, Box<Expr>),
-    /// `a *= b`
-    MultiplicationAssignment(Box<Expr>, Box<Expr>),
-    /// `a /= b`
-    DivisionAssignment(Box<Expr>, Box<Expr>),
-    /// `a %= b`
-    ModuloAssignment(Box<Expr>, Box<Expr>),
-    /// `a &= b`
-    BitwiseAndAssignment(Box<Expr>, Box<Expr>),
-    /// `a |= b`
-    BitwiseOrAssignment(Box<Expr>, Box<Expr>),
-    /// `a ^= b`
-    BitwiseXorAssignment(Box<Expr>, Box<Expr>),
-    /// `a <<= b`
-    BitwiseLeftShiftAssignment(Box<Expr>, Box<Expr>),
-    /// `a >>= b`
-    BitwiseRightShiftAssignment(Box<Expr>, Box<Expr>),
+    Assignment(Assignment, Box<Expr>, Box<Expr>),
 
     /// `!x`
     UnaryNot(Box<Expr>),
@@ -60,48 +167,10 @@ pub enum Expr {
     /// `a ? b : c`
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
 
-    /// `a && b`
-    LogicalAnd(Box<Expr>, Box<Expr>),
-    /// `a || b`
-    LogicalOr(Box<Expr>, Box<Expr>),
+    BinaryBitwise(BinaryBitwise, Box<Expr>, Box<Expr>),
 
-    /// `a == b`
-    Equals(Box<Expr>, Box<Expr>),
-    /// `a != b`
-    NotEquals(Box<Expr>, Box<Expr>),
-
-    /// `a & b`
-    BitwiseAnd(Box<Expr>, Box<Expr>),
-    /// `a | b`
-    BitwiseOr(Box<Expr>, Box<Expr>),
-    /// `a ^ b`
-    BitwiseXor(Box<Expr>, Box<Expr>),
-
-    /// `a > b`
-    GreaterThan(Box<Expr>, Box<Expr>),
-    /// `a >= b`
-    GreaterThanOrEqualTo(Box<Expr>, Box<Expr>),
-    /// `a < b`
-    LessThan(Box<Expr>, Box<Expr>),
-    /// `a <= b`
-    LessThanOrEqualTo(Box<Expr>, Box<Expr>),
-
-    /// `a >> b`
-    BitwiseRightShift(Box<Expr>, Box<Expr>),
-    /// `a << b`
-    BitwiseLeftShift(Box<Expr>, Box<Expr>),
-
-    /// `a + b`
-    Addition(Box<Expr>, Box<Expr>),
-    /// `a - b`
-    Subtraction(Box<Expr>, Box<Expr>),
-
-    /// `a * b`
-    Multiplication(Box<Expr>, Box<Expr>),
-    /// `a / b`
-    Division(Box<Expr>, Box<Expr>),
-    /// `a % b`
-    Modulo(Box<Expr>, Box<Expr>),
+    Logic(Logic, Box<Expr>, Box<Expr>),
+    Arithmetic(Arithmetic, Box<Expr>, Box<Expr>),
 
     /// Any numeric literal.
     NumberLiteral(String),
@@ -125,36 +194,15 @@ impl Display for Expr {
             Self::Identifier(i) => write!(f, "{i}"),
             Self::BooleanLiteral(b) => write!(f, "{b}"),
             Self::Error => write!(f, "error"),
-            Self::Assignment(l, r) => write!(f, "{l} = {r}"),
-            Self::Addition(l, r) => write!(f, "{l} + {r}"),
-            Self::Subtraction(l, r) => write!(f, "{l} - {r}"),
-            Self::Multiplication(l, r) => write!(f, "{l} * {r}"),
-            Self::Division(l, r) => write!(f, "{l} / {r}"),
-            Self::Modulo(l, r) => write!(f, "{l} % {r}"),
-            Self::BitwiseAnd(l, r) => write!(f, "{l} & {r}"),
-            Self::BitwiseOr(l, r) => write!(f, "{l} | {r}"),
-            Self::BitwiseXor(l, r) => write!(f, "{l} ^ {r}"),
-            Self::BitwiseLeftShift(l, r) => write!(f, "{l} << {r}"),
-            Self::BitwiseRightShift(l, r) => write!(f, "{l} >> {r}"),
-            Self::GreaterThan(l, r) => write!(f, "{l} > {r}"),
-            Self::GreaterThanOrEqualTo(l, r) => write!(f, "{l} >= {r}"),
-            Self::LessThan(l, r) => write!(f, "{l} < {r}"),
-            Self::LessThanOrEqualTo(l, r) => write!(f, "{l} <= {r}"),
-            Self::Equals(l, r) => write!(f, "{l} == {r}"),
-            Self::NotEquals(l, r) => write!(f, "{l} != {r}"),
-            Self::LogicalAnd(l, r) => write!(f, "{l} && {r}"),
-            Self::LogicalOr(l, r) => write!(f, "{l} || {r}"),
+
+            Self::Assignment(op, l, r) => write!(f, "{l} {op} {r}"),
+
+            Self::Arithmetic(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
+
+            Self::BinaryBitwise(op, l, r) => write!(f, "{l} {op} {r}"),
+            Self::Logic(op, l, r) => write!(f, "{l} {op} {r}"),
+
             Self::Comma(l, r) => write!(f, "{l}, {r}"),
-            Self::AdditionAssignment(l, r) => write!(f, "{l} += {r}"),
-            Self::SubtractionAssignment(l, r) => write!(f, "{l} -= {r}"),
-            Self::MultiplicationAssignment(l, r) => write!(f, "{l} *= {r}"),
-            Self::DivisionAssignment(l, r) => write!(f, "{l} /= {r}"),
-            Self::ModuloAssignment(l, r) => write!(f, "{l} %= {r}"),
-            Self::BitwiseAndAssignment(l, r) => write!(f, "{l} &= {r}"),
-            Self::BitwiseOrAssignment(l, r) => write!(f, "{l} |= {r}"),
-            Self::BitwiseXorAssignment(l, r) => write!(f, "{l} ^= {r}"),
-            Self::BitwiseLeftShiftAssignment(l, r) => write!(f, "{l} <<= {r}"),
-            Self::BitwiseRightShiftAssignment(l, r) => write!(f, "{l} >>= {r}"),
             Self::UnaryNot(e) => write!(f, "!{e}"),
             Self::UnaryBitwiseNot(e) => write!(f, "~{e}"),
             Self::UnaryMinus(e) => write!(f, "-{e}"),
