@@ -4,7 +4,7 @@
 //! language, emitted by the parser.
 
 /// A token with an associated span within the input.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Spanned<T>(pub usize, pub T, pub usize);
 
 pub mod expr;

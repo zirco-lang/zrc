@@ -17,6 +17,7 @@ pub struct Stmt(pub super::Spanned<StmtKind>);
 /// This enum represents all the different kinds of statements in Zirco. It is
 /// used by the parser to represent the AST in the statement position.
 #[derive(PartialEq, Debug, Clone)]
+#[allow(clippy::module_name_repetitions)]
 pub enum StmtKind {
     /// `if (x) y` or `if (x) y else z`
     IfStmt(Expr, Box<Stmt>, Option<Box<Stmt>>),
@@ -203,7 +204,7 @@ impl Display for LetDeclaration {
 }
 
 /// A special form of [`LetDeclaration`] used for function parameters.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ArgumentDeclaration {
     /// The name of the parameter.
     pub name: super::Spanned<String>,

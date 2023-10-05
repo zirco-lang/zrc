@@ -169,6 +169,7 @@ impl Display for Comparison {
     }
 }
 
+/// A Zirco expression
 #[derive(PartialEq, Debug, Clone)]
 pub struct Expr(pub super::Spanned<ExprKind>);
 
@@ -183,6 +184,7 @@ impl Display for Expr {
 /// This enum represents all the different kinds of expressions in Zirco. It is
 /// used by the parser to represent the AST in the expression position.
 #[derive(PartialEq, Debug, Clone)]
+#[allow(clippy::module_name_repetitions)]
 pub enum ExprKind {
     /// `a, b`
     Comma(Box<Expr>, Box<Expr>),

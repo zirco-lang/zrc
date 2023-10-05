@@ -6,7 +6,7 @@
 use std::fmt::Display;
 
 /// A valid Zirco AST type
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Type(pub super::Spanned<TypeKind>);
 
 /// A valid Zirco AST type

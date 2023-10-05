@@ -69,7 +69,11 @@ pub fn parse_stmt(input: &str) -> Result<Stmt, ZircoParserError<Stmt>> {
 #[cfg(test)]
 mod tests {
     use super::{
-        super::ast::{expr::*, stmt::*, ty::*},
+        super::ast::{
+            expr::{Arithmetic, Expr, ExprKind},
+            stmt::{ArgumentDeclaration, Declaration, LetDeclaration, Stmt, StmtKind},
+            ty::{Type, TypeKind},
+        },
         *,
     };
 
@@ -496,7 +500,7 @@ mod tests {
                                                 ty: None,
                                                 value: Some(Expr(Spanned(
                                                     135,
-                                                    ExprKind::NumberLiteral("1".to_string()).into(),
+                                                    ExprKind::NumberLiteral("1".to_string()),
                                                     136
                                                 )))
                                             },
@@ -513,7 +517,7 @@ mod tests {
                                                 ))),
                                                 value: Some(Expr(Spanned(
                                                     147,
-                                                    ExprKind::NumberLiteral("2".to_string()).into(),
+                                                    ExprKind::NumberLiteral("2".to_string()),
                                                     148
                                                 )))
                                             },
