@@ -77,15 +77,35 @@ mod tests {
     fn basic_expr_works_as_expected() {
         assert_eq!(
             parse_expr("1 + 2 * 3"),
-            Ok(Expr::Arithmetic(
-                Arithmetic::Addition,
-                Box::new(Expr::NumberLiteral("1".to_string())),
-                Box::new(Expr::Arithmetic(
-                    Arithmetic::Multiplication,
-                    Box::new(Expr::NumberLiteral("2".to_string())),
-                    Box::new(Expr::NumberLiteral("3".to_string()))
-                ))
-            )),
+            Ok(Expr(Spanned(
+                0,
+                ExprKind::Arithmetic(
+                    Arithmetic::Addition,
+                    Box::new(Expr(Spanned(
+                        0,
+                        ExprKind::NumberLiteral("1".to_string()),
+                        1
+                    ))),
+                    Box::new(Expr(Spanned(
+                        4,
+                        ExprKind::Arithmetic(
+                            Arithmetic::Multiplication,
+                            Box::new(Expr(Spanned(
+                                4,
+                                ExprKind::NumberLiteral("2".to_string()),
+                                5
+                            ))),
+                            Box::new(Expr(Spanned(
+                                8,
+                                ExprKind::NumberLiteral("3".to_string()),
+                                9
+                            )))
+                        ),
+                        9
+                    )))
+                ),
+                9
+            ))),
         );
     }
 
@@ -96,11 +116,19 @@ mod tests {
         if let ZircoParserError::Recoverable { errors, partial } = result {
             assert_eq!(
                 partial,
-                Expr::Arithmetic(
-                    Arithmetic::Addition,
-                    Box::new(Expr::NumberLiteral("1".to_string())),
-                    Box::new(Expr::Error)
-                )
+                Expr(Spanned(
+                    0,
+                    ExprKind::Arithmetic(
+                        Arithmetic::Addition,
+                        Box::new(Expr(Spanned(
+                            0,
+                            ExprKind::NumberLiteral("1".to_string()),
+                            1
+                        ))),
+                        Box::new(Expr(Spanned(2, ExprKind::Error, 2)))
+                    ),
+                    2
+                ))
             );
             assert_eq!(errors.len(), 1);
             if let ParseError::UnrecognizedEof { location, .. } = &errors[0].error {
@@ -118,83 +146,184 @@ mod tests {
     fn dangling_else_binds_correctly() {
         assert_eq!(
             parse_stmt("if (a) if (b) c; else d;"),
-            Ok(Stmt::IfStmt(
-                Expr::Identifier("a".to_string()),
-                Box::new(Stmt::IfStmt(
-                    Expr::Identifier("b".to_string()),
-                    Box::new(Stmt::ExprStmt(Expr::Identifier("c".to_string()))),
-                    Some(Box::new(Stmt::ExprStmt(Expr::Identifier("d".to_string()))))
-                )),
-                None
-            ))
-        )
+            Ok(Stmt(Spanned(
+                0,
+                StmtKind::IfStmt(
+                    Expr(Spanned(4, ExprKind::Identifier("a".to_string()), 5)),
+                    Box::new(Stmt(Spanned(
+                        7,
+                        StmtKind::IfStmt(
+                            Expr(Spanned(11, ExprKind::Identifier("b".to_string()), 12)),
+                            Box::new(Stmt(Spanned(
+                                14,
+                                StmtKind::ExprStmt(Expr(Spanned(
+                                    14,
+                                    ExprKind::Identifier("c".to_string()),
+                                    15
+                                ))),
+                                16
+                            ))),
+                            Some(Box::new(Stmt(Spanned(
+                                22,
+                                StmtKind::ExprStmt(Expr(Spanned(
+                                    22,
+                                    ExprKind::Identifier("d".to_string()),
+                                    23
+                                ))),
+                                24
+                            ))))
+                        ),
+                        24
+                    ))),
+                    None
+                ),
+                24
+            )))
+        );
     }
 
     #[test]
     fn simple_declaration_parses() {
         assert_eq!(
             parse_stmt("let a = 1;"),
-            Ok(Stmt::Declaration(Declaration::DeclarationList(vec![
-                LetDeclaration {
-                    name: ("a".to_string()),
-                    ty: None,
-                    value: Some(Expr::NumberLiteral("1".to_string()).into())
-                }
-            ])))
-        )
+            Ok(Stmt(Spanned(
+                0,
+                StmtKind::Declaration(Declaration::DeclarationList(vec![Spanned(
+                    4,
+                    LetDeclaration {
+                        name: Spanned(4, "a".to_string(), 5),
+                        ty: None,
+                        value: Some(Expr(Spanned(
+                            8,
+                            ExprKind::NumberLiteral("1".to_string()),
+                            9
+                        )))
+                    },
+                    9
+                )])),
+                10
+            )))
+        );
     }
 
     #[test]
     fn small_function_declaration_parses() {
         assert_eq!(
             parse_stmt("fn add(a: i32, b: i32) -> i32 { return a + b; }"),
-            Ok(Stmt::Declaration(Declaration::FunctionDefinition {
-                name: ("add".to_string()),
-                parameters: vec![
-                    ArgumentDeclaration {
-                        name: ("a".to_string()),
-                        ty: Some(Type::Identifier("i32".to_string()))
-                    },
-                    ArgumentDeclaration {
-                        name: ("b".to_string()),
-                        ty: Some(Type::Identifier("i32".to_string()))
-                    }
-                ],
-                return_type: Some(Type::Identifier("i32".to_string())),
-                body: vec![Stmt::ReturnStmt(Some(Expr::Arithmetic(
-                    Arithmetic::Addition,
-                    Box::new(Expr::Identifier("a".to_string())),
-                    Box::new(Expr::Identifier("b".to_string()))
-                )))]
-            }))
-        )
+            Ok(Stmt(Spanned(
+                0,
+                StmtKind::Declaration(Declaration::FunctionDefinition {
+                    name: Spanned(3, "add".to_string(), 6),
+                    parameters: Spanned(
+                        7,
+                        vec![
+                            Spanned(
+                                7,
+                                ArgumentDeclaration {
+                                    name: Spanned(7, "a".to_string(), 8),
+                                    ty: Some(Type(Spanned(
+                                        10,
+                                        TypeKind::Identifier("i32".to_string()),
+                                        13
+                                    )))
+                                },
+                                13
+                            ),
+                            Spanned(
+                                15,
+                                ArgumentDeclaration {
+                                    name: Spanned(15, "b".to_string(), 16),
+                                    ty: Some(Type(Spanned(
+                                        18,
+                                        TypeKind::Identifier("i32".to_string()),
+                                        21
+                                    )))
+                                },
+                                21
+                            )
+                        ],
+                        21
+                    ),
+                    return_type: Some(Type(Spanned(
+                        26,
+                        TypeKind::Identifier("i32".to_string()),
+                        29
+                    ))),
+                    body: Spanned(
+                        32,
+                        vec![Stmt(Spanned(
+                            32,
+                            StmtKind::ReturnStmt(Some(Expr(Spanned(
+                                39,
+                                ExprKind::Arithmetic(
+                                    Arithmetic::Addition,
+                                    Box::new(Expr(Spanned(
+                                        39,
+                                        ExprKind::Identifier("a".to_string()),
+                                        40
+                                    ))),
+                                    Box::new(Expr(Spanned(
+                                        43,
+                                        ExprKind::Identifier("b".to_string()),
+                                        44
+                                    )))
+                                ),
+                                44
+                            )))),
+                            45
+                        ))],
+                        45
+                    )
+                }),
+                47
+            )))
+        );
     }
 
     #[test]
     fn for_loop_test() {
         assert_eq!(
             parse_program("fn main() { for (let i = 0;;) {} }"),
-            Ok(vec![Declaration::FunctionDefinition {
-                name: "main".to_string(),
-                parameters: vec![],
-                return_type: None,
-                body: vec![Stmt::ForStmt {
-                    init: Some(Box::new(Declaration::DeclarationList(vec![
-                        LetDeclaration {
-                            name: "i".to_string(),
-                            ty: None,
-                            value: Some(Expr::NumberLiteral("0".to_string()))
-                        }
-                    ]))),
-                    cond: None,
-                    post: None,
-                    body: Box::new(Stmt::BlockStmt(vec![]))
-                }]
-            }])
-        )
+            Ok(vec![Spanned(
+                0,
+                Declaration::FunctionDefinition {
+                    name: Spanned(3, "main".to_string(), 7),
+                    parameters: Spanned(8, vec![], 8),
+                    return_type: None,
+                    body: Spanned(
+                        12,
+                        vec![Stmt(Spanned(
+                            12,
+                            StmtKind::ForStmt {
+                                init: Some(Box::new(Declaration::DeclarationList(vec![Spanned(
+                                    21,
+                                    LetDeclaration {
+                                        name: Spanned(21, "i".to_string(), 22),
+                                        ty: None,
+                                        value: Some(Expr(Spanned(
+                                            25,
+                                            ExprKind::NumberLiteral("0".to_string()),
+                                            26
+                                        )))
+                                    },
+                                    26
+                                )]))),
+                                cond: None,
+                                post: None,
+                                body: Box::new(Stmt(Spanned(30, StmtKind::BlockStmt(vec![]), 32)))
+                            },
+                            32
+                        ))],
+                        32
+                    )
+                },
+                34
+            )])
+        );
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn larger_program_parses() {
         assert_eq!(
             parse_program(concat!(
@@ -214,91 +343,305 @@ mod tests {
                 "}",
             )),
             Ok(vec![
-                Declaration::FunctionDefinition {
-                    name: ("add".to_string()),
-                    parameters: vec![
-                        ArgumentDeclaration {
-                            name: ("a".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
-                        },
-                        ArgumentDeclaration {
-                            name: ("b".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
-                        }
-                    ],
-                    return_type: Some(Type::Identifier("i32".to_string())),
-                    body: vec![Stmt::ReturnStmt(Some(Expr::Arithmetic(
-                        Arithmetic::Addition,
-                        Box::new(Expr::Identifier("a".to_string())),
-                        Box::new(Expr::Identifier("b".to_string()))
-                    )))]
-                },
-                Declaration::FunctionDefinition {
-                    name: ("subtract".to_string()),
-                    parameters: vec![
-                        ArgumentDeclaration {
-                            name: ("a".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
-                        },
-                        ArgumentDeclaration {
-                            name: ("b".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
-                        }
-                    ],
-                    return_type: Some(Type::Identifier("i32".to_string())),
-                    body: vec![Stmt::ReturnStmt(Some(Expr::Arithmetic(
-                        Arithmetic::Subtraction,
-                        Box::new(Expr::Identifier("a".to_string())),
-                        Box::new(Expr::Identifier("b".to_string()))
-                    )))]
-                },
-                Declaration::FunctionDefinition {
-                    name: ("main".to_string()),
-                    parameters: vec![],
-                    return_type: None,
-                    body: vec![
-                        Stmt::Declaration(Declaration::DeclarationList(vec![
-                            LetDeclaration {
-                                name: ("a".to_string()),
-                                ty: None,
-                                value: Some(Expr::NumberLiteral("1".to_string()).into())
-                            },
-                            LetDeclaration {
-                                name: ("b".to_string()),
-                                ty: Some(Type::Identifier("i32".to_string())),
-                                value: Some(Expr::NumberLiteral("2".to_string()).into())
-                            },
-                        ])),
-                        Stmt::Declaration(Declaration::DeclarationList(vec![LetDeclaration {
-                            name: ("c".to_string()),
-                            ty: None,
-                            value: Some(Expr::Call(
-                                Box::new(Expr::Identifier("add".to_string())),
-                                vec![
-                                    Expr::Identifier("a".to_string()),
-                                    Expr::Identifier("b".to_string())
-                                ]
-                            ))
-                        }])),
-                        Stmt::Declaration(Declaration::DeclarationList(vec![LetDeclaration {
-                            name: ("d".to_string()),
-                            ty: None,
-                            value: Some(Expr::Call(
-                                Box::new(Expr::Identifier("subtract".to_string())),
-                                vec![
-                                    Expr::Identifier("a".to_string()),
-                                    Expr::Identifier("b".to_string())
-                                ]
-                            ))
-                        }])),
-                        Stmt::ReturnStmt(Some(Expr::Arithmetic(
-                            Arithmetic::Addition,
-                            Box::new(Expr::Identifier("c".to_string())),
-                            Box::new(Expr::Identifier("d".to_string()))
-                        )))
-                    ]
-                }
+                Spanned(
+                    0,
+                    Declaration::FunctionDefinition {
+                        name: Spanned(3, "add".to_string(), 6),
+                        parameters: Spanned(
+                            7,
+                            vec![
+                                Spanned(
+                                    7,
+                                    ArgumentDeclaration {
+                                        name: Spanned(7, "a".to_string(), 8),
+                                        ty: Some(Type(Spanned(
+                                            10,
+                                            TypeKind::Identifier("i32".to_string()),
+                                            13
+                                        )))
+                                    },
+                                    13
+                                ),
+                                Spanned(
+                                    15,
+                                    ArgumentDeclaration {
+                                        name: Spanned(15, "b".to_string(), 16),
+                                        ty: Some(Type(Spanned(
+                                            18,
+                                            TypeKind::Identifier("i32".to_string()),
+                                            21
+                                        )))
+                                    },
+                                    21
+                                )
+                            ],
+                            21
+                        ),
+                        return_type: Some(Type(Spanned(
+                            26,
+                            TypeKind::Identifier("i32".to_string()),
+                            29
+                        ))),
+                        body: Spanned(
+                            36,
+                            vec![Stmt(Spanned(
+                                36,
+                                StmtKind::ReturnStmt(Some(Expr(Spanned(
+                                    43,
+                                    ExprKind::Arithmetic(
+                                        Arithmetic::Addition,
+                                        Box::new(Expr(Spanned(
+                                            43,
+                                            ExprKind::Identifier("a".to_string()),
+                                            44
+                                        ))),
+                                        Box::new(Expr(Spanned(
+                                            47,
+                                            ExprKind::Identifier("b".to_string()),
+                                            48
+                                        )))
+                                    ),
+                                    48
+                                )))),
+                                49
+                            ))],
+                            49
+                        )
+                    },
+                    51
+                ),
+                Spanned(
+                    53,
+                    Declaration::FunctionDefinition {
+                        name: Spanned(56, "subtract".to_string(), 64),
+                        parameters: Spanned(
+                            65,
+                            vec![
+                                Spanned(
+                                    65,
+                                    ArgumentDeclaration {
+                                        name: Spanned(65, "a".to_string(), 66),
+                                        ty: Some(Type(Spanned(
+                                            68,
+                                            TypeKind::Identifier("i32".to_string()),
+                                            71
+                                        )))
+                                    },
+                                    71
+                                ),
+                                Spanned(
+                                    73,
+                                    ArgumentDeclaration {
+                                        name: Spanned(73, "b".to_string(), 74),
+                                        ty: Some(Type(Spanned(
+                                            76,
+                                            TypeKind::Identifier("i32".to_string()),
+                                            79
+                                        )))
+                                    },
+                                    79
+                                )
+                            ],
+                            79
+                        ),
+                        return_type: Some(Type(Spanned(
+                            84,
+                            TypeKind::Identifier("i32".to_string()),
+                            87
+                        ))),
+                        body: Spanned(
+                            94,
+                            vec![Stmt(Spanned(
+                                94,
+                                StmtKind::ReturnStmt(Some(Expr(Spanned(
+                                    101,
+                                    ExprKind::Arithmetic(
+                                        Arithmetic::Subtraction,
+                                        Box::new(Expr(Spanned(
+                                            101,
+                                            ExprKind::Identifier("a".to_string()),
+                                            102
+                                        ))),
+                                        Box::new(Expr(Spanned(
+                                            105,
+                                            ExprKind::Identifier("b".to_string()),
+                                            106
+                                        )))
+                                    ),
+                                    106
+                                )))),
+                                107
+                            ))],
+                            107
+                        )
+                    },
+                    109
+                ),
+                Spanned(
+                    111,
+                    Declaration::FunctionDefinition {
+                        name: Spanned(114, "main".to_string(), 118),
+                        parameters: Spanned(119, vec![], 119),
+                        return_type: None,
+                        body: Spanned(
+                            127,
+                            vec![
+                                Stmt(Spanned(
+                                    127,
+                                    StmtKind::Declaration(Declaration::DeclarationList(vec![
+                                        Spanned(
+                                            131,
+                                            LetDeclaration {
+                                                name: Spanned(131, "a".to_string(), 132),
+                                                ty: None,
+                                                value: Some(Expr(Spanned(
+                                                    135,
+                                                    ExprKind::NumberLiteral("1".to_string()).into(),
+                                                    136
+                                                )))
+                                            },
+                                            136
+                                        ),
+                                        Spanned(
+                                            138,
+                                            LetDeclaration {
+                                                name: Spanned(138, "b".to_string(), 139),
+                                                ty: Some(Type(Spanned(
+                                                    141,
+                                                    TypeKind::Identifier("i32".to_string()),
+                                                    144
+                                                ))),
+                                                value: Some(Expr(Spanned(
+                                                    147,
+                                                    ExprKind::NumberLiteral("2".to_string()).into(),
+                                                    148
+                                                )))
+                                            },
+                                            148
+                                        ),
+                                    ])),
+                                    149
+                                )),
+                                Stmt(Spanned(
+                                    154,
+                                    StmtKind::Declaration(Declaration::DeclarationList(vec![
+                                        Spanned(
+                                            158,
+                                            LetDeclaration {
+                                                name: Spanned(158, "c".to_string(), 159),
+                                                ty: None,
+                                                value: Some(Expr(Spanned(
+                                                    162,
+                                                    ExprKind::Call(
+                                                        Box::new(Expr(Spanned(
+                                                            162,
+                                                            ExprKind::Identifier("add".to_string()),
+                                                            165
+                                                        ))),
+                                                        Spanned(
+                                                            166,
+                                                            vec![
+                                                                Expr(Spanned(
+                                                                    166,
+                                                                    ExprKind::Identifier(
+                                                                        "a".to_string()
+                                                                    ),
+                                                                    167
+                                                                )),
+                                                                Expr(Spanned(
+                                                                    169,
+                                                                    ExprKind::Identifier(
+                                                                        "b".to_string()
+                                                                    ),
+                                                                    170
+                                                                ))
+                                                            ],
+                                                            170
+                                                        )
+                                                    ),
+                                                    171
+                                                )))
+                                            },
+                                            171
+                                        )
+                                    ])),
+                                    172
+                                )),
+                                Stmt(Spanned(
+                                    177,
+                                    StmtKind::Declaration(Declaration::DeclarationList(vec![
+                                        Spanned(
+                                            181,
+                                            LetDeclaration {
+                                                name: Spanned(181, "d".to_string(), 182),
+                                                ty: None,
+                                                value: Some(Expr(Spanned(
+                                                    185,
+                                                    ExprKind::Call(
+                                                        Box::new(Expr(Spanned(
+                                                            185,
+                                                            ExprKind::Identifier(
+                                                                "subtract".to_string()
+                                                            ),
+                                                            193
+                                                        ))),
+                                                        Spanned(
+                                                            194,
+                                                            vec![
+                                                                Expr(Spanned(
+                                                                    194,
+                                                                    ExprKind::Identifier(
+                                                                        "a".to_string()
+                                                                    ),
+                                                                    195
+                                                                )),
+                                                                Expr(Spanned(
+                                                                    197,
+                                                                    ExprKind::Identifier(
+                                                                        "b".to_string()
+                                                                    ),
+                                                                    198
+                                                                ))
+                                                            ],
+                                                            198
+                                                        )
+                                                    ),
+                                                    199
+                                                )))
+                                            },
+                                            199
+                                        )
+                                    ])),
+                                    200
+                                )),
+                                Stmt(Spanned(
+                                    205,
+                                    StmtKind::ReturnStmt(Some(Expr(Spanned(
+                                        212,
+                                        ExprKind::Arithmetic(
+                                            Arithmetic::Addition,
+                                            Box::new(Expr(Spanned(
+                                                212,
+                                                ExprKind::Identifier("c".to_string()),
+                                                213
+                                            ))),
+                                            Box::new(Expr(Spanned(
+                                                216,
+                                                ExprKind::Identifier("d".to_string()),
+                                                217
+                                            )))
+                                        ),
+                                        217
+                                    )))),
+                                    218
+                                ))
+                            ],
+                            218
+                        )
+                    },
+                    220
+                )
             ])
-        )
+        );
     }
 }
