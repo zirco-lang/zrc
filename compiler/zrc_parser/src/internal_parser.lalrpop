@@ -1,5 +1,5 @@
 // DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY MODULE parser INSTEAD
-use super::ast::{expr::{Expr,Arithmetic,Assignment,BinaryBitwise,Logic}, stmt::{Stmt, ArgumentDeclaration, LetDeclaration, Declaration}, ty::Type};
+use super::ast::{expr::{Expr,Arithmetic,Assignment,BinaryBitwise,Logical,Comparison,Equality}, stmt::{Stmt, ArgumentDeclaration, LetDeclaration, Declaration}, ty::Type};
 use super::lexer;
 use lalrpop_util::ErrorRecovery;
 
@@ -156,11 +156,11 @@ Ternary: Expr = {
 
 Logical: Expr = LogicalOr;
 LogicalOr: Expr = {
-    <l:LogicalOr> "||" <r:LogicalAnd> => Expr::Logic(Logic::Or, Box::new(l), Box::new(r)),
+    <l:LogicalOr> "||" <r:LogicalAnd> => Expr::Logical(Logical::Or, Box::new(l), Box::new(r)),
     <LogicalAnd>,
 };
 LogicalAnd: Expr = {
-    <l:LogicalAnd> "&&" <r:Equality> => Expr::Logic(Logic::And, Box::new(l), Box::new(r)),
+    <l:LogicalAnd> "&&" <r:Equality> => Expr::Logical(Logical::And, Box::new(l), Box::new(r)),
     <Bitwise>
 };
 
@@ -179,17 +179,17 @@ BitwiseAnd: Expr = {
 }
 
 Equality: Expr = {
-    <l:Equality> "==" <r:Comparison> => Expr::Logic(Logic::Eq, Box::new(l), Box::new(r)),
-    <l:Equality> "!=" <r:Comparison> => Expr::Logic(Logic::Neq, Box::new(l), Box::new(r)),
+    <l:Equality> "==" <r:Comparison> => Expr::Equality(Equality::Eq, Box::new(l), Box::new(r)),
+    <l:Equality> "!=" <r:Comparison> => Expr::Equality(Equality::Neq, Box::new(l), Box::new(r)),
     <Comparison>
 };
 
 
 Comparison: Expr = {
-    <l:Comparison> ">" <r:BitShift> => Expr::Logic(Logic::Gt, Box::new(l), Box::new(r)),
-    <l:Comparison> ">=" <r:BitShift> => Expr::Logic(Logic::Gte, Box::new(l), Box::new(r)),
-    <l:Comparison> "<" <r:BitShift> => Expr::Logic(Logic::Lt, Box::new(l), Box::new(r)),
-    <l:Comparison> "<=" <r:BitShift> => Expr::Logic(Logic::Lte, Box::new(l), Box::new(r)),
+    <l:Comparison> ">" <r:BitShift> => Expr::Comparison(Comparison::Gt, Box::new(l), Box::new(r)),
+    <l:Comparison> ">=" <r:BitShift> => Expr::Comparison(Comparison::Gte, Box::new(l), Box::new(r)),
+    <l:Comparison> "<" <r:BitShift> => Expr::Comparison(Comparison::Lt, Box::new(l), Box::new(r)),
+    <l:Comparison> "<=" <r:BitShift> => Expr::Comparison(Comparison::Lte, Box::new(l), Box::new(r)),
     <BitShift>
 };
 

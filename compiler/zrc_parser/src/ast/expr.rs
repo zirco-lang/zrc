@@ -99,7 +99,7 @@ impl Display for BinaryBitwise {
 
 /// Logical operators
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub enum Logic {
+pub enum Logical {
     /// `&&`
     And,
     /// `||`
@@ -128,7 +128,7 @@ pub enum Comparison {
     Lte,
 }
 
-impl Display for Logic {
+impl Display for Logical {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::And => write!(f, "&&"),
@@ -191,7 +191,7 @@ pub enum Expr {
 
     BinaryBitwise(BinaryBitwise, Box<Expr>, Box<Expr>),
 
-    Logic(Logic, Box<Expr>, Box<Expr>),
+    Logical(Logical, Box<Expr>, Box<Expr>),
     Equality(Equality, Box<Expr>, Box<Expr>),
     Comparison(Comparison, Box<Expr>, Box<Expr>),
     Arithmetic(Arithmetic, Box<Expr>, Box<Expr>),
@@ -223,7 +223,7 @@ impl Display for Expr {
             Self::Comparison(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
             Self::Arithmetic(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
             Self::BinaryBitwise(op, l, r) => write!(f, "{l} {op} {r}"),
-            Self::Logic(op, l, r) => write!(f, "{l} {op} {r}"),
+            Self::Logical(op, l, r) => write!(f, "{l} {op} {r}"),
             Self::Comma(l, r) => write!(f, "{l}, {r}"),
             Self::UnaryNot(e) => write!(f, "!{e}"),
             Self::UnaryBitwiseNot(e) => write!(f, "~{e}"),

@@ -65,28 +65,22 @@ pub fn parse_stmt(input: &str) -> Result<Stmt, ZircoParserError<Stmt>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        super::ast::{
-            stmt::{ArgumentDeclaration, LetDeclaration},
-            ty::Type,
-        },
-        *,
-    };
-    use crate::box_arguments;
+    use super::super::ast::{expr::*, stmt::*, ty::*};
+    use super::*;
 
     #[test]
     fn basic_expr_works_as_expected() {
         assert_eq!(
             parse_expr("1 + 2 * 3"),
-            Ok(box_arguments!(
-                Expr::Addition,
-                Expr::NumberLiteral("1".to_string()),
-                box_arguments!(
-                    Expr::Multiplication,
-                    Expr::NumberLiteral("2".to_string()),
-                    Expr::NumberLiteral("3".to_string())
-                )
-            ))
+            Ok(Expr::Arithmetic(
+                Arithmetic::Addition,
+                Box::new(Expr::NumberLiteral("1".to_string())),
+                Box::new(Expr::Arithmetic(
+                    Arithmetic::Multiplication,
+                    Box::new(Expr::NumberLiteral("2".to_string())),
+                    Box::new(Expr::NumberLiteral("3".to_string()))
+                ))
+            )),
         );
     }
 
@@ -97,10 +91,10 @@ mod tests {
         if let ZircoParserError::Recoverable { errors, partial } = result {
             assert_eq!(
                 partial,
-                box_arguments!(
-                    Expr::Addition,
-                    Expr::NumberLiteral("1".to_string()),
-                    Expr::Error
+                Expr::Arithmetic(
+                    Arithmetic::Addition,
+                    Box::new(Expr::NumberLiteral("1".to_string())),
+                    Box::new(Expr::Error)
                 )
             );
             assert_eq!(errors.len(), 1);
@@ -162,7 +156,8 @@ mod tests {
                     }
                 ],
                 return_type: Some(Type::Identifier("i32".to_string())),
-                body: vec![Stmt::ReturnStmt(Some(Expr::Addition(
+                body: vec![Stmt::ReturnStmt(Some(Expr::Arithmetic(
+                    Arithmetic::Addition,
                     Box::new(Expr::Identifier("a".to_string())),
                     Box::new(Expr::Identifier("b".to_string()))
                 )))]
@@ -227,7 +222,8 @@ mod tests {
                         }
                     ],
                     return_type: Some(Type::Identifier("i32".to_string())),
-                    body: vec![Stmt::ReturnStmt(Some(Expr::Addition(
+                    body: vec![Stmt::ReturnStmt(Some(Expr::Arithmetic(
+                        Arithmetic::Addition,
                         Box::new(Expr::Identifier("a".to_string())),
                         Box::new(Expr::Identifier("b".to_string()))
                     )))]
@@ -245,7 +241,8 @@ mod tests {
                         }
                     ],
                     return_type: Some(Type::Identifier("i32".to_string())),
-                    body: vec![Stmt::ReturnStmt(Some(Expr::Subtraction(
+                    body: vec![Stmt::ReturnStmt(Some(Expr::Arithmetic(
+                        Arithmetic::Subtraction,
                         Box::new(Expr::Identifier("a".to_string())),
                         Box::new(Expr::Identifier("b".to_string()))
                     )))]
@@ -289,7 +286,8 @@ mod tests {
                                 ]
                             ))
                         }])),
-                        Stmt::ReturnStmt(Some(Expr::Addition(
+                        Stmt::ReturnStmt(Some(Expr::Arithmetic(
+                            Arithmetic::Addition,
                             Box::new(Expr::Identifier("c".to_string())),
                             Box::new(Expr::Identifier("d".to_string()))
                         )))
