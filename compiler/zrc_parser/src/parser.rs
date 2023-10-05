@@ -6,6 +6,7 @@ use super::{
     ast::{
         expr::Expr,
         stmt::{Declaration, Stmt},
+        Spanned,
     },
     lexer,
 };
@@ -43,7 +44,9 @@ macro_rules! parse_internal {
 ///
 /// # Errors
 /// Returns a valid [`ZircoParserError`] if parsing fails.
-pub fn parse_program(input: &str) -> Result<Vec<Declaration>, ZircoParserError<Vec<Declaration>>> {
+pub fn parse_program(
+    input: &str,
+) -> Result<Vec<Spanned<Declaration>>, ZircoParserError<Vec<Spanned<Declaration>>>> {
     parse_internal!(internal_parser::ProgramParser, input)
 }
 

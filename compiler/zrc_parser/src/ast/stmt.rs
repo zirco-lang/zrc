@@ -8,39 +8,16 @@ use std::fmt::Display;
 
 use super::{expr::Expr, ty::Type};
 
-/// A declaration created with `let`.
-#[derive(Debug, Clone, PartialEq)]
-pub struct LetDeclaration {
-    /// The name of the identifier.
-    pub name: String,
-    /// The type of the new symbol. If set to [`None`], the type will be
-    /// inferred.
-    pub ty: Option<Type>,
-    /// The value to associate with the new symbol.
-    pub value: Option<Expr>,
-}
-
-impl Display for LetDeclaration {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.ty {
-            None => match &self.value {
-                None => write!(f, "{}", self.name),
-                Some(v) => write!(f, "{} = {}", self.name, v),
-            },
-            Some(t) => match &self.value {
-                None => write!(f, "{}: {}", self.name, t),
-                Some(v) => write!(f, "{}: {} = {}", self.name, t, v),
-            },
-        }
-    }
-}
+/// A Zirco statement
+#[derive(PartialEq, Debug, Clone)]
+pub struct Stmt(pub super::Spanned<StmtKind>);
 
 /// The enum representing all the different kinds of statements in Zirco
 ///
 /// This enum represents all the different kinds of statements in Zirco. It is
 /// used by the parser to represent the AST in the statement position.
 #[derive(PartialEq, Debug, Clone)]
-pub enum Stmt {
+pub enum StmtKind {
     /// `if (x) y` or `if (x) y else z`
     IfStmt(Expr, Box<Stmt>, Option<Box<Stmt>>),
     /// `while (x) y`
@@ -74,24 +51,23 @@ pub enum Stmt {
     /// Any kind of declaration
     Declaration(Declaration),
 }
-
 /// Any declaration valid to be present at the top level of a file. May also be
 /// used from the [`Stmt::Declaration`] variant.
 #[derive(PartialEq, Debug, Clone)]
 pub enum Declaration {
     /// A list of [`LetDeclaration`]s.
-    DeclarationList(Vec<LetDeclaration>),
+    DeclarationList(Vec<super::Spanned<LetDeclaration>>),
     /// A definition for a function
     FunctionDefinition {
         /// The name of the function.
-        name: String,
+        name: super::Spanned<String>,
         /// The parameters of the function.
-        parameters: Vec<ArgumentDeclaration>,
+        parameters: super::Spanned<Vec<super::Spanned<ArgumentDeclaration>>>,
         /// The return type of the function. If set to [`None`], the function is
         /// void.
         return_type: Option<Type>,
         /// The body of the function.
-        body: Vec<Stmt>,
+        body: super::Spanned<Vec<Stmt>>,
     },
 }
 
@@ -103,7 +79,7 @@ impl Display for Declaration {
                     f,
                     "let {};",
                     l.iter()
-                        .map(ToString::to_string)
+                        .map(|x| x.1.to_string())
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -115,13 +91,17 @@ impl Display for Declaration {
                 body,
             } => write!(
                 f,
-                "fn {name}({}) -> {r} {}",
+                "fn {}({}) -> {} {}",
+                name.1,
                 parameters
+                    .1
                     .iter()
-                    .map(ToString::to_string)
+                    .map(|x| x.1.to_string())
                     .collect::<Vec<String>>()
                     .join(", "),
-                body.iter()
+                r.0 .1,
+                body.1
+                    .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(" ")
@@ -133,13 +113,16 @@ impl Display for Declaration {
                 body,
             } => write!(
                 f,
-                "fn {name}({}) {}",
+                "fn {}({}) {}",
+                name.1,
                 parameters
+                    .1
                     .iter()
-                    .map(ToString::to_string)
+                    .map(|x| x.1.to_string())
                     .collect::<Vec<String>>()
                     .join(", "),
-                body.iter()
+                body.1
+                    .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(" ")
@@ -149,6 +132,11 @@ impl Display for Declaration {
 }
 
 impl Display for Stmt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0 .1.fmt(f)
+    }
+}
+impl Display for StmtKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::IfStmt(e, s, None) => write!(f, "if ({e}) {s}"),
@@ -187,11 +175,38 @@ impl Display for Stmt {
     }
 }
 
+/// A declaration created with `let`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LetDeclaration {
+    /// The name of the identifier.
+    pub name: super::Spanned<String>,
+    /// The type of the new symbol. If set to [`None`], the type will be
+    /// inferred.
+    pub ty: Option<Type>,
+    /// The value to associate with the new symbol.
+    pub value: Option<Expr>,
+}
+
+impl Display for LetDeclaration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.ty {
+            None => match &self.value {
+                None => write!(f, "{}", self.name.1),
+                Some(v) => write!(f, "{} = {}", self.name.1, v),
+            },
+            Some(t) => match &self.value {
+                None => write!(f, "{}: {}", self.name.1, t),
+                Some(v) => write!(f, "{}: {} = {}", self.name.1, t, v),
+            },
+        }
+    }
+}
+
 /// A special form of [`LetDeclaration`] used for function parameters.
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct ArgumentDeclaration {
     /// The name of the parameter.
-    pub name: String,
+    pub name: super::Spanned<String>,
     /// The type of the parameter.
     pub ty: Option<Type>,
 }
@@ -199,8 +214,8 @@ pub struct ArgumentDeclaration {
 impl Display for ArgumentDeclaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.ty {
-            None => write!(f, "{}", self.name),
-            Some(t) => write!(f, "{}: {}", self.name, t),
+            None => write!(f, "{}", self.name.1),
+            Some(t) => write!(f, "{}: {}", self.name.1, t),
         }
     }
 }

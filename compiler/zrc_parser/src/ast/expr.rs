@@ -1,6 +1,6 @@
 //! Expression representation for the Zirco AST
 //!
-//! The main thing within this module you will need is the [`Expr`] enum. It
+//! The main thing within this module you will need is the [`Expr`] struct. It
 //! contains all the different expression kinds in Zirco.
 
 use std::fmt::Display;
@@ -169,12 +169,21 @@ impl Display for Comparison {
     }
 }
 
+#[derive(PartialEq, Debug, Clone)]
+pub struct Expr(pub super::Spanned<ExprKind>);
+
+impl Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0 .1.fmt(f)
+    }
+}
+
 /// The enum representing the different kinds of expressions in Zirco
 ///
 /// This enum represents all the different kinds of expressions in Zirco. It is
 /// used by the parser to represent the AST in the expression position.
 #[derive(PartialEq, Debug, Clone)]
-pub enum Expr {
+pub enum ExprKind {
     /// `a, b`
     Comma(Box<Expr>, Box<Expr>),
 
@@ -205,11 +214,11 @@ pub enum Expr {
     /// `a[b]`
     Index(Box<Expr>, Box<Expr>),
     /// `a.b`
-    Dot(Box<Expr>, String),
+    Dot(Box<Expr>, super::Spanned<String>),
     /// `a->b`
-    Arrow(Box<Expr>, String),
+    Arrow(Box<Expr>, super::Spanned<String>),
     /// `a(b, c, d, ...)`
-    Call(Box<Expr>, Vec<Expr>),
+    Call(Box<Expr>, super::Spanned<Vec<Expr>>),
 
     /// `a ? b : c`
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -226,7 +235,7 @@ pub enum Expr {
     /// An error occurred while parsing.
     Error,
 }
-impl Display for Expr {
+impl Display for ExprKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(")?;
         match self {
@@ -247,15 +256,15 @@ impl Display for Expr {
             Self::UnaryMinus(e) => write!(f, "-{e}"),
             Self::UnaryAddressOf(e) => write!(f, "&{e}"),
             Self::UnaryDereference(e) => write!(f, "*{e}"),
-            Self::Arrow(l, r) => write!(f, "{l}->{r}"),
+            Self::Arrow(l, r) => write!(f, "{l}->{}", r.1),
             Self::Ternary(l, m, r) => write!(f, "{l} ? {m} : {r}"),
             Self::Index(a, b) => write!(f, "{a}[{b}]"),
-            Self::Dot(a, b) => write!(f, "{a}.{b}"),
+            Self::Dot(a, b) => write!(f, "{a}.{}", b.1),
             Self::Call(a, b) => write!(
                 f,
                 "{}({})",
                 a,
-                b.iter()
+                b.1.iter()
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", ")
