@@ -147,6 +147,7 @@ Assignment: Expr = {
     <lhs:Unary> "^=" <rhs:Assignment> => Expr::Assignment(Assignment::BinaryBitwise(BinaryBitwise::Xor), Box::new(lhs), Box::new(rhs)),
     <lhs:Unary> "<<=" <rhs:Assignment> => Expr::Assignment(Assignment::BinaryBitwise(BinaryBitwise::Shl), Box::new(lhs), Box::new(rhs)),
     <lhs:Unary> ">>=" <rhs:Assignment> => Expr::Assignment(Assignment::BinaryBitwise(BinaryBitwise::Shr), Box::new(lhs), Box::new(rhs)),
+    <Ternary>,
 }
 
 Ternary: Expr = {
