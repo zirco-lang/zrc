@@ -7,9 +7,12 @@ use std::fmt::Display;
 
 /// Arithmetic operators
 ///
-/// For an operator to fall under this enum, it must operate on two integers
-/// of the same type and yield that type, and performs some mathematical
-/// operation.
+/// For an operator to be considered an arithmetic operator, it must meet the
+/// following criteria:
+/// - Operates on two integers
+/// - Both operands must be the same type
+/// - The result type is the same as the operand types
+/// - Performs some mathematical operation
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Arithmetic {
     /// `+`
@@ -23,7 +26,6 @@ pub enum Arithmetic {
     /// `%`
     Modulo,
 }
-
 impl Display for Arithmetic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -38,40 +40,34 @@ impl Display for Arithmetic {
 
 /// Assignment operators
 ///
-/// This enum defines all of the different types of assignments which may use
-/// another operation under the hood.
+/// All possible forms of assignments with operational variations.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Assignment {
     /// `=`
     Standard,
-    /// `+=` etc.
+    /// Any form of assignment via [`Arithmetic`] operator (e.g. `+=`)
     Arithmetic(Arithmetic),
-    /// `|=` etc.
+    /// Any form of assignment via [`BinaryBitwise`] operator (e.g. `&=`)
     BinaryBitwise(BinaryBitwise),
 }
-
 impl Display for Assignment {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Standard => write!(f, "="),
-            Self::Arithmetic(Arithmetic::Addition) => write!(f, "+="),
-            Self::Arithmetic(Arithmetic::Subtraction) => write!(f, "-="),
-            Self::Arithmetic(Arithmetic::Multiplication) => write!(f, "*="),
-            Self::Arithmetic(Arithmetic::Division) => write!(f, "/="),
-            Self::Arithmetic(Arithmetic::Modulo) => write!(f, "%="),
-            Self::BinaryBitwise(BinaryBitwise::And) => write!(f, "&="),
-            Self::BinaryBitwise(BinaryBitwise::Or) => write!(f, "|="),
-            Self::BinaryBitwise(BinaryBitwise::Xor) => write!(f, "^="),
-            Self::BinaryBitwise(BinaryBitwise::Shl) => write!(f, "<<="),
-            Self::BinaryBitwise(BinaryBitwise::Shr) => write!(f, ">>="),
+            Self::Arithmetic(op) => write!(f, "{op}="),
+            Self::BinaryBitwise(op) => write!(f, "{op}="),
         }
     }
 }
 
 /// Binary bitwise operators
 ///
-/// For an operator to fall under this enum, it must operate on two integers
-/// of the same type and yield that type, and performs some bitwise operation.
+/// For an operator to be considered a binary bitwise operator, it must meet the
+/// following criteria:
+/// - Operates on two integers
+/// - Both operands must be the same type
+/// - The result type is the same as the operand types
+/// - Performs some bitwise operation
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum BinaryBitwise {
     /// `&`
@@ -85,7 +81,6 @@ pub enum BinaryBitwise {
     /// `>>`
     Shr,
 }
-
 impl Display for BinaryBitwise {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -99,6 +94,12 @@ impl Display for BinaryBitwise {
 }
 
 /// Logical operators
+///
+/// For an operand to be considered a logical operator, it must meet the
+/// following criteria:
+/// - Operates on two booleans
+/// - The result type is a boolean
+/// - Performs some logical operation
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Logical {
     /// `&&`
@@ -106,8 +107,22 @@ pub enum Logical {
     /// `||`
     Or,
 }
+impl Display for Logical {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::And => write!(f, "&&"),
+            Self::Or => write!(f, "||"),
+        }
+    }
+}
 
 /// Equality checks
+///
+/// For an operand to be considered an equality check, it must meet the
+/// following criteria:
+/// - Operates on two values of the same type
+/// - The result type is a boolean
+/// - Performs some equality or inequality check
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Equality {
     /// `==`
@@ -115,8 +130,23 @@ pub enum Equality {
     /// `!=`
     Neq,
 }
+impl Display for Equality {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Eq => write!(f, "=="),
+            Self::Neq => write!(f, "!="),
+        }
+    }
+}
 
 /// Comparison checks
+///
+/// For an operand to be considered a comparison check, it must meet the
+/// following criteria:
+/// - Operates on two integers
+/// - Both operands must be the same type
+/// - The result type is a boolean
+/// - Performs some comparison or order check
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Comparison {
     /// `>`
@@ -127,23 +157,6 @@ pub enum Comparison {
     Lt,
     /// `<=`
     Lte,
-}
-
-impl Display for Logical {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::And => write!(f, "&&"),
-            Self::Or => write!(f, "||"),
-        }
-    }
-}
-impl Display for Equality {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Eq => write!(f, "=="),
-            Self::Neq => write!(f, "!="),
-        }
-    }
 }
 impl Display for Comparison {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -165,7 +178,18 @@ pub enum Expr {
     /// `a, b`
     Comma(Box<Expr>, Box<Expr>),
 
+    /// Assignment operations
     Assignment(Assignment, Box<Expr>, Box<Expr>),
+    /// Bitwise operations
+    BinaryBitwise(BinaryBitwise, Box<Expr>, Box<Expr>),
+    /// Logical operations
+    Logical(Logical, Box<Expr>, Box<Expr>),
+    /// Equality checks
+    Equality(Equality, Box<Expr>, Box<Expr>),
+    /// Comparisons
+    Comparison(Comparison, Box<Expr>, Box<Expr>),
+    /// Arithmetic operations
+    Arithmetic(Arithmetic, Box<Expr>, Box<Expr>),
 
     /// `!x`
     UnaryNot(Box<Expr>),
@@ -189,13 +213,6 @@ pub enum Expr {
 
     /// `a ? b : c`
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
-
-    BinaryBitwise(BinaryBitwise, Box<Expr>, Box<Expr>),
-
-    Logical(Logical, Box<Expr>, Box<Expr>),
-    Equality(Equality, Box<Expr>, Box<Expr>),
-    Comparison(Comparison, Box<Expr>, Box<Expr>),
-    Arithmetic(Arithmetic, Box<Expr>, Box<Expr>),
 
     /// Any numeric literal.
     NumberLiteral(String),
