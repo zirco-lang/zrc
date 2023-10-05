@@ -8,7 +8,8 @@ use std::fmt::Display;
 /// Arithmetic operators
 ///
 /// For an operator to fall under this enum, it must operate on two integers
-/// of the same type and yield that type, and performs some mathematical operation.
+/// of the same type and yield that type, and performs some mathematical
+/// operation.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Arithmetic {
     /// `+`
@@ -37,8 +38,8 @@ impl Display for Arithmetic {
 
 /// Assignment operators
 ///
-/// This enum defines all of the different types of assignments which may use another operation
-/// under the hood.
+/// This enum defines all of the different types of assignments which may use
+/// another operation under the hood.
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Assignment {
     /// `=`

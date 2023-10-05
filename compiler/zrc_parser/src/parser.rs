@@ -65,8 +65,10 @@ pub fn parse_stmt(input: &str) -> Result<Stmt, ZircoParserError<Stmt>> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::ast::{expr::*, stmt::*, ty::*};
-    use super::*;
+    use super::{
+        super::ast::{expr::*, stmt::*, ty::*},
+        *,
+    };
 
     #[test]
     fn basic_expr_works_as_expected() {
