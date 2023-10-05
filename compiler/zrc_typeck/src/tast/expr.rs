@@ -1,6 +1,7 @@
 //! Expression representation for the Zirco [TAST](super)
 
 use std::fmt::Display;
+pub use zrc_parser::ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical};
 
 /// An [expression kind](TypedExprKind) with its yielded [result
 /// type](super::ty::Type) attached to it.
@@ -15,7 +16,20 @@ pub enum TypedExprKind {
     Comma(Box<TypedExpr>, Box<TypedExpr>),
 
     /// `a = b`
+    ///
+    /// `a += b` is desugared to `a = a + b` by the type checker.
     Assignment(Box<TypedExpr>, Box<TypedExpr>),
+
+    /// Bitwise operations
+    BinaryBitwise(BinaryBitwise, Box<TypedExpr>, Box<TypedExpr>),
+    /// Logical operations
+    Logical(Logical, Box<TypedExpr>, Box<TypedExpr>),
+    /// Equality checks
+    Equality(Equality, Box<TypedExpr>, Box<TypedExpr>),
+    /// Comparisons
+    Comparison(Comparison, Box<TypedExpr>, Box<TypedExpr>),
+    /// Arithmetic operations
+    Arithmetic(Arithmetic, Box<TypedExpr>, Box<TypedExpr>),
 
     /// `!x`
     UnaryNot(Box<TypedExpr>),
@@ -40,49 +54,6 @@ pub enum TypedExprKind {
     /// `a ? b : c`
     Ternary(Box<TypedExpr>, Box<TypedExpr>, Box<TypedExpr>),
 
-    /// `a && b`
-    LogicalAnd(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a || b`
-    LogicalOr(Box<TypedExpr>, Box<TypedExpr>),
-
-    /// `a == b`
-    Equals(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a != b`
-    NotEquals(Box<TypedExpr>, Box<TypedExpr>),
-
-    /// `a & b`
-    BitwiseAnd(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a | b`
-    BitwiseOr(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a ^ b`
-    BitwiseXor(Box<TypedExpr>, Box<TypedExpr>),
-
-    /// `a > b`
-    GreaterThan(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a >= b`
-    GreaterThanOrEqualTo(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a < b`
-    LessThan(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a <= b`
-    LessThanOrEqualTo(Box<TypedExpr>, Box<TypedExpr>),
-
-    /// `a >> b`
-    BitwiseRightShift(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a << b`
-    BitwiseLeftShift(Box<TypedExpr>, Box<TypedExpr>),
-
-    /// `a + b`
-    Addition(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a - b`
-    Subtraction(Box<TypedExpr>, Box<TypedExpr>),
-
-    /// `a * b`
-    Multiplication(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a / b`
-    Division(Box<TypedExpr>, Box<TypedExpr>),
-    /// `a % b`
-    Modulo(Box<TypedExpr>, Box<TypedExpr>),
-
     /// `x as T`
     Cast(Box<TypedExpr>, super::ty::Type),
 
@@ -104,35 +75,22 @@ impl Display for TypedExprKind {
             Self::Identifier(i) => write!(f, "{i}"),
             Self::BooleanLiteral(b) => write!(f, "{b}"),
             Self::Assignment(l, r) => write!(f, "{l} = {r}"),
-            Self::Addition(l, r) => write!(f, "{l} + {r}"),
-            Self::Subtraction(l, r) => write!(f, "{l} - {r}"),
-            Self::Multiplication(l, r) => write!(f, "{l} * {r}"),
-            Self::Division(l, r) => write!(f, "{l} / {r}"),
-            Self::Modulo(l, r) => write!(f, "{l} % {r}"),
-            Self::BitwiseAnd(l, r) => write!(f, "{l} & {r}"),
-            Self::BitwiseOr(l, r) => write!(f, "{l} | {r}"),
-            Self::BitwiseXor(l, r) => write!(f, "{l} ^ {r}"),
-            Self::BitwiseLeftShift(l, r) => write!(f, "{l} << {r}"),
-            Self::BitwiseRightShift(l, r) => write!(f, "{l} >> {r}"),
-            Self::GreaterThan(l, r) => write!(f, "{l} > {r}"),
-            Self::GreaterThanOrEqualTo(l, r) => write!(f, "{l} >= {r}"),
-            Self::LessThan(l, r) => write!(f, "{l} < {r}"),
-            Self::LessThanOrEqualTo(l, r) => write!(f, "{l} <= {r}"),
-            Self::Equals(l, r) => write!(f, "{l} == {r}"),
-            Self::NotEquals(l, r) => write!(f, "{l} != {r}"),
-            Self::LogicalAnd(l, r) => write!(f, "{l} && {r}"),
-            Self::LogicalOr(l, r) => write!(f, "{l} || {r}"),
+            Self::Equality(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
+            Self::Comparison(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
+            Self::Arithmetic(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
+            Self::BinaryBitwise(op, l, r) => write!(f, "{l} {op} {r}"),
+            Self::Logical(op, l, r) => write!(f, "{l} {op} {r}"),
             Self::Comma(l, r) => write!(f, "{l}, {r}"),
             Self::UnaryNot(e) => write!(f, "!{e}"),
-            Self::Cast(x, t) => write!(f, "{x} as {t}"),
             Self::UnaryBitwiseNot(e) => write!(f, "~{e}"),
             Self::UnaryMinus(e) => write!(f, "-{e}"),
             Self::UnaryAddressOf(e) => write!(f, "&{e}"),
             Self::UnaryDereference(e) => write!(f, "*{e}"),
             Self::Arrow(l, r) => write!(f, "{l}->{r}"),
-            Self::Ternary(a, b, c) => write!(f, "{a} ? {b} : {c}"),
+            Self::Ternary(l, m, r) => write!(f, "{l} ? {m} : {r}"),
             Self::Index(a, b) => write!(f, "{a}[{b}]"),
             Self::Dot(a, b) => write!(f, "{a}.{b}"),
+            Self::Cast(a, t) => write!(f, "{a} as {t}"),
             Self::Call(a, b) => write!(
                 f,
                 "{a}({})",
