@@ -226,7 +226,6 @@ pub enum Expr {
     /// An error occurred while parsing.
     Error,
 }
-
 impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(")?;
