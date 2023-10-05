@@ -1,6 +1,7 @@
 //! Expression representation for the Zirco [TAST](super)
 
 use std::fmt::Display;
+
 pub use zrc_parser::ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical};
 
 /// An [expression kind](TypedExprKind) with its yielded [result
