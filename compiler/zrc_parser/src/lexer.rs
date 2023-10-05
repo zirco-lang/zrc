@@ -439,7 +439,7 @@ mod tests {
                     Ok((0, Tok::Identifier("a".to_string()), 1)),
                     Err(LexicalError::UnterminatedBlockComment)
                 ]
-            )
+            );
         }
     }
 }
