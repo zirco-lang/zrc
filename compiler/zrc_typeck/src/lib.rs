@@ -187,6 +187,26 @@ pub enum BlockReturnActuality {
     WillReturn,
 }
 
+/// Desugar an assignment like `x += y` to `x = x + y`.
+fn desugar_assignment(
+    mode: zrc_parser::ast::expr::Assignment,
+    lhs: Expr,
+    rhs: Expr,
+) -> (Expr, Expr) {
+    use zrc_parser::ast::expr::Assignment;
+    match mode {
+        Assignment::Standard => (lhs, rhs),
+        Assignment::Arithmetic(op) => (
+            lhs.clone(),
+            Expr::Arithmetic(op, Box::new(lhs), Box::new(rhs)),
+        ),
+        Assignment::BinaryBitwise(op) => (
+            lhs.clone(),
+            Expr::BinaryBitwise(op, Box::new(lhs), Box::new(rhs)),
+        ),
+    }
+}
+
 // FIXME: this NEEDS to be rewritten to use references almost everywhere and be
 // no-clone. We stack overflow for deep expressions which is VERY VERY BAD.
 /// Type check and infer an [AST expression](Expr) to a [TAST
@@ -205,10 +225,14 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
                 TypedExprKind::Comma(Box::new(at), Box::new(bt)),
             )
         }
-        Expr::Assignment(place, value) => {
-            // TODO: Check place is a valid lvalue so that 7 = 4; is invalid?
-            let place_t = type_expr(scope, *place)?;
-            let value_t = type_expr(scope, *value)?;
+        Expr::Assignment(mode, place, value) => {
+            // TODO: Check place is a valid lvalue so that `7 = 4;` is invalid
+
+            // Desugar `x += y` to `x = x + y`.
+            let (place, value) = desugar_assignment(mode, *place, *value);
+
+            let place_t = type_expr(scope, place)?;
+            let value_t = type_expr(scope, value)?;
 
             if place_t.0 != value_t.0 {
                 return Err(format!("Type mismatch: {} != {}", place_t.0, value_t.0));
@@ -219,53 +243,6 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
                 TypedExprKind::Assignment(Box::new(place_t), Box::new(value_t)),
             )
         }
-
-        Expr::AdditionAssignment(place, value) => type_expr(
-            scope,
-            Expr::Assignment(place.clone(), Box::new(Expr::Addition(place, value))),
-        )?,
-        Expr::SubtractionAssignment(place, value) => type_expr(
-            scope,
-            Expr::Assignment(place.clone(), Box::new(Expr::Subtraction(place, value))),
-        )?,
-        Expr::MultiplicationAssignment(place, value) => type_expr(
-            scope,
-            Expr::Assignment(place.clone(), Box::new(Expr::Multiplication(place, value))),
-        )?,
-        Expr::DivisionAssignment(place, value) => type_expr(
-            scope,
-            Expr::Assignment(place.clone(), Box::new(Expr::Division(place, value))),
-        )?,
-        Expr::ModuloAssignment(place, value) => type_expr(
-            scope,
-            Expr::Assignment(place.clone(), Box::new(Expr::Modulo(place, value))),
-        )?,
-        Expr::BitwiseAndAssignment(place, value) => type_expr(
-            scope,
-            Expr::Assignment(place.clone(), Box::new(Expr::BitwiseAnd(place, value))),
-        )?,
-        Expr::BitwiseOrAssignment(place, value) => type_expr(
-            scope,
-            Expr::Assignment(place.clone(), Box::new(Expr::BitwiseOr(place, value))),
-        )?,
-        Expr::BitwiseXorAssignment(place, value) => type_expr(
-            scope,
-            Expr::Assignment(place.clone(), Box::new(Expr::BitwiseXor(place, value))),
-        )?,
-        Expr::BitwiseLeftShiftAssignment(place, value) => type_expr(
-            scope,
-            Expr::Assignment(
-                place.clone(),
-                Box::new(Expr::BitwiseLeftShift(place, value)),
-            ),
-        )?,
-        Expr::BitwiseRightShiftAssignment(place, value) => type_expr(
-            scope,
-            Expr::Assignment(
-                place.clone(),
-                Box::new(Expr::BitwiseRightShift(place, value)),
-            ),
-        )?,
 
         Expr::UnaryNot(x) => TypedExpr(
             TastType::Bool,
@@ -403,445 +380,109 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             )
         }
 
-        Expr::LogicalAnd(a, b) => {
+        Expr::Logical(op, a, b) => {
             let at = type_expr(scope, *a)?;
             let bt = type_expr(scope, *b)?;
 
             if at.0 != TastType::Bool {
-                return Err(format!("Logical AND lhs must be bool, not {}", at.0));
+                return Err(format!("Operator `{op}` lhs must be bool, not {}", at.0));
             }
 
             if bt.0 != TastType::Bool {
-                return Err(format!("Logical AND rhs must be bool, not {}", bt.0));
+                return Err(format!("Operator `{op}` rhs must be bool, not {}", bt.0));
             }
 
             TypedExpr(
                 TastType::Bool,
-                TypedExprKind::LogicalAnd(Box::new(at), Box::new(bt)),
+                TypedExprKind::Logical(op, Box::new(at), Box::new(bt)),
             )
         }
-
-        Expr::LogicalOr(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if at.0 != TastType::Bool {
-                return Err(format!("Logical OR lhs must be bool, not {}", at.0));
-            }
-
-            if bt.0 != TastType::Bool {
-                return Err(format!("Logical OR rhs must be bool, not {}", bt.0));
-            }
-
-            TypedExpr(
-                TastType::Bool,
-                TypedExprKind::LogicalOr(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::Equals(a, b) => {
+        Expr::Equality(op, a, b) => {
             let at = type_expr(scope, *a)?;
             let bt = type_expr(scope, *b)?;
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "Equals lhs and rhs must have same type, not {} and {}",
+                    "Operator `{op}` lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
 
             TypedExpr(
                 TastType::Bool,
-                TypedExprKind::Equals(Box::new(at), Box::new(bt)),
+                TypedExprKind::Equality(op, Box::new(at), Box::new(bt)),
             )
         }
-
-        Expr::NotEquals(a, b) => {
+        Expr::BinaryBitwise(op, a, b) => {
             let at = type_expr(scope, *a)?;
             let bt = type_expr(scope, *b)?;
 
+            if !at.0.is_integer() {
+                return Err(format!("Operator `{op}` lhs must be integer, not {}", at.0));
+            }
+
+            if !bt.0.is_integer() {
+                return Err(format!("Operator `{op}` rhs must be integer, not {}", bt.0));
+            }
+
             if at.0 != bt.0 {
                 return Err(format!(
-                    "NotEquals lhs and rhs must have same type, not {} and {}",
+                    "Operator `{op}` lhs and rhs must have same type, not {} and {}",
+                    at.0, bt.0
+                ));
+            }
+
+            TypedExpr(
+                at.0.clone(),
+                TypedExprKind::BinaryBitwise(op, Box::new(at), Box::new(bt)),
+            )
+        }
+        Expr::Comparison(op, a, b) => {
+            let at = type_expr(scope, *a)?;
+            let bt = type_expr(scope, *b)?;
+
+            if !at.0.is_integer() {
+                return Err(format!("Operator `{op}` lhs must be integer, not {}", at.0));
+            }
+
+            if !bt.0.is_integer() {
+                return Err(format!("Operator `{op}` rhs must be integer, not {}", bt.0));
+            }
+
+            if at.0 != bt.0 {
+                return Err(format!(
+                    "Operator `{op}` lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
 
             TypedExpr(
                 TastType::Bool,
-                TypedExprKind::NotEquals(Box::new(at), Box::new(bt)),
+                TypedExprKind::Comparison(op, Box::new(at), Box::new(bt)),
             )
         }
-
-        Expr::BitwiseAnd(a, b) => {
+        Expr::Arithmetic(op, a, b) => {
             let at = type_expr(scope, *a)?;
             let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("BitwiseAnd lhs must be integer, not {}", at.0));
+                return Err(format!("Operator `{op}` lhs must be integer, not {}", at.0));
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("BitwiseAnd rhs must be integer, not {}", bt.0));
+                return Err(format!("Operator `{op}` rhs must be integer, not {}", bt.0));
             }
 
             if at.0 != bt.0 {
                 return Err(format!(
-                    "BitwiseAnd lhs and rhs must have same type, not {} and {}",
+                    "Operator `{op}` lhs and rhs must have same type, not {} and {}",
                     at.0, bt.0
                 ));
             }
 
             TypedExpr(
                 at.0.clone(),
-                TypedExprKind::BitwiseAnd(Box::new(at), Box::new(bt)),
-            )
-        }
-        Expr::BitwiseOr(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!("BitwiseOr lhs must be integer, not {}", at.0));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!("BitwiseOr rhs must be integer, not {}", bt.0));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "BitwiseOr lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                at.0.clone(),
-                TypedExprKind::BitwiseOr(Box::new(at), Box::new(bt)),
-            )
-        }
-        Expr::BitwiseXor(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!("BitwiseXor lhs must be integer, not {}", at.0));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!("BitwiseXor rhs must be integer, not {}", bt.0));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "BitwiseXor lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                at.0.clone(),
-                TypedExprKind::BitwiseXor(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::GreaterThan(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!("GreaterThan lhs must be integer, not {}", at.0));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!("GreaterThan rhs must be integer, not {}", bt.0));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "GreaterThan lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                TastType::Bool,
-                TypedExprKind::GreaterThan(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::GreaterThanOrEqualTo(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!(
-                    "GreaterThanOrEqualTo lhs must be integer, not {}",
-                    at.0
-                ));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!(
-                    "GreaterThanOrEqualTo rhs must be integer, not {}",
-                    bt.0
-                ));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "GreaterThanOrEqualTo lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                TastType::Bool,
-                TypedExprKind::GreaterThanOrEqualTo(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::LessThan(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!("LessThan lhs must be integer, not {}", at.0));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!("LessThan rhs must be integer, not {}", bt.0));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "LessThan lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                TastType::Bool,
-                TypedExprKind::LessThan(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::LessThanOrEqualTo(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!(
-                    "LessThanOrEqualTo lhs must be integer, not {}",
-                    at.0
-                ));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!(
-                    "LessThanOrEqualTo rhs must be integer, not {}",
-                    bt.0
-                ));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "LessThanOrEqualTo lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                TastType::Bool,
-                TypedExprKind::LessThanOrEqualTo(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::BitwiseRightShift(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!(
-                    "BitwiseRightShift lhs must be integer, not {}",
-                    at.0
-                ));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!(
-                    "BitwiseRightShift rhs must be integer, not {}",
-                    bt.0
-                ));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "BitwiseRightShift lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                at.0.clone(),
-                TypedExprKind::BitwiseRightShift(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::BitwiseLeftShift(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!(
-                    "BitwiseLeftShift lhs must be integer, not {}",
-                    at.0
-                ));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!(
-                    "BitwiseLeftShift rhs must be integer, not {}",
-                    bt.0
-                ));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "BitwiseLeftShift lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                at.0.clone(),
-                TypedExprKind::BitwiseLeftShift(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::Addition(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!("Addition lhs must be integer, not {}", at.0));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!("Addition rhs must be integer, not {}", bt.0));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "Addition lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                at.0.clone(),
-                TypedExprKind::Addition(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::Subtraction(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!("Subtraction lhs must be integer, not {}", at.0));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!("Subtraction rhs must be integer, not {}", bt.0));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "Subtraction lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                at.0.clone(),
-                TypedExprKind::Subtraction(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::Multiplication(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!("Multiplication lhs must be integer, not {}", at.0));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!("Multiplication rhs must be integer, not {}", bt.0));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "Multiplication lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                at.0.clone(),
-                TypedExprKind::Multiplication(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::Division(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!("Division lhs must be integer, not {}", at.0));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!("Division rhs must be integer, not {}", bt.0));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "Division lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                at.0.clone(),
-                TypedExprKind::Division(Box::new(at), Box::new(bt)),
-            )
-        }
-
-        Expr::Modulo(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
-
-            if !at.0.is_integer() {
-                return Err(format!("Modulo lhs must be integer, not {}", at.0));
-            }
-
-            if !bt.0.is_integer() {
-                return Err(format!("Modulo rhs must be integer, not {}", bt.0));
-            }
-
-            if at.0 != bt.0 {
-                return Err(format!(
-                    "Modulo lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
-            }
-
-            TypedExpr(
-                at.0.clone(),
-                TypedExprKind::Modulo(Box::new(at), Box::new(bt)),
+                TypedExprKind::Arithmetic(op, Box::new(at), Box::new(bt)),
             )
         }
 
