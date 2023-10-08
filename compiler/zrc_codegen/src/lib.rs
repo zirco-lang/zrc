@@ -1,3 +1,4 @@
+use anyhow::bail;
 use anyhow::Context as _;
 use std::{collections::HashMap, fmt::Display};
 
@@ -200,15 +201,15 @@ fn cg_place(
                 .clone();
             (reg, bb.clone())
         }
-        PlaceKind::Dereference(x) => {
+        PlaceKind::Deref(x) => {
             let (x_ptr, bb) = cg_expr(cg, bb, scope, *x)?;
             (x_ptr, bb)
         }
         PlaceKind::Index(x, index) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x)?;
-            let (index_ptr, bb) = cg_expr(cg, &bb, scope, *index)?;
+            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x.clone())?;
+            let (index_ptr, bb) = cg_expr(cg, &bb, scope, *index.clone())?;
 
-            let x_typename = get_llvm_typename(*x.clone());
+            let x_typename = get_llvm_typename(x.clone().0);
 
             let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
 
@@ -216,7 +217,7 @@ fn cg_place(
 
             let index_reg = cg_load(cg, &bb, &index_typename, &index_ptr);
 
-            let result_typename = match *x {
+            let result_typename = match x.0 {
                 zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
                 _ => unreachable!(), // per typeck, this is always a pointer
             };
@@ -233,20 +234,20 @@ fn cg_place(
             (result_reg, bb)
         }
         PlaceKind::Arrow(x, key) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x)?;
+            let (x_ptr, bb) = cg_place(cg, bb, scope, *x.clone())?;
 
-            let x_typename = get_llvm_typename(*x.clone());
+            let x_typename = get_llvm_typename(x.0.clone());
 
             let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
 
-            let result_typename = match *x {
+            let result_typename = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
                 _ => unreachable!(), // per typeck, this is always a pointer
             };
 
             let result_reg = cg.new_reg();
 
-            let key_idx = match x.0 {
+            let key_idx = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Struct(entries) => {
                     determine_order_of_struct(entries)
                         .into_iter()
@@ -262,24 +263,23 @@ fn cg_place(
                 cg,
                 &format!(
                     "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 0, i32 {key_idx}",
-                    key = key,
                 )
             );
 
             (result_reg, bb)
         }
         PlaceKind::Dot(x, key) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x)?;
+            let (x_ptr, bb) = cg_place(cg, bb, scope, *x.clone())?;
 
-            let x_typename = get_llvm_typename(*x.clone());
+            let x_typename = get_llvm_typename(x.0.clone());
 
             let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
 
-            let result_typename = match *x {
+            let result_typename = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Struct(entries) => get_llvm_typename(
                     entries
                         .get(&key)
-                        .with_context(|| format!("Struct {} has no field {}", x.0, key))?
+                        .with_context(|| format!("Struct {} has no field {}", x.0.clone(), key))?
                         .clone(),
                 ),
                 _ => unreachable!(), // per typeck, this is always a struct
@@ -287,7 +287,7 @@ fn cg_place(
 
             let result_reg = cg.new_reg();
 
-            let key_idx = match x.0 {
+            let key_idx = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Struct(entries) => {
                     determine_order_of_struct(entries)
                         .into_iter()
@@ -303,7 +303,6 @@ fn cg_place(
                 cg,
                 &format!(
                     "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 {key_idx}",
-                    key = key,
                 )
             );
 
@@ -628,7 +627,7 @@ fn cg_expr(
 
         TypedExprKind::Assignment(place, value) => {
             let (place_ptr, bb) = cg_place(cg, bb, scope, *place)?;
-            let (value_ptr, bb) = cg_expr(cg, &bb, scope, *value)?;
+            let (value_ptr, bb) = cg_expr(cg, &bb, scope, *value.clone())?;
 
             let value_typename = get_llvm_typename(value.0.clone());
 
@@ -648,25 +647,113 @@ fn cg_expr(
         }
 
         TypedExprKind::Index(x, index) => {
-            use zrc_typeck::tast::expr::{Place, PlaceKind};
-            // get the pointer via cg_place
-            cg_place(cg, bb, scope, Place(expr.0, PlaceKind::Index(x, index)))?
+            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x.clone())?;
+            let (index_ptr, bb) = cg_expr(cg, &bb, scope, *index.clone())?;
+
+            let x_typename = get_llvm_typename(x.clone().0);
+
+            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
+
+            let index_typename = get_llvm_typename(index.0.clone());
+
+            let index_reg = cg_load(cg, &bb, &index_typename, &index_ptr);
+
+            let result_typename = match x.0 {
+                zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
+                _ => unreachable!(), // per typeck, this is always a pointer
+            };
+
+            let result_reg = cg.new_reg();
+
+            bb.add_instruction(
+                cg,
+                &format!(
+                    "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, {index_typename} {index_reg}",
+                )
+            );
+
+            (result_reg, bb)
         }
 
         TypedExprKind::Dot(x, prop) => {
-            use zrc_typeck::tast::expr::{Place, PlaceKind};
-            // get the pointer via cg_place
-            cg_place(cg, bb, scope, Place(expr.0, PlaceKind::Dot(x, prop)))?
+            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x.clone())?;
+
+            let x_typename = get_llvm_typename(x.0.clone());
+
+            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
+
+            let result_typename = match x.0.clone() {
+                zrc_typeck::tast::ty::Type::Struct(entries) => get_llvm_typename(
+                    entries
+                        .get(&prop)
+                        .with_context(|| format!("Struct {} has no field {}", x.0.clone(), prop))?
+                        .clone(),
+                ),
+                _ => unreachable!(), // per typeck, this is always a struct
+            };
+
+            let result_reg = cg.new_reg();
+
+            let key_idx = match x.0.clone() {
+                zrc_typeck::tast::ty::Type::Struct(entries) => {
+                    determine_order_of_struct(entries)
+                        .into_iter()
+                        .enumerate()
+                        .find(|(_, (k, _))| k == &prop)
+                        .with_context(|| format!("Struct {} has no field {}", x.0, prop))?
+                        .0
+                }
+                _ => unreachable!(), // per typeck, this is always a struct
+            };
+
+            bb.add_instruction(
+                cg,
+                &format!(
+                    "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 {key_idx}",
+                )
+            );
+
+            (result_reg, bb)
         }
 
         TypedExprKind::Arrow(x, prop) => {
-            use zrc_typeck::tast::expr::{Place, PlaceKind};
-            // get the pointer via cg_place
-            cg_place(cg, bb, scope, Place(expr.0, PlaceKind::Arrow(x, prop)))?
+            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x.clone())?;
+
+            let x_typename = get_llvm_typename(x.0.clone());
+
+            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
+
+            let result_typename = match x.0.clone() {
+                zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
+                _ => unreachable!(), // per typeck, this is always a pointer
+            };
+
+            let result_reg = cg.new_reg();
+
+            let key_idx = match x.0.clone() {
+                zrc_typeck::tast::ty::Type::Struct(entries) => {
+                    determine_order_of_struct(entries)
+                        .into_iter()
+                        .enumerate()
+                        .find(|(_, (k, _))| k == &prop)
+                        .with_context(|| format!("Struct {} has no field {}", x.0.clone(), prop))?
+                        .0
+                }
+                _ => unreachable!(), // per typeck, this is always a struct
+            };
+
+            bb.add_instruction(
+                cg,
+                &format!(
+                    "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 0, i32 {key_idx}",
+                )
+            );
+
+            (result_reg, bb)
         }
 
         TypedExprKind::Call(f, args) => {
-            let (f_ptr, bb) = cg_expr(cg, bb, scope, *f)?;
+            let (f_ptr, bb) = cg_expr(cg, bb, scope, *f.clone())?;
 
             let f_typename = get_llvm_typename(f.0.clone());
 
@@ -675,7 +762,7 @@ fn cg_expr(
             let args = args
                 .into_iter()
                 .map(|arg| {
-                    let (arg_ptr, bb) = cg_expr(cg, &bb, scope, arg)?;
+                    let (arg_ptr, bb) = cg_expr(cg, &bb, scope, arg.clone())?;
                     let arg_typename = get_llvm_typename(arg.0.clone());
                     let arg_reg = cg_load(cg, &bb, &arg_typename, &arg_ptr);
                     Ok(format!("{arg_typename} {arg_reg}"))
@@ -702,8 +789,8 @@ fn cg_expr(
 
         TypedExprKind::Cast(x, t) => {
             use zrc_typeck::tast::ty::Type::*;
-            let cast_opcode = match (x.0, t) {
-                (x, x) => "bitcast",
+            let cast_opcode = match (x.0.clone(), t.clone()) {
+                (x, y) if x == y => "bitcast",
                 // signed -> signed = sext
                 // signed -> unsigned = sext
                 // unsigned -> signed = zext
@@ -736,9 +823,10 @@ fn cg_expr(
                 (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Ptr(_)) => "inttoptr",
                 (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Fn(_, _)) => "inttoptr",
                 (Fn(_, _), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
+                _ => bail!("invalid cast from {} to {}", x.0, t),
             };
 
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x)?;
+            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x.clone())?;
 
             let x_typename = get_llvm_typename(x.0.clone());
 

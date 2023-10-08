@@ -213,6 +213,21 @@ fn desugar_assignment(
     }
 }
 
+/// Validate an expr into a place
+fn expr_to_place(expr: TypedExpr) -> Result<tast::expr::Place, String> {
+    use tast::expr::{Place, PlaceKind};
+    Ok(match expr.1 {
+        TypedExprKind::UnaryDereference(x) => Place(expr.0, PlaceKind::Deref(x)),
+        TypedExprKind::Identifier(x) => Place(expr.0, PlaceKind::Variable(x)),
+        TypedExprKind::Index(x, y) => Place(expr.0, PlaceKind::Index(x, y)),
+        TypedExprKind::Dot(x, y) => Place(expr.0, PlaceKind::Dot(Box::new(expr_to_place(*x)?), y)),
+        TypedExprKind::Arrow(x, y) => {
+            Place(expr.0, PlaceKind::Arrow(Box::new(expr_to_place(*x)?), y))
+        }
+        _ => return Err(format!("Cannot assign to non-place expression {}", expr.0)),
+    })
+}
+
 // FIXME: this NEEDS to be rewritten to use references almost everywhere and be
 // no-clone. We stack overflow for deep expressions which is VERY VERY BAD.
 /// Type check and infer an [AST expression](Expr) to a [TAST
@@ -237,7 +252,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             // Desugar `x += y` to `x = x + y`.
             let (place, value) = desugar_assignment(mode, *place, *value);
 
-            let place_t = type_expr(scope, place)?;
+            let place_t = expr_to_place(type_expr(scope, place)?)?;
             let value_t = type_expr(scope, value)?;
 
             if place_t.0 != value_t.0 {
