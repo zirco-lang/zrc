@@ -10,6 +10,22 @@ pub use zrc_parser::ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality,
 #[allow(clippy::module_name_repetitions)]
 pub struct TypedExpr(pub super::ty::Type, pub TypedExprKind);
 
+#[derive(PartialEq, Debug, Clone)]
+pub struct Place(pub super::ty::Type, pub PlaceKind);
+/// The valid left-hand-side of a [`TypedExprKind::Assignment`].
+///
+/// Places may be:
+/// - A variable or an property access of a place
+/// - A dereference or index into any expression yielding a pointer
+#[derive(PartialEq, Debug, Clone)]
+pub enum PlaceKind {
+    Deref(Box<TypedExpr>),
+    Variable(String),
+    Index(Box<TypedExpr>, Box<TypedExpr>),
+    Dot(Box<Place>, String),
+    Arrow(Box<Place>, String),
+}
+
 /// The kind of a [`TypedExpr`]
 #[derive(PartialEq, Debug, Clone)]
 pub enum TypedExprKind {
@@ -19,7 +35,7 @@ pub enum TypedExprKind {
     /// `a = b`
     ///
     /// `a += b` is desugared to `a = a + b` by the type checker.
-    Assignment(Box<TypedExpr>, Box<TypedExpr>),
+    Assignment(Box<Place>, Box<TypedExpr>),
 
     /// Bitwise operations
     BinaryBitwise(BinaryBitwise, Box<TypedExpr>, Box<TypedExpr>),
@@ -101,6 +117,22 @@ impl Display for TypedExprKind {
                     .join(", ")
             ),
         }
+    }
+}
+impl Display for PlaceKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PlaceKind::Deref(e) => write!(f, "*{e}"),
+            PlaceKind::Variable(s) => write!(f, "{s}"),
+            PlaceKind::Index(a, b) => write!(f, "{a}[{b}]"),
+            PlaceKind::Dot(a, b) => write!(f, "{a}.{b}"),
+            PlaceKind::Arrow(a, b) => write!(f, "{a}->{b}"),
+        }
+    }
+}
+impl Display for Place {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}) as ({})", self.1, self.0)
     }
 }
 

@@ -23,10 +23,6 @@ pub enum Type {
     I64,
     /// `u64`
     U64,
-    /// `isize`
-    Isize,
-    /// `usize`
-    Usize,
     /// `void`, only producible by calling a void function (`fn()`)
     Void,
     /// `bool`
@@ -51,8 +47,6 @@ impl Display for Type {
             Self::U32 => write!(f, "u32"),
             Self::I64 => write!(f, "i64"),
             Self::U64 => write!(f, "u64"),
-            Self::Isize => write!(f, "isize"),
-            Self::Usize => write!(f, "usize"),
             Self::Bool => write!(f, "bool"),
             Self::Ptr(t) => write!(f, "*({t})"),
             Self::Void => write!(f, "void"),
@@ -85,17 +79,14 @@ impl Type {
     /// Returns `true` if this is an integer type like [`Type::I8`].
     #[must_use]
     pub const fn is_integer(&self) -> bool {
-        use Type::{Isize, Usize, I16, I32, I64, I8, U16, U32, U64, U8};
-        matches!(
-            self,
-            I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64 | Isize | Usize
-        )
+        use Type::{I16, I32, I64, I8, U16, U32, U64, U8};
+        matches!(self, I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64)
     }
 
     /// Returns `true` if this is a signed integer type like [`Type::I8`].
     #[must_use]
     pub const fn is_signed_integer(&self) -> bool {
-        use Type::{Isize, I16, I32, I64, I8};
-        matches!(self, I8 | I16 | I32 | I64 | Isize)
+        use Type::{I16, I32, I64, I8};
+        matches!(self, I8 | I16 | I32 | I64)
     }
 }

@@ -1,3 +1,16 @@
 {
-    "cSpell.words": ["lalrpop", "structptr", "tast"]
+    "cSpell.words": [
+        "alloca",
+        "bitcast",
+        "inttoptr",
+        "lalrpop",
+        "ptrtoint",
+        "sdiv",
+        "srem",
+        "structptr",
+        "tast",
+        "trunc",
+        "typeck",
+        "zext"
+    ]
 }

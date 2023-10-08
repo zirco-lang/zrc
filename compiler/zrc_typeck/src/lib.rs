@@ -106,8 +106,6 @@ fn resolve_type(scope: &Scope, ty: ParserType) -> Result<TastType, String> {
             "u32" => TastType::U32,
             "i64" => TastType::I64,
             "u64" => TastType::U64,
-            "isize" => TastType::Isize,
-            "usize" => TastType::Usize,
             "bool" => TastType::Bool,
             _ => {
                 if let Some(t) = scope.get_type(&x) {
@@ -145,6 +143,14 @@ impl BlockReturnType {
         match self {
             Self::Void => None,
             Self::Return(t) => Some(t),
+        }
+    }
+
+    /// Converts this [`BlockReturnType`] to a [`TastType`]
+    pub fn into_tast_type(self) -> TastType {
+        match self {
+            Self::Void => TastType::Void,
+            Self::Return(t) => t,
         }
     }
 }
@@ -244,10 +250,13 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             )
         }
 
-        Expr::UnaryNot(x) => TypedExpr(
-            TastType::Bool,
-            TypedExprKind::UnaryNot(Box::new(type_expr(scope, *x)?)),
-        ),
+        Expr::UnaryNot(x) => {
+            let t = type_expr(scope, *x)?;
+            if t.0 != TastType::Bool {
+                return Err(format!("Cannot not {}", t.0));
+            }
+            TypedExpr(t.0.clone(), TypedExprKind::UnaryNot(Box::new(t)))
+        }
         Expr::UnaryBitwiseNot(x) => {
             let t = type_expr(scope, *x)?;
             if !t.0.is_integer() {
@@ -285,8 +294,8 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             let ptr_t = type_expr(scope, *ptr)?;
             let offset_t = type_expr(scope, *offset)?;
 
-            if offset_t.0 != TastType::Usize {
-                return Err(format!("Index offset must be usize, not {}", offset_t.0));
+            if !offset_t.0.is_integer() {
+                return Err(format!("Index offset must be integer, not {}", offset_t.0));
             }
 
             if let TastType::Ptr(t) = ptr_t.0.clone() {
@@ -401,9 +410,13 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             let at = type_expr(scope, *a)?;
             let bt = type_expr(scope, *b)?;
 
-            if at.0 != bt.0 {
+            if at.0.is_integer() && bt.0.is_integer() && at.0 == bt.0 {
+                // int == int is valid
+            } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (at.0.clone(), bt.0.clone()) {
+                // *T == *U is valid
+            } else {
                 return Err(format!(
-                    "Operator `{op}` lhs and rhs must have same type, not {} and {}",
+                    "Operator `{op}` lhs and rhs must be same-type integer or pointer, not {} and {}",
                     at.0, bt.0
                 ));
             }
@@ -496,6 +509,15 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (xt.0.clone(), tt.clone()) {
                 // *T -> *U cast is valid
                 TypedExpr(tt.clone(), TypedExprKind::Cast(Box::new(xt), tt))
+            } else if let (TastType::Ptr(_), _) | (_, TastType::Ptr(_)) = (xt.0.clone(), tt.clone())
+            {
+                // ensure one is an int
+                if xt.0.is_integer() || tt.is_integer() {
+                    // *T -> int or int -> *T cast is valid
+                    TypedExpr(tt.clone(), TypedExprKind::Cast(Box::new(xt), tt))
+                } else {
+                    return Err(format!("Cannot cast {} to {}", xt.0, tt));
+                }
             } else {
                 return Err(format!("Cannot cast {} to {}", xt.0, tt));
             }
