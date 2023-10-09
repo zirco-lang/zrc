@@ -23,6 +23,10 @@ impl Counter {
 pub struct FunctionCg {
     blocks: Vec<BasicBlockData>,
     next_instruction_id: Counter,
+    /// One of our design decisions involves using memory registers extremely often, and `alloca`s can only
+    /// be easily optimized to SSA registers by SROA if they are located at the beginning of the first basic block
+    /// in the function. For this reason, the allocas are located here.
+    allocations: Vec<String>,
 }
 impl FunctionCg {
     pub fn new() -> (Self, BasicBlock) {
@@ -30,6 +34,7 @@ impl FunctionCg {
             Self {
                 blocks: vec![BasicBlockData::new(0)],
                 next_instruction_id: Counter::new(1),
+                allocations: Vec::new(),
             },
             BasicBlock { id: 0 },
         )
@@ -45,7 +50,7 @@ impl FunctionCg {
     }
 
     fn new_reg(&mut self) -> String {
-        format!("%{}", self.next_instruction_id.next())
+        format!("%l{}", self.next_instruction_id.next())
     }
 
     fn add_instruction_to_bb(&mut self, bb: &BasicBlock, instr: &str) -> anyhow::Result<()> {
@@ -60,6 +65,9 @@ impl Display for FunctionCg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, bb) in self.blocks.iter().enumerate() {
             if i == 0 {
+                for instr in &self.allocations {
+                    write!(f, "    {}\n", instr)?;
+                }
                 for instr in &bb.instructions {
                     write!(f, "    {}\n", instr)?;
                 }
@@ -145,10 +153,11 @@ fn get_llvm_typename(ty: zrc_typeck::tast::ty::Type) -> String {
     }
 }
 
-/// Allocates a new register and returns it.
+/// Allocates a new register and returns it. This also properly handles the alloca instruction needing
+/// to be at the beginning of a basic block.
 fn cg_alloc(cg: &mut FunctionCg, bb: &BasicBlock, ty: &str) -> String {
     let reg = cg.new_reg();
-    bb.add_instruction(cg, &format!("{reg} = alloca {ty}"));
+    cg.allocations.push(format!("{reg} = alloca {ty}"));
     reg
 }
 /// Loads a type `T` from a `T*`
@@ -605,7 +614,7 @@ pub fn cg_expr(
 
             let result_reg = cg.new_reg();
 
-            bb.add_instruction(cg, &format!("{result_reg} = alloca {result_typename}"));
+            cg_alloc(cg, &bb, &result_typename);
 
             cg_store(cg, &bb, &result_typename, &result_reg, &x_ptr);
 
