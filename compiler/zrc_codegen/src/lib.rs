@@ -20,12 +20,12 @@ impl Counter {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-struct FunctionCg {
+pub struct FunctionCg {
     blocks: Vec<BasicBlockData>,
     next_instruction_id: Counter,
 }
 impl FunctionCg {
-    fn new() -> (Self, BasicBlock) {
+    pub fn new() -> (Self, BasicBlock) {
         (
             Self {
                 blocks: vec![BasicBlockData::new(0)],
@@ -89,7 +89,7 @@ impl BasicBlockData {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-struct BasicBlock {
+pub struct BasicBlock {
     id: usize,
 }
 impl Display for BasicBlock {
@@ -163,12 +163,12 @@ fn cg_store(cg: &mut FunctionCg, bb: &BasicBlock, ty: &str, ptr: &str, value: &s
 }
 
 #[derive(PartialEq, Clone, Debug)]
-struct CgScope {
+pub struct CgScope {
     /// Maps identifiers to their LLVM register
     identifiers: HashMap<String, String>,
 }
 impl CgScope {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             identifiers: HashMap::new(),
         }
@@ -184,7 +184,7 @@ impl CgScope {
 }
 
 /// Returns a register containing a pointer to the place inputted
-fn cg_place(
+pub fn cg_place(
     cg: &mut FunctionCg,
     bb: &BasicBlock,
     scope: &CgScope,
@@ -193,6 +193,7 @@ fn cg_place(
     // Again, produces a REGISTER holding the pointer.
 
     use zrc_typeck::tast::expr::PlaceKind;
+
     Ok(match place.1 {
         PlaceKind::Variable(x) => {
             let reg = scope
@@ -312,7 +313,7 @@ fn cg_place(
 }
 
 /// Returns a register containing a pointer to the result of the expression.
-fn cg_expr(
+pub fn cg_expr(
     cg: &mut FunctionCg,
     bb: &BasicBlock,
     scope: &CgScope,
@@ -445,7 +446,7 @@ fn cg_expr(
             let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr);
 
             // the operands are integers
-            let op = match (op, expr.0) {
+            let op = match (op, expr.0.clone()) {
                 (zrc_typeck::tast::expr::Comparison::Lt, ty) if ty.is_signed_integer() => {
                     "icmp slt"
                 }
