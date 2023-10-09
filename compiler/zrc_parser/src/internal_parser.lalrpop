@@ -1,8 +1,8 @@
 // DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY MODULE parser INSTEAD
-use super::ast::{expr::Expr, stmt::{Stmt, ArgumentDeclaration, LetDeclaration, Declaration}, ty::Type};
+use super::ast::{expr::{Expr,Arithmetic,Assignment,BinaryBitwise,Logical,Comparison,Equality}, stmt::{Stmt, ArgumentDeclaration, LetDeclaration, Declaration}, ty::Type};
 use super::lexer;
-use super::box_arguments;
 use lalrpop_util::ErrorRecovery;
+use std::collections::HashMap;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
 
@@ -84,24 +84,37 @@ Declaration: Declaration = {
     <LetDeclaration>,
     // FIXME: This might allow code like for (fn foo() {};;) {} to work. Do we want this?
     <FunctionDeclaration>,
+    <StructDeclaration>,
 };
 
 FunctionDeclaration: Declaration = {
     "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList?> ")" <r:("->" <Type>)?> "{"
         <s:StmtList?>
-    "}" => Declaration::FunctionDefinition {
+    "}" => Declaration::FunctionDeclaration {
         name: i,
         parameters: a.unwrap_or(Vec::new()),
         return_type: r,
-        body: s.unwrap_or(Vec::new())
+        body: Some(s.unwrap_or(Vec::new())),
+    },
+    "fn" <i:IDENTIFIER> "(" <a:ArgumentDeclarationList?> ")" <r:("->" <Type>)?> ";" => Declaration::FunctionDeclaration {
+        name: i,
+        parameters: a.unwrap_or(Vec::new()),
+        return_type: r,
+        body: None,
     }
-    // TODO: External declarations
 };
+
+StructDeclaration: Declaration = {
+    "struct" <i:IDENTIFIER> "{" <l:CommaSeparated<(<IDENTIFIER> ":" <Type>)>?> "}" => Declaration::StructDeclaration {
+        name: i,
+        fields: l.unwrap_or(Vec::new()).into_iter().collect::<HashMap<_, _>>(),
+    }
+}
 
 ArgumentDeclarationList = CommaSeparated<ArgumentDeclaration>;
 
 ArgumentDeclaration: ArgumentDeclaration = {
-    <i:IDENTIFIER> <t:(":" <Type>)?> => ArgumentDeclaration {
+    <i:IDENTIFIER> ":" <t:Type> => ArgumentDeclaration {
         name: i,
         ty: t
     }
@@ -119,6 +132,9 @@ LetDeclaration: Declaration = {
 
 Type: Type = {
     <IDENTIFIER> => Type::Identifier(<>),
+    "*" <Type> => Type::Ptr(Box::new(<>)),
+    "struct" "{" <l:CommaSeparated<
+        (<IDENTIFIER> ":" <Type>)>?> "}" => Type::Struct(l.unwrap_or(Vec::new()).into_iter().collect::<HashMap<_, _>>()),
 }
 
 FlowStmt: Stmt = {
@@ -132,98 +148,104 @@ StmtList: Vec<Stmt> = Stmt+;
 pub Expr: Expr = Comma;
 
 Comma: Expr = {
-    <Comma> "," <Assignment> => box_arguments!(Expr::Comma, <>),
+    <l:Comma> "," <r:Assignment> => Expr::Comma(Box::new(l), Box::new(r)),
     <Assignment>
 }
 
 Assignment: Expr = {
-    <Unary> "=" <Assignment> => box_arguments!(Expr::Assignment, <>),
-    <Unary> "+=" <Assignment> => box_arguments!(Expr::AdditionAssignment, <>),
-    <Unary> "-=" <Assignment> => box_arguments!(Expr::SubtractionAssignment, <>),
-    <Unary> "*=" <Assignment> => box_arguments!(Expr::MultiplicationAssignment, <>),
-    <Unary> "/=" <Assignment> => box_arguments!(Expr::DivisionAssignment, <>),
-    <Unary> "%=" <Assignment> => box_arguments!(Expr::ModuloAssignment, <>),
-    <Unary> "&=" <Assignment> => box_arguments!(Expr::BitwiseAndAssignment, <>),
-    <Unary> "|=" <Assignment> => box_arguments!(Expr::BitwiseOrAssignment, <>),
-    <Unary> "^=" <Assignment> => box_arguments!(Expr::BitwiseXorAssignment, <>),
-    <Unary> "<<=" <Assignment> => box_arguments!(Expr::BitwiseLeftShiftAssignment, <>),
-    <Unary> ">>=" <Assignment> => box_arguments!(Expr::BitwiseRightShiftAssignment, <>),
-    <Ternary>
-};
+    <lhs:Unary> "=" <rhs:Assignment> => Expr::Assignment(Assignment::Standard, Box::new(lhs), Box::new(rhs)),
+    <lhs:Unary> "+=" <rhs:Assignment> => Expr::Assignment(Assignment::Arithmetic(Arithmetic::Addition), Box::new(lhs), Box::new(rhs)),
+    <lhs:Unary> "-=" <rhs:Assignment> => Expr::Assignment(Assignment::Arithmetic(Arithmetic::Subtraction), Box::new(lhs), Box::new(rhs)),
+    <lhs:Unary> "*=" <rhs:Assignment> => Expr::Assignment(Assignment::Arithmetic(Arithmetic::Multiplication), Box::new(lhs), Box::new(rhs)),
+    <lhs:Unary> "/=" <rhs:Assignment> => Expr::Assignment(Assignment::Arithmetic(Arithmetic::Division), Box::new(lhs), Box::new(rhs)),
+    <lhs:Unary> "%=" <rhs:Assignment> => Expr::Assignment(Assignment::Arithmetic(Arithmetic::Modulo), Box::new(lhs), Box::new(rhs)),
+    <lhs:Unary> "&=" <rhs:Assignment> => Expr::Assignment(Assignment::BinaryBitwise(BinaryBitwise::And), Box::new(lhs), Box::new(rhs)),
+    <lhs:Unary> "|=" <rhs:Assignment> => Expr::Assignment(Assignment::BinaryBitwise(BinaryBitwise::Or), Box::new(lhs), Box::new(rhs)),
+    <lhs:Unary> "^=" <rhs:Assignment> => Expr::Assignment(Assignment::BinaryBitwise(BinaryBitwise::Xor), Box::new(lhs), Box::new(rhs)),
+    <lhs:Unary> "<<=" <rhs:Assignment> => Expr::Assignment(Assignment::BinaryBitwise(BinaryBitwise::Shl), Box::new(lhs), Box::new(rhs)),
+    <lhs:Unary> ">>=" <rhs:Assignment> => Expr::Assignment(Assignment::BinaryBitwise(BinaryBitwise::Shr), Box::new(lhs), Box::new(rhs)),
+    <Ternary>,
+}
 
 Ternary: Expr = {
-    <Logical> "?" <Expr> ":" <Ternary> => box_arguments!(Expr::Ternary, <>),
+    <l:Logical> "?" <c:Expr> ":" <r:Ternary> => Expr::Ternary(Box::new(l), Box::new(c), Box::new(r)),
     <Logical>
 };
 
 Logical: Expr = LogicalOr;
 LogicalOr: Expr = {
-    <LogicalOr> "||" <LogicalAnd> => box_arguments!(Expr::LogicalOr, <>),
+    <l:LogicalOr> "||" <r:LogicalAnd> => Expr::Logical(Logical::Or, Box::new(l), Box::new(r)),
     <LogicalAnd>,
 };
 LogicalAnd: Expr = {
-    <LogicalAnd> "&&" <Equality> => box_arguments!(Expr::LogicalAnd, <>),
+    <l:LogicalAnd> "&&" <r:Equality> => Expr::Logical(Logical::And, Box::new(l), Box::new(r)),
     <Bitwise>
 };
 
 Bitwise: Expr = BitwiseOr;
 BitwiseOr: Expr = {
-    <BitwiseOr> "|" <BitwiseXor> => box_arguments!(Expr::BitwiseOr, <>),
+    <l:BitwiseOr> "|" <r:BitwiseXor> => Expr::BinaryBitwise(BinaryBitwise::Or, Box::new(l), Box::new(r)),
     <BitwiseXor>
 };
 BitwiseXor: Expr = {
-    <BitwiseXor> "^" <BitwiseAnd> => box_arguments!(Expr::BitwiseXor, <>),
+    <l:BitwiseXor> "^" <r:BitwiseAnd> => Expr::BinaryBitwise(BinaryBitwise::Xor, Box::new(l), Box::new(r)),
     <BitwiseAnd>,
 };
 BitwiseAnd: Expr = {
-    <BitwiseAnd> "&" <Equality> => box_arguments!(Expr::BitwiseAnd, <>),
+    <l:BitwiseAnd> "&" <r:Equality> => Expr::BinaryBitwise(BinaryBitwise::And, Box::new(l), Box::new(r)),
     <Equality>,
 }
 
 Equality: Expr = {
-    <Equality> "==" <Comparison> => box_arguments!(Expr::Equals, <>),
-    <Equality> "!=" <Comparison> => box_arguments!(Expr::NotEquals, <>),
+    <l:Equality> "==" <r:Comparison> => Expr::Equality(Equality::Eq, Box::new(l), Box::new(r)),
+    <l:Equality> "!=" <r:Comparison> => Expr::Equality(Equality::Neq, Box::new(l), Box::new(r)),
     <Comparison>
 };
 
+
 Comparison: Expr = {
-    <Comparison> ">" <BitShift> => box_arguments!(Expr::GreaterThan, <>),
-    <Comparison> ">=" <BitShift> => box_arguments!(Expr::GreaterThanOrEqualTo, <>),
-    <Comparison> "<" <BitShift> => box_arguments!(Expr::LessThan, <>),
-    <Comparison> "<=" <BitShift> => box_arguments!(Expr::LessThanOrEqualTo, <>),
+    <l:Comparison> ">" <r:BitShift> => Expr::Comparison(Comparison::Gt, Box::new(l), Box::new(r)),
+    <l:Comparison> ">=" <r:BitShift> => Expr::Comparison(Comparison::Gte, Box::new(l), Box::new(r)),
+    <l:Comparison> "<" <r:BitShift> => Expr::Comparison(Comparison::Lt, Box::new(l), Box::new(r)),
+    <l:Comparison> "<=" <r:BitShift> => Expr::Comparison(Comparison::Lte, Box::new(l), Box::new(r)),
     <BitShift>
 };
 
 BitShift: Expr = {
-    <BitShift> ">>" <Term> => box_arguments!(Expr::BitwiseRightShift, <>),
-    <BitShift> "<<" <Term> => box_arguments!(Expr::BitwiseLeftShift, <>),
+    <l:BitShift> ">>" <r:Term> => Expr::BinaryBitwise(BinaryBitwise::Shr, Box::new(l), Box::new(r)),
+    <l:BitShift> "<<" <r:Term> => Expr::BinaryBitwise(BinaryBitwise::Shl, Box::new(l), Box::new(r)),
     <Term>
 };
 
 Term: Expr = {
-    <Term> "+" <Factor> => box_arguments!(Expr::Addition, <>),
-    <Term> "-" <Factor> => box_arguments!(Expr::Subtraction, <>),
+    <l:Term> "+" <r:Factor> => Expr::Arithmetic(Arithmetic::Addition, Box::new(l), Box::new(r)),
+    <l:Term> "-" <r:Factor> => Expr::Arithmetic(Arithmetic::Subtraction, Box::new(l), Box::new(r)),
     <Factor>
 };
 
 Factor: Expr = {
-    <Factor> "/" <Unary> => box_arguments!(Expr::Division, <>),
-    <Factor> "*" <Unary> => box_arguments!(Expr::Multiplication, <>),
-    <Factor> "%" <Unary> => box_arguments!(Expr::Modulo, <>),
-    <Unary>
+    <l:Factor> "/" <r:Cast> => Expr::Arithmetic(Arithmetic::Division, Box::new(l), Box::new(r)),
+    <l:Factor> "*" <r:Cast> => Expr::Arithmetic(Arithmetic::Multiplication, Box::new(l), Box::new(r)),
+    <l:Factor> "%" <r:Cast> => Expr::Arithmetic(Arithmetic::Modulo, Box::new(l), Box::new(r)),
+    <Cast>
 };
 
+Cast: Expr = {
+    <e:Unary> "as" <t:Type> => Expr::Cast(Box::new(e), t),
+    <Unary>,
+}
+
 Unary: Expr = {
-    "!" <Unary> => box_arguments!(Expr::UnaryNot, <>),
-    "-" <Unary> => box_arguments!(Expr::UnaryMinus, <>),
-    "~" <Unary> => box_arguments!(Expr::UnaryBitwiseNot, <>),
-    "&" <Unary> => box_arguments!(Expr::UnaryAddressOf, <>),
-    "*" <Unary> => box_arguments!(Expr::UnaryDereference, <>),
+    "!" <Unary> => Expr::UnaryNot(Box::new(<>)),
+    "-" <Unary> => Expr::UnaryMinus(Box::new(<>)),
+    "~" <Unary> => Expr::UnaryBitwiseNot(Box::new(<>)),
+    "&" <Unary> => Expr::UnaryAddressOf(Box::new(<>)),
+    "*" <Unary> => Expr::UnaryDereference(Box::new(<>)),
     <Postfix>
 };
 
 Postfix: Expr = {
-    <Postfix> "[" <Expr> "]" => box_arguments!(Expr::Index, <>),
+    <x:Postfix> "[" <i:Expr> "]" => Expr::Index(Box::new(x), Box::new(i)),
     <l:Postfix> "." <r:IDENTIFIER> => Expr::Dot(Box::new(l), r),
     <l:Postfix> "->" <r:IDENTIFIER> => Expr::Arrow(Box::new(l), r),
     <i:Postfix> "(" <l:ArgumentList?> ")" => Expr::Call(Box::new(i), l.unwrap_or(Vec::new())),
@@ -252,8 +274,6 @@ extern {
         "*" => lexer::Tok::Star,
         "/" => lexer::Tok::Slash,
         "%" => lexer::Tok::Percent,
-        "++" => lexer::Tok::PlusPlus,
-        "--" => lexer::Tok::MinusMinus,
 
         "==" => lexer::Tok::EqEq,
         "!=" => lexer::Tok::NotEq,
@@ -290,7 +310,6 @@ extern {
         "." => lexer::Tok::Dot,
         "?" => lexer::Tok::QuestionMark,
         ":" => lexer::Tok::Colon,
-        "::" => lexer::Tok::ColonColon,
 
         "(" => lexer::Tok::LeftParen,
         ")" => lexer::Tok::RightParen,
@@ -314,6 +333,8 @@ extern {
         "return" => lexer::Tok::Return,
         "let" => lexer::Tok::Let,
         "fn" => lexer::Tok::Fn,
+        "as" => lexer::Tok::As,
+        "struct" => lexer::Tok::Struct,
         "->" => lexer::Tok::SmallArrow,
     }
 }

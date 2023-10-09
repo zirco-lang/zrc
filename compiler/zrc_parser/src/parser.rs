@@ -66,27 +66,23 @@ pub fn parse_stmt(input: &str) -> Result<Stmt, ZircoParserError<Stmt>> {
 #[cfg(test)]
 mod tests {
     use super::{
-        super::ast::{
-            stmt::{ArgumentDeclaration, LetDeclaration},
-            ty::Type,
-        },
+        super::ast::{expr::*, stmt::*, ty::*},
         *,
     };
-    use crate::box_arguments;
 
     #[test]
     fn basic_expr_works_as_expected() {
         assert_eq!(
             parse_expr("1 + 2 * 3"),
-            Ok(box_arguments!(
-                Expr::Addition,
-                Expr::NumberLiteral("1".to_string()),
-                box_arguments!(
-                    Expr::Multiplication,
-                    Expr::NumberLiteral("2".to_string()),
-                    Expr::NumberLiteral("3".to_string())
-                )
-            ))
+            Ok(Expr::Arithmetic(
+                Arithmetic::Addition,
+                Box::new(Expr::NumberLiteral("1".to_string())),
+                Box::new(Expr::Arithmetic(
+                    Arithmetic::Multiplication,
+                    Box::new(Expr::NumberLiteral("2".to_string())),
+                    Box::new(Expr::NumberLiteral("3".to_string()))
+                ))
+            )),
         );
     }
 
@@ -97,10 +93,10 @@ mod tests {
         if let ZircoParserError::Recoverable { errors, partial } = result {
             assert_eq!(
                 partial,
-                box_arguments!(
-                    Expr::Addition,
-                    Expr::NumberLiteral("1".to_string()),
-                    Expr::Error
+                Expr::Arithmetic(
+                    Arithmetic::Addition,
+                    Box::new(Expr::NumberLiteral("1".to_string())),
+                    Box::new(Expr::Error)
                 )
             );
             assert_eq!(errors.len(), 1);
@@ -149,23 +145,24 @@ mod tests {
     fn small_function_declaration_parses() {
         assert_eq!(
             parse_stmt("fn add(a: i32, b: i32) -> i32 { return a + b; }"),
-            Ok(Stmt::Declaration(Declaration::FunctionDefinition {
+            Ok(Stmt::Declaration(Declaration::FunctionDeclaration {
                 name: ("add".to_string()),
                 parameters: vec![
                     ArgumentDeclaration {
                         name: ("a".to_string()),
-                        ty: Some(Type::Identifier("i32".to_string()))
+                        ty: Type::Identifier("i32".to_string())
                     },
                     ArgumentDeclaration {
                         name: ("b".to_string()),
-                        ty: Some(Type::Identifier("i32".to_string()))
+                        ty: Type::Identifier("i32".to_string())
                     }
                 ],
                 return_type: Some(Type::Identifier("i32".to_string())),
-                body: vec![Stmt::ReturnStmt(Some(Expr::Addition(
+                body: Some(vec![Stmt::ReturnStmt(Some(Expr::Arithmetic(
+                    Arithmetic::Addition,
                     Box::new(Expr::Identifier("a".to_string())),
                     Box::new(Expr::Identifier("b".to_string()))
-                )))]
+                )))])
             }))
         )
     }
@@ -174,11 +171,11 @@ mod tests {
     fn for_loop_test() {
         assert_eq!(
             parse_program("fn main() { for (let i = 0;;) {} }"),
-            Ok(vec![Declaration::FunctionDefinition {
+            Ok(vec![Declaration::FunctionDeclaration {
                 name: "main".to_string(),
                 parameters: vec![],
                 return_type: None,
-                body: vec![Stmt::ForStmt {
+                body: Some(vec![Stmt::ForStmt {
                     init: Some(Box::new(Declaration::DeclarationList(vec![
                         LetDeclaration {
                             name: "i".to_string(),
@@ -189,7 +186,7 @@ mod tests {
                     cond: None,
                     post: None,
                     body: Box::new(Stmt::BlockStmt(vec![]))
-                }]
+                }])
             }])
         )
     }
@@ -214,47 +211,49 @@ mod tests {
                 "}",
             )),
             Ok(vec![
-                Declaration::FunctionDefinition {
+                Declaration::FunctionDeclaration {
                     name: ("add".to_string()),
                     parameters: vec![
                         ArgumentDeclaration {
                             name: ("a".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
+                            ty: Type::Identifier("i32".to_string())
                         },
                         ArgumentDeclaration {
                             name: ("b".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
+                            ty: Type::Identifier("i32".to_string())
                         }
                     ],
                     return_type: Some(Type::Identifier("i32".to_string())),
-                    body: vec![Stmt::ReturnStmt(Some(Expr::Addition(
+                    body: Some(vec![Stmt::ReturnStmt(Some(Expr::Arithmetic(
+                        Arithmetic::Addition,
                         Box::new(Expr::Identifier("a".to_string())),
                         Box::new(Expr::Identifier("b".to_string()))
-                    )))]
+                    )))])
                 },
-                Declaration::FunctionDefinition {
+                Declaration::FunctionDeclaration {
                     name: ("subtract".to_string()),
                     parameters: vec![
                         ArgumentDeclaration {
                             name: ("a".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
+                            ty: Type::Identifier("i32".to_string())
                         },
                         ArgumentDeclaration {
                             name: ("b".to_string()),
-                            ty: Some(Type::Identifier("i32".to_string()))
+                            ty: Type::Identifier("i32".to_string())
                         }
                     ],
                     return_type: Some(Type::Identifier("i32".to_string())),
-                    body: vec![Stmt::ReturnStmt(Some(Expr::Subtraction(
+                    body: Some(vec![Stmt::ReturnStmt(Some(Expr::Arithmetic(
+                        Arithmetic::Subtraction,
                         Box::new(Expr::Identifier("a".to_string())),
                         Box::new(Expr::Identifier("b".to_string()))
-                    )))]
+                    )))])
                 },
-                Declaration::FunctionDefinition {
+                Declaration::FunctionDeclaration {
                     name: ("main".to_string()),
                     parameters: vec![],
                     return_type: None,
-                    body: vec![
+                    body: Some(vec![
                         Stmt::Declaration(Declaration::DeclarationList(vec![
                             LetDeclaration {
                                 name: ("a".to_string()),
@@ -289,11 +288,12 @@ mod tests {
                                 ]
                             ))
                         }])),
-                        Stmt::ReturnStmt(Some(Expr::Addition(
+                        Stmt::ReturnStmt(Some(Expr::Arithmetic(
+                            Arithmetic::Addition,
                             Box::new(Expr::Identifier("c".to_string())),
                             Box::new(Expr::Identifier("d".to_string()))
                         )))
-                    ]
+                    ])
                 }
             ])
         )
