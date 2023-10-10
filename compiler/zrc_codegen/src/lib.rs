@@ -973,57 +973,45 @@ pub struct LoopBreakaway {
 }
 
 /// Declares the variable, creating its allocation and also evaluating the assignment.
-pub fn cg_declaration(
+pub fn cg_let_declaration(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
     bb: &BasicBlock,
     scope: &mut CgScope,
-    declaration: zrc_typeck::tast::stmt::TypedDeclaration,
+    declarations: Vec<zrc_typeck::tast::stmt::LetDeclaration>,
 ) -> anyhow::Result<BasicBlock> {
     use zrc_typeck::tast::stmt::{LetDeclaration, TypedDeclaration};
     let mut bb = bb.clone();
 
-    Ok(match declaration {
-        // We do nothing for structure declarations because they are not emitted in the LLVM IR (the types are inlined)
-        TypedDeclaration::StructDeclaration { .. } => bb.clone(),
+    for let_declaration in declarations {
+        // allocate space for it
+        let ptr = cg_alloc(cg, &bb, &get_llvm_typename(let_declaration.ty.clone()));
 
-        TypedDeclaration::DeclarationList(declarations) => {
-            for let_declaration in declarations {
-                // allocate space for it
-                let ptr = cg_alloc(cg, &bb, &get_llvm_typename(let_declaration.ty.clone()));
+        // store it in scope
+        scope.insert(&let_declaration.name, &ptr);
 
-                // store it in scope
-                scope.insert(&let_declaration.name, &ptr);
-
-                if let Some(value) = let_declaration.value {
-                    bb = cg_expr(
-                        module,
-                        cg,
-                        &bb,
-                        scope,
-                        zrc_typeck::tast::expr::TypedExpr(
-                            let_declaration.ty.clone(),
-                            zrc_typeck::tast::expr::TypedExprKind::Assignment(
-                                Box::new(zrc_typeck::tast::expr::Place(
-                                    let_declaration.ty,
-                                    zrc_typeck::tast::expr::PlaceKind::Variable(
-                                        let_declaration.name,
-                                    ),
-                                )),
-                                Box::new(value),
-                            ),
-                        ),
-                    )?
-                    .1;
-                }
-            }
-
-            bb
+        if let Some(value) = let_declaration.value {
+            bb = cg_expr(
+                module,
+                cg,
+                &bb,
+                scope,
+                zrc_typeck::tast::expr::TypedExpr(
+                    let_declaration.ty.clone(),
+                    zrc_typeck::tast::expr::TypedExprKind::Assignment(
+                        Box::new(zrc_typeck::tast::expr::Place(
+                            let_declaration.ty,
+                            zrc_typeck::tast::expr::PlaceKind::Variable(let_declaration.name),
+                        )),
+                        Box::new(value),
+                    ),
+                ),
+            )?
+            .1;
         }
+    }
 
-        // TODO: Handle functions (this is done once we have a module code-generator struct)
-        TypedDeclaration::FunctionDeclaration { .. } => todo!(),
-    })
+    Ok(bb)
 }
 
 // TODO: Something is needed to stop code generating within a block once a 'br' is reached.
@@ -1136,7 +1124,9 @@ pub fn cg_block(
                     }
                 }
 
-                TypedStmt::Declaration(d) => cg_declaration(module, cg, &bb, &mut scope, d)?,
+                TypedStmt::DeclarationList(d) => {
+                    cg_let_declaration(module, cg, &bb, &mut scope, d)?
+                }
 
                 TypedStmt::ForStmt {
                     init,
@@ -1157,7 +1147,7 @@ pub fn cg_block(
                     // The block we are currently in will become the preheader. Generate the `init` code if there is any.
                     let bb = match init {
                         None => bb,
-                        Some(init) => cg_declaration(module, cg, &bb, &mut scope, *init)?,
+                        Some(init) => cg_let_declaration(module, cg, &bb, &mut scope, *init)?,
                     };
 
                     let header = cg.new_bb();
