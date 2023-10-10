@@ -26,7 +26,7 @@ use tast::{
 };
 use zrc_parser::ast::{
     expr::Expr,
-    stmt::{Declaration as AstDeclaration, Stmt},
+    stmt::{Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt},
     ty::Type as ParserType,
 };
 
@@ -565,101 +565,101 @@ fn coerce_stmt_into_block(stmt: Stmt) -> Vec<Stmt> {
     }
 }
 
-/// Process an [AST declaration](AstDeclaration) and place it in the appropriate
-/// scope, returning a [TAST declaration](TypedDeclaration).
+/// Process a vector of [AST let declarations](AstLetDeclaration) and insert it into the scope,
+/// returning a vector of [TAST let declarations](TastLetDeclaration).
+pub fn process_let_declaration(
+    scope: &mut Scope,
+    declarations: Vec<AstLetDeclaration>,
+) -> Result<Vec<TastLetDeclaration>, String> {
+    Ok(declarations
+        .into_iter()
+        .map(|let_declaration| -> Result<TastLetDeclaration, String> {
+            if scope.get_value(&let_declaration.name).is_some() {
+                // TODO: In the future we may allow shadowing but currently no
+                return Err(format!(
+                    "Identifier {} already in use",
+                    let_declaration.name
+                ));
+            }
+
+            let typed_expr = let_declaration
+                .value
+                .map(|expr| type_expr(scope, expr))
+                .transpose()?;
+            let resolved_ty = let_declaration
+                .ty
+                .map(|ty| resolve_type(scope, ty))
+                .transpose()?;
+
+            let result_decl = match (typed_expr, resolved_ty) {
+                (None, None) => {
+                    Err("No explicit variable type present and no value to infer from".to_string())
+                }
+
+                // Explicitly typed with no value
+                (None, Some(ty)) => Ok(TastLetDeclaration {
+                    name: let_declaration.name,
+                    ty,
+                    value: None,
+                }),
+
+                // Infer type from value
+                (Some(TypedExpr(ty, ex)), None) => Ok(TastLetDeclaration {
+                    name: let_declaration.name,
+                    ty: ty.clone(),
+                    value: Some(TypedExpr(ty, ex)),
+                }),
+
+                // Both explicitly typed and inferable
+                (Some(TypedExpr(ty, ex)), Some(resolved_ty)) => {
+                    if ty == resolved_ty {
+                        Ok(TastLetDeclaration {
+                            name: let_declaration.name,
+                            ty: ty.clone(),
+                            value: Some(TypedExpr(ty, ex)),
+                        })
+                    } else {
+                        Err(format!(
+                            concat!("Cannot assign value of type {} to binding of", " type {}"),
+                            ty, resolved_ty
+                        ))
+                    }
+                }
+            };
+            if let Ok(TastLetDeclaration { name, ty, .. }) = &result_decl {
+                scope.set_value(name.clone(), ty.clone());
+            }
+
+            result_decl
+        })
+        .collect::<Result<Vec<_>, _>>()?)
+}
+
+/// Process a top-level [AST declaration](AstDeclaration), insert it into the scope, and return
+/// a [TAST declaration](TypedDeclaration).
 ///
-/// This mutates `value_scope` and `type_scope` to add the new declaration.
+/// This should only be used in the global scope.
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
 #[allow(clippy::too_many_lines)]
 pub fn process_declaration(
-    scope: &mut Scope,
+    global_scope: &mut Scope,
     declaration: AstDeclaration,
 ) -> Result<TypedDeclaration, String> {
     Ok(match declaration {
-        AstDeclaration::DeclarationList(declarations) => {
-            TypedDeclaration::DeclarationList(
-                declarations
-                    .into_iter()
-                    .map(|let_declaration| -> Result<TastLetDeclaration, String> {
-                        if scope.get_value(&let_declaration.name).is_some() {
-                            // TODO: In the future we may allow shadowing but currently no
-                            return Err(format!(
-                                "Identifier {} already in use",
-                                let_declaration.name
-                            ));
-                        }
-
-                        let typed_expr = let_declaration
-                            .value
-                            .map(|expr| type_expr(scope, expr))
-                            .transpose()?;
-                        let resolved_ty = let_declaration
-                            .ty
-                            .map(|ty| resolve_type(scope, ty))
-                            .transpose()?;
-
-                        let result_decl = match (typed_expr, resolved_ty) {
-                            (None, None) => Err(
-                                "No explicit variable type present and no value to infer from"
-                                    .to_string(),
-                            ),
-
-                            // Explicitly typed with no value
-                            (None, Some(ty)) => Ok(TastLetDeclaration {
-                                name: let_declaration.name,
-                                ty,
-                                value: None,
-                            }),
-
-                            // Infer type from value
-                            (Some(TypedExpr(ty, ex)), None) => Ok(TastLetDeclaration {
-                                name: let_declaration.name,
-                                ty: ty.clone(),
-                                value: Some(TypedExpr(ty, ex)),
-                            }),
-
-                            // Both explicitly typed and inferable
-                            (Some(TypedExpr(ty, ex)), Some(resolved_ty)) => {
-                                if ty == resolved_ty {
-                                    Ok(TastLetDeclaration {
-                                        name: let_declaration.name,
-                                        ty: ty.clone(),
-                                        value: Some(TypedExpr(ty, ex)),
-                                    })
-                                } else {
-                                    Err(format!(
-                                        concat!(
-                                            "Cannot assign value of type {} to binding of",
-                                            " type {}"
-                                        ),
-                                        ty, resolved_ty
-                                    ))
-                                }
-                            }
-                        };
-                        if let Ok(TastLetDeclaration { name, ty, .. }) = &result_decl {
-                            scope.set_value(name.clone(), ty.clone());
-                        }
-
-                        result_decl
-                    })
-                    .collect::<Result<Vec<_>, _>>()?,
-            )
-        }
         AstDeclaration::FunctionDeclaration {
             name,
             parameters,
             return_type,
             body,
         } => {
-            if scope.get_value(&name).is_some() {
+            if global_scope.get_value(&name).is_some() {
                 return Err(format!("Identifier {name} already in use"));
             }
 
             let resolved_return_type = return_type
-                .map(|ty| resolve_type(scope, ty))
+                .map(|ty| resolve_type(global_scope, ty))
                 .transpose()?
                 .map_or(BlockReturnType::Void, BlockReturnType::Return);
 
@@ -668,12 +668,12 @@ pub fn process_declaration(
                 .map(|parameter| -> Result<TastArgumentDeclaration, String> {
                     Ok(TastArgumentDeclaration {
                         name: parameter.name,
-                        ty: resolve_type(scope, parameter.ty)?,
+                        ty: resolve_type(global_scope, parameter.ty)?,
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            scope.set_value(
+            global_scope.set_value(
                 name.clone(),
                 TastType::Fn(
                     resolved_parameters
@@ -696,7 +696,7 @@ pub fn process_declaration(
                             .iter()
                             .map(|x| (x.name.clone(), x.ty.clone()))
                             .collect::<HashMap<_, _>>(),
-                        scope.type_scope.clone(),
+                        global_scope.type_scope.clone(),
                     );
 
                     // discard return actuality as it's guaranteed
@@ -715,18 +715,18 @@ pub fn process_declaration(
             }
         }
         AstDeclaration::StructDeclaration { name, fields } => {
-            if scope.get_type(&name).is_some() {
+            if global_scope.get_type(&name).is_some() {
                 return Err(format!("Type name {name} already in use"));
             }
 
             let resolved_pairs = fields
                 .into_iter()
                 .map(|(name, ty)| -> Result<(String, TastType), String> {
-                    Ok((name, resolve_type(scope, ty)?))
+                    Ok((name, resolve_type(global_scope, ty)?))
                 })
                 .collect::<Result<HashMap<_, _>, _>>()?;
 
-            scope.set_type(name.clone(), TastType::Struct(resolved_pairs.clone()));
+            global_scope.set_type(name.clone(), TastType::Struct(resolved_pairs.clone()));
 
             TypedDeclaration::StructDeclaration {
                 name,
@@ -798,8 +798,11 @@ pub fn type_block(
                     }
                     Stmt::ContinueStmt => Err("Cannot use continue statement here".to_string()),
 
-                    Stmt::Declaration(declaration) => Ok((
-                        TypedStmt::Declaration(process_declaration(&mut scope, declaration)?),
+                    Stmt::DeclarationList(declarations) => Ok((
+                        TypedStmt::DeclarationList(process_let_declaration(
+                            &mut scope,
+                            declarations,
+                        )?),
                         BlockReturnActuality::DoesNotReturn, /* because expressions can't return */
                     )),
 
@@ -940,7 +943,7 @@ pub fn type_block(
 
                         // if present, evaluate the declaration
                         let typed_init = init
-                            .map(|decl| process_declaration(&mut loop_scope, *decl))
+                            .map(|decl| process_let_declaration(&mut loop_scope, *decl))
                             .transpose()?;
 
                         let typed_cond =

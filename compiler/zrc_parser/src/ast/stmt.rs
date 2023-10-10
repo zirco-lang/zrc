@@ -71,7 +71,7 @@ pub enum Stmt {
     BreakStmt,
     /// `return;` or `return x;`
     ReturnStmt(Option<Expr>),
-    /// Any kind of declaration
+    /// A let declaration
     DeclarationList(Vec<LetDeclaration>),
 }
 

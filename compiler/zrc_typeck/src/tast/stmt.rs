@@ -39,7 +39,7 @@ pub enum TypedStmt {
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
-        init: Option<Box<TypedDeclaration>>,
+        init: Option<Box<Vec<LetDeclaration>>>,
         /// Runs before each iteration of the loop. If this evaluates to
         /// `false`, the loop will end. If this is [`None`], the loop
         /// will run forever.
@@ -61,16 +61,13 @@ pub enum TypedStmt {
     BreakStmt,
     /// `return;` or `return x;`
     ReturnStmt(Option<TypedExpr>),
-    /// Any kind of declaration
-    Declaration(TypedDeclaration),
+    /// A let declaration
+    DeclarationList(Vec<LetDeclaration>),
 }
 
-/// Any declaration valid to be present at the top level of a file. May also be
-/// used from the [`TypedStmt::Declaration`] variant.
+/// A struct or function declaration at the top level of a file
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypedDeclaration {
-    /// A list of [`LetDeclaration`]s.
-    DeclarationList(Vec<LetDeclaration>),
     /// A declaration of a function
     FunctionDeclaration {
         /// The name of the function.
@@ -96,14 +93,6 @@ pub enum TypedDeclaration {
 impl Display for TypedDeclaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::DeclarationList(l) => write!(
-                f,
-                "let {};",
-                l.iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
             Self::FunctionDeclaration {
                 name,
                 parameters,
@@ -250,7 +239,13 @@ impl Display for TypedStmt {
             } => write!(
                 f,
                 "for ({} {}; {}) {{\n{}\n}}",
-                init.clone().map_or(String::new(), |x| x.to_string()),
+                init.clone().map_or(String::new(), |x| format!(
+                    "let {};",
+                    x.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )),
                 cond.clone().map_or(String::new(), |x| x.to_string()),
                 post.clone().map_or(String::new(), |x| x.to_string()),
                 body.iter()
@@ -282,7 +277,14 @@ impl Display for TypedStmt {
             Self::BreakStmt => write!(f, "break;"),
             Self::ReturnStmt(Some(e)) => write!(f, "return {e};",),
             Self::ReturnStmt(None) => write!(f, "return;"),
-            Self::Declaration(d) => write!(f, "{d}"),
+            Self::DeclarationList(d) => write!(
+                f,
+                "let {};",
+                d.iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
         }
     }
 }
