@@ -643,7 +643,7 @@ pub fn process_let_declaration(
 /// # Errors
 /// Errors if a type checker error is encountered.
 #[allow(clippy::too_many_lines)]
-pub fn process_declaration(
+fn process_declaration(
     global_scope: &mut Scope,
     declaration: AstDeclaration,
 ) -> Result<TypedDeclaration, String> {
@@ -689,15 +689,10 @@ pub fn process_declaration(
                 parameters: resolved_parameters.clone(),
                 return_type: resolved_return_type.clone().into_option(),
                 body: if let Some(body) = body {
-                    // functions run in their own value scope because identifiers from the parent
-                    // scope are not accessible the type scope is kept, however.
-                    let function_scope = Scope::from_scopes(
-                        resolved_parameters
-                            .iter()
-                            .map(|x| (x.name.clone(), x.ty.clone()))
-                            .collect::<HashMap<_, _>>(),
-                        global_scope.type_scope.clone(),
-                    );
+                    let mut function_scope = global_scope.clone();
+                    for param in resolved_parameters {
+                        function_scope.set_value(param.name, param.ty);
+                    }
 
                     // discard return actuality as it's guaranteed
                     Some(
@@ -1131,8 +1126,13 @@ pub fn type_block(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    // TODO: Tests
-    use super::*;
+pub fn type_program(
+    program: Vec<zrc_parser::ast::stmt::Declaration>,
+) -> Result<Vec<tast::stmt::TypedDeclaration>, String> {
+    let mut scope = Scope::new();
+
+    program
+        .into_iter()
+        .map(|declaration| process_declaration(&mut scope, declaration))
+        .collect()
 }

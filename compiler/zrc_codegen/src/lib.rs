@@ -125,7 +125,7 @@ impl Display for FunctionCg {
             self.name,
             self.parameters
                 .iter()
-                .map(|(name, ty)| format!("{ty} {name}"))
+                .map(|(name, ty)| format!("{} {name}", get_llvm_typename(ty.clone())))
                 .collect::<Vec<_>>()
                 .join(", ")
         );
@@ -144,7 +144,7 @@ impl Display for FunctionCg {
                 }
             }
         }
-        writeln!(f, "}}");
+        write!(f, "}}");
         Ok(())
     }
 }
@@ -1249,4 +1249,68 @@ pub fn cg_block(
                 }
             })
         })
+}
+
+pub fn cg_program(
+    program: Vec<zrc_typeck::tast::stmt::TypedDeclaration>,
+) -> anyhow::Result<String> {
+    let mut module = ModuleCg::new();
+    let mut global_scope = CgScope::new();
+
+    for declaration in program {
+        match declaration {
+            // Struct declarations don't need code generation as they're all inlined
+            zrc_typeck::tast::stmt::TypedDeclaration::StructDeclaration { .. } => {}
+
+            zrc_typeck::tast::stmt::TypedDeclaration::FunctionDeclaration {
+                name,
+                parameters,
+                return_type,
+                body: Some(body),
+            } => {
+                let (mut cg, bb, fn_scope) = FunctionCg::new(
+                    format!("@{name}"),
+                    match return_type {
+                        Some(x) => zrc_typeck::BlockReturnType::Return(x),
+                        None => zrc_typeck::BlockReturnType::Void,
+                    },
+                    parameters.into_iter().map(|x| (x.name, x.ty)).collect(),
+                    &global_scope,
+                );
+
+                global_scope.insert(&name, &format!("@{name}"));
+
+                cg_block(&mut module, &mut cg, &bb, &fn_scope, body, None);
+
+                module.declarations.push(cg.to_string());
+            }
+
+            zrc_typeck::tast::stmt::TypedDeclaration::FunctionDeclaration {
+                name,
+                parameters,
+                return_type,
+                body: None,
+            } => {
+                global_scope.insert(&name, &format!("@{name}"));
+
+                module.declarations.push(format!(
+                    "declare {} @{}({})",
+                    get_llvm_typename(return_type.unwrap_or(zrc_typeck::tast::ty::Type::Void)),
+                    name,
+                    parameters
+                        .iter()
+                        .map(
+                            |zrc_typeck::tast::stmt::ArgumentDeclaration { ty, .. }| format!(
+                                "{}",
+                                get_llvm_typename(ty.clone())
+                            )
+                        )
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+        }
+    }
+
+    Ok(module.to_string())
 }
