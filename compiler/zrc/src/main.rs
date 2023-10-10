@@ -23,33 +23,6 @@ fn main() {
         ),
     );
     tck_scope.set_value(
-        "get_fib".to_string(),
-        zrc_typeck::tast::ty::Type::Fn(
-            vec![],
-            Box::new(zrc_typeck::BlockReturnType::Return(
-                zrc_typeck::tast::ty::Type::Ptr(Box::new(zrc_typeck::tast::ty::Type::U8)),
-            )),
-        ),
-    );
-    tck_scope.set_value(
-        "get_buzz".to_string(),
-        zrc_typeck::tast::ty::Type::Fn(
-            vec![],
-            Box::new(zrc_typeck::BlockReturnType::Return(
-                zrc_typeck::tast::ty::Type::Ptr(Box::new(zrc_typeck::tast::ty::Type::U8)),
-            )),
-        ),
-    );
-    tck_scope.set_value(
-        "get_fibbuzz".to_string(),
-        zrc_typeck::tast::ty::Type::Fn(
-            vec![],
-            Box::new(zrc_typeck::BlockReturnType::Return(
-                zrc_typeck::tast::ty::Type::Ptr(Box::new(zrc_typeck::tast::ty::Type::U8)),
-            )),
-        ),
-    );
-    tck_scope.set_value(
         "itoa".to_string(),
         zrc_typeck::tast::ty::Type::Fn(
             vec![zrc_typeck::tast::ty::Type::I32],
@@ -68,9 +41,6 @@ fn main() {
         ),
     );
     cg_scope.insert("is_fib", "@is_fib");
-    cg_scope.insert("get_fib", "@get_fib");
-    cg_scope.insert("get_buzz", "@get_buzz");
-    cg_scope.insert("get_fibbuzz", "@get_fibbuzz");
     cg_scope.insert("puts", "@puts");
     cg_scope.insert("itoa", "@itoa");
 
@@ -82,8 +52,10 @@ fn main() {
         vec![("max".to_string(), zrc_typeck::tast::ty::Type::I32)],
         &cg_scope,
     );
+    let mut mod_cg = zrc_codegen::ModuleCg::new();
 
     let bb = zrc_codegen::cg_block(
+        &mut mod_cg,
         &mut cg,
         &bb,
         &cg_scope,
@@ -93,9 +65,9 @@ fn main() {
                 "{",
                 "    for (let x = 0; x <= max; x += 1) {",
                 "        let as_u32 = x as u32;",
-                "        if (is_fib(as_u32) && x % 5 == 0) puts(get_fibbuzz());",
-                "        else if (is_fib(as_u32)) puts(get_fib());",
-                "        else if (x % 5 == 0) puts(get_buzz());",
+                "        if (is_fib(as_u32) && x % 5 == 0) puts(\"fibbuzz\");",
+                "        else if (is_fib(as_u32)) puts(\"fib\");",
+                "        else if (x % 5 == 0) puts(\"buzz\");",
                 "        else puts(itoa(x));",
                 "    }",
                 "    return 0;",
@@ -113,6 +85,7 @@ fn main() {
     )
     .unwrap();
 
-    println!("{cg}");
-    println!("Yields basic block {bb}");
+    mod_cg.declarations.push(cg.to_string());
+
+    println!("{mod_cg}");
 }

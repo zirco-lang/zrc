@@ -19,6 +19,28 @@ impl Counter {
     }
 }
 
+/// A code generator for one module, the unit of compilation in Zirco corresponding to one source file.
+pub struct ModuleCg {
+    pub declarations: Vec<String>,
+    global_constant_id: Counter,
+}
+impl ModuleCg {
+    pub fn new() -> Self {
+        Self {
+            declarations: Vec::new(),
+            global_constant_id: Counter::new(0),
+        }
+    }
+}
+impl Display for ModuleCg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for decl in &self.declarations {
+            writeln!(f, "{}", decl)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct FunctionCg {
     name: String,
@@ -94,7 +116,6 @@ impl FunctionCg {
         Ok(())
     }
 }
-
 impl Display for FunctionCg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
@@ -240,6 +261,7 @@ impl CgScope {
 
 /// Returns a register containing a pointer to the place inputted
 pub fn cg_place(
+    module: &mut ModuleCg,
     cg: &mut FunctionCg,
     bb: &BasicBlock,
     scope: &CgScope,
@@ -258,12 +280,12 @@ pub fn cg_place(
             (reg, bb.clone())
         }
         PlaceKind::Deref(x) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x)?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
             (x_ptr, bb)
         }
         PlaceKind::Index(x, index) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x.clone())?;
-            let (index_ptr, bb) = cg_expr(cg, &bb, scope, *index.clone())?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
+            let (index_ptr, bb) = cg_expr(module, cg, &bb, scope, *index.clone())?;
 
             let x_typename = get_llvm_typename(x.clone().0);
 
@@ -290,7 +312,7 @@ pub fn cg_place(
             (result_reg, bb)
         }
         PlaceKind::Arrow(x, key) => {
-            let (x_ptr, bb) = cg_place(cg, bb, scope, *x.clone())?;
+            let (x_ptr, bb) = cg_place(module, cg, bb, scope, *x.clone())?;
 
             let x_typename = get_llvm_typename(x.0.clone());
 
@@ -325,7 +347,7 @@ pub fn cg_place(
             (result_reg, bb)
         }
         PlaceKind::Dot(x, key) => {
-            let (x_ptr, bb) = cg_place(cg, bb, scope, *x.clone())?;
+            let (x_ptr, bb) = cg_place(module, cg, bb, scope, *x.clone())?;
 
             let x_typename = get_llvm_typename(x.0.clone());
 
@@ -369,6 +391,7 @@ pub fn cg_place(
 
 /// Returns a register containing a pointer to the result of the expression.
 pub fn cg_expr(
+    module: &mut ModuleCg,
     cg: &mut FunctionCg,
     bb: &BasicBlock,
     scope: &CgScope,
@@ -379,7 +402,7 @@ pub fn cg_expr(
 
     Ok(match expr.1 {
         TypedExprKind::Ternary(condition, lhs, rhs) => {
-            let (condition_ptr, bb) = cg_expr(cg, bb, scope, *condition)?;
+            let (condition_ptr, bb) = cg_expr(module, cg, bb, scope, *condition)?;
             // condition_ptr: i1*
 
             let result_typename = get_llvm_typename(expr.0.clone());
@@ -396,8 +419,8 @@ pub fn cg_expr(
             );
 
             // generate the expressions on both sides
-            let (if_true_ptr, if_true_bb) = cg_expr(cg, &if_true_bb, scope, *lhs)?;
-            let (if_false_ptr, if_false_bb) = cg_expr(cg, &if_false_bb, scope, *rhs)?;
+            let (if_true_ptr, if_true_bb) = cg_expr(module, cg, &if_true_bb, scope, *lhs)?;
+            let (if_false_ptr, if_false_bb) = cg_expr(module, cg, &if_false_bb, scope, *rhs)?;
             // if_true_ptr is a pointer accessible on the true side and vice versa
 
             let terminating_bb = cg.new_bb();
@@ -428,14 +451,14 @@ pub fn cg_expr(
         }
 
         TypedExprKind::Comma(lhs, rhs) => {
-            let (_, bb) = cg_expr(cg, bb, scope, *lhs)?;
-            let (rhs_ptr, bb) = cg_expr(cg, &bb, scope, *rhs)?;
+            let (_, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
+            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
             (rhs_ptr, bb)
         }
 
         TypedExprKind::BinaryBitwise(op, lhs, rhs) => {
-            let (lhs_ptr, bb) = cg_expr(cg, bb, scope, *lhs)?;
-            let (rhs_ptr, bb) = cg_expr(cg, &bb, scope, *rhs)?;
+            let (lhs_ptr, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
+            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
 
             let result_typename = get_llvm_typename(expr.0.clone());
             let result_ptr = cg_alloc(cg, &bb, &result_typename);
@@ -465,8 +488,8 @@ pub fn cg_expr(
         TypedExprKind::Equality(op, lhs, rhs) => {
             // it's either *T == *U or iN == iN
 
-            let (lhs_ptr, bb) = cg_expr(cg, bb, scope, *lhs.clone())?;
-            let (rhs_ptr, bb) = cg_expr(cg, &bb, scope, *rhs)?;
+            let (lhs_ptr, bb) = cg_expr(module, cg, bb, scope, *lhs.clone())?;
+            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
 
             let operand_typename = get_llvm_typename(lhs.0.clone());
 
@@ -492,8 +515,8 @@ pub fn cg_expr(
         }
 
         TypedExprKind::Comparison(op, lhs, rhs) => {
-            let (lhs_ptr, bb) = cg_expr(cg, bb, scope, *lhs.clone())?;
-            let (rhs_ptr, bb) = cg_expr(cg, &bb, scope, *rhs)?;
+            let (lhs_ptr, bb) = cg_expr(module, cg, bb, scope, *lhs.clone())?;
+            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
 
             let result_typename = get_llvm_typename(lhs.0.clone());
 
@@ -534,8 +557,8 @@ pub fn cg_expr(
             (result_ptr, bb)
         }
         TypedExprKind::Arithmetic(op, lhs, rhs) => {
-            let (lhs_ptr, bb) = cg_expr(cg, bb, scope, *lhs)?;
-            let (rhs_ptr, bb) = cg_expr(cg, &bb, scope, *rhs)?;
+            let (lhs_ptr, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
+            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
@@ -563,8 +586,8 @@ pub fn cg_expr(
             (result_ptr, bb)
         }
         TypedExprKind::Logical(op, lhs, rhs) => {
-            let (lhs_ptr, bb) = cg_expr(cg, bb, scope, *lhs)?;
-            let (rhs_ptr, bb) = cg_expr(cg, &bb, scope, *rhs)?;
+            let (lhs_ptr, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
+            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
@@ -591,7 +614,7 @@ pub fn cg_expr(
         }
 
         TypedExprKind::UnaryBitwiseNot(x) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x)?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
@@ -612,7 +635,7 @@ pub fn cg_expr(
 
         TypedExprKind::UnaryNot(x) => {
             // x is bool
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x)?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
@@ -633,7 +656,7 @@ pub fn cg_expr(
         }
 
         TypedExprKind::UnaryMinus(x) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x)?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
@@ -654,7 +677,7 @@ pub fn cg_expr(
         }
 
         TypedExprKind::UnaryAddressOf(x) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x)?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
@@ -668,7 +691,7 @@ pub fn cg_expr(
         }
 
         TypedExprKind::UnaryDereference(x) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x)?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
@@ -682,8 +705,8 @@ pub fn cg_expr(
         }
 
         TypedExprKind::Assignment(place, value) => {
-            let (place_ptr, bb) = cg_place(cg, bb, scope, *place)?;
-            let (value_ptr, bb) = cg_expr(cg, &bb, scope, *value.clone())?;
+            let (place_ptr, bb) = cg_place(module, cg, bb, scope, *place)?;
+            let (value_ptr, bb) = cg_expr(module, cg, &bb, scope, *value.clone())?;
 
             let value_typename = get_llvm_typename(value.0.clone());
 
@@ -703,8 +726,8 @@ pub fn cg_expr(
         }
 
         TypedExprKind::Index(x, index) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x.clone())?;
-            let (index_ptr, bb) = cg_expr(cg, &bb, scope, *index.clone())?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
+            let (index_ptr, bb) = cg_expr(module, cg, &bb, scope, *index.clone())?;
 
             let x_typename = get_llvm_typename(x.clone().0);
 
@@ -732,7 +755,7 @@ pub fn cg_expr(
         }
 
         TypedExprKind::Dot(x, prop) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x.clone())?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
 
             let x_typename = get_llvm_typename(x.0.clone());
 
@@ -773,7 +796,7 @@ pub fn cg_expr(
         }
 
         TypedExprKind::Arrow(x, prop) => {
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x.clone())?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
 
             let x_typename = get_llvm_typename(x.0.clone());
 
@@ -809,14 +832,14 @@ pub fn cg_expr(
         }
 
         TypedExprKind::Call(f, args) => {
-            let (f_ptr, bb) = cg_expr(cg, bb, scope, *f.clone())?;
+            let (f_ptr, bb) = cg_expr(module, cg, bb, scope, *f.clone())?;
 
             let f_typename = get_llvm_typename(f.0.clone());
 
             let args = args
                 .into_iter()
                 .map(|arg| {
-                    let (arg_ptr, bb) = cg_expr(cg, &bb, scope, arg.clone())?;
+                    let (arg_ptr, bb) = cg_expr(module, cg, &bb, scope, arg.clone())?;
                     let arg_typename = get_llvm_typename(arg.0.clone());
                     let arg_reg = cg_load(cg, &bb, &arg_typename, &arg_ptr);
                     Ok(format!("{arg_typename} {arg_reg}"))
@@ -899,7 +922,7 @@ pub fn cg_expr(
                 _ => bail!("invalid cast from {} to {}", x.0, t),
             };
 
-            let (x_ptr, bb) = cg_expr(cg, bb, scope, *x.clone())?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
 
             let x_typename = get_llvm_typename(x.0.clone());
 
@@ -922,8 +945,19 @@ pub fn cg_expr(
         }
 
         // FIXME: Once we have module-scoped type check done, support strings
-        TypedExprKind::StringLiteral(_) => {
-            bail!("the Zirco code generator does not yet support string literals. aborting!")
+        TypedExprKind::StringLiteral(s) => {
+            let id = module.global_constant_id.next();
+            module.declarations.push(format!(
+                "@.str{id} = private constant [{} x i8] c\"{}\\00\"",
+                s.len() - 1, // subtract both quotes, add the null
+                &s[1..s.len() - 1]
+            ));
+
+            let result_reg = cg_alloc(cg, bb, "ptr"); // u8*
+
+            cg_store(cg, bb, "ptr", &result_reg, &format!("@.str{id}"));
+
+            (result_reg, bb.clone())
         }
     })
 }
@@ -938,8 +972,9 @@ pub struct LoopBreakaway {
     on_continue: BasicBlock,
 }
 
-/// Declares the variable, creating its allocation and also evaluating the assignment
+/// Declares the variable, creating its allocation and also evaluating the assignment.
 pub fn cg_declaration(
+    module: &mut ModuleCg,
     cg: &mut FunctionCg,
     bb: &BasicBlock,
     scope: &mut CgScope,
@@ -962,6 +997,7 @@ pub fn cg_declaration(
 
                 if let Some(value) = let_declaration.value {
                     bb = cg_expr(
+                        module,
                         cg,
                         &bb,
                         scope,
@@ -993,6 +1029,7 @@ pub fn cg_declaration(
 // TODO: Something is needed to stop code generating within a block once a 'br' is reached.
 // Currently, LLVM will accept it and create a useless block, which is removed later on.
 pub fn cg_block(
+    module: &mut ModuleCg,
     cg: &mut FunctionCg,
     bb: &BasicBlock,
     parent_scope: &CgScope,
@@ -1010,9 +1047,9 @@ pub fn cg_block(
         .try_fold(bb.clone(), |bb, stmt| -> anyhow::Result<BasicBlock> {
             Ok(match stmt {
                 TypedStmt::EmptyStmt => bb,
-                TypedStmt::ExprStmt(expr) => cg_expr(cg, &bb, &scope, expr)?.1,
+                TypedStmt::ExprStmt(expr) => cg_expr(module, cg, &bb, &scope, expr)?.1,
                 TypedStmt::IfStmt(cond, then, then_else) => {
-                    let (cond_ptr, bb) = cg_expr(cg, &bb, &scope, cond.clone())?;
+                    let (cond_ptr, bb) = cg_expr(module, cg, &bb, &scope, cond.clone())?;
 
                     let then_bb = cg.new_bb();
                     let then_else_bb = if then_else.is_some() {
@@ -1032,10 +1069,11 @@ pub fn cg_block(
                         ),
                     );
 
-                    let then_bb = cg_block(cg, &then_bb, &scope, then, breakaway.clone())?;
+                    let then_bb = cg_block(module, cg, &then_bb, &scope, then, breakaway.clone())?;
                     let then_else_bb = then_else
                         .map(|te| {
                             cg_block(
+                                module,
                                 cg,
                                 &then_else_bb.clone().unwrap(),
                                 &scope,
@@ -1053,11 +1091,13 @@ pub fn cg_block(
                     terminating_bb
                 }
 
-                TypedStmt::BlockStmt(body) => cg_block(cg, &bb, &scope, body, breakaway.clone())?,
+                TypedStmt::BlockStmt(body) => {
+                    cg_block(module, cg, &bb, &scope, body, breakaway.clone())?
+                }
 
                 TypedStmt::ReturnStmt(Some(ex)) => {
                     // FIXME: If a return statement is not the last thing in a block the code generator will continue and emit a llvm syntax error
-                    let (ex_ptr, bb) = cg_expr(cg, &bb, &scope, ex.clone())?;
+                    let (ex_ptr, bb) = cg_expr(module, cg, &bb, &scope, ex.clone())?;
                     let ex_type = get_llvm_typename(ex.0.clone());
                     let ex_reg = cg_load(cg, &bb, &ex_type, &ex_ptr);
                     bb.add_instruction(cg, &format!("ret {ex_type} {ex_reg}"));
@@ -1096,7 +1136,7 @@ pub fn cg_block(
                     }
                 }
 
-                TypedStmt::Declaration(d) => cg_declaration(cg, &bb, &mut scope, d)?,
+                TypedStmt::Declaration(d) => cg_declaration(module, cg, &bb, &mut scope, d)?,
 
                 TypedStmt::ForStmt {
                     init,
@@ -1117,7 +1157,7 @@ pub fn cg_block(
                     // The block we are currently in will become the preheader. Generate the `init` code if there is any.
                     let bb = match init {
                         None => bb,
-                        Some(init) => cg_declaration(cg, &bb, &mut scope, *init)?,
+                        Some(init) => cg_declaration(module, cg, &bb, &mut scope, *init)?,
                     };
 
                     let header = cg.new_bb();
@@ -1134,7 +1174,8 @@ pub fn cg_block(
                             header
                         }
                         Some(cond) => {
-                            let (cond_ptr, header) = cg_expr(cg, &header, &scope, cond.clone())?;
+                            let (cond_ptr, header) =
+                                cg_expr(module, cg, &header, &scope, cond.clone())?;
 
                             let cond_reg =
                                 cg_load(cg, &header, &get_llvm_typename(cond.0), &cond_ptr);
@@ -1150,6 +1191,7 @@ pub fn cg_block(
 
                     // Generate the body
                     let body = cg_block(
+                        module,
                         cg,
                         &body,
                         &scope,
@@ -1165,7 +1207,7 @@ pub fn cg_block(
 
                     // Latch runs post and then breaks right back to the header.
                     let latch = if let Some(post) = post {
-                        cg_expr(cg, &latch, &scope, post)?.1
+                        cg_expr(module, cg, &latch, &scope, post)?.1
                     } else {
                         latch
                     };
@@ -1190,7 +1232,7 @@ pub fn cg_block(
                     let body = cg.new_bb();
                     let exit = cg.new_bb();
 
-                    let (cond_ptr, header) = cg_expr(cg, &bb, &scope, cond.clone())?;
+                    let (cond_ptr, header) = cg_expr(module, cg, &bb, &scope, cond.clone())?;
                     let cond_reg = cg_load(cg, &bb, &get_llvm_typename(cond.0.clone()), &cond_ptr);
 
                     header.add_instruction(
@@ -1199,6 +1241,7 @@ pub fn cg_block(
                     );
 
                     let body = cg_block(
+                        module,
                         cg,
                         &bb,
                         &scope,
