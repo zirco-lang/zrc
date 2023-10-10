@@ -22,9 +22,7 @@ CommaSeparatedWithoutTrailing<T>: Vec<T> = {
     }
 }
 
-pub Program: Vec<Declaration> = DeclarationList;
-
-DeclarationList: Vec<Declaration> = Declaration*;
+pub Program: Vec<Declaration> = Declaration*;
 
 // See https://en.wikipedia.org/wiki/Dangling_else#Avoiding_the_conflict_in_LR_parsers for why this
 // is necessary. The ClosedStmt rule REQUIRES that an 'else' clause is used, meaning that it will
@@ -39,7 +37,7 @@ OpenStmt: Stmt = {
     "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:OpenStmt> => 
         Stmt::IfStmt(a, Box::new(b), Some(Box::new(c))),
     "while" "(" <a:Expr> ")" <b:OpenStmt> => Stmt::WhileStmt(a, Box::new(b)),
-    "for" "(" <a:Declaration> <b:Expr?> ";" <c:Expr?> ")" <d:OpenStmt> => Stmt::ForStmt {
+    "for" "(" <a:LetDeclaration> <b:Expr?> ";" <c:Expr?> ")" <d:OpenStmt> => Stmt::ForStmt {
         init: Some(Box::new(a)),
         cond: b,
         post: c,
@@ -58,7 +56,7 @@ ClosedStmt: Stmt = {
     "if" "(" <a:Expr> ")" <b:ClosedStmt> "else" <c:ClosedStmt> =>
         Stmt::IfStmt(a, Box::new(b), Some(Box::new(c))),
     "while" "(" <a:Expr> ")" <b:ClosedStmt> => Stmt::WhileStmt(a, Box::new(b)),
-    "for" "(" <a:Declaration> <b:Expr?> ";" <c:Expr?> ")" <d:ClosedStmt> => Stmt::ForStmt {
+    "for" "(" <a:LetDeclaration> <b:Expr?> ";" <c:Expr?> ")" <d:ClosedStmt> => Stmt::ForStmt {
         init: Some(Box::new(a)),
         cond: b,
         post: c,
@@ -77,12 +75,11 @@ SimpleStmt: Stmt = {
     ";" => Stmt::EmptyStmt,
     "{" <l:StmtList?> "}" => Stmt::BlockStmt(l.unwrap_or(Vec::new())),
     <FlowStmt>,
-    <Declaration> => Stmt::Declaration(<>),
+    <LetDeclaration> => Stmt::DeclarationList(<>),
 };
 
+// For declarations at the global scope
 Declaration: Declaration = {
-    <LetDeclaration>,
-    // FIXME: This might allow code like for (fn foo() {};;) {} to work. Do we want this?
     <FunctionDeclaration>,
     <StructDeclaration>,
 };
@@ -120,14 +117,14 @@ ArgumentDeclaration: ArgumentDeclaration = {
     }
 };
 
-LetDeclaration: Declaration = {
+LetDeclaration: Vec<LetDeclaration> = {
     "let" <l:CommaSeparatedWithoutTrailing<
         (<IDENTIFIER> <(":" <Type>)?> <("=" <Assignment>)?>)
-    >> ";" => Declaration::DeclarationList(l.into_iter().map(|(i, t, v)| LetDeclaration {
+    >> ";" => l.into_iter().map(|(i, t, v)| LetDeclaration {
         name: (i),
         ty: t,
         value: v,
-    }).collect::<Vec<_>>()),
+    }).collect::<Vec<_>>(),
 };
 
 Type: Type = {

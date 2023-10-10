@@ -131,21 +131,19 @@ mod tests {
     fn simple_declaration_parses() {
         assert_eq!(
             parse_stmt("let a = 1;"),
-            Ok(Stmt::Declaration(Declaration::DeclarationList(vec![
-                LetDeclaration {
-                    name: ("a".to_string()),
-                    ty: None,
-                    value: Some(Expr::NumberLiteral("1".to_string()).into())
-                }
-            ])))
+            Ok(Stmt::DeclarationList(vec![LetDeclaration {
+                name: ("a".to_string()),
+                ty: None,
+                value: Some(Expr::NumberLiteral("1".to_string()).into())
+            }]))
         )
     }
 
     #[test]
     fn small_function_declaration_parses() {
         assert_eq!(
-            parse_stmt("fn add(a: i32, b: i32) -> i32 { return a + b; }"),
-            Ok(Stmt::Declaration(Declaration::FunctionDeclaration {
+            parse_program("fn add(a: i32, b: i32) -> i32 { return a + b; }"),
+            Ok(vec![Declaration::FunctionDeclaration {
                 name: ("add".to_string()),
                 parameters: vec![
                     ArgumentDeclaration {
@@ -163,7 +161,7 @@ mod tests {
                     Box::new(Expr::Identifier("a".to_string())),
                     Box::new(Expr::Identifier("b".to_string()))
                 )))])
-            }))
+            }])
         )
     }
 
@@ -176,13 +174,11 @@ mod tests {
                 parameters: vec![],
                 return_type: None,
                 body: Some(vec![Stmt::ForStmt {
-                    init: Some(Box::new(Declaration::DeclarationList(vec![
-                        LetDeclaration {
-                            name: "i".to_string(),
-                            ty: None,
-                            value: Some(Expr::NumberLiteral("0".to_string()))
-                        }
-                    ]))),
+                    init: Some(Box::new(vec![LetDeclaration {
+                        name: "i".to_string(),
+                        ty: None,
+                        value: Some(Expr::NumberLiteral("0".to_string()))
+                    }])),
                     cond: None,
                     post: None,
                     body: Box::new(Stmt::BlockStmt(vec![]))
@@ -254,7 +250,7 @@ mod tests {
                     parameters: vec![],
                     return_type: None,
                     body: Some(vec![
-                        Stmt::Declaration(Declaration::DeclarationList(vec![
+                        Stmt::DeclarationList(vec![
                             LetDeclaration {
                                 name: ("a".to_string()),
                                 ty: None,
@@ -265,8 +261,8 @@ mod tests {
                                 ty: Some(Type::Identifier("i32".to_string())),
                                 value: Some(Expr::NumberLiteral("2".to_string()).into())
                             },
-                        ])),
-                        Stmt::Declaration(Declaration::DeclarationList(vec![LetDeclaration {
+                        ]),
+                        Stmt::DeclarationList(vec![LetDeclaration {
                             name: ("c".to_string()),
                             ty: None,
                             value: Some(Expr::Call(
@@ -276,8 +272,8 @@ mod tests {
                                     Expr::Identifier("b".to_string())
                                 ]
                             ))
-                        }])),
-                        Stmt::Declaration(Declaration::DeclarationList(vec![LetDeclaration {
+                        }]),
+                        Stmt::DeclarationList(vec![LetDeclaration {
                             name: ("d".to_string()),
                             ty: None,
                             value: Some(Expr::Call(
@@ -287,7 +283,7 @@ mod tests {
                                     Expr::Identifier("b".to_string())
                                 ]
                             ))
-                        }])),
+                        }]),
                         Stmt::ReturnStmt(Some(Expr::Arithmetic(
                             Arithmetic::Addition,
                             Box::new(Expr::Identifier("c".to_string())),

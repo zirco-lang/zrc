@@ -49,7 +49,7 @@ pub enum Stmt {
     ForStmt {
         /// Runs once before the loop starts.
         // TODO: May also be able to be expressions?
-        init: Option<Box<Declaration>>,
+        init: Option<Box<Vec<LetDeclaration>>>,
         /// Runs before each iteration of the loop. If this evaluates to
         /// `false`, the loop will end. If this is [`None`], the loop
         /// will run forever.
@@ -72,15 +72,12 @@ pub enum Stmt {
     /// `return;` or `return x;`
     ReturnStmt(Option<Expr>),
     /// Any kind of declaration
-    Declaration(Declaration),
+    DeclarationList(Vec<LetDeclaration>),
 }
 
-/// Any declaration valid to be present at the top level of a file. May also be
-/// used from the [`Stmt::Declaration`] variant.
+/// A struct or function declaration at the top level of a file
 #[derive(PartialEq, Debug, Clone)]
 pub enum Declaration {
-    /// A list of [`LetDeclaration`]s.
-    DeclarationList(Vec<LetDeclaration>),
     /// A declaration of a function
     FunctionDeclaration {
         /// The name of the function.
@@ -106,16 +103,6 @@ pub enum Declaration {
 impl Display for Declaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::DeclarationList(l) => {
-                write!(
-                    f,
-                    "let {};",
-                    l.iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            }
             Self::FunctionDeclaration {
                 name,
                 parameters,
@@ -208,7 +195,13 @@ impl Display for Stmt {
                 write!(
                     f,
                     "for ({} {}; {}) {body}",
-                    init.clone().map_or(String::new(), |x| x.to_string()),
+                    init.clone().map_or(";".to_string(), |x| format!(
+                        "let {};",
+                        x.iter()
+                            .map(|x| x.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )),
                     cond.clone().map_or(String::new(), |x| x.to_string()),
                     post.clone().map_or(String::new(), |x| x.to_string()),
                 )
@@ -227,7 +220,16 @@ impl Display for Stmt {
             Self::BreakStmt => write!(f, "break;"),
             Self::ReturnStmt(Some(e)) => write!(f, "return {e};",),
             Self::ReturnStmt(None) => write!(f, "return;"),
-            Self::Declaration(d) => write!(f, "{d}"),
+            Self::DeclarationList(d) => {
+                write!(
+                    f,
+                    "let {};",
+                    d.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
         }
     }
 }
