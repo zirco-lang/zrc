@@ -33,8 +33,7 @@ pub enum TypedStmt {
     // all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here
     // (basically if (x) y has become if (x) {y})
     /// `if (x) y` or `if (x) y else z`
-    // if (x) y; desugars to if (x) y; else {} here.
-    IfStmt(TypedExpr, Vec<TypedStmt>, Vec<TypedStmt>),
+    IfStmt(TypedExpr, Vec<TypedStmt>, Option<Vec<TypedStmt>>),
     /// `while (x) y`
     WhileStmt(TypedExpr, Vec<TypedStmt>),
     /// `for (init; cond; post) body`
@@ -195,7 +194,7 @@ impl Display for TypedDeclaration {
 impl Display for TypedStmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::IfStmt(e, s1, s2) => write!(
+            Self::IfStmt(e, s1, Some(s2)) => write!(
                 f,
                 "if ({e}) {{\n{}\n}} else {{\n{}\n}}",
                 s1.iter()
@@ -208,6 +207,19 @@ impl Display for TypedStmt {
                     .collect::<Vec<_>>()
                     .join("\n"),
                 s2.iter()
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ),
+            Self::IfStmt(e, s1, None) => write!(
+                f,
+                "if ({e}) {{\n{}\n}}",
+                s1.iter()
                     .map(|stmt| stmt
                         .to_string()
                         .split('\n')

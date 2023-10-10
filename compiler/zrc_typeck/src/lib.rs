@@ -808,9 +808,6 @@ pub fn type_block(
                         // branch is always taken (hence if it's WillReturn we can be WillReturn
                         // instead of MayReturn)
 
-                        // else branch implicitly becomes {}
-                        let then_else = then_else.unwrap_or(Box::new(Stmt::BlockStmt(vec![])));
-
                         let typed_cond = type_expr(&scope, cond)?;
 
                         if typed_cond.0 != TastType::Bool {
@@ -833,25 +830,34 @@ pub fn type_block(
                             },
                         )?;
 
-                        let (typed_then_else, then_else_return_actuality) = type_block(
-                            &scope,
-                            coerce_stmt_into_block(*then_else),
-                            can_use_break_continue,
-                            // return ability of a sub-block is determined by this match:
-                            match return_ability.clone() {
-                                BlockReturnAbility::MustNotReturn => {
-                                    BlockReturnAbility::MustNotReturn
-                                }
-                                BlockReturnAbility::MustReturn(x)
-                                | BlockReturnAbility::MayReturn(x) => {
-                                    BlockReturnAbility::MayReturn(x)
-                                }
-                            },
-                        )?;
+                        let (typed_then_else, then_else_return_actuality) = then_else
+                            .map(|then_else| {
+                                type_block(
+                                    &scope,
+                                    coerce_stmt_into_block(*then_else),
+                                    can_use_break_continue,
+                                    // return ability of a sub-block is determined by this match:
+                                    match return_ability.clone() {
+                                        BlockReturnAbility::MustNotReturn => {
+                                            BlockReturnAbility::MustNotReturn
+                                        }
+                                        BlockReturnAbility::MustReturn(x)
+                                        | BlockReturnAbility::MayReturn(x) => {
+                                            BlockReturnAbility::MayReturn(x)
+                                        }
+                                    },
+                                )
+                            })
+                            .transpose()?
+                            .unzip();
 
                         Ok((
                             TypedStmt::IfStmt(typed_cond, typed_then, typed_then_else),
-                            match (then_return_actuality, then_else_return_actuality) {
+                            match (
+                                then_return_actuality,
+                                then_else_return_actuality
+                                    .unwrap_or(BlockReturnActuality::DoesNotReturn),
+                            ) {
                                 (
                                     BlockReturnActuality::DoesNotReturn,
                                     BlockReturnActuality::DoesNotReturn,

@@ -12,5 +12,6 @@
         "trunc",
         "typeck",
         "zext"
-    ]
+    ],
+    "rust-analyzer.debug.sourceFileMap": "auto"
 }

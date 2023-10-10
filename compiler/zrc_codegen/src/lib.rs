@@ -66,15 +66,15 @@ impl Display for FunctionCg {
         for (i, bb) in self.blocks.iter().enumerate() {
             if i == 0 {
                 for instr in &self.allocations {
-                    write!(f, "    {}\n", instr)?;
+                    writeln!(f, "    {}", instr)?;
                 }
                 for instr in &bb.instructions {
-                    write!(f, "    {}\n", instr)?;
+                    writeln!(f, "    {}", instr)?;
                 }
             } else {
-                write!(f, "bb{}:\n", bb.id)?;
+                writeln!(f, "bb{}:", bb.id)?;
                 for instr in &bb.instructions {
-                    write!(f, "    {}\n", instr)?;
+                    writeln!(f, "    {}", instr)?;
                 }
             }
         }
@@ -132,10 +132,10 @@ fn get_llvm_typename(ty: zrc_typeck::tast::ty::Type) -> String {
         Type::I64 | Type::U64 => "u64".to_string(),
         Type::Void => "void".to_string(),
         Type::Bool => "i1".to_string(),
-        Type::Ptr(x) => format!("{x}*"),
+        Type::Ptr(_) => "ptr".to_string(),
         Type::Fn(params, ret) => format!(
             "{} ({})*",
-            ret.into_tast_type(),
+            get_llvm_typename(ret.into_tast_type()),
             params
                 .into_iter()
                 .map(get_llvm_typename)
@@ -155,7 +155,7 @@ fn get_llvm_typename(ty: zrc_typeck::tast::ty::Type) -> String {
 
 /// Allocates a new register and returns it. This also properly handles the alloca instruction needing
 /// to be at the beginning of a basic block.
-fn cg_alloc(cg: &mut FunctionCg, bb: &BasicBlock, ty: &str) -> String {
+fn cg_alloc(cg: &mut FunctionCg, _bb: &BasicBlock, ty: &str) -> String {
     let reg = cg.new_reg();
     cg.allocations.push(format!("{reg} = alloca {ty}"));
     reg
@@ -163,12 +163,12 @@ fn cg_alloc(cg: &mut FunctionCg, bb: &BasicBlock, ty: &str) -> String {
 /// Loads a type `T` from a `T*`
 fn cg_load(cg: &mut FunctionCg, bb: &BasicBlock, ty: &str, ptr: &str) -> String {
     let reg = cg.new_reg();
-    bb.add_instruction(cg, &format!("{reg} = load {ty}, {ty}* {ptr}"));
+    bb.add_instruction(cg, &format!("{reg} = load {ty}, ptr {ptr}"));
     reg
 }
 /// Stores a type `T` to a `T*`
 fn cg_store(cg: &mut FunctionCg, bb: &BasicBlock, ty: &str, ptr: &str, value: &str) {
-    bb.add_instruction(cg, &format!("store {ty} {value}, {ty}* {ptr}"));
+    bb.add_instruction(cg, &format!("store {ty} {value}, ptr {ptr}"));
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -183,11 +183,11 @@ impl CgScope {
         }
     }
 
-    fn get(&self, ident: &str) -> Option<&String> {
+    pub fn get(&self, ident: &str) -> Option<&String> {
         self.identifiers.get(ident)
     }
 
-    fn insert(&mut self, ident: &str, reg: &str) {
+    pub fn insert(&mut self, ident: &str, reg: &str) {
         self.identifiers.insert(ident.to_string(), reg.to_string());
     }
 }
@@ -363,7 +363,7 @@ pub fn cg_expr(
             let result_ptr = cg.new_reg();
 
             // now generate a phi node
-            terminating_bb.add_instruction(cg, &format!("{result_ptr} = phi {result_typename}* [{if_true_ptr}, {if_true_bb}], [{if_false_ptr}, {if_false_bb}]"));
+            terminating_bb.add_instruction(cg, &format!("{result_ptr} = phi ptr [{if_true_ptr}, {if_true_bb}], [{if_false_ptr}, {if_false_bb}]"));
 
             (result_ptr, terminating_bb)
         }
@@ -446,10 +446,10 @@ pub fn cg_expr(
         }
 
         TypedExprKind::Comparison(op, lhs, rhs) => {
-            let (lhs_ptr, bb) = cg_expr(cg, bb, scope, *lhs)?;
+            let (lhs_ptr, bb) = cg_expr(cg, bb, scope, *lhs.clone())?;
             let (rhs_ptr, bb) = cg_expr(cg, &bb, scope, *rhs)?;
 
-            let result_typename = get_llvm_typename(expr.0.clone());
+            let result_typename = get_llvm_typename(lhs.0.clone());
 
             let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr);
             let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr);
@@ -767,8 +767,6 @@ pub fn cg_expr(
 
             let f_typename = get_llvm_typename(f.0.clone());
 
-            let f_reg = cg_load(cg, &bb, &f_typename, &f_ptr);
-
             let args = args
                 .into_iter()
                 .map(|arg| {
@@ -783,18 +781,30 @@ pub fn cg_expr(
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
-            let result_reg = cg.new_reg();
+            if result_typename == "void" {
+                bb.add_instruction(cg, &format!("call {result_typename} {f_ptr}({args})"));
 
-            bb.add_instruction(
-                cg,
-                &format!("{result_reg} = call {result_typename} {f_typename} {f_reg}({args})"),
-            );
+                let undef = cg_alloc(cg, &bb, "i8");
 
-            let result_ptr = cg_alloc(cg, &bb, &result_typename);
+                // store the undefined value here as `void` results should never be loaded but our
+                // code generator expects a loadable value
+                cg_store(cg, &bb, "i8", &undef, "undef");
 
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg);
+                (undef, bb)
+            } else {
+                let result_reg = cg.new_reg();
 
-            (result_ptr, bb)
+                bb.add_instruction(
+                    cg,
+                    &format!("{result_reg} = call {result_typename} {f_ptr}({args})"),
+                );
+
+                let result_ptr = cg_alloc(cg, &bb, &result_typename);
+
+                cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg);
+
+                (result_ptr, bb)
+            }
         }
 
         TypedExprKind::Cast(x, t) => {
@@ -827,6 +837,13 @@ pub fn cg_expr(
                 (I32 | U32 | I64 | U64, U16) => "trunc",
                 (I64 | U64, I32) => "trunc",
                 (I64 | U64, U32) => "trunc",
+
+                // also handle things like I32 => U32
+                // is this even the correct way to do it?
+                (I8, U8) => "bitcast",
+                (I16, U16) => "bitcast",
+                (I32, U32) => "bitcast",
+                (I64, U64) => "bitcast",
 
                 (Ptr(_), Ptr(_)) => "bitcast",
                 (Ptr(_), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
@@ -863,4 +880,294 @@ pub fn cg_expr(
             bail!("the Zirco code generator does not yet support string literals. aborting!")
         }
     })
+}
+
+/// Consists of the [`BasicBlock`]s to `br` to when encountering certain instructions.
+/// It is passed to [`cg_block`] to allow it to properly handle break and continue.
+#[derive(PartialEq, Debug, Clone)]
+pub struct LoopBreakaway {
+    /// Points to the exit basic block.
+    on_break: BasicBlock,
+    /// For `for` loops, points to the latch. For `while` loops, points to the header.
+    on_continue: BasicBlock,
+}
+
+/// Declares the variable, creating its allocation and also evaluating the assignment
+pub fn cg_declaration(
+    cg: &mut FunctionCg,
+    bb: &BasicBlock,
+    scope: &mut CgScope,
+    declaration: zrc_typeck::tast::stmt::TypedDeclaration,
+) -> anyhow::Result<BasicBlock> {
+    use zrc_typeck::tast::stmt::{LetDeclaration, TypedDeclaration};
+    let mut bb = bb.clone();
+
+    Ok(match declaration {
+        // We do nothing for structure declarations because they are not emitted in the LLVM IR (the types are inlined)
+        TypedDeclaration::StructDeclaration { .. } => bb.clone(),
+
+        TypedDeclaration::DeclarationList(declarations) => {
+            for let_declaration in declarations {
+                // allocate space for it
+                let ptr = cg_alloc(cg, &bb, &get_llvm_typename(let_declaration.ty.clone()));
+
+                // store it in scope
+                scope.insert(&let_declaration.name, &ptr);
+
+                if let Some(value) = let_declaration.value {
+                    bb = cg_expr(
+                        cg,
+                        &bb,
+                        scope,
+                        zrc_typeck::tast::expr::TypedExpr(
+                            let_declaration.ty.clone(),
+                            zrc_typeck::tast::expr::TypedExprKind::Assignment(
+                                Box::new(zrc_typeck::tast::expr::Place(
+                                    let_declaration.ty,
+                                    zrc_typeck::tast::expr::PlaceKind::Variable(
+                                        let_declaration.name,
+                                    ),
+                                )),
+                                Box::new(value),
+                            ),
+                        ),
+                    )?
+                    .1;
+                }
+            }
+
+            bb
+        }
+
+        // TODO: Handle functions (this is done once we have a module code-generator struct)
+        TypedDeclaration::FunctionDeclaration { .. } => todo!(),
+    })
+}
+
+// TODO: Something is needed to stop code generating within a block once a 'br' is reached.
+// Currently, LLVM will accept it and create a useless block, which is removed later on.
+pub fn cg_block(
+    cg: &mut FunctionCg,
+    bb: &BasicBlock,
+    parent_scope: &CgScope,
+    block: Vec<zrc_typeck::tast::stmt::TypedStmt>,
+    // If set to None, break and continue are invalid.
+    // If set to Some, break and continue will break to the bbs listed in there.
+    breakaway: Option<LoopBreakaway>,
+) -> anyhow::Result<BasicBlock> {
+    use zrc_typeck::tast::stmt::*;
+
+    let mut scope = parent_scope.clone();
+
+    block
+        .into_iter()
+        .try_fold(bb.clone(), |bb, stmt| -> anyhow::Result<BasicBlock> {
+            Ok(match stmt {
+                TypedStmt::EmptyStmt => bb,
+                TypedStmt::ExprStmt(expr) => cg_expr(cg, &bb, &scope, expr)?.1,
+                TypedStmt::IfStmt(cond, then, then_else) => {
+                    let (cond_ptr, bb) = cg_expr(cg, &bb, &scope, cond.clone())?;
+
+                    let then_bb = cg.new_bb();
+                    let then_else_bb = if then_else.is_some() {
+                        Some(cg.new_bb())
+                    } else {
+                        None
+                    };
+                    let terminating_bb = cg.new_bb();
+
+                    let cond_reg = cg_load(cg, &bb, "i1", &cond_ptr);
+                    bb.add_instruction(
+                        cg,
+                        &format!(
+                            "br i1 {cond_reg}, label {then_bb}, label {}",
+                            // without an else, the else branch is just lead to the terminator
+                            then_else_bb.clone().unwrap_or(terminating_bb.clone())
+                        ),
+                    );
+
+                    let then_bb = cg_block(cg, &then_bb, &scope, then, breakaway.clone())?;
+                    let then_else_bb = then_else
+                        .map(|te| {
+                            cg_block(
+                                cg,
+                                &then_else_bb.clone().unwrap(),
+                                &scope,
+                                te,
+                                breakaway.clone(),
+                            )
+                        })
+                        .transpose()?;
+
+                    then_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
+                    if let Some(te) = then_else_bb {
+                        te.add_instruction(cg, &format!("br label {terminating_bb}"));
+                    }
+
+                    terminating_bb
+                }
+
+                TypedStmt::BlockStmt(body) => cg_block(cg, &bb, &scope, body, breakaway.clone())?,
+
+                TypedStmt::ReturnStmt(Some(ex)) => {
+                    // FIXME: If a return statement is not the last thing in a block the code generator will continue and emit a llvm syntax error
+                    let (ex_ptr, bb) = cg_expr(cg, &bb, &scope, ex.clone())?;
+                    let ex_type = get_llvm_typename(ex.0.clone());
+                    let ex_reg = cg_load(cg, &bb, &ex_type, &ex_ptr);
+                    bb.add_instruction(cg, &format!("ret {ex_type} {ex_reg}"));
+
+                    bb
+                }
+                TypedStmt::ReturnStmt(None) => {
+                    bb.add_instruction(cg, "ret void");
+                    bb
+                }
+
+                TypedStmt::ContinueStmt => {
+                    // We can jump into whatever the 'continue' target is in `breakaway`
+                    // This is going to be the loop header for `while` loops and the loop latch for `for` loops
+
+                    match breakaway.clone() {
+                        Some(LoopBreakaway { on_continue, .. }) => {
+                            bb.add_instruction(cg, &format!("br label {on_continue}"));
+                            // make sure to use 'bb' here not 'on_continue' so later statements are appended to this block
+                            bb
+                        }
+                        None => bail!("continue statement outside of loop"),
+                    }
+                }
+
+                TypedStmt::BreakStmt => {
+                    // Jump into the 'break' target in `breakaway`
+                    // This is the exit portion of the loop
+
+                    match breakaway.clone() {
+                        Some(LoopBreakaway { on_break, .. }) => {
+                            bb.add_instruction(cg, &format!("br label {on_break}"));
+                            bb
+                        }
+                        None => bail!("break statement outside of loop"),
+                    }
+                }
+
+                TypedStmt::Declaration(d) => cg_declaration(cg, &bb, &mut scope, d)?,
+
+                TypedStmt::ForStmt {
+                    init,
+                    cond,
+                    post,
+                    body: body_code,
+                } => {
+                    // For loops generate a somewhat more complicated CFG, with a few parts.
+                    // The preheader, where `init` runs. Breaks to the header.
+                    // The header, where `cond` is checked and breaks to either the exit or the body.
+                    // The body, where most of the body runs. Breaks to the latch. `break` transfers to the exit by force and `continue` transfers to the latch by force.
+                    // The latch, where `post` runs and breaks back to the header
+                    // The exit, which is the basic block we return.
+
+                    // loops lie in an implicit subscope
+                    let mut scope = scope.clone();
+
+                    // The block we are currently in will become the preheader. Generate the `init` code if there is any.
+                    let bb = match init {
+                        None => bb,
+                        Some(init) => cg_declaration(cg, &bb, &mut scope, *init)?,
+                    };
+
+                    let header = cg.new_bb();
+                    bb.add_instruction(cg, &format!("br label {header}"));
+
+                    let body = cg.new_bb();
+                    let latch = cg.new_bb();
+                    let exit = cg.new_bb();
+
+                    // You are now officially in the loop. Within the header, we check `cond` and use that to jump to either the body or the exit condition.
+                    let header = match cond {
+                        None => {
+                            header.add_instruction(cg, &format!("br label {body}"));
+                            header
+                        }
+                        Some(cond) => {
+                            let (cond_ptr, header) = cg_expr(cg, &header, &scope, cond.clone())?;
+
+                            let cond_reg =
+                                cg_load(cg, &header, &get_llvm_typename(cond.0), &cond_ptr);
+
+                            header.add_instruction(
+                                cg,
+                                &format!("br i1 {cond_reg}, label {body}, label {exit}"),
+                            );
+
+                            header
+                        }
+                    };
+
+                    // Generate the body
+                    let body = cg_block(
+                        cg,
+                        &body,
+                        &scope,
+                        body_code,
+                        Some(LoopBreakaway {
+                            on_break: exit.clone(),
+                            on_continue: latch.clone(),
+                        }),
+                    )?;
+
+                    // The body breaks to latch
+                    body.add_instruction(cg, &format!("br label {latch}"));
+
+                    // Latch runs post and then breaks right back to the header.
+                    let latch = if let Some(post) = post {
+                        cg_expr(cg, &latch, &scope, post)?.1
+                    } else {
+                        latch
+                    };
+
+                    latch.add_instruction(cg, &format!("br label {header}"));
+
+                    exit
+                }
+                TypedStmt::WhileStmt(cond, body_code) => {
+                    // While loops are similar to for loops but much simpler.
+                    // The preheader simply just breaks to the header.
+                    // The header checks the condition and breaks to the exit or the body.
+                    // The body simply breaks to the header.
+                    // The exit is the continued code
+
+                    // `break` => exit
+                    // `continue` => header
+
+                    let header = cg.new_bb();
+                    bb.add_instruction(cg, &format!("br label {header}"));
+
+                    let body = cg.new_bb();
+                    let exit = cg.new_bb();
+
+                    let (cond_ptr, header) = cg_expr(cg, &bb, &scope, cond.clone())?;
+                    let cond_reg = cg_load(cg, &bb, &get_llvm_typename(cond.0.clone()), &cond_ptr);
+
+                    header.add_instruction(
+                        cg,
+                        &format!("br i1 {cond_reg}, label {body}, label {exit}"),
+                    );
+
+                    let body = cg_block(
+                        cg,
+                        &bb,
+                        &scope,
+                        body_code,
+                        Some(LoopBreakaway {
+                            on_break: exit.clone(),
+                            on_continue: header.clone(),
+                        }),
+                    )?;
+
+                    // The body breaks to header
+                    body.add_instruction(cg, &format!("br label {header}"));
+
+                    exit
+                }
+            })
+        })
 }
