@@ -10,8 +10,6 @@
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
 fn main() {
-    let (mut cg, bb) = zrc_codegen::FunctionCg::new();
-
     let mut tck_scope = zrc_typeck::Scope::new();
     let mut cg_scope = zrc_codegen::CgScope::new();
 
@@ -76,6 +74,15 @@ fn main() {
     cg_scope.insert("puts", "@puts");
     cg_scope.insert("itoa", "@itoa");
 
+    tck_scope.set_value("max".to_string(), zrc_typeck::tast::ty::Type::I32);
+
+    let (mut cg, bb, cg_scope) = zrc_codegen::FunctionCg::new(
+        "@main".to_string(),
+        zrc_typeck::BlockReturnType::Return(zrc_typeck::tast::ty::Type::I32),
+        vec![("max".to_string(), zrc_typeck::tast::ty::Type::I32)],
+        &cg_scope,
+    );
+
     let bb = zrc_codegen::cg_block(
         &mut cg,
         &bb,
@@ -84,7 +91,6 @@ fn main() {
             &tck_scope,
             vec![zrc_parser::parser::parse_stmt(concat!(
                 "{",
-                "    let max = 100;",
                 "    for (let x = 0; x <= max; x += 1) {",
                 "        let as_u32 = x as u32;",
                 "        if (is_fib(as_u32) && x % 5 == 0) puts(get_fibbuzz());",

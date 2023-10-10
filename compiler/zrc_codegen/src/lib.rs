@@ -21,6 +21,9 @@ impl Counter {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct FunctionCg {
+    name: String,
+    parameters: Vec<(String, zrc_typeck::tast::ty::Type)>,
+    ret: zrc_typeck::BlockReturnType,
     blocks: Vec<BasicBlockData>,
     next_instruction_id: Counter,
     /// One of our design decisions involves using memory registers extremely often, and `alloca`s can only
@@ -29,15 +32,46 @@ pub struct FunctionCg {
     allocations: Vec<String>,
 }
 impl FunctionCg {
-    pub fn new() -> (Self, BasicBlock) {
-        (
-            Self {
-                blocks: vec![BasicBlockData::new(0)],
-                next_instruction_id: Counter::new(1),
-                allocations: Vec::new(),
-            },
-            BasicBlock { id: 0 },
-        )
+    pub fn new(
+        name: String,
+        ret: zrc_typeck::BlockReturnType,
+        parameters: Vec<(String, zrc_typeck::tast::ty::Type)>,
+        parent_scope: &CgScope,
+    ) -> (Self, BasicBlock, CgScope) {
+        let mut scope = parent_scope.clone();
+        let mut cg = Self {
+            blocks: vec![BasicBlockData::new(0)],
+            next_instruction_id: Counter::new(1),
+            allocations: Vec::new(),
+            name,
+            ret,
+            parameters: parameters
+                .clone()
+                .into_iter()
+                .enumerate()
+                .map(|(i, (_, ty))| (format!("%p{i}"), ty))
+                .collect(),
+        };
+        let bb = BasicBlock { id: 0 };
+
+        for (id, parameter) in parameters.into_iter().enumerate() {
+            // promote all of the parameters passed by value into allocas
+            let ptr = cg_alloc(&mut cg, &bb, &get_llvm_typename(parameter.1.clone()));
+
+            // store the parameter into the alloca
+            cg_store(
+                &mut cg,
+                &bb,
+                &get_llvm_typename(parameter.1),
+                &ptr,
+                &format!("%p{id}"),
+            );
+
+            // insert the parameter into the scope
+            scope.insert(&parameter.0, &ptr);
+        }
+
+        (cg, bb, scope)
     }
 
     fn new_bb(&mut self) -> BasicBlock {
@@ -63,6 +97,17 @@ impl FunctionCg {
 
 impl Display for FunctionCg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "define {} {}({}) {{",
+            get_llvm_typename(self.ret.clone().into_tast_type()),
+            self.name,
+            self.parameters
+                .iter()
+                .map(|(name, ty)| format!("{ty} {name}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
         for (i, bb) in self.blocks.iter().enumerate() {
             if i == 0 {
                 for instr in &self.allocations {
@@ -78,6 +123,7 @@ impl Display for FunctionCg {
                 }
             }
         }
+        writeln!(f, "}}");
         Ok(())
     }
 }
