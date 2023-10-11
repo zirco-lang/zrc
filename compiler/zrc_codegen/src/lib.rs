@@ -389,7 +389,7 @@ pub fn cg_place(
     })
 }
 
-/// Returns a register containing a pointer to the result of the expression.
+/// Returns a register containing a pointer to the result of the expression along with the basic block to continue adding statements from.
 pub fn cg_expr(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
@@ -909,10 +909,10 @@ pub fn cg_expr(
 
                 // also handle things like I32 => U32
                 // is this even the correct way to do it?
-                (I8, U8) => "bitcast",
-                (I16, U16) => "bitcast",
-                (I32, U32) => "bitcast",
-                (I64, U64) => "bitcast",
+                (I8, U8) | (U8, I8) => "bitcast",
+                (I16, U16) | (U16, I16) => "bitcast",
+                (I32, U32) | (U32, I32) => "bitcast",
+                (I64, U64) | (U64, I64) => "bitcast",
 
                 (Ptr(_), Ptr(_)) => "bitcast",
                 (Ptr(_), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
@@ -1014,8 +1014,8 @@ pub fn cg_let_declaration(
     Ok(bb)
 }
 
-// TODO: Something is needed to stop code generating within a block once a 'br' is reached.
-// Currently, LLVM will accept it and create a useless block, which is removed later on.
+/// Returns the basic block to continue adding instructions to.
+/// If it is None, a return statement was encountered and no more instructions should be added.
 pub fn cg_block(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
@@ -1025,58 +1025,65 @@ pub fn cg_block(
     // If set to None, break and continue are invalid.
     // If set to Some, break and continue will break to the bbs listed in there.
     breakaway: Option<LoopBreakaway>,
-) -> anyhow::Result<BasicBlock> {
+) -> anyhow::Result<Option<BasicBlock>> {
     use zrc_typeck::tast::stmt::*;
 
     let mut scope = parent_scope.clone();
 
-    block
-        .into_iter()
-        .try_fold(bb.clone(), |bb, stmt| -> anyhow::Result<BasicBlock> {
+    block.into_iter().try_fold(
+        Some(bb.clone()),
+        |bb, stmt| -> anyhow::Result<Option<BasicBlock>> {
+            let Some(bb) = bb else {
+                // we hit a return statement already, so we're done
+                return Ok(None);
+            };
             Ok(match stmt {
-                TypedStmt::EmptyStmt => bb,
-                TypedStmt::ExprStmt(expr) => cg_expr(module, cg, &bb, &scope, expr)?.1,
+                TypedStmt::EmptyStmt => Some(bb),
+                TypedStmt::ExprStmt(expr) => Some(cg_expr(module, cg, &bb, &scope, expr)?.1),
                 TypedStmt::IfStmt(cond, then, then_else) => {
                     let (cond_ptr, bb) = cg_expr(module, cg, &bb, &scope, cond.clone())?;
 
+                    let then_else = then_else.unwrap_or(vec![]);
+
                     let then_bb = cg.new_bb();
-                    let then_else_bb = if then_else.is_some() {
-                        Some(cg.new_bb())
-                    } else {
-                        None
-                    };
-                    let terminating_bb = cg.new_bb();
+                    let then_else_bb = cg.new_bb();
 
                     let cond_reg = cg_load(cg, &bb, "i1", &cond_ptr);
                     bb.add_instruction(
                         cg,
-                        &format!(
-                            "br i1 {cond_reg}, label {then_bb}, label {}",
-                            // without an else, the else branch is just lead to the terminator
-                            then_else_bb.clone().unwrap_or(terminating_bb.clone())
-                        ),
+                        &format!("br i1 {cond_reg}, label {then_bb}, label {then_else_bb}",),
                     );
 
                     let then_bb = cg_block(module, cg, &then_bb, &scope, then, breakaway.clone())?;
-                    let then_else_bb = then_else
-                        .map(|te| {
-                            cg_block(
-                                module,
-                                cg,
-                                &then_else_bb.clone().unwrap(),
-                                &scope,
-                                te,
-                                breakaway.clone(),
-                            )
-                        })
-                        .transpose()?;
+                    let then_else_bb = cg_block(
+                        module,
+                        cg,
+                        &then_else_bb,
+                        &scope,
+                        then_else,
+                        breakaway.clone(),
+                    )?;
 
-                    then_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
-                    if let Some(te) = then_else_bb {
-                        te.add_instruction(cg, &format!("br label {terminating_bb}"));
+                    match (then_bb, then_else_bb) {
+                        (Some(then_bb), Some(then_else_bb)) => {
+                            let terminating_bb = cg.new_bb();
+                            then_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
+                            then_else_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
+
+                            Some(terminating_bb)
+                        }
+                        (Some(then_bb), None) => {
+                            let terminating_bb = cg.new_bb();
+                            then_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
+                            Some(terminating_bb)
+                        }
+                        (None, Some(then_else_bb)) => {
+                            let terminating_bb = cg.new_bb();
+                            then_else_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
+                            Some(terminating_bb)
+                        }
+                        (None, None) => None,
                     }
-
-                    terminating_bb
                 }
 
                 TypedStmt::BlockStmt(body) => {
@@ -1084,17 +1091,16 @@ pub fn cg_block(
                 }
 
                 TypedStmt::ReturnStmt(Some(ex)) => {
-                    // FIXME: If a return statement is not the last thing in a block the code generator will continue and emit a llvm syntax error
                     let (ex_ptr, bb) = cg_expr(module, cg, &bb, &scope, ex.clone())?;
                     let ex_type = get_llvm_typename(ex.0.clone());
                     let ex_reg = cg_load(cg, &bb, &ex_type, &ex_ptr);
                     bb.add_instruction(cg, &format!("ret {ex_type} {ex_reg}"));
 
-                    bb
+                    None
                 }
                 TypedStmt::ReturnStmt(None) => {
                     bb.add_instruction(cg, "ret void");
-                    bb
+                    None
                 }
 
                 TypedStmt::ContinueStmt => {
@@ -1105,7 +1111,7 @@ pub fn cg_block(
                         Some(LoopBreakaway { on_continue, .. }) => {
                             bb.add_instruction(cg, &format!("br label {on_continue}"));
                             // make sure to use 'bb' here not 'on_continue' so later statements are appended to this block
-                            bb
+                            None
                         }
                         None => bail!("continue statement outside of loop"),
                     }
@@ -1118,14 +1124,14 @@ pub fn cg_block(
                     match breakaway.clone() {
                         Some(LoopBreakaway { on_break, .. }) => {
                             bb.add_instruction(cg, &format!("br label {on_break}"));
-                            bb
+                            None
                         }
                         None => bail!("break statement outside of loop"),
                     }
                 }
 
                 TypedStmt::DeclarationList(d) => {
-                    cg_let_declaration(module, cg, &bb, &mut scope, d)?
+                    Some(cg_let_declaration(module, cg, &bb, &mut scope, d)?)
                 }
 
                 TypedStmt::ForStmt {
@@ -1193,7 +1199,9 @@ pub fn cg_block(
                     )?;
 
                     // The body breaks to latch
-                    body.add_instruction(cg, &format!("br label {latch}"));
+                    if let Some(body) = body {
+                        body.add_instruction(cg, &format!("br label {latch}"));
+                    }
 
                     // Latch runs post and then breaks right back to the header.
                     let latch = if let Some(post) = post {
@@ -1204,7 +1212,7 @@ pub fn cg_block(
 
                     latch.add_instruction(cg, &format!("br label {header}"));
 
-                    exit
+                    Some(exit)
                 }
                 TypedStmt::WhileStmt(cond, body_code) => {
                     // While loops are similar to for loops but much simpler.
@@ -1222,8 +1230,9 @@ pub fn cg_block(
                     let body = cg.new_bb();
                     let exit = cg.new_bb();
 
-                    let (cond_ptr, header) = cg_expr(module, cg, &bb, &scope, cond.clone())?;
-                    let cond_reg = cg_load(cg, &bb, &get_llvm_typename(cond.0.clone()), &cond_ptr);
+                    let (cond_ptr, header) = cg_expr(module, cg, &header, &scope, cond.clone())?;
+                    let cond_reg =
+                        cg_load(cg, &header, &get_llvm_typename(cond.0.clone()), &cond_ptr);
 
                     header.add_instruction(
                         cg,
@@ -1233,7 +1242,7 @@ pub fn cg_block(
                     let body = cg_block(
                         module,
                         cg,
-                        &bb,
+                        &body,
                         &scope,
                         body_code,
                         Some(LoopBreakaway {
@@ -1243,12 +1252,15 @@ pub fn cg_block(
                     )?;
 
                     // The body breaks to header
-                    body.add_instruction(cg, &format!("br label {header}"));
+                    if let Some(body) = body {
+                        body.add_instruction(cg, &format!("br label {header}"));
+                    }
 
-                    exit
+                    Some(exit)
                 }
             })
-        })
+        },
+    )
 }
 
 pub fn cg_program(
@@ -1268,6 +1280,10 @@ pub fn cg_program(
                 return_type,
                 body: Some(body),
             } => {
+                // Must happen before creating `cg` as FunctionCg::new() clones it and
+                // recursion would be impossible w/o this
+                global_scope.insert(&name, &format!("@{name}"));
+
                 let (mut cg, bb, fn_scope) = FunctionCg::new(
                     format!("@{name}"),
                     match return_type {
@@ -1278,9 +1294,7 @@ pub fn cg_program(
                     &global_scope,
                 );
 
-                global_scope.insert(&name, &format!("@{name}"));
-
-                cg_block(&mut module, &mut cg, &bb, &fn_scope, body, None);
+                cg_block(&mut module, &mut cg, &bb, &fn_scope, body, None)?;
 
                 module.declarations.push(cg.to_string());
             }
