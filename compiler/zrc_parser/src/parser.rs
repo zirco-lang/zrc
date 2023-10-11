@@ -1,6 +1,10 @@
 //! Functions to parse Zirco into an Abstract Syntax Tree
 
 use lalrpop_util::{ErrorRecovery, ParseError};
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+};
 
 use super::{
     ast::{
@@ -24,6 +28,21 @@ pub enum ZircoParserError<T> {
     },
     /// An error that stopped the parser.
     Fatal(ParseError<usize, lexer::Tok, lexer::LexicalError>),
+}
+impl<T: Debug> Error for ZircoParserError<T> {}
+impl<T: Debug> Display for ZircoParserError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ZircoParserError::Recoverable { errors, .. } => {
+                write!(f, "Recoverable parser error: ")?;
+                for error in errors {
+                    write!(f, "{}\n", error.error)?;
+                }
+                Ok(())
+            }
+            ZircoParserError::Fatal(e) => write!(f, "Fatal parser error: {}", e),
+        }
+    }
 }
 
 /// More generic macro for [`parse_expr`] and [`parse_stmt`]

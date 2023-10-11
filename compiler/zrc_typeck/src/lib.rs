@@ -12,6 +12,7 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
+use anyhow::{bail, Context as _};
 use std::collections::HashMap;
 
 pub mod tast;
@@ -95,7 +96,7 @@ impl Default for Scope {
 ///
 /// # Errors
 /// Errors if the identifier is not found in the type scope.
-fn resolve_type(scope: &Scope, ty: ParserType) -> Result<TastType, String> {
+fn resolve_type(scope: &Scope, ty: ParserType) -> anyhow::Result<TastType> {
     Ok(match ty {
         ParserType::Identifier(x) => match x.as_str() {
             "i8" => TastType::I8,
@@ -111,7 +112,7 @@ fn resolve_type(scope: &Scope, ty: ParserType) -> Result<TastType, String> {
                 if let Some(t) = scope.get_type(&x) {
                     t.clone()
                 } else {
-                    return Err(format!("Unknown type {x}"));
+                    bail!("Unknown type {x}");
                 }
             }
         },
@@ -120,7 +121,7 @@ fn resolve_type(scope: &Scope, ty: ParserType) -> Result<TastType, String> {
             members
                 .iter()
                 .map(|(k, v)| Ok((k.clone(), resolve_type(scope, v.clone())?)))
-                .collect::<Result<HashMap<String, TastType>, String>>()?,
+                .collect::<anyhow::Result<HashMap<String, TastType>>>()?,
         ),
     })
 }
@@ -214,7 +215,7 @@ fn desugar_assignment(
 }
 
 /// Validate an expr into a place
-fn expr_to_place(expr: TypedExpr) -> Result<tast::expr::Place, String> {
+fn expr_to_place(expr: TypedExpr) -> anyhow::Result<tast::expr::Place> {
     use tast::expr::{Place, PlaceKind};
     Ok(match expr.1 {
         TypedExprKind::UnaryDereference(x) => Place(expr.0, PlaceKind::Deref(x)),
@@ -224,7 +225,7 @@ fn expr_to_place(expr: TypedExpr) -> Result<tast::expr::Place, String> {
         TypedExprKind::Arrow(x, y) => {
             Place(expr.0, PlaceKind::Arrow(Box::new(expr_to_place(*x)?), y))
         }
-        _ => return Err(format!("Cannot assign to non-place expression {}", expr.0)),
+        _ => bail!("Cannot assign to non-place expression {}", expr.0),
     })
 }
 
@@ -236,7 +237,7 @@ fn expr_to_place(expr: TypedExpr) -> Result<tast::expr::Place, String> {
 /// # Errors
 /// Errors if a type checker error is encountered.
 #[allow(clippy::too_many_lines)] // FIXME: make this fn shorter
-pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
+pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
     Ok(match expr {
         Expr::Comma(a, b) => {
             let at = type_expr(scope, *a)?;
@@ -256,7 +257,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             let value_t = type_expr(scope, value)?;
 
             if place_t.0 != value_t.0 {
-                return Err(format!("Type mismatch: {} != {}", place_t.0, value_t.0));
+                bail!("Type mismatch: {} != {}", place_t.0, value_t.0);
             }
 
             TypedExpr(
@@ -268,24 +269,24 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
         Expr::UnaryNot(x) => {
             let t = type_expr(scope, *x)?;
             if t.0 != TastType::Bool {
-                return Err(format!("Cannot not {}", t.0));
+                bail!("Cannot not {}", t.0);
             }
             TypedExpr(t.0.clone(), TypedExprKind::UnaryNot(Box::new(t)))
         }
         Expr::UnaryBitwiseNot(x) => {
             let t = type_expr(scope, *x)?;
             if !t.0.is_integer() {
-                return Err(format!("Cannot bitwise not {}", t.0));
+                bail!("Cannot bitwise not {}", t.0);
             }
             TypedExpr(t.0.clone(), TypedExprKind::UnaryBitwiseNot(Box::new(t)))
         }
         Expr::UnaryMinus(x) => {
             let t = type_expr(scope, *x)?;
             if !t.0.is_integer() {
-                return Err(format!("Cannot unary minus {}", t.0));
+                bail!("Cannot unary minus {}", t.0);
             }
             if !t.0.is_signed_integer() {
-                return Err(format!("Cannot unary minus unsigned integer {}", t.0));
+                bail!("Cannot unary minus unsigned integer {}", t.0);
             }
             TypedExpr(t.0.clone(), TypedExprKind::UnaryMinus(Box::new(t)))
         }
@@ -301,7 +302,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             if let TastType::Ptr(tt) = t.clone().0 {
                 TypedExpr(*tt, TypedExprKind::UnaryDereference(Box::new(t)))
             } else {
-                return Err(format!("Cannot dereference {}", t.0));
+                bail!("Cannot dereference {}", t.0);
             }
         }
 
@@ -310,7 +311,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             let offset_t = type_expr(scope, *offset)?;
 
             if !offset_t.0.is_integer() {
-                return Err(format!("Index offset must be integer, not {}", offset_t.0));
+                bail!("Index offset must be integer, not {}", offset_t.0);
             }
 
             if let TastType::Ptr(t) = ptr_t.0.clone() {
@@ -319,7 +320,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
                     TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_t)),
                 )
             } else {
-                return Err(format!("Cannot index {}", ptr_t.0));
+                bail!("Cannot index {}", ptr_t.0);
             }
         }
 
@@ -330,10 +331,10 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
                 if let Some(t) = fields.get(&key) {
                     TypedExpr(t.clone(), TypedExprKind::Dot(Box::new(obj_t), key.clone()))
                 } else {
-                    return Err(format!("Struct {} does not have field {}", obj_t.0, key));
+                    bail!("Struct {} does not have field {}", obj_t.0, key);
                 }
             } else {
-                return Err(format!("Cannot dot into non-struct type {}", obj_t.0));
+                bail!("Cannot dot into non-struct type {}", obj_t.0);
             }
         }
         Expr::Arrow(obj, key) => {
@@ -342,10 +343,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             if let TastType::Ptr(_) = obj_t.0 {
                 type_expr(scope, Expr::Dot(Box::new(Expr::UnaryDereference(obj)), key))?
             } else {
-                return Err(format!(
-                    "Cannot deref to access into non-pointer type {}",
-                    obj_t.0
-                ));
+                bail!("Cannot deref to access into non-pointer type {}", obj_t.0);
             }
         }
         Expr::Call(f, args) => {
@@ -353,23 +351,20 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             let args_t = args
                 .iter()
                 .map(|x| type_expr(scope, x.clone()))
-                .collect::<Result<Vec<TypedExpr>, String>>()?;
+                .collect::<anyhow::Result<Vec<TypedExpr>>>()?;
 
             if let TastType::Fn(arg_types, ret_type) = ft.0.clone() {
                 if arg_types.len() != args_t.len() {
-                    return Err(format!(
+                    bail!(
                         "Function takes {} arguments, not {}",
                         arg_types.len(),
                         args_t.len()
-                    ));
+                    );
                 }
 
                 for (i, (arg_type, arg_t)) in arg_types.iter().zip(args_t.iter()).enumerate() {
                     if arg_type != &arg_t.0 {
-                        return Err(format!(
-                            "Argument {} must be {}, not {}",
-                            i, arg_type, arg_t.0
-                        ));
+                        bail!("Argument {} must be {}, not {}", i, arg_type, arg_t.0);
                     }
                 }
 
@@ -378,7 +373,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
                     TypedExprKind::Call(Box::new(ft), args_t),
                 )
             } else {
-                return Err(format!("Cannot call non-function type {}", ft.0));
+                bail!("Cannot call non-function type {}", ft.0);
             }
         }
 
@@ -388,14 +383,15 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             let if_false_t = type_expr(scope, *if_false)?;
 
             if cond_t.0 != TastType::Bool {
-                return Err(format!("Ternary condition must be bool, not {}", cond_t.0));
+                bail!("Ternary condition must be bool, not {}", cond_t.0);
             }
 
             if if_true_t.0 != if_false_t.0 {
-                return Err(format!(
+                bail!(
                     "Ternary branches must have same type, not {} and {}",
-                    if_true_t.0, if_false_t.0
-                ));
+                    if_true_t.0,
+                    if_false_t.0
+                );
             }
 
             TypedExpr(
@@ -409,11 +405,11 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             let bt = type_expr(scope, *b)?;
 
             if at.0 != TastType::Bool {
-                return Err(format!("Operator `{op}` lhs must be bool, not {}", at.0));
+                bail!("Operator `{op}` lhs must be bool, not {}", at.0);
             }
 
             if bt.0 != TastType::Bool {
-                return Err(format!("Operator `{op}` rhs must be bool, not {}", bt.0));
+                bail!("Operator `{op}` rhs must be bool, not {}", bt.0);
             }
 
             TypedExpr(
@@ -430,10 +426,10 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (at.0.clone(), bt.0.clone()) {
                 // *T == *U is valid
             } else {
-                return Err(format!(
+                bail!(
                     "Operator `{op}` lhs and rhs must be same-type integer or pointer, not {} and {}",
                     at.0, bt.0
-                ));
+                );
             }
 
             TypedExpr(
@@ -446,18 +442,19 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("Operator `{op}` lhs must be integer, not {}", at.0));
+                bail!("Operator `{op}` lhs must be integer, not {}", at.0);
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("Operator `{op}` rhs must be integer, not {}", bt.0));
+                bail!("Operator `{op}` rhs must be integer, not {}", bt.0);
             }
 
             if at.0 != bt.0 {
-                return Err(format!(
+                bail!(
                     "Operator `{op}` lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
+                    at.0,
+                    bt.0
+                );
             }
 
             TypedExpr(
@@ -470,18 +467,19 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("Operator `{op}` lhs must be integer, not {}", at.0));
+                bail!("Operator `{op}` lhs must be integer, not {}", at.0);
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("Operator `{op}` rhs must be integer, not {}", bt.0));
+                bail!("Operator `{op}` rhs must be integer, not {}", bt.0);
             }
 
             if at.0 != bt.0 {
-                return Err(format!(
+                bail!(
                     "Operator `{op}` lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
+                    at.0,
+                    bt.0
+                );
             }
 
             TypedExpr(
@@ -494,18 +492,19 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
             let bt = type_expr(scope, *b)?;
 
             if !at.0.is_integer() {
-                return Err(format!("Operator `{op}` lhs must be integer, not {}", at.0));
+                bail!("Operator `{op}` lhs must be integer, not {}", at.0);
             }
 
             if !bt.0.is_integer() {
-                return Err(format!("Operator `{op}` rhs must be integer, not {}", bt.0));
+                bail!("Operator `{op}` rhs must be integer, not {}", bt.0);
             }
 
             if at.0 != bt.0 {
-                return Err(format!(
+                bail!(
                     "Operator `{op}` lhs and rhs must have same type, not {} and {}",
-                    at.0, bt.0
-                ));
+                    at.0,
+                    bt.0
+                );
             }
 
             TypedExpr(
@@ -531,10 +530,10 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
                     // *T -> int or int -> *T cast is valid
                     TypedExpr(tt.clone(), TypedExprKind::Cast(Box::new(xt), tt))
                 } else {
-                    return Err(format!("Cannot cast {} to {}", xt.0, tt));
+                    bail!("Cannot cast {} to {}", xt.0, tt);
                 }
             } else {
-                return Err(format!("Cannot cast {} to {}", xt.0, tt));
+                bail!("Cannot cast {} to {}", xt.0, tt);
             }
         }
 
@@ -546,12 +545,12 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, String> {
         Expr::Identifier(i) => {
             let t = scope
                 .get_value(&i)
-                .ok_or(format!("Unknown identifier {i}"))?;
+                .context(format!("Unknown identifier {i}"))?;
             TypedExpr(t.clone(), TypedExprKind::Identifier(i))
         }
         Expr::BooleanLiteral(b) => TypedExpr(TastType::Bool, TypedExprKind::BooleanLiteral(b)),
 
-        Expr::Error => return Err("Parse error encountered".to_string()),
+        Expr::Error => bail!("Parse error encountered"),
     })
 }
 
@@ -571,16 +570,13 @@ fn coerce_stmt_into_block(stmt: Stmt) -> Vec<Stmt> {
 pub fn process_let_declaration(
     scope: &mut Scope,
     declarations: Vec<AstLetDeclaration>,
-) -> Result<Vec<TastLetDeclaration>, String> {
+) -> anyhow::Result<Vec<TastLetDeclaration>> {
     Ok(declarations
         .into_iter()
-        .map(|let_declaration| -> Result<TastLetDeclaration, String> {
+        .map(|let_declaration| -> anyhow::Result<TastLetDeclaration> {
             if scope.get_value(&let_declaration.name).is_some() {
                 // TODO: In the future we may allow shadowing but currently no
-                return Err(format!(
-                    "Identifier {} already in use",
-                    let_declaration.name
-                ));
+                bail!("Identifier {} already in use", let_declaration.name);
             }
 
             let typed_expr = let_declaration
@@ -594,46 +590,46 @@ pub fn process_let_declaration(
 
             let result_decl = match (typed_expr, resolved_ty) {
                 (None, None) => {
-                    Err("No explicit variable type present and no value to infer from".to_string())
+                    bail!(
+                        "No explicit variable type present and no value to infer from".to_string()
+                    )
                 }
 
                 // Explicitly typed with no value
-                (None, Some(ty)) => Ok(TastLetDeclaration {
+                (None, Some(ty)) => TastLetDeclaration {
                     name: let_declaration.name,
                     ty,
                     value: None,
-                }),
+                },
 
                 // Infer type from value
-                (Some(TypedExpr(ty, ex)), None) => Ok(TastLetDeclaration {
+                (Some(TypedExpr(ty, ex)), None) => TastLetDeclaration {
                     name: let_declaration.name,
                     ty: ty.clone(),
                     value: Some(TypedExpr(ty, ex)),
-                }),
+                },
 
                 // Both explicitly typed and inferable
                 (Some(TypedExpr(ty, ex)), Some(resolved_ty)) => {
                     if ty == resolved_ty {
-                        Ok(TastLetDeclaration {
+                        TastLetDeclaration {
                             name: let_declaration.name,
                             ty: ty.clone(),
                             value: Some(TypedExpr(ty, ex)),
-                        })
+                        }
                     } else {
-                        Err(format!(
+                        bail!(
                             concat!("Cannot assign value of type {} to binding of", " type {}"),
-                            ty, resolved_ty
-                        ))
+                            ty,
+                            resolved_ty
+                        )
                     }
                 }
             };
-            if let Ok(TastLetDeclaration { name, ty, .. }) = &result_decl {
-                scope.set_value(name.clone(), ty.clone());
-            }
-
-            result_decl
+            scope.set_value(result_decl.name.clone(), result_decl.ty.clone());
+            Ok(result_decl)
         })
-        .collect::<Result<Vec<_>, _>>()?)
+        .collect::<anyhow::Result<Vec<_>>>()?)
 }
 
 /// Process a top-level [AST declaration](AstDeclaration), insert it into the
@@ -647,7 +643,7 @@ pub fn process_let_declaration(
 fn process_declaration(
     global_scope: &mut Scope,
     declaration: AstDeclaration,
-) -> Result<TypedDeclaration, String> {
+) -> anyhow::Result<TypedDeclaration> {
     Ok(match declaration {
         AstDeclaration::FunctionDeclaration {
             name,
@@ -656,7 +652,7 @@ fn process_declaration(
             body,
         } => {
             if global_scope.get_value(&name).is_some() {
-                return Err(format!("Identifier {name} already in use"));
+                bail!("Identifier {name} already in use");
             }
 
             let resolved_return_type = return_type
@@ -666,13 +662,13 @@ fn process_declaration(
 
             let resolved_parameters = parameters
                 .into_iter()
-                .map(|parameter| -> Result<TastArgumentDeclaration, String> {
+                .map(|parameter| -> anyhow::Result<TastArgumentDeclaration> {
                     Ok(TastArgumentDeclaration {
                         name: parameter.name,
                         ty: resolve_type(global_scope, parameter.ty)?,
                     })
                 })
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<anyhow::Result<Vec<_>>>()?;
 
             global_scope.set_value(
                 name.clone(),
@@ -712,15 +708,15 @@ fn process_declaration(
         }
         AstDeclaration::StructDeclaration { name, fields } => {
             if global_scope.get_type(&name).is_some() {
-                return Err(format!("Type name {name} already in use"));
+                bail!("Type name {name} already in use");
             }
 
             let resolved_pairs = fields
                 .into_iter()
-                .map(|(name, ty)| -> Result<(String, TastType), String> {
+                .map(|(name, ty)| -> anyhow::Result<(String, TastType)> {
                     Ok((name, resolve_type(global_scope, ty)?))
                 })
-                .collect::<Result<HashMap<_, _>, _>>()?;
+                .collect::<anyhow::Result<HashMap<_, _>>>()?;
 
             global_scope.set_type(name.clone(), TastType::Struct(resolved_pairs.clone()));
 
@@ -772,14 +768,14 @@ pub fn type_block(
     input_block: Vec<Stmt>,
     can_use_break_continue: bool,
     return_ability: BlockReturnAbility,
-) -> Result<(Vec<TypedStmt>, BlockReturnActuality), String> {
+) -> anyhow::Result<(Vec<TypedStmt>, BlockReturnActuality)> {
     let mut scope = parent_scope.clone();
 
     // At first, the block does not return.
     let (tast_block, return_actualities): (Vec<_>, Vec<_>) = input_block
         .into_iter()
         .map(
-            |stmt| -> Result<(TypedStmt, BlockReturnActuality), String> {
+            |stmt| -> anyhow::Result<(TypedStmt, BlockReturnActuality)> {
                 match stmt {
                     Stmt::EmptyStmt => {
                         Ok((TypedStmt::EmptyStmt, BlockReturnActuality::DoesNotReturn))
@@ -787,12 +783,12 @@ pub fn type_block(
                     Stmt::BreakStmt if can_use_break_continue => {
                         Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
                     }
-                    Stmt::BreakStmt => Err("Cannot use break statement here".to_string()),
+                    Stmt::BreakStmt => bail!("Cannot use break statement here"),
 
                     Stmt::ContinueStmt if can_use_break_continue => {
                         Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
                     }
-                    Stmt::ContinueStmt => Err("Cannot use continue statement here".to_string()),
+                    Stmt::ContinueStmt => bail!("Cannot use continue statement here"),
 
                     Stmt::DeclarationList(declarations) => Ok((
                         TypedStmt::DeclarationList(process_let_declaration(
@@ -810,7 +806,7 @@ pub fn type_block(
                         let typed_cond = type_expr(&scope, cond)?;
 
                         if typed_cond.0 != TastType::Bool {
-                            return Err(format!("If condition must be bool, not {}", typed_cond.0));
+                            bail!("If condition must be bool, not {}", typed_cond.0);
                         }
 
                         let (typed_then, then_return_actuality) = type_block(
@@ -887,10 +883,7 @@ pub fn type_block(
                         let typed_cond = type_expr(&scope, cond)?;
 
                         if typed_cond.0 != TastType::Bool {
-                            return Err(format!(
-                                "While condition must be bool, not {}",
-                                typed_cond.0
-                            ));
+                            bail!("While condition must be bool, not {}", typed_cond.0);
                         }
 
                         let (typed_body, body_return_actuality) = type_block(
@@ -1014,7 +1007,7 @@ pub fn type_block(
                         match (resolved_value, return_ability.clone()) {
                             // expects no return
                             (_, BlockReturnAbility::MustNotReturn) => {
-                                Err("Cannot return from a block that must not return".to_string())
+                                bail!("Cannot return from a block that must not return")
                             }
 
                             // return; in void fn
@@ -1032,22 +1025,22 @@ pub fn type_block(
                                 None,
                                 BlockReturnAbility::MayReturn(BlockReturnType::Return(t))
                                 | BlockReturnAbility::MustReturn(BlockReturnType::Return(t)),
-                            ) => Err(format!(
+                            ) => bail!(
                                 "Cannot return void from a block expecting a return type of {t}",
-                            )),
+                            ),
 
                             // return x; in fn expecting to return void
                             (
                                 Some(TypedExpr(ty, _)),
                                 BlockReturnAbility::MustReturn(BlockReturnType::Void)
                                 | BlockReturnAbility::MayReturn(BlockReturnType::Void),
-                            ) => Err(format!(
+                            ) => bail!(
                                 concat!(
                                     "Cannot return value of type {} from a block that must",
                                     " return void"
                                 ),
                                 ty
-                            )),
+                            ),
 
                             // return x; in fn expecting to return x
                             (
@@ -1061,13 +1054,14 @@ pub fn type_block(
                                         BlockReturnActuality::WillReturn,
                                     ))
                                 } else {
-                                    Err(format!(
+                                    bail!(
                                         concat!(
                                             "Cannot return value of type {} from a block that",
                                             " must return type {}"
                                         ),
-                                        ty, t
-                                    ))
+                                        ty,
+                                        t
+                                    )
                                 }
                             }
                         }
@@ -1075,7 +1069,7 @@ pub fn type_block(
                 }
             },
         )
-        .collect::<Result<Vec<_>, _>>()?
+        .collect::<anyhow::Result<Vec<_>>>()?
         .into_iter()
         .unzip();
 
@@ -1113,23 +1107,23 @@ pub fn type_block(
             Ok((tast_block, BlockReturnActuality::DoesNotReturn))
         }
         (BlockReturnAbility::MustReturn(_), BlockReturnActuality::MightReturn) => {
-            Err("Block must return, but no sub-block is guaranteed to return".to_string())
+            bail!("Block must return, but no sub-block is guaranteed to return")
         }
         (BlockReturnAbility::MustReturn(_), BlockReturnActuality::DoesNotReturn) => {
-            Err("Block must return, but no sub-block is guaranteed to return".to_string())
+            bail!("Block must return, but no sub-block is guaranteed to return")
         }
         (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => {
-            Err("Block must not return, but a sub-block may return".to_string())
+            bail!("Block must not return, but a sub-block may return")
         }
         (BlockReturnAbility::MustNotReturn, BlockReturnActuality::WillReturn) => {
-            Err("Block must not return, but a sub-block may return".to_string())
+            bail!("Block must not return, but a sub-block may return")
         }
     }
 }
 
 pub fn type_program(
     program: Vec<zrc_parser::ast::stmt::Declaration>,
-) -> Result<Vec<tast::stmt::TypedDeclaration>, String> {
+) -> anyhow::Result<Vec<tast::stmt::TypedDeclaration>> {
     let mut scope = Scope::new();
 
     program
