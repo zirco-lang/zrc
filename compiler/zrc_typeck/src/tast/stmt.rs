@@ -181,6 +181,7 @@ impl Display for TypedDeclaration {
 }
 
 impl Display for TypedStmt {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::IfStmt(e, s1, Some(s2)) => write!(
@@ -242,7 +243,7 @@ impl Display for TypedStmt {
                 init.clone().map_or(String::new(), |x| format!(
                     "let {};",
                     x.iter()
-                        .map(|x| x.to_string())
+                        .map(std::string::ToString::to_string)
                         .collect::<Vec<_>>()
                         .join(", ")
                 )),
@@ -281,7 +282,7 @@ impl Display for TypedStmt {
                 f,
                 "let {};",
                 d.iter()
-                    .map(|x| x.to_string())
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ")
             ),

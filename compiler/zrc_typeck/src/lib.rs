@@ -12,8 +12,9 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
-use anyhow::{bail, Context as _};
 use std::collections::HashMap;
+
+use anyhow::{bail, Context as _};
 
 pub mod tast;
 
@@ -148,6 +149,8 @@ impl BlockReturnType {
     }
 
     /// Converts this [`BlockReturnType`] to a [`TastType`]
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // I think clippy's high.
     pub fn into_tast_type(self) -> TastType {
         match self {
             Self::Void => TastType::Void,
@@ -567,11 +570,14 @@ fn coerce_stmt_into_block(stmt: Stmt) -> Vec<Stmt> {
 /// Process a vector of [AST let declarations](AstLetDeclaration) and insert it
 /// into the scope, returning a vector of [TAST let
 /// declarations](TastLetDeclaration).
+///
+/// # Errors
+/// Errors with type checker errors.
 pub fn process_let_declaration(
     scope: &mut Scope,
     declarations: Vec<AstLetDeclaration>,
 ) -> anyhow::Result<Vec<TastLetDeclaration>> {
-    Ok(declarations
+    declarations
         .into_iter()
         .map(|let_declaration| -> anyhow::Result<TastLetDeclaration> {
             if scope.get_value(&let_declaration.name).is_some() {
@@ -629,7 +635,7 @@ pub fn process_let_declaration(
             scope.set_value(result_decl.name.clone(), result_decl.ty.clone());
             Ok(result_decl)
         })
-        .collect::<anyhow::Result<Vec<_>>>()?)
+        .collect::<anyhow::Result<Vec<_>>>()
 }
 
 /// Process a top-level [AST declaration](AstDeclaration), insert it into the
@@ -1121,6 +1127,8 @@ pub fn type_block(
     }
 }
 
+/// # Errors
+/// Errors with type checker errors.
 pub fn type_program(
     program: Vec<zrc_parser::ast::stmt::Declaration>,
 ) -> anyhow::Result<Vec<tast::stmt::TypedDeclaration>> {

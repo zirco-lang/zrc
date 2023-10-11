@@ -41,6 +41,11 @@ impl Display for ModuleCg {
         Ok(())
     }
 }
+impl Default for ModuleCg {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct FunctionCg {
@@ -89,7 +94,8 @@ impl FunctionCg {
                 &get_llvm_typename(parameter.1),
                 &ptr,
                 &format!("%p{id}"),
-            );
+            )
+            .unwrap(); // we KNOW cg is this bb already
 
             // insert the parameter into the scope
             scope.insert(&parameter.0, &ptr);
@@ -130,7 +136,7 @@ impl Display for FunctionCg {
                 .map(|(name, ty)| format!("{} {name}", get_llvm_typename(ty.clone())))
                 .collect::<Vec<_>>()
                 .join(", ")
-        );
+        )?;
         for (i, bb) in self.blocks.iter().enumerate() {
             if i == 0 {
                 for instr in &self.allocations {
@@ -146,7 +152,7 @@ impl Display for FunctionCg {
                 }
             }
         }
-        write!(f, "}}");
+        write!(f, "}}")?;
         Ok(())
     }
 }
@@ -231,14 +237,21 @@ fn cg_alloc(cg: &mut FunctionCg, _bb: &BasicBlock, ty: &str) -> String {
     reg
 }
 /// Loads a type `T` from a `T*`
-fn cg_load(cg: &mut FunctionCg, bb: &BasicBlock, ty: &str, ptr: &str) -> String {
+fn cg_load(cg: &mut FunctionCg, bb: &BasicBlock, ty: &str, ptr: &str) -> anyhow::Result<String> {
     let reg = cg.new_reg();
-    bb.add_instruction(cg, &format!("{reg} = load {ty}, ptr {ptr}"));
-    reg
+    bb.add_instruction(cg, &format!("{reg} = load {ty}, ptr {ptr}"))?;
+    Ok(reg)
 }
 /// Stores a type `T` to a `T*`
-fn cg_store(cg: &mut FunctionCg, bb: &BasicBlock, ty: &str, ptr: &str, value: &str) {
-    bb.add_instruction(cg, &format!("store {ty} {value}, ptr {ptr}"));
+fn cg_store(
+    cg: &mut FunctionCg,
+    bb: &BasicBlock,
+    ty: &str,
+    ptr: &str,
+    value: &str,
+) -> anyhow::Result<()> {
+    bb.add_instruction(cg, &format!("store {ty} {value}, ptr {ptr}"))?;
+    Ok(())
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -259,6 +272,11 @@ impl CgScope {
 
     pub fn insert(&mut self, ident: &str, reg: &str) {
         self.identifiers.insert(ident.to_string(), reg.to_string());
+    }
+}
+impl Default for CgScope {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -292,11 +310,11 @@ pub fn cg_place(
 
             let x_typename = get_llvm_typename(x.clone().0);
 
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
+            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
 
             let index_typename = get_llvm_typename(index.0.clone());
 
-            let index_reg = cg_load(cg, &bb, &index_typename, &index_ptr);
+            let index_reg = cg_load(cg, &bb, &index_typename, &index_ptr)?;
 
             let result_typename = match x.0 {
                 zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
@@ -310,7 +328,7 @@ pub fn cg_place(
                 &format!(
                     "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, {index_typename} {index_reg}",
                 )
-            );
+            )?;
 
             (result_reg, bb)
         }
@@ -319,7 +337,7 @@ pub fn cg_place(
 
             let x_typename = get_llvm_typename(x.0.clone());
 
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
+            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
 
             let result_typename = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
@@ -345,7 +363,7 @@ pub fn cg_place(
                 &format!(
                     "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 0, i32 {key_idx}",
                 )
-            );
+            )?;
 
             (result_reg, bb)
         }
@@ -354,7 +372,7 @@ pub fn cg_place(
 
             let x_typename = get_llvm_typename(x.0.clone());
 
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
+            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
 
             let result_typename = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Struct(entries) => get_llvm_typename(
@@ -385,7 +403,7 @@ pub fn cg_place(
                 &format!(
                     "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 {key_idx}",
                 )
-            );
+            )?;
 
             (result_reg, bb)
         }
@@ -401,7 +419,7 @@ pub fn cg_expr(
     scope: &CgScope,
     expr: zrc_typeck::tast::expr::TypedExpr,
 ) -> anyhow::Result<(String, BasicBlock)> {
-    use zrc_typeck::tast::{expr::TypedExprKind, ty::Type};
+    use zrc_typeck::tast::expr::TypedExprKind;
     // Remember you must ALWAYS return a POINTER register. This is an intentional
     // design choice for now. llvm can optimize away the pointer if it wants to.
 
@@ -410,18 +428,16 @@ pub fn cg_expr(
             let (condition_ptr, bb) = cg_expr(module, cg, bb, scope, *condition)?;
             // condition_ptr: i1*
 
-            let result_typename = get_llvm_typename(expr.0.clone());
-
             let if_true_bb = cg.new_bb();
             let if_false_bb = cg.new_bb();
 
             // load the condition
-            let condition_reg = cg_load(cg, &bb, "i1", &condition_ptr);
+            let condition_reg = cg_load(cg, &bb, "i1", &condition_ptr)?;
             // and branch on it
             bb.add_instruction(
                 cg,
                 &format!("br i1 {condition_reg}, label {if_true_bb}, label {if_false_bb}"),
-            );
+            )?;
 
             // generate the expressions on both sides
             let (if_true_ptr, if_true_bb) = cg_expr(module, cg, &if_true_bb, scope, *lhs)?;
@@ -431,13 +447,13 @@ pub fn cg_expr(
             let terminating_bb = cg.new_bb();
 
             // branch to the terminating bb
-            if_true_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
-            if_false_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
+            if_true_bb.add_instruction(cg, &format!("br label {terminating_bb}"))?;
+            if_false_bb.add_instruction(cg, &format!("br label {terminating_bb}"))?;
 
             let result_ptr = cg.new_reg();
 
             // now generate a phi node
-            terminating_bb.add_instruction(cg, &format!("{result_ptr} = phi ptr [{if_true_ptr}, {if_true_bb}], [{if_false_ptr}, {if_false_bb}]"));
+            terminating_bb.add_instruction(cg, &format!("{result_ptr} = phi ptr [{if_true_ptr}, {if_true_bb}], [{if_false_ptr}, {if_false_bb}]"))?;
 
             (result_ptr, terminating_bb)
         }
@@ -445,13 +461,13 @@ pub fn cg_expr(
         TypedExprKind::NumberLiteral(n) => {
             let typename = get_llvm_typename(expr.0.clone());
             let reg = cg_alloc(cg, bb, &typename);
-            cg_store(cg, &bb, &typename, &reg, &n);
+            cg_store(cg, bb, &typename, &reg, &n)?;
             (reg, bb.clone())
         }
         TypedExprKind::BooleanLiteral(b) => {
             let typename = get_llvm_typename(expr.0.clone());
             let reg = cg_alloc(cg, bb, &typename);
-            cg_store(cg, &bb, &typename, &reg, &b.to_string());
+            cg_store(cg, bb, &typename, &reg, &b.to_string())?;
             (reg, bb.clone())
         }
 
@@ -468,8 +484,8 @@ pub fn cg_expr(
             let result_typename = get_llvm_typename(expr.0.clone());
             let result_ptr = cg_alloc(cg, &bb, &result_typename);
 
-            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr);
-            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr);
+            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr)?;
+            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr)?;
 
             let op = match op {
                 zrc_typeck::tast::expr::BinaryBitwise::And => "and",
@@ -484,8 +500,8 @@ pub fn cg_expr(
             bb.add_instruction(
                 cg,
                 &format!("{result_reg} = {op} {result_typename} {lhs_reg}, {rhs_reg}"),
-            );
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg);
+            )?;
+            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
 
             (result_ptr, bb)
         }
@@ -498,8 +514,8 @@ pub fn cg_expr(
 
             let operand_typename = get_llvm_typename(lhs.0.clone());
 
-            let lhs_reg = cg_load(cg, &bb, &operand_typename, &lhs_ptr);
-            let rhs_reg = cg_load(cg, &bb, &operand_typename, &rhs_ptr);
+            let lhs_reg = cg_load(cg, &bb, &operand_typename, &lhs_ptr)?;
+            let rhs_reg = cg_load(cg, &bb, &operand_typename, &rhs_ptr)?;
 
             let op = match op {
                 zrc_typeck::tast::expr::Equality::Eq => "icmp eq",
@@ -511,10 +527,10 @@ pub fn cg_expr(
             bb.add_instruction(
                 cg,
                 &format!("{result_reg} = {op} {operand_typename} {lhs_reg}, {rhs_reg}"),
-            );
+            )?;
 
             let result_ptr = cg_alloc(cg, &bb, "i1");
-            cg_store(cg, &bb, "i1", &result_ptr, &result_reg);
+            cg_store(cg, &bb, "i1", &result_ptr, &result_reg)?;
 
             (result_ptr, bb)
         }
@@ -525,8 +541,8 @@ pub fn cg_expr(
 
             let result_typename = get_llvm_typename(lhs.0.clone());
 
-            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr);
-            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr);
+            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr)?;
+            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr)?;
 
             // the operands are integers
             let op = match (op, expr.0.clone()) {
@@ -554,10 +570,10 @@ pub fn cg_expr(
             bb.add_instruction(
                 cg,
                 &format!("{result_reg} = {op} {result_typename} {lhs_reg}, {rhs_reg}"),
-            );
+            )?;
 
             let result_ptr = cg_alloc(cg, &bb, "i1");
-            cg_store(cg, &bb, "i1", &result_ptr, &result_reg);
+            cg_store(cg, &bb, "i1", &result_ptr, &result_reg)?;
 
             (result_ptr, bb)
         }
@@ -567,8 +583,8 @@ pub fn cg_expr(
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
-            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr);
-            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr);
+            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr)?;
+            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr)?;
 
             let op = match op {
                 zrc_typeck::tast::expr::Arithmetic::Addition => "add",
@@ -583,10 +599,10 @@ pub fn cg_expr(
             bb.add_instruction(
                 cg,
                 &format!("{result_reg} = {op} {result_typename} {lhs_reg}, {rhs_reg}"),
-            );
+            )?;
 
             let result_ptr = cg_alloc(cg, &bb, &result_typename);
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg);
+            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
 
             (result_ptr, bb)
         }
@@ -596,8 +612,8 @@ pub fn cg_expr(
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
-            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr);
-            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr);
+            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr)?;
+            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr)?;
 
             // "and/or i1" works for bools
             let op = match op {
@@ -610,10 +626,10 @@ pub fn cg_expr(
             bb.add_instruction(
                 cg,
                 &format!("{result_reg} = {op} {result_typename} {lhs_reg}, {rhs_reg}"),
-            );
+            )?;
 
             let result_ptr = cg_alloc(cg, &bb, &result_typename);
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg);
+            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
 
             (result_ptr, bb)
         }
@@ -623,17 +639,17 @@ pub fn cg_expr(
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
-            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr);
+            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr)?;
 
             let result_reg = cg.new_reg();
 
             bb.add_instruction(
                 cg,
                 &format!("{result_reg} = xor {result_typename} {x_reg}, -1"),
-            );
+            )?;
 
             let result_ptr = cg_alloc(cg, &bb, &result_typename);
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg);
+            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
 
             (result_ptr, bb)
         }
@@ -644,18 +660,18 @@ pub fn cg_expr(
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
-            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr);
+            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr)?;
 
             let result_reg = cg.new_reg();
 
             bb.add_instruction(
                 cg,
                 &format!("{result_reg} = xor {result_typename} {x_reg}, 1"),
-            );
+            )?;
 
             let result_ptr = cg_alloc(cg, &bb, &result_typename);
 
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg);
+            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
 
             (result_ptr, bb)
         }
@@ -665,18 +681,18 @@ pub fn cg_expr(
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
-            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr);
+            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr)?;
 
             let result_reg = cg.new_reg();
 
             bb.add_instruction(
                 cg,
                 &format!("{result_reg} = sub {result_typename} 0, {x_reg}"),
-            );
+            )?;
 
             let result_ptr = cg_alloc(cg, &bb, &result_typename);
 
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg);
+            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
 
             (result_ptr, bb)
         }
@@ -690,7 +706,7 @@ pub fn cg_expr(
 
             cg_alloc(cg, &bb, &result_typename);
 
-            cg_store(cg, &bb, &result_typename, &result_reg, &x_ptr);
+            cg_store(cg, &bb, &result_typename, &result_reg, &x_ptr)?;
 
             (result_reg, bb)
         }
@@ -700,11 +716,11 @@ pub fn cg_expr(
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
-            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr);
+            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr)?;
 
             let result_ptr = cg_alloc(cg, &bb, &result_typename);
 
-            cg_store(cg, &bb, &result_typename, &result_ptr, &x_reg);
+            cg_store(cg, &bb, &result_typename, &result_ptr, &x_reg)?;
 
             (result_ptr, bb)
         }
@@ -715,9 +731,9 @@ pub fn cg_expr(
 
             let value_typename = get_llvm_typename(value.0.clone());
 
-            let value_reg = cg_load(cg, &bb, &value_typename, &value_ptr);
+            let value_reg = cg_load(cg, &bb, &value_typename, &value_ptr)?;
 
-            cg_store(cg, &bb, &value_typename, &place_ptr, &value_reg);
+            cg_store(cg, &bb, &value_typename, &place_ptr, &value_reg)?;
 
             (place_ptr, bb)
         }
@@ -736,11 +752,11 @@ pub fn cg_expr(
 
             let x_typename = get_llvm_typename(x.clone().0);
 
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
+            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
 
             let index_typename = get_llvm_typename(index.0.clone());
 
-            let index_reg = cg_load(cg, &bb, &index_typename, &index_ptr);
+            let index_reg = cg_load(cg, &bb, &index_typename, &index_ptr)?;
 
             let result_typename = match x.0 {
                 zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
@@ -754,7 +770,7 @@ pub fn cg_expr(
                 &format!(
                     "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, {index_typename} {index_reg}",
                 )
-            );
+            )?;
 
             (result_reg, bb)
         }
@@ -764,7 +780,7 @@ pub fn cg_expr(
 
             let x_typename = get_llvm_typename(x.0.clone());
 
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
+            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
 
             let result_typename = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Struct(entries) => get_llvm_typename(
@@ -795,7 +811,7 @@ pub fn cg_expr(
                 &format!(
                     "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 {key_idx}",
                 )
-            );
+            )?;
 
             (result_reg, bb)
         }
@@ -805,7 +821,7 @@ pub fn cg_expr(
 
             let x_typename = get_llvm_typename(x.0.clone());
 
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
+            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
 
             let result_typename = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
@@ -831,22 +847,20 @@ pub fn cg_expr(
                 &format!(
                     "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 0, i32 {key_idx}",
                 )
-            );
+            )?;
 
             (result_reg, bb)
         }
 
         TypedExprKind::Call(f, args) => {
-            let (f_ptr, bb) = cg_expr(module, cg, bb, scope, *f.clone())?;
-
-            let f_typename = get_llvm_typename(f.0.clone());
+            let (f_ptr, bb) = cg_expr(module, cg, bb, scope, *f)?;
 
             let args = args
                 .into_iter()
                 .map(|arg| {
                     let (arg_ptr, bb) = cg_expr(module, cg, &bb, scope, arg.clone())?;
-                    let arg_typename = get_llvm_typename(arg.0.clone());
-                    let arg_reg = cg_load(cg, &bb, &arg_typename, &arg_ptr);
+                    let arg_typename = get_llvm_typename(arg.0);
+                    let arg_reg = cg_load(cg, &bb, &arg_typename, &arg_ptr)?;
                     Ok(format!("{arg_typename} {arg_reg}"))
                 })
                 .collect::<anyhow::Result<Vec<_>>>()?;
@@ -856,13 +870,13 @@ pub fn cg_expr(
             let result_typename = get_llvm_typename(expr.0.clone());
 
             if result_typename == "void" {
-                bb.add_instruction(cg, &format!("call {result_typename} {f_ptr}({args})"));
+                bb.add_instruction(cg, &format!("call {result_typename} {f_ptr}({args})"))?;
 
                 let undef = cg_alloc(cg, &bb, "i8");
 
                 // store the undefined value here as `void` results should never be loaded but
                 // our code generator expects a loadable value
-                cg_store(cg, &bb, "i8", &undef, "undef");
+                cg_store(cg, &bb, "i8", &undef, "undef")?;
 
                 (undef, bb)
             } else {
@@ -871,11 +885,11 @@ pub fn cg_expr(
                 bb.add_instruction(
                     cg,
                     &format!("{result_reg} = call {result_typename} {f_ptr}({args})"),
-                );
+                )?;
 
                 let result_ptr = cg_alloc(cg, &bb, &result_typename);
 
-                cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg);
+                cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
 
                 (result_ptr, bb)
             }
@@ -931,7 +945,7 @@ pub fn cg_expr(
 
             let x_typename = get_llvm_typename(x.0.clone());
 
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr);
+            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
@@ -940,11 +954,11 @@ pub fn cg_expr(
             bb.add_instruction(
                 cg,
                 &format!("{result_reg} = {cast_opcode} {x_typename} {x_reg} to {result_typename}"),
-            );
+            )?;
 
             let result_ptr = cg_alloc(cg, &bb, &result_typename);
 
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg);
+            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
 
             (result_ptr, bb)
         }
@@ -960,7 +974,7 @@ pub fn cg_expr(
 
             let result_reg = cg_alloc(cg, bb, "ptr"); // u8*
 
-            cg_store(cg, bb, "ptr", &result_reg, &format!("@.str{id}"));
+            cg_store(cg, bb, "ptr", &result_reg, &format!("@.str{id}"))?;
 
             (result_reg, bb.clone())
         }
@@ -988,7 +1002,6 @@ pub fn cg_let_declaration(
     scope: &mut CgScope,
     declarations: Vec<zrc_typeck::tast::stmt::LetDeclaration>,
 ) -> anyhow::Result<BasicBlock> {
-    use zrc_typeck::tast::stmt::{LetDeclaration, TypedDeclaration};
     let mut bb = bb.clone();
 
     for let_declaration in declarations {
@@ -1050,18 +1063,18 @@ pub fn cg_block(
                 TypedStmt::EmptyStmt => Some(bb),
                 TypedStmt::ExprStmt(expr) => Some(cg_expr(module, cg, &bb, &scope, expr)?.1),
                 TypedStmt::IfStmt(cond, then, then_else) => {
-                    let (cond_ptr, bb) = cg_expr(module, cg, &bb, &scope, cond.clone())?;
+                    let (cond_ptr, bb) = cg_expr(module, cg, &bb, &scope, cond)?;
 
                     let then_else = then_else.unwrap_or(vec![]);
 
                     let then_bb = cg.new_bb();
                     let then_else_bb = cg.new_bb();
 
-                    let cond_reg = cg_load(cg, &bb, "i1", &cond_ptr);
+                    let cond_reg = cg_load(cg, &bb, "i1", &cond_ptr)?;
                     bb.add_instruction(
                         cg,
                         &format!("br i1 {cond_reg}, label {then_bb}, label {then_else_bb}",),
-                    );
+                    )?;
 
                     let then_bb = cg_block(module, cg, &then_bb, &scope, then, breakaway.clone())?;
                     let then_else_bb = cg_block(
@@ -1076,19 +1089,21 @@ pub fn cg_block(
                     match (then_bb, then_else_bb) {
                         (Some(then_bb), Some(then_else_bb)) => {
                             let terminating_bb = cg.new_bb();
-                            then_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
-                            then_else_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
+                            then_bb.add_instruction(cg, &format!("br label {terminating_bb}"))?;
+                            then_else_bb
+                                .add_instruction(cg, &format!("br label {terminating_bb}"))?;
 
                             Some(terminating_bb)
                         }
                         (Some(then_bb), None) => {
                             let terminating_bb = cg.new_bb();
-                            then_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
+                            then_bb.add_instruction(cg, &format!("br label {terminating_bb}"))?;
                             Some(terminating_bb)
                         }
                         (None, Some(then_else_bb)) => {
                             let terminating_bb = cg.new_bb();
-                            then_else_bb.add_instruction(cg, &format!("br label {terminating_bb}"));
+                            then_else_bb
+                                .add_instruction(cg, &format!("br label {terminating_bb}"))?;
                             Some(terminating_bb)
                         }
                         (None, None) => None,
@@ -1101,14 +1116,14 @@ pub fn cg_block(
 
                 TypedStmt::ReturnStmt(Some(ex)) => {
                     let (ex_ptr, bb) = cg_expr(module, cg, &bb, &scope, ex.clone())?;
-                    let ex_type = get_llvm_typename(ex.0.clone());
-                    let ex_reg = cg_load(cg, &bb, &ex_type, &ex_ptr);
-                    bb.add_instruction(cg, &format!("ret {ex_type} {ex_reg}"));
+                    let ex_type = get_llvm_typename(ex.0);
+                    let ex_reg = cg_load(cg, &bb, &ex_type, &ex_ptr)?;
+                    bb.add_instruction(cg, &format!("ret {ex_type} {ex_reg}"))?;
 
                     None
                 }
                 TypedStmt::ReturnStmt(None) => {
-                    bb.add_instruction(cg, "ret void");
+                    bb.add_instruction(cg, "ret void")?;
                     None
                 }
 
@@ -1119,7 +1134,7 @@ pub fn cg_block(
 
                     match breakaway.clone() {
                         Some(LoopBreakaway { on_continue, .. }) => {
-                            bb.add_instruction(cg, &format!("br label {on_continue}"));
+                            bb.add_instruction(cg, &format!("br label {on_continue}"))?;
                             // make sure to use 'bb' here not 'on_continue' so later statements are
                             // appended to this block
                             None
@@ -1134,7 +1149,7 @@ pub fn cg_block(
 
                     match breakaway.clone() {
                         Some(LoopBreakaway { on_break, .. }) => {
-                            bb.add_instruction(cg, &format!("br label {on_break}"));
+                            bb.add_instruction(cg, &format!("br label {on_break}"))?;
                             None
                         }
                         None => bail!("break statement outside of loop"),
@@ -1171,7 +1186,7 @@ pub fn cg_block(
                     };
 
                     let header = cg.new_bb();
-                    bb.add_instruction(cg, &format!("br label {header}"));
+                    bb.add_instruction(cg, &format!("br label {header}"))?;
 
                     let body = cg.new_bb();
                     let latch = cg.new_bb();
@@ -1181,7 +1196,7 @@ pub fn cg_block(
                     // use that to jump to either the body or the exit condition.
                     let header = match cond {
                         None => {
-                            header.add_instruction(cg, &format!("br label {body}"));
+                            header.add_instruction(cg, &format!("br label {body}"))?;
                             header
                         }
                         Some(cond) => {
@@ -1189,12 +1204,12 @@ pub fn cg_block(
                                 cg_expr(module, cg, &header, &scope, cond.clone())?;
 
                             let cond_reg =
-                                cg_load(cg, &header, &get_llvm_typename(cond.0), &cond_ptr);
+                                cg_load(cg, &header, &get_llvm_typename(cond.0), &cond_ptr)?;
 
                             header.add_instruction(
                                 cg,
                                 &format!("br i1 {cond_reg}, label {body}, label {exit}"),
-                            );
+                            )?;
 
                             header
                         }
@@ -1215,7 +1230,7 @@ pub fn cg_block(
 
                     // The body breaks to latch
                     if let Some(body) = body {
-                        body.add_instruction(cg, &format!("br label {latch}"));
+                        body.add_instruction(cg, &format!("br label {latch}"))?;
                     }
 
                     // Latch runs post and then breaks right back to the header.
@@ -1225,7 +1240,7 @@ pub fn cg_block(
                         latch
                     };
 
-                    latch.add_instruction(cg, &format!("br label {header}"));
+                    latch.add_instruction(cg, &format!("br label {header}"))?;
 
                     Some(exit)
                 }
@@ -1240,19 +1255,18 @@ pub fn cg_block(
                     // `continue` => header
 
                     let header = cg.new_bb();
-                    bb.add_instruction(cg, &format!("br label {header}"));
+                    bb.add_instruction(cg, &format!("br label {header}"))?;
 
                     let body = cg.new_bb();
                     let exit = cg.new_bb();
 
                     let (cond_ptr, header) = cg_expr(module, cg, &header, &scope, cond.clone())?;
-                    let cond_reg =
-                        cg_load(cg, &header, &get_llvm_typename(cond.0.clone()), &cond_ptr);
+                    let cond_reg = cg_load(cg, &header, &get_llvm_typename(cond.0), &cond_ptr)?;
 
                     header.add_instruction(
                         cg,
                         &format!("br i1 {cond_reg}, label {body}, label {exit}"),
-                    );
+                    )?;
 
                     let body = cg_block(
                         module,
@@ -1268,7 +1282,7 @@ pub fn cg_block(
 
                     // The body breaks to header
                     if let Some(body) = body {
-                        body.add_instruction(cg, &format!("br label {header}"));
+                        body.add_instruction(cg, &format!("br label {header}"))?;
                     }
 
                     Some(exit)
@@ -1328,12 +1342,9 @@ pub fn cg_program(
                     name,
                     parameters
                         .iter()
-                        .map(
-                            |zrc_typeck::tast::stmt::ArgumentDeclaration { ty, .. }| format!(
-                                "{}",
-                                get_llvm_typename(ty.clone())
-                            )
-                        )
+                        .map(|zrc_typeck::tast::stmt::ArgumentDeclaration { ty, .. }| {
+                            get_llvm_typename(ty.clone())
+                        })
                         .collect::<Vec<_>>()
                         .join(", ")
                 ));

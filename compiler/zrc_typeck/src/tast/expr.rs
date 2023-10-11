@@ -10,6 +10,7 @@ pub use zrc_parser::ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality,
 #[allow(clippy::module_name_repetitions)]
 pub struct TypedExpr(pub super::ty::Type, pub TypedExprKind);
 
+/// The left hand side of an assignment.
 #[derive(PartialEq, Debug, Clone)]
 pub struct Place(pub super::ty::Type, pub PlaceKind);
 /// The valid left-hand-side of a [`TypedExprKind::Assignment`].
@@ -19,10 +20,15 @@ pub struct Place(pub super::ty::Type, pub PlaceKind);
 /// - A dereference or index into any expression yielding a pointer
 #[derive(PartialEq, Debug, Clone)]
 pub enum PlaceKind {
+    /// `*x`
     Deref(Box<TypedExpr>),
+    /// `x`
     Variable(String),
+    /// `x[y]`
     Index(Box<TypedExpr>, Box<TypedExpr>),
+    /// `x.y`
     Dot(Box<Place>, String),
+    /// `x -> y`
     Arrow(Box<Place>, String),
 }
 
@@ -122,11 +128,11 @@ impl Display for TypedExprKind {
 impl Display for PlaceKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PlaceKind::Deref(e) => write!(f, "*{e}"),
-            PlaceKind::Variable(s) => write!(f, "{s}"),
-            PlaceKind::Index(a, b) => write!(f, "{a}[{b}]"),
-            PlaceKind::Dot(a, b) => write!(f, "{a}.{b}"),
-            PlaceKind::Arrow(a, b) => write!(f, "{a}->{b}"),
+            Self::Deref(e) => write!(f, "*{e}"),
+            Self::Variable(s) => write!(f, "{s}"),
+            Self::Index(a, b) => write!(f, "{a}[{b}]"),
+            Self::Dot(a, b) => write!(f, "{a}.{b}"),
+            Self::Arrow(a, b) => write!(f, "{a}->{b}"),
         }
     }
 }

@@ -24,14 +24,14 @@ pub enum LexicalError {
 impl Display for LexicalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LexicalError::NoMatchingRule => write!(f, "No matching rule"),
-            LexicalError::UnknownToken((pos, char), msg) => {
-                write!(f, "Unknown token '{}' at position {}: {}", char, pos, msg)
+            Self::NoMatchingRule => write!(f, "No matching rule"),
+            Self::UnknownToken((pos, char), msg) => {
+                write!(f, "Unknown token '{char}' at position {pos}: {msg}")
             }
-            LexicalError::UnterminatedStringLiteral(pos) => {
-                write!(f, "Unterminated string literal at position {}", pos)
+            Self::UnterminatedStringLiteral(pos) => {
+                write!(f, "Unterminated string literal at position {pos}")
             }
-            LexicalError::UnterminatedBlockComment => {
+            Self::UnterminatedBlockComment => {
                 write!(f, "Unterminated block comment at end of file")
             }
         }
@@ -528,7 +528,7 @@ mod tests {
                     Ok((0, Tok::Identifier("a".to_string()), 1)),
                     Err(LexicalError::UnterminatedBlockComment)
                 ]
-            )
+            );
         }
     }
 }

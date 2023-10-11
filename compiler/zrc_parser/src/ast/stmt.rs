@@ -198,7 +198,7 @@ impl Display for Stmt {
                     init.clone().map_or(";".to_string(), |x| format!(
                         "let {};",
                         x.iter()
-                            .map(|x| x.to_string())
+                            .map(std::string::ToString::to_string)
                             .collect::<Vec<_>>()
                             .join(", ")
                     )),
@@ -225,7 +225,7 @@ impl Display for Stmt {
                     f,
                     "let {};",
                     d.iter()
-                        .map(|x| x.to_string())
+                        .map(std::string::ToString::to_string)
                         .collect::<Vec<_>>()
                         .join(", ")
                 )

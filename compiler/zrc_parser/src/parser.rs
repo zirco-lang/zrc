@@ -1,10 +1,11 @@
 //! Functions to parse Zirco into an Abstract Syntax Tree
 
-use lalrpop_util::{ErrorRecovery, ParseError};
 use std::{
     error::Error,
     fmt::{Debug, Display},
 };
+
+use lalrpop_util::{ErrorRecovery, ParseError};
 
 use super::{
     ast::{
@@ -33,14 +34,14 @@ impl<T: Debug> Error for ZircoParserError<T> {}
 impl<T: Debug> Display for ZircoParserError<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ZircoParserError::Recoverable { errors, .. } => {
+            Self::Recoverable { errors, .. } => {
                 write!(f, "Recoverable parser error: ")?;
                 for error in errors {
-                    write!(f, "{}\n", error.error)?;
+                    writeln!(f, "{}", error.error)?;
                 }
                 Ok(())
             }
-            ZircoParserError::Fatal(e) => write!(f, "Fatal parser error: {}", e),
+            Self::Fatal(e) => write!(f, "Fatal parser error: {e}"),
         }
     }
 }
@@ -85,7 +86,11 @@ pub fn parse_stmt(input: &str) -> Result<Stmt, ZircoParserError<Stmt>> {
 #[cfg(test)]
 mod tests {
     use super::{
-        super::ast::{expr::*, stmt::*, ty::*},
+        super::ast::{
+            expr::{Arithmetic, Expr},
+            stmt::{ArgumentDeclaration, Declaration, LetDeclaration, Stmt},
+            ty::Type,
+        },
         *,
     };
 
@@ -143,7 +148,7 @@ mod tests {
                 )),
                 None
             ))
-        )
+        );
     }
 
     #[test]
@@ -153,9 +158,9 @@ mod tests {
             Ok(Stmt::DeclarationList(vec![LetDeclaration {
                 name: ("a".to_string()),
                 ty: None,
-                value: Some(Expr::NumberLiteral("1".to_string()).into())
+                value: Some(Expr::NumberLiteral("1".to_string()))
             }]))
-        )
+        );
     }
 
     #[test]
@@ -181,7 +186,7 @@ mod tests {
                     Box::new(Expr::Identifier("b".to_string()))
                 )))])
             }])
-        )
+        );
     }
 
     #[test]
@@ -203,10 +208,11 @@ mod tests {
                     body: Box::new(Stmt::BlockStmt(vec![]))
                 }])
             }])
-        )
+        );
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn larger_program_parses() {
         assert_eq!(
             parse_program(concat!(
@@ -273,12 +279,12 @@ mod tests {
                             LetDeclaration {
                                 name: ("a".to_string()),
                                 ty: None,
-                                value: Some(Expr::NumberLiteral("1".to_string()).into())
+                                value: Some(Expr::NumberLiteral("1".to_string()))
                             },
                             LetDeclaration {
                                 name: ("b".to_string()),
                                 ty: Some(Type::Identifier("i32".to_string())),
-                                value: Some(Expr::NumberLiteral("2".to_string()).into())
+                                value: Some(Expr::NumberLiteral("2".to_string()))
                             },
                         ]),
                         Stmt::DeclarationList(vec![LetDeclaration {
@@ -311,6 +317,6 @@ mod tests {
                     ])
                 }
             ])
-        )
+        );
     }
 }
