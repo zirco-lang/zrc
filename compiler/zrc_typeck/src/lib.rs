@@ -565,8 +565,9 @@ fn coerce_stmt_into_block(stmt: Stmt) -> Vec<Stmt> {
     }
 }
 
-/// Process a vector of [AST let declarations](AstLetDeclaration) and insert it into the scope,
-/// returning a vector of [TAST let declarations](TastLetDeclaration).
+/// Process a vector of [AST let declarations](AstLetDeclaration) and insert it
+/// into the scope, returning a vector of [TAST let
+/// declarations](TastLetDeclaration).
 pub fn process_let_declaration(
     scope: &mut Scope,
     declarations: Vec<AstLetDeclaration>,
@@ -635,8 +636,8 @@ pub fn process_let_declaration(
         .collect::<Result<Vec<_>, _>>()?)
 }
 
-/// Process a top-level [AST declaration](AstDeclaration), insert it into the scope, and return
-/// a [TAST declaration](TypedDeclaration).
+/// Process a top-level [AST declaration](AstDeclaration), insert it into the
+/// scope, and return a [TAST declaration](TypedDeclaration).
 ///
 /// This should only be used in the global scope.
 ///

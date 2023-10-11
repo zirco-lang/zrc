@@ -1,6 +1,6 @@
-use anyhow::bail;
-use anyhow::Context as _;
 use std::{collections::HashMap, fmt::Display};
+
+use anyhow::{bail, Context as _};
 
 #[derive(PartialEq, Debug, Clone)]
 struct Counter {
@@ -19,7 +19,8 @@ impl Counter {
     }
 }
 
-/// A code generator for one module, the unit of compilation in Zirco corresponding to one source file.
+/// A code generator for one module, the unit of compilation in Zirco
+/// corresponding to one source file.
 pub struct ModuleCg {
     pub declarations: Vec<String>,
     global_constant_id: Counter,
@@ -48,8 +49,9 @@ pub struct FunctionCg {
     ret: zrc_typeck::BlockReturnType,
     blocks: Vec<BasicBlockData>,
     next_instruction_id: Counter,
-    /// One of our design decisions involves using memory registers extremely often, and `alloca`s can only
-    /// be easily optimized to SSA registers by SROA if they are located at the beginning of the first basic block
+    /// One of our design decisions involves using memory registers extremely
+    /// often, and `alloca`s can only be easily optimized to SSA registers
+    /// by SROA if they are located at the beginning of the first basic block
     /// in the function. For this reason, the allocas are located here.
     allocations: Vec<String>,
 }
@@ -180,7 +182,8 @@ impl BasicBlock {
 
 /// Determine the order of the values within a struct.
 ///
-/// FIXME: This MUST use insertion order in the future for C FFI compat, instead of our.. alphabetical order approach?
+/// FIXME: This MUST use insertion order in the future for C FFI compat, instead
+/// of our.. alphabetical order approach?
 fn determine_order_of_struct(
     values: HashMap<String, zrc_typeck::tast::ty::Type>,
 ) -> Vec<(String, zrc_typeck::tast::ty::Type)> {
@@ -220,8 +223,8 @@ fn get_llvm_typename(ty: zrc_typeck::tast::ty::Type) -> String {
     }
 }
 
-/// Allocates a new register and returns it. This also properly handles the alloca instruction needing
-/// to be at the beginning of a basic block.
+/// Allocates a new register and returns it. This also properly handles the
+/// alloca instruction needing to be at the beginning of a basic block.
 fn cg_alloc(cg: &mut FunctionCg, _bb: &BasicBlock, ty: &str) -> String {
     let reg = cg.new_reg();
     cg.allocations.push(format!("{reg} = alloca {ty}"));
@@ -389,7 +392,8 @@ pub fn cg_place(
     })
 }
 
-/// Returns a register containing a pointer to the result of the expression along with the basic block to continue adding statements from.
+/// Returns a register containing a pointer to the result of the expression
+/// along with the basic block to continue adding statements from.
 pub fn cg_expr(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
@@ -398,7 +402,8 @@ pub fn cg_expr(
     expr: zrc_typeck::tast::expr::TypedExpr,
 ) -> anyhow::Result<(String, BasicBlock)> {
     use zrc_typeck::tast::{expr::TypedExprKind, ty::Type};
-    // Remember you must ALWAYS return a POINTER register. This is an intentional design choice for now. llvm can optimize away the pointer if it wants to.
+    // Remember you must ALWAYS return a POINTER register. This is an intentional
+    // design choice for now. llvm can optimize away the pointer if it wants to.
 
     Ok(match expr.1 {
         TypedExprKind::Ternary(condition, lhs, rhs) => {
@@ -855,8 +860,8 @@ pub fn cg_expr(
 
                 let undef = cg_alloc(cg, &bb, "i8");
 
-                // store the undefined value here as `void` results should never be loaded but our
-                // code generator expects a loadable value
+                // store the undefined value here as `void` results should never be loaded but
+                // our code generator expects a loadable value
                 cg_store(cg, &bb, "i8", &undef, "undef");
 
                 (undef, bb)
@@ -962,17 +967,20 @@ pub fn cg_expr(
     })
 }
 
-/// Consists of the [`BasicBlock`]s to `br` to when encountering certain instructions.
-/// It is passed to [`cg_block`] to allow it to properly handle break and continue.
+/// Consists of the [`BasicBlock`]s to `br` to when encountering certain
+/// instructions. It is passed to [`cg_block`] to allow it to properly handle
+/// break and continue.
 #[derive(PartialEq, Debug, Clone)]
 pub struct LoopBreakaway {
     /// Points to the exit basic block.
     on_break: BasicBlock,
-    /// For `for` loops, points to the latch. For `while` loops, points to the header.
+    /// For `for` loops, points to the latch. For `while` loops, points to the
+    /// header.
     on_continue: BasicBlock,
 }
 
-/// Declares the variable, creating its allocation and also evaluating the assignment.
+/// Declares the variable, creating its allocation and also evaluating the
+/// assignment.
 pub fn cg_let_declaration(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
@@ -1015,7 +1023,8 @@ pub fn cg_let_declaration(
 }
 
 /// Returns the basic block to continue adding instructions to.
-/// If it is None, a return statement was encountered and no more instructions should be added.
+/// If it is None, a return statement was encountered and no more instructions
+/// should be added.
 pub fn cg_block(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
@@ -1105,12 +1114,14 @@ pub fn cg_block(
 
                 TypedStmt::ContinueStmt => {
                     // We can jump into whatever the 'continue' target is in `breakaway`
-                    // This is going to be the loop header for `while` loops and the loop latch for `for` loops
+                    // This is going to be the loop header for `while` loops and the loop latch for
+                    // `for` loops
 
                     match breakaway.clone() {
                         Some(LoopBreakaway { on_continue, .. }) => {
                             bb.add_instruction(cg, &format!("br label {on_continue}"));
-                            // make sure to use 'bb' here not 'on_continue' so later statements are appended to this block
+                            // make sure to use 'bb' here not 'on_continue' so later statements are
+                            // appended to this block
                             None
                         }
                         None => bail!("continue statement outside of loop"),
@@ -1142,15 +1153,18 @@ pub fn cg_block(
                 } => {
                     // For loops generate a somewhat more complicated CFG, with a few parts.
                     // The preheader, where `init` runs. Breaks to the header.
-                    // The header, where `cond` is checked and breaks to either the exit or the body.
-                    // The body, where most of the body runs. Breaks to the latch. `break` transfers to the exit by force and `continue` transfers to the latch by force.
-                    // The latch, where `post` runs and breaks back to the header
-                    // The exit, which is the basic block we return.
+                    // The header, where `cond` is checked and breaks to either the exit or the
+                    // body. The body, where most of the body runs. Breaks to
+                    // the latch. `break` transfers to the exit by force and `continue` transfers to
+                    // the latch by force. The latch, where `post` runs and
+                    // breaks back to the header The exit, which is the basic
+                    // block we return.
 
                     // loops lie in an implicit subscope
                     let mut scope = scope.clone();
 
-                    // The block we are currently in will become the preheader. Generate the `init` code if there is any.
+                    // The block we are currently in will become the preheader. Generate the `init`
+                    // code if there is any.
                     let bb = match init {
                         None => bb,
                         Some(init) => cg_let_declaration(module, cg, &bb, &mut scope, *init)?,
@@ -1163,7 +1177,8 @@ pub fn cg_block(
                     let latch = cg.new_bb();
                     let exit = cg.new_bb();
 
-                    // You are now officially in the loop. Within the header, we check `cond` and use that to jump to either the body or the exit condition.
+                    // You are now officially in the loop. Within the header, we check `cond` and
+                    // use that to jump to either the body or the exit condition.
                     let header = match cond {
                         None => {
                             header.add_instruction(cg, &format!("br label {body}"));
