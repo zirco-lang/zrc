@@ -430,8 +430,10 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                 // *T == *U is valid
             } else {
                 bail!(
-                    "Operator `{op}` lhs and rhs must be same-type integer or pointer, not {} and {}",
-                    at.0, bt.0
+                    "Operator `{}` lhs and rhs must be same-type integer or pointer, not {} and {}",
+                    op,
+                    at.0,
+                    bt.0
                 );
             }
 

@@ -323,11 +323,13 @@ pub fn cg_place(
 
             let result_reg = cg.new_reg();
 
+            #[allow(clippy::uninlined_format_args)] // for line length
             bb.add_instruction(
                 cg,
                 &format!(
-                    "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, {index_typename} {index_reg}",
-                )
+                    "{} = getelementptr {}, {} {}, {} {}",
+                    result_reg, result_typename, x_typename, x_reg, index_typename, index_reg
+                ),
             )?;
 
             (result_reg, bb)
@@ -358,11 +360,13 @@ pub fn cg_place(
                 _ => unreachable!(), // per typeck, this is always a struct
             };
 
+            #[allow(clippy::uninlined_format_args)] // for line length
             bb.add_instruction(
                 cg,
                 &format!(
-                    "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 0, i32 {key_idx}",
-                )
+                    "{} = getelementptr {}, {} {}, i32 0, i32 0, i32 {}",
+                    result_reg, result_typename, x_typename, x_reg, key_idx
+                ),
             )?;
 
             (result_reg, bb)
@@ -398,11 +402,13 @@ pub fn cg_place(
                 _ => unreachable!(), // per typeck, this is always a struct
             };
 
+            #[allow(clippy::uninlined_format_args)] // for line length
             bb.add_instruction(
                 cg,
                 &format!(
-                    "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 {key_idx}",
-                )
+                    "{} = getelementptr {}, {} {}, i32 0, i32 {}",
+                    result_reg, result_typename, x_typename, x_reg, key_idx
+                ),
             )?;
 
             (result_reg, bb)
@@ -453,7 +459,14 @@ pub fn cg_expr(
             let result_ptr = cg.new_reg();
 
             // now generate a phi node
-            terminating_bb.add_instruction(cg, &format!("{result_ptr} = phi ptr [{if_true_ptr}, {if_true_bb}], [{if_false_ptr}, {if_false_bb}]"))?;
+            #[allow(clippy::uninlined_format_args)] // for line length
+            terminating_bb.add_instruction(
+                cg,
+                &format!(
+                    "{} = phi ptr [{}, {}], [{}, {}]",
+                    result_ptr, if_false_ptr, if_false_bb, if_true_ptr, if_true_bb
+                ),
+            )?;
 
             (result_ptr, terminating_bb)
         }
@@ -765,11 +778,13 @@ pub fn cg_expr(
 
             let result_reg = cg.new_reg();
 
+            #[allow(clippy::uninlined_format_args)] // for line length
             bb.add_instruction(
                 cg,
                 &format!(
-                    "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, {index_typename} {index_reg}",
-                )
+                    "{} = getelementptr {}, {} {}, {} {}",
+                    result_reg, result_typename, x_typename, x_reg, index_typename, index_reg
+                ),
             )?;
 
             (result_reg, bb)
@@ -806,11 +821,13 @@ pub fn cg_expr(
                 _ => unreachable!(), // per typeck, this is always a struct
             };
 
+            #[allow(clippy::uninlined_format_args)] // for line length
             bb.add_instruction(
                 cg,
                 &format!(
-                    "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 {key_idx}",
-                )
+                    "{} = getelementptr {}, {} {}, i32 0, i32 {}",
+                    result_reg, result_typename, x_typename, x_reg, key_idx
+                ),
             )?;
 
             (result_reg, bb)
@@ -842,11 +859,13 @@ pub fn cg_expr(
                 _ => unreachable!(), // per typeck, this is always a struct
             };
 
+            #[allow(clippy::uninlined_format_args)] // for line length
             bb.add_instruction(
                 cg,
                 &format!(
-                    "{result_reg} = getelementptr {result_typename}, {x_typename} {x_reg}, i32 0, i32 0, i32 {key_idx}",
-                )
+                    "{} = getelementptr {}, {} {}, i32 0, i32 0, i32 {}",
+                    result_reg, result_typename, x_typename, x_reg, key_idx
+                ),
             )?;
 
             (result_reg, bb)
