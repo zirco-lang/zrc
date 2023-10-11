@@ -40,7 +40,7 @@ impl Display for LexicalError {
 impl Error for LexicalError {}
 
 /// A lexer callback helper to obtain the currently matched token slice.
-fn string_slice(lex: &mut Lexer<'_, Tok>) -> String {
+fn string_slice(lex: &Lexer<'_, Tok>) -> String {
     lex.slice().to_string()
 }
 
