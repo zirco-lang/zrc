@@ -11,6 +11,22 @@
 use anyhow::Context as _;
 
 fn main() -> anyhow::Result<()> {
+    let default_panic_hook = std::panic::take_hook();
+
+    // ICE (internal compiler error) / panic message
+    std::panic::set_hook(Box::new(move |panic_info| {
+        eprintln!("error: internal compiler error encountered: thread panicked");
+        eprintln!("note: this is not your fault! this is ALWAYS a compiler bug.");
+        eprintln!(
+            "note: compiler bugs threaten the Zirco ecosystem -- we would appreciate a bug report:"
+        );
+        eprintln!("note: bug reporting link: https://github.com/zirco-lang/zrc/issues/new?template=bug.yml");
+        eprintln!();
+        default_panic_hook(panic_info);
+        eprintln!();
+        eprintln!("error: end internal compiler error. compilation failed.");
+    }));
+
     let content =
         std::fs::read_to_string(std::env::args().nth(1).context("no input file provided")?)
             .context("failed to read input file")?;
