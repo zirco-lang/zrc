@@ -113,7 +113,7 @@ FunctionDeclaration: Declaration = {
 };
 
 StructDeclaration: Declaration = {
-    "struct" <i:Spanned<IDENTIFIER>> "{" <l:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Spanned<Type>>)>>?>> "}" => Declaration::StructDeclaration {
+    "struct" <i:Spanned<IDENTIFIER>> "{" <l:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}" => Declaration::StructDeclaration {
         name: i,
         fields: Spanned(l.0, l.1.unwrap_or(Vec::new()).into_iter().map(|x| (x.1.0.1.clone(), x)).collect::<HashMap<_, _>>(), l.2),
     }

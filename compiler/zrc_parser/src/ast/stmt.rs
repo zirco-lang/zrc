@@ -75,10 +75,7 @@ pub enum Declaration {
         name: super::Spanned<String>,
         /// The key-value pairs of the struct
         fields: super::Spanned<
-            HashMap<
-                String,
-                super::Spanned<(super::Spanned<String>, super::Spanned<super::ty::Type>)>,
-            >,
+            HashMap<String, super::Spanned<(super::Spanned<String>, super::ty::Type)>>,
         >,
     },
 }
@@ -169,10 +166,7 @@ impl Display for Declaration {
                 fields
                     .1
                     .iter()
-                    .map(|(_, super::Spanned(_, (name, ty), _))| format!(
-                        "    {}: {}",
-                        name.1, ty.1
-                    ))
+                    .map(|(_, super::Spanned(_, (name, ty), _))| format!("    {}: {}", name.1, ty))
                     .collect::<Vec<_>>()
                     .join(",\n")
             ),
