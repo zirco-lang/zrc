@@ -27,9 +27,10 @@ use tast::{
     ty::Type as TastType,
 };
 use zrc_parser::ast::{
-    expr::Expr,
-    stmt::{Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt},
-    ty::Type as ParserType,
+    expr::{Expr, ExprKind},
+    stmt::{Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind},
+    ty::{Type as ParserType, TypeKind as ParserTypeKind},
+    Spanned,
 };
 
 /// Contains scoping information during type checking.
@@ -98,8 +99,8 @@ impl Default for Scope {
 /// # Errors
 /// Errors if the identifier is not found in the type scope.
 fn resolve_type(scope: &Scope, ty: ParserType) -> anyhow::Result<TastType> {
-    Ok(match ty {
-        ParserType::Identifier(x) => match x.as_str() {
+    Ok(match ty.0 .1 {
+        ParserTypeKind::Identifier(x) => match x.as_str() {
             "i8" => TastType::I8,
             "u8" => TastType::U8,
             "i16" => TastType::I16,
@@ -117,8 +118,8 @@ fn resolve_type(scope: &Scope, ty: ParserType) -> anyhow::Result<TastType> {
                 }
             }
         },
-        ParserType::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t)?)),
-        ParserType::Struct(members) => TastType::Struct(
+        ParserTypeKind::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t)?)),
+        ParserTypeKind::Struct(members) => TastType::Struct(
             members
                 .iter()
                 .map(|(k, v)| Ok((k.clone(), resolve_type(scope, v.clone())?)))
@@ -208,11 +209,19 @@ fn desugar_assignment(
         Assignment::Standard => (lhs, rhs),
         Assignment::Arithmetic(op) => (
             lhs.clone(),
-            Expr::Arithmetic(op, Box::new(lhs), Box::new(rhs)),
+            Expr(Spanned(
+                rhs.0 .0,
+                ExprKind::Arithmetic(op, Box::new(lhs), Box::new(rhs.clone())),
+                rhs.0 .2,
+            )),
         ),
         Assignment::BinaryBitwise(op) => (
             lhs.clone(),
-            Expr::BinaryBitwise(op, Box::new(lhs), Box::new(rhs)),
+            Expr(Spanned(
+                rhs.0 .0,
+                ExprKind::BinaryBitwise(op, Box::new(lhs), Box::new(rhs.clone())),
+                rhs.0 .2,
+            )),
         ),
     }
 }
@@ -241,8 +250,8 @@ fn expr_to_place(expr: TypedExpr) -> anyhow::Result<tast::expr::Place> {
 /// Errors if a type checker error is encountered.
 #[allow(clippy::too_many_lines)] // FIXME: make this fn shorter
 pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
-    Ok(match expr {
-        Expr::Comma(a, b) => {
+    Ok(match expr.0 .1 {
+        ExprKind::Comma(a, b) => {
             let at = type_expr(scope, *a)?;
             let bt = type_expr(scope, *b)?;
             TypedExpr(
@@ -250,7 +259,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                 TypedExprKind::Comma(Box::new(at), Box::new(bt)),
             )
         }
-        Expr::Assignment(mode, place, value) => {
+        ExprKind::Assignment(mode, place, value) => {
             // TODO: Check place is a valid lvalue so that `7 = 4;` is invalid
 
             // Desugar `x += y` to `x = x + y`.
@@ -269,21 +278,21 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             )
         }
 
-        Expr::UnaryNot(x) => {
+        ExprKind::UnaryNot(x) => {
             let t = type_expr(scope, *x)?;
             if t.0 != TastType::Bool {
                 bail!("Cannot not {}", t.0);
             }
             TypedExpr(t.0.clone(), TypedExprKind::UnaryNot(Box::new(t)))
         }
-        Expr::UnaryBitwiseNot(x) => {
+        ExprKind::UnaryBitwiseNot(x) => {
             let t = type_expr(scope, *x)?;
             if !t.0.is_integer() {
                 bail!("Cannot bitwise not {}", t.0);
             }
             TypedExpr(t.0.clone(), TypedExprKind::UnaryBitwiseNot(Box::new(t)))
         }
-        Expr::UnaryMinus(x) => {
+        ExprKind::UnaryMinus(x) => {
             let t = type_expr(scope, *x)?;
             if !t.0.is_integer() {
                 bail!("Cannot unary minus {}", t.0);
@@ -293,14 +302,14 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             }
             TypedExpr(t.0.clone(), TypedExprKind::UnaryMinus(Box::new(t)))
         }
-        Expr::UnaryAddressOf(x) => {
+        ExprKind::UnaryAddressOf(x) => {
             let t = type_expr(scope, *x)?;
             TypedExpr(
                 TastType::Ptr(Box::new(t.0.clone())),
                 TypedExprKind::UnaryAddressOf(Box::new(t)),
             )
         }
-        Expr::UnaryDereference(x) => {
+        ExprKind::UnaryDereference(x) => {
             let t = type_expr(scope, *x)?;
             if let TastType::Ptr(tt) = t.clone().0 {
                 TypedExpr(*tt, TypedExprKind::UnaryDereference(Box::new(t)))
@@ -309,7 +318,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             }
         }
 
-        Expr::Index(ptr, offset) => {
+        ExprKind::Index(ptr, offset) => {
             let ptr_t = type_expr(scope, *ptr)?;
             let offset_t = type_expr(scope, *offset)?;
 
@@ -327,31 +336,50 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             }
         }
 
-        Expr::Dot(obj, key) => {
+        ExprKind::Dot(obj, key) => {
             let obj_t = type_expr(scope, *obj)?;
 
             if let TastType::Struct(fields) = obj_t.0.clone() {
-                if let Some(t) = fields.get(&key) {
-                    TypedExpr(t.clone(), TypedExprKind::Dot(Box::new(obj_t), key.clone()))
+                if let Some(t) = fields.get(&key.1) {
+                    TypedExpr(
+                        t.clone(),
+                        TypedExprKind::Dot(Box::new(obj_t), key.1.clone()),
+                    )
                 } else {
-                    bail!("Struct {} does not have field {}", obj_t.0, key);
+                    bail!("Struct {} does not have field {}", obj_t.0, key.1);
                 }
             } else {
                 bail!("Cannot dot into non-struct type {}", obj_t.0);
             }
         }
-        Expr::Arrow(obj, key) => {
+        ExprKind::Arrow(obj, key) => {
             let obj_t = type_expr(scope, *obj.clone())?;
 
             if let TastType::Ptr(_) = obj_t.0 {
-                type_expr(scope, Expr::Dot(Box::new(Expr::UnaryDereference(obj)), key))?
+                type_expr(
+                    scope,
+                    Expr(Spanned(
+                        obj.0 .0,
+                        ExprKind::Dot(
+                            Box::new(Expr(Spanned(
+                                (*obj).0 .0,
+                                ExprKind::UnaryDereference(obj.clone()),
+                                (*obj).0 .2,
+                            ))),
+                            key.clone(),
+                        ),
+                        // because 'expr' is already moved
+                        key.2,
+                    )),
+                )?
             } else {
                 bail!("Cannot deref to access into non-pointer type {}", obj_t.0);
             }
         }
-        Expr::Call(f, args) => {
+        ExprKind::Call(f, args) => {
             let ft = type_expr(scope, *f)?;
             let args_t = args
+                .1
                 .iter()
                 .map(|x| type_expr(scope, x.clone()))
                 .collect::<anyhow::Result<Vec<TypedExpr>>>()?;
@@ -380,7 +408,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             }
         }
 
-        Expr::Ternary(cond, if_true, if_false) => {
+        ExprKind::Ternary(cond, if_true, if_false) => {
             let cond_t = type_expr(scope, *cond)?;
             let if_true_t = type_expr(scope, *if_true)?;
             let if_false_t = type_expr(scope, *if_false)?;
@@ -403,7 +431,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             )
         }
 
-        Expr::Logical(op, a, b) => {
+        ExprKind::Logical(op, a, b) => {
             let at = type_expr(scope, *a)?;
             let bt = type_expr(scope, *b)?;
 
@@ -420,7 +448,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                 TypedExprKind::Logical(op, Box::new(at), Box::new(bt)),
             )
         }
-        Expr::Equality(op, a, b) => {
+        ExprKind::Equality(op, a, b) => {
             let at = type_expr(scope, *a)?;
             let bt = type_expr(scope, *b)?;
 
@@ -442,7 +470,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                 TypedExprKind::Equality(op, Box::new(at), Box::new(bt)),
             )
         }
-        Expr::BinaryBitwise(op, a, b) => {
+        ExprKind::BinaryBitwise(op, a, b) => {
             let at = type_expr(scope, *a)?;
             let bt = type_expr(scope, *b)?;
 
@@ -467,7 +495,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                 TypedExprKind::BinaryBitwise(op, Box::new(at), Box::new(bt)),
             )
         }
-        Expr::Comparison(op, a, b) => {
+        ExprKind::Comparison(op, a, b) => {
             let at = type_expr(scope, *a)?;
             let bt = type_expr(scope, *b)?;
 
@@ -492,7 +520,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                 TypedExprKind::Comparison(op, Box::new(at), Box::new(bt)),
             )
         }
-        Expr::Arithmetic(op, a, b) => {
+        ExprKind::Arithmetic(op, a, b) => {
             let at = type_expr(scope, *a)?;
             let bt = type_expr(scope, *b)?;
 
@@ -518,7 +546,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             )
         }
 
-        Expr::Cast(x, t) => {
+        ExprKind::Cast(x, t) => {
             let xt = type_expr(scope, *x)?;
             let tt = resolve_type(scope, t)?;
 
@@ -542,20 +570,20 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             }
         }
 
-        Expr::NumberLiteral(n) => TypedExpr(TastType::I32, TypedExprKind::NumberLiteral(n)),
-        Expr::StringLiteral(s) => TypedExpr(
+        ExprKind::NumberLiteral(n) => TypedExpr(TastType::I32, TypedExprKind::NumberLiteral(n)),
+        ExprKind::StringLiteral(s) => TypedExpr(
             TastType::Ptr(Box::new(TastType::U8)),
             TypedExprKind::StringLiteral(s),
         ),
-        Expr::Identifier(i) => {
+        ExprKind::Identifier(i) => {
             let t = scope
                 .get_value(&i)
                 .context(format!("Unknown identifier {i}"))?;
             TypedExpr(t.clone(), TypedExprKind::Identifier(i))
         }
-        Expr::BooleanLiteral(b) => TypedExpr(TastType::Bool, TypedExprKind::BooleanLiteral(b)),
+        ExprKind::BooleanLiteral(b) => TypedExpr(TastType::Bool, TypedExprKind::BooleanLiteral(b)),
 
-        Expr::Error => bail!("Parse error encountered"),
+        ExprKind::Error => bail!("Parse error encountered"),
     })
 }
 
@@ -563,8 +591,8 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
 /// }` without converting `{ x; }` to `{ { x; } }`. This is preferred instead of
 /// `vec![x]` as it prevents extra nesting layers.
 fn coerce_stmt_into_block(stmt: Stmt) -> Vec<Stmt> {
-    match stmt {
-        Stmt::BlockStmt(stmts) => stmts,
+    match stmt.0 .1 {
+        StmtKind::BlockStmt(stmts) => stmts,
         _ => vec![stmt],
     }
 }
@@ -577,21 +605,23 @@ fn coerce_stmt_into_block(stmt: Stmt) -> Vec<Stmt> {
 /// Errors with type checker errors.
 pub fn process_let_declaration(
     scope: &mut Scope,
-    declarations: Vec<AstLetDeclaration>,
+    declarations: Vec<Spanned<AstLetDeclaration>>,
 ) -> anyhow::Result<Vec<TastLetDeclaration>> {
     declarations
         .into_iter()
         .map(|let_declaration| -> anyhow::Result<TastLetDeclaration> {
-            if scope.get_value(&let_declaration.name).is_some() {
+            if scope.get_value(&let_declaration.1.name.1).is_some() {
                 // TODO: In the future we may allow shadowing but currently no
-                bail!("Identifier {} already in use", let_declaration.name);
+                bail!("Identifier {} already in use", let_declaration.1.name.1);
             }
 
             let typed_expr = let_declaration
+                .1
                 .value
                 .map(|expr| type_expr(scope, expr))
                 .transpose()?;
             let resolved_ty = let_declaration
+                .1
                 .ty
                 .map(|ty| resolve_type(scope, ty))
                 .transpose()?;
@@ -605,14 +635,14 @@ pub fn process_let_declaration(
 
                 // Explicitly typed with no value
                 (None, Some(ty)) => TastLetDeclaration {
-                    name: let_declaration.name,
+                    name: let_declaration.1.name.1,
                     ty,
                     value: None,
                 },
 
                 // Infer type from value
                 (Some(TypedExpr(ty, ex)), None) => TastLetDeclaration {
-                    name: let_declaration.name,
+                    name: let_declaration.1.name.1,
                     ty: ty.clone(),
                     value: Some(TypedExpr(ty, ex)),
                 },
@@ -621,7 +651,7 @@ pub fn process_let_declaration(
                 (Some(TypedExpr(ty, ex)), Some(resolved_ty)) => {
                     if ty == resolved_ty {
                         TastLetDeclaration {
-                            name: let_declaration.name,
+                            name: let_declaration.1.name.1,
                             ty: ty.clone(),
                             value: Some(TypedExpr(ty, ex)),
                         }
@@ -659,8 +689,8 @@ fn process_declaration(
             return_type,
             body,
         } => {
-            if global_scope.get_value(&name).is_some() {
-                bail!("Identifier {name} already in use");
+            if global_scope.get_value(&name.1).is_some() {
+                bail!("Identifier {} already in use", name.1);
             }
 
             let resolved_return_type = return_type
@@ -669,17 +699,18 @@ fn process_declaration(
                 .map_or(BlockReturnType::Void, BlockReturnType::Return);
 
             let resolved_parameters = parameters
+                .1
                 .into_iter()
                 .map(|parameter| -> anyhow::Result<TastArgumentDeclaration> {
                     Ok(TastArgumentDeclaration {
-                        name: parameter.name,
-                        ty: resolve_type(global_scope, parameter.ty)?,
+                        name: parameter.1.name.1,
+                        ty: resolve_type(global_scope, parameter.1.ty)?,
                     })
                 })
                 .collect::<anyhow::Result<Vec<_>>>()?;
 
             global_scope.set_value(
-                name.clone(),
+                name.clone().1,
                 TastType::Fn(
                     resolved_parameters
                         .iter()
@@ -690,7 +721,7 @@ fn process_declaration(
             );
 
             TypedDeclaration::FunctionDeclaration {
-                name,
+                name: name.1,
                 parameters: resolved_parameters.clone(),
                 return_type: resolved_return_type.clone().into_option(),
                 body: if let Some(body) = body {
@@ -703,7 +734,7 @@ fn process_declaration(
                     Some(
                         type_block(
                             &function_scope,
-                            body,
+                            body.1,
                             false,
                             BlockReturnAbility::MustReturn(resolved_return_type),
                         )?
@@ -715,21 +746,22 @@ fn process_declaration(
             }
         }
         AstDeclaration::StructDeclaration { name, fields } => {
-            if global_scope.get_type(&name).is_some() {
-                bail!("Type name {name} already in use");
+            if global_scope.get_type(&name.1).is_some() {
+                bail!("Type name {} already in use", name.1);
             }
 
             let resolved_pairs = fields
+                .1
                 .into_iter()
                 .map(|(name, ty)| -> anyhow::Result<(String, TastType)> {
-                    Ok((name, resolve_type(global_scope, ty)?))
+                    Ok((name, resolve_type(global_scope, ty.1 .1)?))
                 })
                 .collect::<anyhow::Result<HashMap<_, _>>>()?;
 
-            global_scope.set_type(name.clone(), TastType::Struct(resolved_pairs.clone()));
+            global_scope.set_type(name.1.clone(), TastType::Struct(resolved_pairs.clone()));
 
             TypedDeclaration::StructDeclaration {
-                name,
+                name: name.1,
                 fields: resolved_pairs,
             }
         }
@@ -784,29 +816,29 @@ pub fn type_block(
         .into_iter()
         .map(
             |stmt| -> anyhow::Result<(TypedStmt, BlockReturnActuality)> {
-                match stmt {
-                    Stmt::EmptyStmt => {
+                match stmt.0 .1 {
+                    StmtKind::EmptyStmt => {
                         Ok((TypedStmt::EmptyStmt, BlockReturnActuality::DoesNotReturn))
                     }
-                    Stmt::BreakStmt if can_use_break_continue => {
+                    StmtKind::BreakStmt if can_use_break_continue => {
                         Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
                     }
-                    Stmt::BreakStmt => bail!("Cannot use break statement here"),
+                    StmtKind::BreakStmt => bail!("Cannot use break statement here"),
 
-                    Stmt::ContinueStmt if can_use_break_continue => {
+                    StmtKind::ContinueStmt if can_use_break_continue => {
                         Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
                     }
-                    Stmt::ContinueStmt => bail!("Cannot use continue statement here"),
+                    StmtKind::ContinueStmt => bail!("Cannot use continue statement here"),
 
-                    Stmt::DeclarationList(declarations) => Ok((
+                    StmtKind::DeclarationList(declarations) => Ok((
                         TypedStmt::DeclarationList(process_let_declaration(
                             &mut scope,
-                            declarations,
+                            declarations.1,
                         )?),
                         BlockReturnActuality::DoesNotReturn, /* because expressions can't return */
                     )),
 
-                    Stmt::IfStmt(cond, then, then_else) => {
+                    StmtKind::IfStmt(cond, then, then_else) => {
                         // TODO: if `cond` is always true at compile-time, we can prove the if
                         // branch is always taken (hence if it's WillReturn we can be WillReturn
                         // instead of MayReturn)
@@ -884,7 +916,7 @@ pub fn type_block(
                             },
                         ))
                     }
-                    Stmt::WhileStmt(cond, body) => {
+                    StmtKind::WhileStmt(cond, body) => {
                         // TODO: we might be able to prove that the body runs at least once or an
                         // infinite loop making this won't/will return statically
 
@@ -926,7 +958,7 @@ pub fn type_block(
                             },
                         ))
                     }
-                    Stmt::ForStmt {
+                    StmtKind::ForStmt {
                         init,
                         cond,
                         post,
@@ -940,7 +972,7 @@ pub fn type_block(
 
                         // if present, evaluate the declaration
                         let typed_init = init
-                            .map(|decl| process_let_declaration(&mut loop_scope, *decl))
+                            .map(|decl| process_let_declaration(&mut loop_scope, decl.1))
                             .transpose()?;
 
                         let typed_cond =
@@ -986,7 +1018,7 @@ pub fn type_block(
                         ))
                     }
 
-                    Stmt::BlockStmt(body) => {
+                    StmtKind::BlockStmt(body) => {
                         let (typed_body, return_actuality) = type_block(
                             &scope,
                             body,
@@ -1005,11 +1037,11 @@ pub fn type_block(
                         Ok((TypedStmt::BlockStmt(typed_body), return_actuality))
                     }
 
-                    Stmt::ExprStmt(expr) => Ok((
+                    StmtKind::ExprStmt(expr) => Ok((
                         TypedStmt::ExprStmt(type_expr(&scope, expr)?),
                         BlockReturnActuality::DoesNotReturn,
                     )),
-                    Stmt::ReturnStmt(value) => {
+                    StmtKind::ReturnStmt(value) => {
                         let resolved_value =
                             value.map(|expr| type_expr(&scope, expr)).transpose()?;
                         match (resolved_value, return_ability.clone()) {
@@ -1132,12 +1164,12 @@ pub fn type_block(
 /// # Errors
 /// Errors with type checker errors.
 pub fn type_program(
-    program: Vec<zrc_parser::ast::stmt::Declaration>,
+    program: Vec<Spanned<zrc_parser::ast::stmt::Declaration>>,
 ) -> anyhow::Result<Vec<tast::stmt::TypedDeclaration>> {
     let mut scope = Scope::new();
 
     program
         .into_iter()
-        .map(|declaration| process_declaration(&mut scope, declaration))
+        .map(|declaration| process_declaration(&mut scope, declaration.1))
         .collect()
 }

@@ -1,13 +1,17 @@
 //! Type representation for the Zirco AST
 //!
-//! The main thing within this module you will need is the [`Type`] enum. It
+//! The main thing within this module you will need is the [`Type`] struct. It
 //! contains all the different type kinds in Zirco.
 
 use std::{collections::HashMap, fmt::Display};
 
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub enum Type {
+pub struct Type(pub super::Spanned<TypeKind>);
+
+/// A valid Zirco AST type
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum TypeKind {
     /// An identifier, such as `i32`
     Identifier(String),
     /// `*T`
@@ -16,7 +20,7 @@ pub enum Type {
     Struct(HashMap<String, Type>),
 }
 
-impl Display for Type {
+impl Display for TypeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Identifier(i) => write!(f, "{i}"),
@@ -32,5 +36,10 @@ impl Display for Type {
                 write!(f, " }}")
             }
         }
+    }
+}
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0 .1.fmt(f)
     }
 }
