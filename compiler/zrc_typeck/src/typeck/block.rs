@@ -1,3 +1,5 @@
+//! for blocks
+
 use super::Scope;
 use super::{resolve_type, type_expr};
 use crate::tast::ty::Type as TastType;
@@ -17,6 +19,7 @@ use zrc_parser::ast::{
 
 /// Describes whether a block returns void or a type.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::module_name_repetitions)]
 pub enum BlockReturnType {
     /// The function/block returns void (`fn()`)
     Void,
@@ -49,6 +52,7 @@ impl BlockReturnType {
 
 /// Describes if a block MAY, MUST, or MUST NOT return.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::module_name_repetitions)]
 pub enum BlockReturnAbility {
     /// The block MUST NOT return at any point.
     MustNotReturn,
@@ -72,6 +76,7 @@ pub enum BlockReturnAbility {
 /// (because the outer block must have at least *one* path which is guaranteed
 /// to return)
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::module_name_repetitions)]
 pub enum BlockReturnActuality {
     /// The block is guaranteed to never return on any path.
     DoesNotReturn,
@@ -301,6 +306,7 @@ pub fn process_declaration(
 // TODO: Maybe the TAST should attach the BlockReturnActuality in each BlockStmt itself and preserve
 // it on sub-blocks in the TAST (this may be helpful in control flow analysis)
 #[allow(clippy::too_many_lines)]
+#[allow(clippy::module_name_repetitions)]
 pub fn type_block(
     parent_scope: &Scope,
     input_block: Vec<Stmt>,

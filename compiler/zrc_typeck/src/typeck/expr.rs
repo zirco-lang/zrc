@@ -1,3 +1,5 @@
+//! for expressions
+
 use super::Scope;
 use crate::tast::expr::{Place, PlaceKind, TypedExpr, TypedExprKind};
 use crate::tast::ty::Type as TastType;
@@ -52,6 +54,7 @@ fn expr_to_place(expr: TypedExpr) -> anyhow::Result<Place> {
 /// # Errors
 /// Errors if a type checker error is encountered.
 #[allow(clippy::too_many_lines)] // FIXME: make this fn shorter
+#[allow(clippy::module_name_repetitions)]
 pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
     Ok(match expr.0 .1 {
         ExprKind::Comma(a, b) => {

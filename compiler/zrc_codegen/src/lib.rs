@@ -57,7 +57,7 @@ impl Default for ModuleCg {
 pub struct FunctionCg {
     name: String,
     parameters: Vec<(String, zrc_typeck::tast::ty::Type)>,
-    ret: zrc_typeck::typeck::block::BlockReturnType,
+    ret: zrc_typeck::typeck::BlockReturnType,
     blocks: Vec<BasicBlockData>,
     next_instruction_id: Counter,
     /// One of our design decisions involves using memory registers extremely
@@ -69,7 +69,7 @@ pub struct FunctionCg {
 impl FunctionCg {
     pub fn new(
         name: String,
-        ret: zrc_typeck::typeck::block::BlockReturnType,
+        ret: zrc_typeck::typeck::BlockReturnType,
         parameters: Vec<(String, zrc_typeck::tast::ty::Type)>,
         parent_scope: &CgScope,
     ) -> (Self, BasicBlock, CgScope) {

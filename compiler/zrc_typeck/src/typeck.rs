@@ -1,8 +1,12 @@
-pub mod block;
-pub mod expr;
-pub mod ty;
+//! Zirco programming language type checker
 
-pub use block::{process_declaration, type_block};
+mod block;
+mod expr;
+mod ty;
+
+pub use block::{
+    process_declaration, type_block, BlockReturnAbility, BlockReturnActuality, BlockReturnType,
+};
 pub use expr::type_expr;
 pub use ty::resolve_type;
 

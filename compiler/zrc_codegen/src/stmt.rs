@@ -338,8 +338,8 @@ pub fn cg_program(
                 let (mut cg, bb, fn_scope) = FunctionCg::new(
                     format!("@{name}"),
                     match return_type {
-                        Some(x) => zrc_typeck::typeck::block::BlockReturnType::Return(x),
-                        None => zrc_typeck::typeck::block::BlockReturnType::Void,
+                        Some(x) => zrc_typeck::typeck::BlockReturnType::Return(x),
+                        None => zrc_typeck::typeck::BlockReturnType::Void,
                     },
                     parameters.into_iter().map(|x| (x.name, x.ty)).collect(),
                     &global_scope,

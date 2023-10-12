@@ -1,3 +1,5 @@
+//! for types
+
 use super::Scope;
 use crate::tast::ty::Type as TastType;
 use anyhow::bail;
