@@ -2,7 +2,7 @@ use super::Scope;
 use super::{resolve_type, type_expr};
 use crate::tast::ty::Type as TastType;
 use crate::tast::{
-    expr::{TypedExpr, TypedExprKind},
+    expr::TypedExpr,
     stmt::{
         ArgumentDeclaration as TastArgumentDeclaration, LetDeclaration as TastLetDeclaration,
         TypedDeclaration, TypedStmt,
@@ -11,10 +11,7 @@ use crate::tast::{
 use anyhow::bail;
 use std::collections::HashMap;
 use zrc_parser::ast::{
-    stmt::{
-        ArgumentDeclaration as AstArgumentDeclaration, Declaration as AstDeclaration,
-        LetDeclaration as AstLetDeclaration, Stmt, StmtKind,
-    },
+    stmt::{Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind},
     Spanned,
 };
 

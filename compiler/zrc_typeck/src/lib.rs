@@ -14,21 +14,3 @@
 
 pub mod tast;
 pub mod typeck;
-
-use anyhow::{bail, Context as _};
-use std::collections::HashMap;
-
-use tast::{
-    expr::{TypedExpr, TypedExprKind},
-    stmt::{
-        ArgumentDeclaration as TastArgumentDeclaration, LetDeclaration as TastLetDeclaration,
-        TypedDeclaration, TypedStmt,
-    },
-    ty::Type as TastType,
-};
-use zrc_parser::ast::{
-    expr::{Expr, ExprKind},
-    stmt::{Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind},
-    ty::{Type as ParserType, TypeKind as ParserTypeKind},
-    Spanned,
-};
