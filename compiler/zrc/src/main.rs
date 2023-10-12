@@ -1,5 +1,4 @@
-//! The Zirco compiler
-
+#![doc=include_str!("../README.md")]
 #![warn(
     clippy::cargo,
     clippy::nursery,
