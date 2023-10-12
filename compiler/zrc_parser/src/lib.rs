@@ -1,9 +1,4 @@
-//! Parser for the Zirco programming language
-//!
-//! This crate contains the lexer, parser, and abstract syntax tree
-//! representation for the Zirco programming language. It is used by the
-//! compiler to parse Zirco source code into an AST.
-
+#![doc=include_str!("../README.md")]
 #![warn(
     clippy::cargo,
     clippy::nursery,

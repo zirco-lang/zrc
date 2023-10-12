@@ -1,7 +1,6 @@
 //! Expression representation for the Zirco AST
 //!
-//! The main thing within this module you will need is the [`Expr`] struct. It
-//! contains all the different expression kinds in Zirco.
+//! The main thing within this module you will need is the [`Expr`] struct.
 
 use std::fmt::Display;
 
