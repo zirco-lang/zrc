@@ -19,7 +19,7 @@ fn main() -> anyhow::Result<()> {
     println!(
         "{}",
         zrc_codegen::cg_program(
-            zrc_typeck::type_program(
+            zrc_typeck::typeck::type_program(
                 zrc_parser::parser::parse_program(&content).context("parser error")?
             )
             .context("type checker error")?

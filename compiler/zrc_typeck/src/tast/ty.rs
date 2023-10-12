@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, fmt::Display};
 
-use super::super::BlockReturnType;
+use crate::typeck::block::BlockReturnType;
 
 /// The possible Zirco types
 #[derive(PartialEq, Debug, Clone)]
