@@ -225,6 +225,9 @@ pub enum ExprKind {
     /// `a ? b : c`
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
 
+    /// `x as T`
+    Cast(Box<Expr>, super::ty::Type),
+
     /// Any numeric literal.
     NumberLiteral(String),
     /// Any string literal.
@@ -262,6 +265,7 @@ impl Display for ExprKind {
             Self::Ternary(l, m, r) => write!(f, "{l} ? {m} : {r}"),
             Self::Index(a, b) => write!(f, "{a}[{b}]"),
             Self::Dot(a, b) => write!(f, "{a}.{}", b.1),
+            Self::Cast(a, t) => write!(f, "{a} as {t}"),
             Self::Call(a, b) => write!(
                 f,
                 "{}({})",

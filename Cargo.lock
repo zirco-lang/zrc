@@ -12,6 +12,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.75"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
+
+[[package]]
 name = "ascii-canvas"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -729,15 +735,35 @@ checksum = "1a515f5799fe4961cb532f983ce2b23082366b898e52ffbce459c86f67c8378a"
 name = "zrc"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "zrc_codegen",
  "zrc_parser",
+ "zrc_typeck",
+]
+
+[[package]]
+name = "zrc_codegen"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "zrc_typeck",
 ]
 
 [[package]]
 name = "zrc_parser"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "lalrpop",
  "lalrpop-util",
  "logos",
  "regex",
+]
+
+[[package]]
+name = "zrc_typeck"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "zrc_parser",
 ]

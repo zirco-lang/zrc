@@ -1,5 +1,7 @@
 //! Lexer for the Zirco programming language
 
+use std::{error::Error, fmt::Display};
+
 use logos::{Lexer, Logos};
 
 /// Represents some token within a certain span
@@ -19,9 +21,26 @@ pub enum LexicalError {
     /// comments nest.
     UnterminatedBlockComment,
 }
+impl Display for LexicalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoMatchingRule => write!(f, "No matching rule"),
+            Self::UnknownToken((pos, char), msg) => {
+                write!(f, "Unknown token '{char}' at position {pos}: {msg}")
+            }
+            Self::UnterminatedStringLiteral(pos) => {
+                write!(f, "Unterminated string literal at position {pos}")
+            }
+            Self::UnterminatedBlockComment => {
+                write!(f, "Unterminated block comment at end of file")
+            }
+        }
+    }
+}
+impl Error for LexicalError {}
 
 /// A lexer callback helper to obtain the currently matched token slice.
-fn string_slice(lex: &mut Lexer<'_, Tok>) -> String {
+fn string_slice(lex: &Lexer<'_, Tok>) -> String {
     lex.slice().to_string()
 }
 
@@ -109,12 +128,6 @@ pub enum Tok {
     /// The token `%`
     #[token("%")]
     Percent,
-    /// The token `++`
-    #[token("++")]
-    PlusPlus,
-    /// The token `--`
-    #[token("--")]
-    MinusMinus,
 
     // === COMPARISON OPERATORS ===
     /// The token `==`
@@ -280,6 +293,12 @@ pub enum Tok {
     /// The keyword `fn`
     #[token("fn")]
     Fn,
+    /// The keyword `as`
+    #[token("as")]
+    As,
+    /// The keyword `struct`
+    #[token("struct")]
+    Struct,
     /// The operator `->`
     #[token("->")]
     SmallArrow,
@@ -300,6 +319,76 @@ pub enum Tok {
     /// Any identifier
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", string_slice)]
     Identifier(String),
+}
+impl Display for Tok {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::As => "as".to_string(),
+                Self::Break => "break".to_string(),
+                Self::Assign => "=".to_string(),
+                Self::Colon => ":".to_string(),
+                Self::ColonColon => "::".to_string(),
+                Self::Comma => ",".to_string(),
+                Self::Continue => "continue".to_string(),
+                Self::Dot => ".".to_string(),
+                Self::Else => "else".to_string(),
+                Self::False => "false".to_string(),
+                Self::Fn => "fn".to_string(),
+                Self::For => "for".to_string(),
+                Self::If => "if".to_string(),
+                Self::LeftBrace => "{".to_string(),
+                Self::LeftBracket => "[".to_string(),
+                Self::LeftParen => "(".to_string(),
+                Self::Let => "let".to_string(),
+                Self::LogicalAnd => "&&".to_string(),
+                Self::LogicalNot => "!".to_string(),
+                Self::LogicalOr => "||".to_string(),
+                Self::Minus => "-".to_string(),
+                Self::MinusAssign => "-=".to_string(),
+                Self::NotEq => "!=".to_string(),
+                Self::NumberLiteral(n) => n.clone(),
+                Self::Percent => "%".to_string(),
+                Self::PercentAssign => "%=".to_string(),
+                Self::Plus => "+".to_string(),
+                Self::PlusAssign => "+=".to_string(),
+                Self::QuestionMark => "?".to_string(),
+                Self::Return => "return".to_string(),
+                Self::RightBrace => "}".to_string(),
+                Self::RightBracket => "]".to_string(),
+                Self::RightParen => ")".to_string(),
+                Self::Semicolon => ";".to_string(),
+                Self::Slash => "/".to_string(),
+                Self::SlashAssign => "/=".to_string(),
+                Self::SmallArrow => "->".to_string(),
+                Self::Star => "*".to_string(),
+                Self::StarAssign => "*=".to_string(),
+                Self::StringLiteral(s) => s.clone(),
+                Self::Struct => "struct".to_string(),
+                Self::True => "true".to_string(),
+                Self::While => "while".to_string(),
+                Self::BitwiseAnd => "&".to_string(),
+                Self::BitwiseAndAssign => "&=".to_string(),
+                Self::BitwiseLeftShift => "<<".to_string(),
+                Self::BitwiseLeftShiftAssign => "<<=".to_string(),
+                Self::BitwiseNot => "~".to_string(),
+                Self::BitwiseOr => "|".to_string(),
+                Self::BitwiseOrAssign => "|=".to_string(),
+                Self::BitwiseRightShift => ">>".to_string(),
+                Self::BitwiseRightShiftAssign => ">>=".to_string(),
+                Self::BitwiseXor => "^".to_string(),
+                Self::BitwiseXorAssign => "^=".to_string(),
+                Self::EqEq => "==".to_string(),
+                Self::Greater => ">".to_string(),
+                Self::GreaterEq => ">=".to_string(),
+                Self::Less => "<".to_string(),
+                Self::LessEq => "<=".to_string(),
+                Self::Identifier(i) => i.clone(),
+            }
+        )
+    }
 }
 
 /// A lexer for the Zirco programming language

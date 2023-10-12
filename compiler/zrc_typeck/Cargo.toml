@@ -1,5 +1,5 @@
 [package]
-name = "zrc_parser"
+name = "zrc_typeck"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,9 +7,4 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
-lalrpop-util = { version = "0.20.0" }
-logos = "0.13.0"
-regex = "1.9.6"
-
-[build-dependencies]
-lalrpop = "0.20.0"
+zrc_parser = { version = "0.1.0", path = "../zrc_parser" }

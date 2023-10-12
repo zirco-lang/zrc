@@ -2,4 +2,6 @@
 members = [
     "compiler/zrc",
     "compiler/zrc_parser",
+    "compiler/zrc_typeck",
+    "compiler/zrc_codegen",
 ]

@@ -14,8 +14,6 @@ body:
           options:
               - label: I am using the latest version of zrc
                 required: true
-              - label: I am using a supported Node.js version
-                required: true
               - label: I have checked existing issues to ensure this is not a duplicate
                 required: true
     - type: input
@@ -26,12 +24,6 @@ body:
           placeholder: vX.Y.Z
       validations:
           required: true
-    - type: input
-      id: node
-      attributes:
-          label: What version of Node.js are you using?
-          description: Examples are `v18.12.1` or `v12`
-          placeholder: v18.12.1
     - type: textarea
       id: description
       attributes:

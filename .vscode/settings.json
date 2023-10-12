@@ -1,3 +1,17 @@
 {
-    "cSpell.words": ["lalrpop"]
+    "cSpell.words": [
+        "alloca",
+        "bitcast",
+        "inttoptr",
+        "lalrpop",
+        "ptrtoint",
+        "sdiv",
+        "srem",
+        "structptr",
+        "tast",
+        "trunc",
+        "typeck",
+        "zext"
+    ],
+    "rust-analyzer.debug.sourceFileMap": "auto"
 }

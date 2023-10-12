@@ -2,6 +2,7 @@
 use super::ast::{Spanned, expr::{Expr,ExprKind,Arithmetic,Assignment,BinaryBitwise,Logical,Comparison,Equality}, stmt::{Stmt, ArgumentDeclaration, LetDeclaration, Declaration,StmtKind}, ty::{Type,TypeKind}};
 use super::lexer;
 use lalrpop_util::ErrorRecovery;
+use std::collections::HashMap;
 
 grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
 
@@ -31,9 +32,7 @@ CommaSeparatedWithoutTrailing<T>: Vec<T> = {
     }
 }
 
-pub Program: Vec<Spanned<Declaration>> = DeclarationList;
-
-DeclarationList: Vec<Spanned<Declaration>> = Spanned<Declaration>*;
+pub Program: Vec<Spanned<Declaration>> = Spanned<Declaration>*;
 
 // See https://en.wikipedia.org/wiki/Dangling_else#Avoiding_the_conflict_in_LR_parsers for why this
 // is necessary. The ClosedStmt rule REQUIRES that an 'else' clause is used, meaning that it will
@@ -48,7 +47,7 @@ OpenStmt: StmtKind = {
     "if" "(" <a:Expr> ")" <b:SpannedStmt<ClosedStmt>> "else" <c:SpannedStmt<OpenStmt>> => 
         StmtKind::IfStmt(a, Box::new(b), Some(Box::new(c))),
     "while" "(" <a:Expr> ")" <b:SpannedStmt<OpenStmt>> => StmtKind::WhileStmt(a, Box::new(b)),
-    "for" "(" <a:Declaration> <b:Expr?> ";" <c:Expr?> ")" <d:SpannedStmt<OpenStmt>> => StmtKind::ForStmt {
+    "for" "(" <a:Spanned<LetDeclaration>> <b:Expr?> ";" <c:Expr?> ")" <d:SpannedStmt<OpenStmt>> => StmtKind::ForStmt {
         init: Some(Box::new(a)),
         cond: b,
         post: c,
@@ -68,7 +67,7 @@ ClosedStmt: StmtKind = {
     "if" "(" <a:Expr> ")" <b:SpannedStmt<ClosedStmt>> "else" <c:SpannedStmt<ClosedStmt>> =>
         StmtKind::IfStmt(a, Box::new(b), Some(Box::new(c))),
     "while" "(" <a:Expr> ")" <b:SpannedStmt<ClosedStmt>> => StmtKind::WhileStmt(a, Box::new(b)),
-    "for" "(" <a:Declaration> <b:Expr?> ";" <c:Expr?> ")" <d:SpannedStmt<ClosedStmt>> => StmtKind::ForStmt {
+    "for" "(" <a:Spanned<LetDeclaration>> <b:Expr?> ";" <c:Expr?> ")" <d:SpannedStmt<ClosedStmt>> => StmtKind::ForStmt {
         init: Some(Box::new(a)),
         cond: b,
         post: c,
@@ -87,48 +86,63 @@ SimpleStmt: StmtKind = {
     ";" => StmtKind::EmptyStmt,
     "{" <l:StmtList?> "}" => StmtKind::BlockStmt(l.unwrap_or(Vec::new())),
     <FlowStmt>,
-    <Declaration> => StmtKind::Declaration(<>),
+    <Spanned<LetDeclaration>> => StmtKind::DeclarationList(<>),
 };
 
+// For declarations at the global scope
 Declaration: Declaration = {
-    <LetDeclaration>,
-    // FIXME: This might allow code like for (fn foo() {};;) {} to work. Do we want this?
     <FunctionDeclaration>,
+    <StructDeclaration>,
 };
 
 FunctionDeclaration: Declaration = {
     "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?> "{"
         <s:Spanned<StmtList?>>
-    "}" => Declaration::FunctionDefinition {
+    "}" => Declaration::FunctionDeclaration {
         name: i,
         parameters: Spanned(a.0, a.1.unwrap_or(Vec::new()), a.2),
         return_type: r,
-        body: Spanned(s.0, s.1.unwrap_or(Vec::new()), s.2),
+        body: Some(Spanned(s.0, s.1.unwrap_or(Vec::new()), s.2)),
+    },
+    "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?> ";" => Declaration::FunctionDeclaration {
+        name: i,
+        parameters: Spanned(a.0, a.1.unwrap_or(Vec::new()), a.2),
+        return_type: r,
+        body: None,
     }
-    // TODO: External declarations
 };
+
+StructDeclaration: Declaration = {
+    "struct" <i:Spanned<IDENTIFIER>> "{" <l:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Spanned<Type>>)>>?>> "}" => Declaration::StructDeclaration {
+        name: i,
+        fields: Spanned(l.0, l.1.unwrap_or(Vec::new()).into_iter().map(|x| (x.1.0.1.clone(), x)).collect::<HashMap<_, _>>(), l.2),
+    }
+}
 
 ArgumentDeclarationList = CommaSeparated<Spanned<ArgumentDeclaration>>;
 
 ArgumentDeclaration: ArgumentDeclaration = {
-    <i:Spanned<IDENTIFIER>> <t:(":" <Type>)?> => ArgumentDeclaration {
+    <i:Spanned<IDENTIFIER>> ":" <t:Type> => ArgumentDeclaration {
         name: i,
         ty: t
     }
 };
 
-LetDeclaration: Declaration = {
+LetDeclaration: Vec<Spanned<LetDeclaration>> = {
     "let" <l:CommaSeparatedWithoutTrailing<
         Spanned<(<Spanned<IDENTIFIER>> <(":" <Type>)?> <("=" <Assignment>)?>)>
-    >> ";" => Declaration::DeclarationList(l.into_iter().map(|Spanned(l, (i, t, v), r)| Spanned(l, LetDeclaration {
+    >> ";" => l.into_iter().map(|Spanned(s, (i, t, v), e)| Spanned(s, LetDeclaration {
         name: i,
         ty: t,
         value: v,
-    }, r)).collect::<Vec<_>>()),
+    }, e)).collect::<Vec<_>>(),
 };
 
 Type: Type = {
     Spanned<IDENTIFIER> => Type(Spanned(<>.0, TypeKind::Identifier(<>.1), <>.2)),
+    Spanned<("*" <Type>)> => Type(Spanned(<>.0, TypeKind::Ptr(Box::new(<>.1)), <>.2)),
+    Spanned<("struct" "{" <CommaSeparated<
+        (<IDENTIFIER> ":" <Type>)>?> "}")> => Type(Spanned(<>.0, TypeKind::Struct(<>.1.unwrap_or(Vec::new()).into_iter().collect::<HashMap<_, _>>()), <>.2)),
 }
 
 FlowStmt: StmtKind = {
@@ -242,7 +256,12 @@ _Factor: ExprKind = {
     <l:Factor> "*" <r:Unary> => ExprKind::Arithmetic(Arithmetic::Multiplication, Box::new(l), Box::new(r)),
     <l:Factor> "%" <r:Unary> => ExprKind::Arithmetic(Arithmetic::Modulo, Box::new(l), Box::new(r)),
 };
-Factor: Expr = ExprPrecedenceTier<_Factor, Unary>;
+Factor: Expr = ExprPrecedenceTier<_Factor, Cast>;
+
+_Cast: ExprKind = {
+    <e:Unary> "as" <t:Type> => ExprKind::Cast(Box::new(e), t),
+};
+Cast: Expr = ExprPrecedenceTier<_Cast, Unary>;
 
 _Unary: ExprKind = {
     "!" <Unary> => ExprKind::UnaryNot(Box::new(<>)),
@@ -283,8 +302,6 @@ extern {
         "*" => lexer::Tok::Star,
         "/" => lexer::Tok::Slash,
         "%" => lexer::Tok::Percent,
-        "++" => lexer::Tok::PlusPlus,
-        "--" => lexer::Tok::MinusMinus,
 
         "==" => lexer::Tok::EqEq,
         "!=" => lexer::Tok::NotEq,
@@ -321,7 +338,6 @@ extern {
         "." => lexer::Tok::Dot,
         "?" => lexer::Tok::QuestionMark,
         ":" => lexer::Tok::Colon,
-        "::" => lexer::Tok::ColonColon,
 
         "(" => lexer::Tok::LeftParen,
         ")" => lexer::Tok::RightParen,
@@ -345,6 +361,8 @@ extern {
         "return" => lexer::Tok::Return,
         "let" => lexer::Tok::Let,
         "fn" => lexer::Tok::Fn,
+        "as" => lexer::Tok::As,
+        "struct" => lexer::Tok::Struct,
         "->" => lexer::Tok::SmallArrow,
     }
 }
