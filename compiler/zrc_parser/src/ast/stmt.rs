@@ -74,6 +74,7 @@ pub enum Declaration {
         /// The name of the newtype.
         name: super::Spanned<String>,
         /// The key-value pairs of the struct
+        #[allow(clippy::type_complexity)]
         fields: super::Spanned<
             HashMap<String, super::Spanned<(super::Spanned<String>, super::ty::Type)>>,
         >,

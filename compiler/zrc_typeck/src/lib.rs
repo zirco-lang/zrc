@@ -359,12 +359,12 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                 type_expr(
                     scope,
                     Expr(Spanned(
-                        obj.clone().0 .0,
+                        obj.0 .0,
                         ExprKind::Dot(
                             Box::new(Expr(Spanned(
-                                (*obj.clone()).0 .0,
+                                (*obj).0 .0,
                                 ExprKind::UnaryDereference(obj.clone()),
-                                (*obj.clone()).0 .2,
+                                (*obj).0 .2,
                             ))),
                             key.clone(),
                         ),
