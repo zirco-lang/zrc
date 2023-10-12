@@ -39,7 +39,7 @@ fn main() -> anyhow::Result<()> {
             )
             .context("type checker error")?
         )
-        .expect("code generation failed -- this is a compiler bug")
+        .expect("code generation failed")
     );
 
     Ok(())
