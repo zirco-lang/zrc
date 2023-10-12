@@ -1,4 +1,4 @@
-# `zrc` -- the official Zirco compiler
+# `zrc` --- the official Zirco compiler
 
 This crate serves as the frontend and binary for `zrc`, the official compiler for the Zirco
 programming language.

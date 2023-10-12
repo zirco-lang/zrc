@@ -1,4 +1,21 @@
-//! Functions to parse Zirco into an Abstract Syntax Tree
+//! Parsing and parser errors
+//!
+//! This module contains thin wrappers around the generated parser for the Zirco programming language,
+//! along with some additional models for error handling.
+//!
+//! In most cases, you will be using the [`parse_program`] function to parse some input code. In some
+//! more specific situations, you may need to use [`parse_expr`] to parse a singular expression.
+//!
+//! # Error handling
+//! The parser returns a [`Result`] that either yields the parsed [AST](super::ast) or a
+//! [`ZircoParserError`]. For more information, read the documentation of [`ZircoParserError`].
+//!
+//! # Example
+//! For more examples, read the documentation for the corresponding parser function.
+//! ```
+//! use zrc_parser::parser::parse_program;
+//! let ast = parse_program("fn main() {}");
+//! ```
 
 use std::{
     error::Error,
@@ -8,27 +25,40 @@ use std::{
 use lalrpop_util::{ErrorRecovery, ParseError};
 
 use super::{
-    ast::{
-        expr::Expr,
-        stmt::{Declaration, Stmt},
-        Spanned,
-    },
+    ast::{expr::Expr, stmt::Declaration, Spanned},
     lexer,
 };
 use crate::internal_parser;
 
-/// An error returned from one of the Zirco parsing functions, like
-/// [`parse_program`].
+/// Representation of a parser error that may have returned a partial AST.
+///
+/// In the Zirco parser, we are capable of recovering from some errors. This means that the parser
+/// may still return an AST in some cases even if a syntax error was encountered. This is useful
+/// for IDEs and other tools that want to provide syntax highlighting or other features that
+/// require at least a partial AST.
+///
+/// When you receive the [`ZircoParserError::Recoverable`] variant, you can access the
+/// [`partial`](ZircoParserError::Recoverable::partial) field to obtain the partial AST. This AST
+/// is "partial" in the way that it may contain some `Error` tokens, such as [`ExprKind::Error`](super::ast::expr::ExprKind::Error).
+///
+/// In the case of the [`ZircoParserError::Fatal`] variant, you cannot access a partial AST as none
+/// was able to be recovered, and your application must just handle the corresponding LALRPOP [`ParseError`].
+///
+/// This type is often found wrapped in a [`Result`] type, where the [`Ok`] variant contains the
+/// full AST and the [`Err`] variant contains a [`ZircoParserError`].
 #[derive(Debug, PartialEq, Eq)]
 pub enum ZircoParserError<T> {
-    /// An error we were able to recover from
+    /// The parser encountered an error, but was still able to produce a partial AST. This AST may
+    /// contain some `Error` tokens, such as [`ExprKind::Error`](super::ast::expr::ExprKind::Error).
     Recoverable {
-        /// The list of recoverable errors
+        /// The list of [`ErrorRecovery`] instances corresponding with the errors that were encountered
+        /// during parsing.
         errors: Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>,
-        /// The partial AST
+        /// The partial AST that was produced by the parser. This AST may contain some `Error` tokens,
+        /// such as [`ExprKind::Error`](super::ast::expr::ExprKind::Error).
         partial: T,
     },
-    /// An error that stopped the parser.
+    /// The parser encountered an error, and was unable to produce a partial AST.
     Fatal(ParseError<usize, lexer::Tok, lexer::LexicalError>),
 }
 impl<T: Debug> Error for ZircoParserError<T> {}
@@ -47,41 +77,60 @@ impl<T: Debug> Display for ZircoParserError<T> {
     }
 }
 
-/// More generic macro for [`parse_expr`] and [`parse_stmt`]
-macro_rules! parse_internal {
-    ($parser: ty, $input: expr) => {{
-        let mut errors = Vec::new();
-        let result = <$parser>::new().parse(&mut errors, lexer::ZircoLexer::new($input));
-        match result {
-            Err(e) => Err(ZircoParserError::Fatal(e)),
-            Ok(v) if errors.is_empty() => Ok(v),
-            Ok(v) => Err(ZircoParserError::Recoverable { errors, partial: v }),
-        }
-    }};
-}
-
-/// Parse a program with the Zirco parser.
+/// Parses a Zirco program, yielding a list of [`Declaration`]s.
+///
+/// This function runs an **entire program** through the Zirco parser and returns either a complete
+/// [AST](super::ast) consisting of root [`Declaration`] nodes, or a list of [`ZircoParserError`]s
+/// in the case of a syntax error.
+///
+/// # Example
+/// Obtaining the AST of a program:
+/// ```
+/// use zrc_parser::parser::parse_program;
+/// let ast = parse_program("fn main() {}");
+/// ```
 ///
 /// # Errors
-/// Returns a valid [`ZircoParserError`] if parsing fails.
+/// This function returns [`Err`] with a [`ZircoParserError`] if any error was encountered while
+/// parsing the input program.
 pub fn parse_program(
     input: &str,
 ) -> Result<Vec<Spanned<Declaration>>, ZircoParserError<Vec<Spanned<Declaration>>>> {
-    parse_internal!(internal_parser::ProgramParser, input)
+    let mut errors = Vec::new();
+    let result =
+        internal_parser::ProgramParser::new().parse(&mut errors, lexer::ZircoLexer::new(input));
+
+    match result {
+        Err(e) => Err(ZircoParserError::Fatal(e)),
+        Ok(v) if errors.is_empty() => Ok(v),
+        Ok(v) => Err(ZircoParserError::Recoverable { errors, partial: v }),
+    }
 }
 
-/// Parse a string as an expression with the Zirco parser.
+/// Parses a singular Zirco expression, yielding an AST [`Expr`] node.
+///
+/// This function only parses a single Zirco [expression](Expr), and not an entire program. Unless
+/// you are trying to do some special integration with partial programs, you probably want to use the
+/// [`parse_program`] function instead.
+///
+/// # Example
+/// Obtaining the AST of an expression:
+/// ```
+/// use zrc_parser::parser::parse_expr;
+/// let ast = parse_expr("1 + 2");
+/// ```
 ///
 /// # Errors
-/// Returns a valid [`ZircoParserError`] if parsing fails.
+/// This function returns [`Err`] with a [`ZircoParserError`] if any error was encountered while
+/// parsing the input expression.
 pub fn parse_expr(input: &str) -> Result<Expr, ZircoParserError<Expr>> {
-    parse_internal!(internal_parser::ExprParser, input)
-}
+    let mut errors = Vec::new();
+    let result =
+        internal_parser::ExprParser::new().parse(&mut errors, lexer::ZircoLexer::new(input));
 
-/// Parse a string as a statement with the Zirco parser.
-///
-/// # Errors
-/// Returns a valid [`ZircoParserError`] if parsing fails.
-pub fn parse_stmt(input: &str) -> Result<Stmt, ZircoParserError<Stmt>> {
-    parse_internal!(internal_parser::StmtParser, input)
+    match result {
+        Err(e) => Err(ZircoParserError::Fatal(e)),
+        Ok(v) if errors.is_empty() => Ok(v),
+        Ok(v) => Err(ZircoParserError::Recoverable { errors, partial: v }),
+    }
 }

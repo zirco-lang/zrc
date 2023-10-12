@@ -37,7 +37,7 @@ pub Program: Vec<Spanned<Declaration>> = Spanned<Declaration>*;
 // See https://en.wikipedia.org/wiki/Dangling_else#Avoiding_the_conflict_in_LR_parsers for why this
 // is necessary. The ClosedStmt rule REQUIRES that an 'else' clause is used, meaning that it will
 // attach to the inner 'if' statement.
-pub Stmt: Stmt = {
+Stmt: Stmt = {
     SpannedStmt<OpenStmt>,
     SpannedStmt<ClosedStmt>
 }

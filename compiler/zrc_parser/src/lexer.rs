@@ -1,20 +1,48 @@
-//! Lexer for the Zirco programming language
+//! Lexer and lexical errors
+//!
+//! This module contains a wrapper around a [logos] lexer that splits an input Zirco text into its individual tokens, which can be then passed into the internal Zirco parser.
+//!
+//! You do not usually need to use this crate, as the [parser](super::parser) already creates [`ZircoLexer`] instances for you before passing them to the internal parser. However, there are some cases where it may be helpful, so it is kept public.
+//!
+//! # Example
+//! ```
+//! use zrc_parser::lexer::{ZircoLexer, Tok};
+//! let mut lex = ZircoLexer::new("2 + 2");
+//! assert_eq!(lex.next(), Some(Ok((0, Tok::NumberLiteral("2".to_string()), 1))));
+//! assert_eq!(lex.next(), Some(Ok((2, Tok::Plus, 3))));
+//! assert_eq!(lex.next(), Some(Ok((4, Tok::NumberLiteral("2".to_string()), 5))));
+//! assert_eq!(lex.next(), None);
+//! ```
+//!
+//! For more information, read the documentation of [`ZircoLexer`].
 
-use std::{error::Error, fmt::Display};
+use std::fmt::Display;
 
 use logos::{Lexer, Logos};
 
-/// Represents some token within a certain span
+/// Represents a lexer token within a certain span, or an error.
 pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
 
-/// An error possibly encountered during lexing
+/// The error enum passed to the internal logos [`Lexer`]. Will be converted to a [`LexicalError`] by [`ZircoLexer`].
+///
+/// Do not use publicly.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub enum LexicalError {
-    /// A generic lexing error. Other more specialized errors are more common.
+pub enum InternalLexicalError {
+    /// A generic lexing error. This is later converted to [`LexicalError::UnknownToken`].
     #[default]
     NoMatchingRule,
+    /// A string literal was left unterminated.
+    UnterminatedStringLiteral(usize),
+    /// A block comment ran to the end of the file. Remind the user that block
+    /// comments nest.
+    UnterminatedBlockComment,
+}
+
+/// An error encountered during lexing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LexicalError {
     /// An unknown token was encountered.
-    UnknownToken((usize, char), String),
+    UnknownToken(usize, char),
     /// A string literal was left unterminated.
     UnterminatedStringLiteral(usize),
     /// A block comment ran to the end of the file. Remind the user that block
@@ -24,20 +52,14 @@ pub enum LexicalError {
 impl Display for LexicalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NoMatchingRule => write!(f, "No matching rule"),
-            Self::UnknownToken((pos, char), msg) => {
-                write!(f, "Unknown token '{char}' at position {pos}: {msg}")
-            }
+            Self::UnknownToken(pos, char) => write!(f, "Unknown token '{char}' at position {pos}"),
             Self::UnterminatedStringLiteral(pos) => {
                 write!(f, "Unterminated string literal at position {pos}")
             }
-            Self::UnterminatedBlockComment => {
-                write!(f, "Unterminated block comment at end of file")
-            }
+            Self::UnterminatedBlockComment => write!(f, "Unterminated block comment"),
         }
     }
 }
-impl Error for LexicalError {}
 
 /// A lexer callback helper to obtain the currently matched token slice.
 fn string_slice(lex: &Lexer<'_, Tok>) -> String {
@@ -49,7 +71,9 @@ fn string_slice(lex: &Lexer<'_, Tok>) -> String {
 /// the lexer and basically consumes characters in our input until we reach the
 /// end of the comment. See also: [logos#307](https://github.com/maciejhirsz/logos/issues/307)
 /// See also: [zrc#14](https://github.com/zirco-lang/zrc/pull/14)
-fn handle_block_comment_start(lex: &mut Lexer<'_, Tok>) -> logos::FilterResult<(), LexicalError> {
+fn handle_block_comment_start(
+    lex: &mut Lexer<'_, Tok>,
+) -> logos::FilterResult<(), InternalLexicalError> {
     let mut depth = 1;
     // This contains all of the remaining tokens in our input except for the opening
     // to this comment -- that's already been consumed.
@@ -94,14 +118,16 @@ fn handle_block_comment_start(lex: &mut Lexer<'_, Tok>) -> logos::FilterResult<(
     } else {
         // This means we've reached the end of our input still in a comment.
         // We can throw an error here.
-        logos::FilterResult::Error(LexicalError::UnterminatedBlockComment)
+        logos::FilterResult::Error(InternalLexicalError::UnterminatedBlockComment)
     }
 }
 
 /// Enum representing all of the result tokens in the Zirco lexer
+///
+/// Do not use `Tok::lexer` publicly. Use [`ZircoLexer`] instead.
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
 #[logos(
-    error = LexicalError,
+    error = InternalLexicalError,
     skip r"[ \t\r\n\f]+",         // whitespace
     skip r"//[^\r\n]*(\r\n|\n)?", // single-line comments
     // multi-line comments are handled by a callback: see handle_block_comment_start.
@@ -307,7 +333,7 @@ pub enum Tok {
     /// Any string literal
     #[regex(r#""([^"\\]|\\.)*""#, string_slice)]
     #[regex(r#""([^"\\]|\\.)*"#, |lex| {
-        Err(LexicalError::UnterminatedStringLiteral(lex.span().start))
+        Err(InternalLexicalError::UnterminatedStringLiteral(lex.span().start))
     })]
     StringLiteral(String),
     /// Any number literal
@@ -416,14 +442,16 @@ impl<'input> Iterator for ZircoLexer<'input> {
         let span = self.lex.span();
         let slice = self.lex.slice().to_string();
         match token {
-            Err(LexicalError::NoMatchingRule) => {
+            Err(InternalLexicalError::NoMatchingRule) => {
                 let char = slice.chars().next().unwrap();
-                Some(Err(LexicalError::UnknownToken(
-                    (span.start, char),
-                    format!("Internal error: Unknown token '{char}'"),
-                )))
+                Some(Err(LexicalError::UnknownToken(span.start, char)))
             }
-            Err(e) => Some(Err(e)),
+            Err(InternalLexicalError::UnterminatedBlockComment) => {
+                Some(Err(LexicalError::UnterminatedBlockComment))
+            }
+            Err(InternalLexicalError::UnterminatedStringLiteral(p)) => {
+                Some(Err(LexicalError::UnterminatedStringLiteral(p)))
+            }
             Ok(token) => Some(Ok((span.start, token, span.end))),
         }
     }
