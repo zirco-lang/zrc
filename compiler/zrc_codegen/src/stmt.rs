@@ -1,7 +1,8 @@
+use anyhow::bail;
+
 use super::{
     cg_alloc, cg_expr, cg_load, get_llvm_typename, BasicBlock, CgScope, FunctionCg, ModuleCg,
 };
-use anyhow::bail;
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
 /// instructions. It is passed to [`cg_block`] to allow it to properly handle

@@ -1,8 +1,9 @@
+use anyhow::{bail, Context as _};
+
 use super::{
     cg_alloc, cg_load, cg_store, determine_order_of_struct, get_llvm_typename, BasicBlock, CgScope,
     FunctionCg, ModuleCg,
 };
-use anyhow::{bail, Context as _};
 
 /// Returns a register containing a pointer to the place inputted
 pub fn cg_place(

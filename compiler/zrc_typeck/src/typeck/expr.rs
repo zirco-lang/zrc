@@ -1,13 +1,19 @@
 //! for expressions
 
-use super::Scope;
-use crate::tast::expr::{Place, PlaceKind, TypedExpr, TypedExprKind};
-use crate::tast::ty::Type as TastType;
-use crate::typeck::resolve_type;
 use anyhow::{bail, Context as _};
-use zrc_parser::ast::expr::Assignment;
-use zrc_parser::ast::expr::{Expr, ExprKind};
-use zrc_parser::ast::Spanned;
+use zrc_parser::ast::{
+    expr::{Assignment, Expr, ExprKind},
+    Spanned,
+};
+
+use super::Scope;
+use crate::{
+    tast::{
+        expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
+        ty::Type as TastType,
+    },
+    typeck::resolve_type,
+};
 
 /// Desugar an assignment like `x += y` to `x = x + y`.
 fn desugar_assignment(mode: Assignment, lhs: Expr, rhs: Expr) -> (Expr, Expr) {

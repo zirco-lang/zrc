@@ -1,12 +1,11 @@
 pub mod expr;
 pub mod stmt;
 
-pub use expr::cg_expr;
-pub use stmt::{cg_block, cg_program};
-
 use std::{collections::HashMap, fmt::Display};
 
 use anyhow::Context as _;
+pub use expr::cg_expr;
+pub use stmt::{cg_block, cg_program};
 
 #[derive(PartialEq, Debug, Clone)]
 struct Counter {

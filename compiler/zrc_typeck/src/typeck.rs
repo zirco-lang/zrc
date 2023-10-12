@@ -4,16 +4,16 @@ mod block;
 mod expr;
 mod ty;
 
+use std::collections::HashMap;
+
 pub use block::{
     process_declaration, type_block, BlockReturnAbility, BlockReturnActuality, BlockReturnType,
 };
 pub use expr::type_expr;
 pub use ty::resolve_type;
+use zrc_parser::ast::{stmt::Declaration as AstDeclaration, Spanned};
 
 use crate::tast::{stmt::TypedDeclaration, ty::Type as TastType};
-use std::collections::HashMap;
-use zrc_parser::ast::stmt::Declaration as AstDeclaration;
-use zrc_parser::ast::Spanned;
 
 /// Contains scoping information during type checking.
 ///

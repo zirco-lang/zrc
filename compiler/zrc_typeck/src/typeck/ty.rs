@@ -1,10 +1,12 @@
 //! for types
 
+use std::collections::HashMap;
+
+use anyhow::bail;
+use zrc_parser::ast::ty::{Type as ParserType, TypeKind as ParserTypeKind};
+
 use super::Scope;
 use crate::tast::ty::Type as TastType;
-use anyhow::bail;
-use std::collections::HashMap;
-use zrc_parser::ast::ty::{Type as ParserType, TypeKind as ParserTypeKind};
 
 /// Resolve an identifier to its corresponding [`tast::ty::Type`].
 ///

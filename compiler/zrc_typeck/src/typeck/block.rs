@@ -1,20 +1,21 @@
 //! for blocks
 
-use super::Scope;
-use super::{resolve_type, type_expr};
-use crate::tast::ty::Type as TastType;
+use std::collections::HashMap;
+
+use anyhow::bail;
+use zrc_parser::ast::{
+    stmt::{Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind},
+    Spanned,
+};
+
+use super::{resolve_type, type_expr, Scope};
 use crate::tast::{
     expr::TypedExpr,
     stmt::{
         ArgumentDeclaration as TastArgumentDeclaration, LetDeclaration as TastLetDeclaration,
         TypedDeclaration, TypedStmt,
     },
-};
-use anyhow::bail;
-use std::collections::HashMap;
-use zrc_parser::ast::{
-    stmt::{Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind},
-    Spanned,
+    ty::Type as TastType,
 };
 
 /// Describes whether a block returns void or a type.
