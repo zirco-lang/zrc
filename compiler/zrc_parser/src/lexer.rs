@@ -32,7 +32,7 @@ pub enum InternalLexicalError {
     #[default]
     NoMatchingRule,
     /// A string literal was left unterminated.
-    UnterminatedStringLiteral(usize),
+    UnterminatedStringLiteral,
     /// A block comment ran to the end of the file. Remind the user that block
     /// comments nest.
     UnterminatedBlockComment,
@@ -42,21 +42,25 @@ pub enum InternalLexicalError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexicalError {
     /// An unknown token was encountered.
-    UnknownToken(usize, char),
+    UnknownToken(usize, char, usize),
     /// A string literal was left unterminated.
-    UnterminatedStringLiteral(usize),
+    UnterminatedStringLiteral(usize, usize),
     /// A block comment ran to the end of the file. Remind the user that block
     /// comments nest.
-    UnterminatedBlockComment,
+    UnterminatedBlockComment(usize, usize),
 }
 impl Display for LexicalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnknownToken(pos, char) => write!(f, "Unknown token '{char}' at position {pos}"),
-            Self::UnterminatedStringLiteral(pos) => {
-                write!(f, "Unterminated string literal at position {pos}")
+            Self::UnknownToken(s, char, e) => {
+                write!(f, "Unknown token '{char}' at position {s}-{e}")
             }
-            Self::UnterminatedBlockComment => write!(f, "Unterminated block comment"),
+            Self::UnterminatedStringLiteral(start, end) => {
+                write!(f, "Unterminated string literal from {start} to {end}")
+            }
+            Self::UnterminatedBlockComment(start, end) => {
+                write!(f, "Unterminated block comment from {start}-{end}")
+            }
         }
     }
 }
@@ -333,7 +337,7 @@ pub enum Tok {
     /// Any string literal
     #[regex(r#""([^"\\]|\\.)*""#, string_slice)]
     #[regex(r#""([^"\\]|\\.)*"#, |lex| {
-        Err(InternalLexicalError::UnterminatedStringLiteral(lex.span().start))
+        Err(InternalLexicalError::UnterminatedStringLiteral)
     })]
     StringLiteral(String),
     /// Any number literal
@@ -444,14 +448,14 @@ impl<'input> Iterator for ZircoLexer<'input> {
         match token {
             Err(InternalLexicalError::NoMatchingRule) => {
                 let char = slice.chars().next().unwrap();
-                Some(Err(LexicalError::UnknownToken(span.start, char)))
+                Some(Err(LexicalError::UnknownToken(span.start, char, span.end)))
             }
-            Err(InternalLexicalError::UnterminatedBlockComment) => {
-                Some(Err(LexicalError::UnterminatedBlockComment))
-            }
-            Err(InternalLexicalError::UnterminatedStringLiteral(p)) => {
-                Some(Err(LexicalError::UnterminatedStringLiteral(p)))
-            }
+            Err(InternalLexicalError::UnterminatedBlockComment) => Some(Err(
+                LexicalError::UnterminatedBlockComment(span.start, span.end),
+            )),
+            Err(InternalLexicalError::UnterminatedStringLiteral) => Some(Err(
+                LexicalError::UnterminatedStringLiteral(span.start, span.end),
+            )),
             Ok(token) => Some(Ok((span.start, token, span.end))),
         }
     }
@@ -485,7 +489,7 @@ mod tests {
         let tokens: Vec<_> = lexer.collect();
         assert_eq!(
             tokens,
-            vec![Err(LexicalError::UnterminatedStringLiteral(0))]
+            vec![Err(LexicalError::UnterminatedStringLiteral(0, 4))]
         );
     }
 
@@ -554,7 +558,7 @@ mod tests {
                 tokens,
                 vec![
                     Ok((0, Tok::Identifier("a".to_string()), 1)),
-                    Err(LexicalError::UnterminatedBlockComment)
+                    Err(LexicalError::UnterminatedBlockComment(2, 7))
                 ]
             );
         }

@@ -80,7 +80,7 @@ impl Default for Scope {
 /// Errors with type checker errors.
 pub fn type_program(
     program: Vec<Spanned<AstDeclaration>>,
-) -> anyhow::Result<Vec<TypedDeclaration>> {
+) -> Result<Vec<TypedDeclaration>, zrc_diagnostics::Diagnostic> {
     let mut scope = Scope::new();
 
     program

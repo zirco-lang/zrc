@@ -4,7 +4,7 @@ use super::lexer;
 use lalrpop_util::ErrorRecovery;
 use std::collections::HashMap;
 
-grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>);
+grammar;
 
 Spanned<T>: Spanned<T> = {
     <@L> <T> <@R> => Spanned(<>),
@@ -252,9 +252,9 @@ _Term: ExprKind = {
 Term: Expr = ExprPrecedenceTier<_Term, Factor>;
 
 _Factor: ExprKind = {
-    <l:Factor> "/" <r:Unary> => ExprKind::Arithmetic(Arithmetic::Division, Box::new(l), Box::new(r)),
-    <l:Factor> "*" <r:Unary> => ExprKind::Arithmetic(Arithmetic::Multiplication, Box::new(l), Box::new(r)),
-    <l:Factor> "%" <r:Unary> => ExprKind::Arithmetic(Arithmetic::Modulo, Box::new(l), Box::new(r)),
+    <l:Factor> "/" <r:Cast> => ExprKind::Arithmetic(Arithmetic::Division, Box::new(l), Box::new(r)),
+    <l:Factor> "*" <r:Cast> => ExprKind::Arithmetic(Arithmetic::Multiplication, Box::new(l), Box::new(r)),
+    <l:Factor> "%" <r:Cast> => ExprKind::Arithmetic(Arithmetic::Modulo, Box::new(l), Box::new(r)),
 };
 Factor: Expr = ExprPrecedenceTier<_Factor, Cast>;
 
@@ -289,7 +289,6 @@ Primary: Expr = {
     Spanned<"true"> => Expr(Spanned(<>.0, ExprKind::BooleanLiteral(true), <>.2)),
     Spanned<"false"> => Expr(Spanned(<>.0, ExprKind::BooleanLiteral(false), <>.2)),
     "(" <Expr> ")" => <>,
-    Spanned<!> => { errors.push(<>.1); Expr(Spanned(<>.0, ExprKind::Error, <>.2)) }
 };
 
 extern {

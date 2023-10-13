@@ -12,6 +12,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ansi_term"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d52a9bb7ec0cf484c551830a7ce27bd20d67eac647e1befb56b0be4ee39a55d2"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -254,6 +263,12 @@ name = "libc"
 version = "0.2.141"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3304a64d199bb964be99741b7a14d26972741915b3649639149b2479bb46f4b5"
+
+[[package]]
+name = "line-span"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29fc123b2f6600099ca18248f69e3ee02b09c4188c0d98e9a690d90dec3e408a"
 
 [[package]]
 name = "linux-raw-sys"
@@ -743,6 +758,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "zrc_codegen",
+ "zrc_diagnostics",
  "zrc_parser",
  "zrc_typeck",
 ]
@@ -756,6 +772,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "zrc_diagnostics"
+version = "0.1.0"
+dependencies = [
+ "ansi_term",
+ "line-span",
+]
+
+[[package]]
 name = "zrc_parser"
 version = "0.1.0"
 dependencies = [
@@ -764,6 +788,7 @@ dependencies = [
  "lalrpop-util",
  "logos",
  "regex",
+ "zrc_diagnostics",
 ]
 
 [[package]]
@@ -771,5 +796,6 @@ name = "zrc_typeck"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "zrc_diagnostics",
  "zrc_parser",
 ]

@@ -8,7 +8,9 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
-use anyhow::Context as _;
+use std::fmt::Display;
+
+use anyhow::{Context as _, Error};
 
 fn main() -> anyhow::Result<()> {
     let default_panic_hook = std::panic::take_hook();
@@ -31,16 +33,18 @@ fn main() -> anyhow::Result<()> {
         std::fs::read_to_string(std::env::args().nth(1).context("no input file provided")?)
             .context("failed to read input file")?;
 
-    println!(
-        "{}",
-        zrc_codegen::cg_program(
-            zrc_typeck::typeck::type_program(
-                zrc_parser::parser::parse_program(&content).context("parser error")?
-            )
-            .context("type checker error")?
-        )
-        .expect("code generation failed")
-    );
+    let result = compile(&content);
+    match result {
+        Err(diagnostic) => eprintln!("{}", diagnostic.print(&content)),
+        Ok(x) => println!("{x}"),
+    }
 
     Ok(())
+}
+
+fn compile(content: &str) -> Result<String, zrc_diagnostics::Diagnostic> {
+    Ok(zrc_codegen::cg_program(zrc_typeck::typeck::type_program(
+        zrc_parser::parser::parse_program(&content)?,
+    )?)
+    .expect("code generation should not fail"))
 }

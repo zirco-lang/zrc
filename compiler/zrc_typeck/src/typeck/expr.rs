@@ -1,6 +1,7 @@
 //! for expressions
 
 use anyhow::{bail, Context as _};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity, Spanned as DiagnosticSpan};
 use zrc_parser::ast::{
     expr::{Assignment, Expr, ExprKind},
     Spanned,
@@ -39,16 +40,32 @@ fn desugar_assignment(mode: Assignment, lhs: Expr, rhs: Expr) -> (Expr, Expr) {
 }
 
 /// Validate an expr into a place
-fn expr_to_place(expr: TypedExpr) -> anyhow::Result<Place> {
+fn expr_to_place(
+    span: (usize, usize),
+    expr: TypedExpr,
+) -> Result<Place, zrc_diagnostics::Diagnostic> {
     Ok(match expr.1 {
         TypedExprKind::UnaryDereference(x) => Place(expr.0, PlaceKind::Deref(x)),
         TypedExprKind::Identifier(x) => Place(expr.0, PlaceKind::Variable(x)),
         TypedExprKind::Index(x, y) => Place(expr.0, PlaceKind::Index(x, y)),
-        TypedExprKind::Dot(x, y) => Place(expr.0, PlaceKind::Dot(Box::new(expr_to_place(*x)?), y)),
-        TypedExprKind::Arrow(x, y) => {
-            Place(expr.0, PlaceKind::Arrow(Box::new(expr_to_place(*x)?), y))
+        TypedExprKind::Dot(x, y) => Place(
+            expr.0,
+            PlaceKind::Dot(Box::new(expr_to_place(span, *x)?), y),
+        ),
+        TypedExprKind::Arrow(x, y) => Place(
+            expr.0,
+            PlaceKind::Arrow(Box::new(expr_to_place(span, *x)?), y),
+        ),
+        _ => {
+            return Err(zrc_diagnostics::Diagnostic(
+                zrc_diagnostics::Severity::Error,
+                zrc_diagnostics::Spanned(
+                    span.0,
+                    zrc_diagnostics::DiagnosticKind::AssignmentToNonPlace(expr.to_string()),
+                    span.1,
+                ),
+            ))
         }
-        _ => bail!("Cannot assign to non-place expression {}", expr.0),
     })
 }
 
@@ -61,7 +78,7 @@ fn expr_to_place(expr: TypedExpr) -> anyhow::Result<Place> {
 /// Errors if a type checker error is encountered.
 #[allow(clippy::too_many_lines)] // FIXME: make this fn shorter
 #[allow(clippy::module_name_repetitions)]
-pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
+pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, zrc_diagnostics::Diagnostic> {
     Ok(match expr.0 .1 {
         ExprKind::Comma(a, b) => {
             let at = type_expr(scope, *a)?;
@@ -72,16 +89,24 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             )
         }
         ExprKind::Assignment(mode, place, value) => {
-            // TODO: Check place is a valid lvalue so that `7 = 4;` is invalid
-
             // Desugar `x += y` to `x = x + y`.
             let (place, value) = desugar_assignment(mode, *place, *value);
 
-            let place_t = expr_to_place(type_expr(scope, place)?)?;
+            let place_t = expr_to_place((expr.0 .0, expr.0 .2), type_expr(scope, place)?)?;
             let value_t = type_expr(scope, value)?;
 
             if place_t.0 != value_t.0 {
-                bail!("Type mismatch: {} != {}", place_t.0, value_t.0);
+                return Err(zrc_diagnostics::Diagnostic(
+                    zrc_diagnostics::Severity::Error,
+                    zrc_diagnostics::Spanned(
+                        expr.0 .0,
+                        zrc_diagnostics::DiagnosticKind::InvalidAssignmentRightHandSideType {
+                            expected: place_t.0.to_string(),
+                            got: value_t.0.to_string(),
+                        },
+                        expr.0 .2,
+                    ),
+                ));
             }
 
             TypedExpr(
@@ -93,24 +118,42 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
         ExprKind::UnaryNot(x) => {
             let t = type_expr(scope, *x)?;
             if t.0 != TastType::Bool {
-                bail!("Cannot not {}", t.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::UnaryNotExpectedBoolean(t.0.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
             TypedExpr(t.0.clone(), TypedExprKind::UnaryNot(Box::new(t)))
         }
         ExprKind::UnaryBitwiseNot(x) => {
             let t = type_expr(scope, *x)?;
             if !t.0.is_integer() {
-                bail!("Cannot bitwise not {}", t.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::UnaryBitwiseNotExpectedInteger(t.0.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
             TypedExpr(t.0.clone(), TypedExprKind::UnaryBitwiseNot(Box::new(t)))
         }
         ExprKind::UnaryMinus(x) => {
             let t = type_expr(scope, *x)?;
-            if !t.0.is_integer() {
-                bail!("Cannot unary minus {}", t.0);
-            }
             if !t.0.is_signed_integer() {
-                bail!("Cannot unary minus unsigned integer {}", t.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::UnaryMinusExpectedSignedInteger(t.0.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
             TypedExpr(t.0.clone(), TypedExprKind::UnaryMinus(Box::new(t)))
         }
@@ -126,7 +169,14 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             if let TastType::Ptr(tt) = t.clone().0 {
                 TypedExpr(*tt, TypedExprKind::UnaryDereference(Box::new(t)))
             } else {
-                bail!("Cannot dereference {}", t.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::CannotDereferenceNonPointer(t.0.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
         }
 
@@ -135,7 +185,14 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             let offset_t = type_expr(scope, *offset)?;
 
             if !offset_t.0.is_integer() {
-                bail!("Index offset must be integer, not {}", offset_t.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::IndexOffsetMustBeInteger(offset_t.0.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
 
             if let TastType::Ptr(t) = ptr_t.0.clone() {
@@ -144,7 +201,14 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                     TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_t)),
                 )
             } else {
-                bail!("Cannot index {}", ptr_t.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::CannotIndexIntoNonPointer(ptr_t.0.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
         }
 
@@ -158,10 +222,24 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                         TypedExprKind::Dot(Box::new(obj_t), key.1.clone()),
                     )
                 } else {
-                    bail!("Struct {} does not have field {}", obj_t.0, key.1);
+                    return Err(Diagnostic(
+                        Severity::Error,
+                        DiagnosticSpan(
+                            expr.0 .0,
+                            DiagnosticKind::StructDoesNotHaveMember(obj_t.to_string(), key.1),
+                            expr.0 .2,
+                        ),
+                    ));
                 }
             } else {
-                bail!("Cannot dot into non-struct type {}", obj_t.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::StructMemberAccessOnNonStruct(obj_t.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
         }
         ExprKind::Arrow(obj, key) => {
@@ -185,7 +263,14 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                     )),
                 )?
             } else {
-                bail!("Cannot deref to access into non-pointer type {}", obj_t.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::CannotDereferenceNonPointer(obj_t.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
         }
         ExprKind::Call(f, args) => {
@@ -194,20 +279,37 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                 .1
                 .iter()
                 .map(|x| type_expr(scope, x.clone()))
-                .collect::<anyhow::Result<Vec<TypedExpr>>>()?;
+                .collect::<Result<Vec<TypedExpr>, Diagnostic>>()?;
 
             if let TastType::Fn(arg_types, ret_type) = ft.0.clone() {
                 if arg_types.len() != args_t.len() {
-                    bail!(
-                        "Function takes {} arguments, not {}",
-                        arg_types.len(),
-                        args_t.len()
-                    );
+                    return Err(Diagnostic(
+                        Severity::Error,
+                        DiagnosticSpan(
+                            expr.0 .0,
+                            DiagnosticKind::FunctionArgumentCountMismatch {
+                                expected: arg_types.len(),
+                                got: args_t.len(),
+                            },
+                            expr.0 .2,
+                        ),
+                    ));
                 }
 
                 for (i, (arg_type, arg_t)) in arg_types.iter().zip(args_t.iter()).enumerate() {
                     if arg_type != &arg_t.0 {
-                        bail!("Argument {} must be {}, not {}", i, arg_type, arg_t.0);
+                        return Err(Diagnostic(
+                            Severity::Error,
+                            DiagnosticSpan(
+                                args.1[i].0 .0,
+                                DiagnosticKind::FunctionArgumentTypeMismatch {
+                                    n: i,
+                                    expected: arg_type.to_string(),
+                                    got: arg_t.0.to_string(),
+                                },
+                                args.1[i].0 .2,
+                            ),
+                        ));
                     }
                 }
 
@@ -216,25 +318,45 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                     TypedExprKind::Call(Box::new(ft), args_t),
                 )
             } else {
-                bail!("Cannot call non-function type {}", ft.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::CannotCallNonFunction(ft.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
         }
 
         ExprKind::Ternary(cond, if_true, if_false) => {
-            let cond_t = type_expr(scope, *cond)?;
+            let cond_t = type_expr(scope, *cond.clone())?;
             let if_true_t = type_expr(scope, *if_true)?;
             let if_false_t = type_expr(scope, *if_false)?;
 
             if cond_t.0 != TastType::Bool {
-                bail!("Ternary condition must be bool, not {}", cond_t.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        cond.0 .0,
+                        DiagnosticKind::TernaryConditionMustBeBoolean(cond_t.to_string()),
+                        cond.0 .2,
+                    ),
+                ));
             }
 
             if if_true_t.0 != if_false_t.0 {
-                bail!(
-                    "Ternary branches must have same type, not {} and {}",
-                    if_true_t.0,
-                    if_false_t.0
-                );
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::TernaryArmsMustHaveSameType(
+                            if_true_t.to_string(),
+                            if_false_t.to_string(),
+                        ),
+                        expr.0 .2,
+                    ),
+                ));
             }
 
             TypedExpr(
@@ -244,15 +366,35 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
         }
 
         ExprKind::Logical(op, a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
+            let at = type_expr(scope, *a.clone())?;
+            let bt = type_expr(scope, *b.clone())?;
 
             if at.0 != TastType::Bool {
-                bail!("Operator `{op}` lhs must be bool, not {}", at.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        a.0 .0,
+                        DiagnosticKind::ExpectedGot {
+                            expected: "bool".to_string(),
+                            got: at.0.to_string(),
+                        },
+                        a.0 .2,
+                    ),
+                ));
             }
 
             if bt.0 != TastType::Bool {
-                bail!("Operator `{op}` rhs must be bool, not {}", bt.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        b.0 .0,
+                        DiagnosticKind::ExpectedGot {
+                            expected: "bool".to_string(),
+                            got: bt.0.to_string(),
+                        },
+                        b.0 .2,
+                    ),
+                ));
             }
 
             TypedExpr(
@@ -269,12 +411,14 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (at.0.clone(), bt.0.clone()) {
                 // *T == *U is valid
             } else {
-                bail!(
-                    "Operator `{}` lhs and rhs must be same-type integer or pointer, not {} and {}",
-                    op,
-                    at.0,
-                    bt.0
-                );
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::EqualityOperators(at.0.to_string(), bt.0.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
 
             TypedExpr(
@@ -283,23 +427,46 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             )
         }
         ExprKind::BinaryBitwise(op, a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
+            let at = type_expr(scope, *a.clone())?;
+            let bt = type_expr(scope, *b.clone())?;
 
             if !at.0.is_integer() {
-                bail!("Operator `{op}` lhs must be integer, not {}", at.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        a.0 .0,
+                        DiagnosticKind::ExpectedGot {
+                            expected: "integer".to_string(),
+                            got: at.0.to_string(),
+                        },
+                        a.0 .2,
+                    ),
+                ));
             }
 
             if !bt.0.is_integer() {
-                bail!("Operator `{op}` rhs must be integer, not {}", bt.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        b.0 .0,
+                        DiagnosticKind::ExpectedGot {
+                            expected: "integer".to_string(),
+                            got: bt.0.to_string(),
+                        },
+                        b.0 .2,
+                    ),
+                ));
             }
 
             if at.0 != bt.0 {
-                bail!(
-                    "Operator `{op}` lhs and rhs must have same type, not {} and {}",
-                    at.0,
-                    bt.0
-                );
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::ExpectedSameType(at.0.to_string(), bt.0.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
 
             TypedExpr(
@@ -308,23 +475,46 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             )
         }
         ExprKind::Comparison(op, a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
+            let at = type_expr(scope, *a.clone())?;
+            let bt = type_expr(scope, *b.clone())?;
 
             if !at.0.is_integer() {
-                bail!("Operator `{op}` lhs must be integer, not {}", at.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        a.0 .0,
+                        DiagnosticKind::ExpectedGot {
+                            expected: "integer".to_string(),
+                            got: at.0.to_string(),
+                        },
+                        a.0 .2,
+                    ),
+                ));
             }
 
             if !bt.0.is_integer() {
-                bail!("Operator `{op}` rhs must be integer, not {}", bt.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        b.0 .0,
+                        DiagnosticKind::ExpectedGot {
+                            expected: "integer".to_string(),
+                            got: bt.0.to_string(),
+                        },
+                        b.0 .2,
+                    ),
+                ));
             }
 
             if at.0 != bt.0 {
-                bail!(
-                    "Operator `{op}` lhs and rhs must have same type, not {} and {}",
-                    at.0,
-                    bt.0
-                );
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::ExpectedSameType(at.0.to_string(), bt.0.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
 
             TypedExpr(
@@ -333,23 +523,46 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             )
         }
         ExprKind::Arithmetic(op, a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
+            let at = type_expr(scope, *a.clone())?;
+            let bt = type_expr(scope, *b.clone())?;
 
             if !at.0.is_integer() {
-                bail!("Operator `{op}` lhs must be integer, not {}", at.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        a.0 .0,
+                        DiagnosticKind::ExpectedGot {
+                            expected: "integer".to_string(),
+                            got: at.0.to_string(),
+                        },
+                        a.0 .2,
+                    ),
+                ));
             }
 
             if !bt.0.is_integer() {
-                bail!("Operator `{op}` rhs must be integer, not {}", bt.0);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        b.0 .0,
+                        DiagnosticKind::ExpectedGot {
+                            expected: "integer".to_string(),
+                            got: bt.0.to_string(),
+                        },
+                        b.0 .2,
+                    ),
+                ));
             }
 
             if at.0 != bt.0 {
-                bail!(
-                    "Operator `{op}` lhs and rhs must have same type, not {} and {}",
-                    at.0,
-                    bt.0
-                );
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::ExpectedSameType(at.0.to_string(), bt.0.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
 
             TypedExpr(
@@ -375,10 +588,24 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
                     // *T -> int or int -> *T cast is valid
                     TypedExpr(tt.clone(), TypedExprKind::Cast(Box::new(xt), tt))
                 } else {
-                    bail!("Cannot cast {} to {}", xt.0, tt);
+                    return Err(Diagnostic(
+                        Severity::Error,
+                        DiagnosticSpan(
+                            expr.0 .0,
+                            DiagnosticKind::InvalidCast(xt.0.to_string(), tt.to_string()),
+                            expr.0 .2,
+                        ),
+                    ));
                 }
             } else {
-                bail!("Cannot cast {} to {}", xt.0, tt);
+                return Err(Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::InvalidCast(xt.0.to_string(), tt.to_string()),
+                        expr.0 .2,
+                    ),
+                ));
             }
         }
 
@@ -388,13 +615,16 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> anyhow::Result<TypedExpr> {
             TypedExprKind::StringLiteral(s),
         ),
         ExprKind::Identifier(i) => {
-            let t = scope
-                .get_value(&i)
-                .context(format!("Unknown identifier {i}"))?;
+            let t = scope.get_value(&i).ok_or(Diagnostic(
+                Severity::Error,
+                DiagnosticSpan(
+                    expr.0 .0,
+                    DiagnosticKind::UnableToResolveIdentifier(i.clone()),
+                    expr.0 .2,
+                ),
+            ))?;
             TypedExpr(t.clone(), TypedExprKind::Identifier(i))
         }
         ExprKind::BooleanLiteral(b) => TypedExpr(TastType::Bool, TypedExprKind::BooleanLiteral(b)),
-
-        ExprKind::Error => bail!("Parse error encountered"),
     })
 }

@@ -1,0 +1,10 @@
+[package]
+name = "zrc_diagnostics"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ansi_term = "0.12.1"
+line-span = "0.1.5"

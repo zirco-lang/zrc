@@ -235,9 +235,6 @@ pub enum ExprKind {
     Identifier(String),
     /// Any boolean literal.
     BooleanLiteral(bool),
-
-    /// An error occurred while parsing.
-    Error,
 }
 impl Display for ExprKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -247,7 +244,6 @@ impl Display for ExprKind {
             Self::StringLiteral(s) => write!(f, "{s}"),
             Self::Identifier(i) => write!(f, "{i}"),
             Self::BooleanLiteral(b) => write!(f, "{b}"),
-            Self::Error => write!(f, "error"),
             Self::Assignment(op, l, r) => write!(f, "{l} {op} {r}"),
             Self::Equality(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
             Self::Comparison(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
