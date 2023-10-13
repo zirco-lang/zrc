@@ -116,83 +116,83 @@ pub enum DiagnosticKind {
 impl Display for DiagnosticKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DiagnosticKind::UnknownToken(c) => write!(f, "unknown token `{c}`"),
-            DiagnosticKind::UnterminatedStringLiteral => write!(f, "unterminated string literal"),
-            DiagnosticKind::UnterminatedBlockComment => write!(f, "unterminated block comment"),
+            Self::UnknownToken(c) => write!(f, "unknown token `{c}`"),
+            Self::UnterminatedStringLiteral => write!(f, "unterminated string literal"),
+            Self::UnterminatedBlockComment => write!(f, "unterminated block comment"),
 
-            DiagnosticKind::InvalidToken => write!(f, "invalid token"),
-            DiagnosticKind::UnexpectedEof(expected) => {
+            Self::InvalidToken => write!(f, "invalid token"),
+            Self::UnexpectedEof(expected) => {
                 write!(
                     f,
                     "unexpected end of file, expected one of: {}",
                     expected.join(", ")
                 )
             }
-            DiagnosticKind::UnrecognizedToken(got, expected) => {
+            Self::UnrecognizedToken(got, expected) => {
                 write!(
                     f,
                     "unrecognized token `{got}`, expected one of: {}",
                     expected.join(", ")
                 )
             }
-            DiagnosticKind::ExtraToken(token) => write!(f, "extra token `{}`", token),
+            Self::ExtraToken(token) => write!(f, "extra token `{token}`"),
 
-            DiagnosticKind::UnableToResolveType(t) => {
+            Self::UnableToResolveType(t) => {
                 write!(f, "unable to resolve `{t}` to a type")
             }
-            DiagnosticKind::UnableToResolveIdentifier(i) => {
+            Self::UnableToResolveIdentifier(i) => {
                 write!(f, "unable to resolve identifier `{i}`")
             }
-            DiagnosticKind::AssignmentToNonPlace(expr) => {
+            Self::AssignmentToNonPlace(expr) => {
                 write!(f, "cannot assign to non-place expression `{expr}`")
             }
-            DiagnosticKind::InvalidAssignmentRightHandSideType { expected, got } => write!(
+            Self::InvalidAssignmentRightHandSideType { expected, got } => write!(
                 f,
                 "expected `{expected}` on right hand side of assignment, got `{got}`"
             ),
-            DiagnosticKind::UnaryNotExpectedBoolean(t) => {
+            Self::UnaryNotExpectedBoolean(t) => {
                 write!(f, "expected boolean type, got `{t}`")
             }
-            DiagnosticKind::UnaryBitwiseNotExpectedInteger(t) => {
+            Self::UnaryBitwiseNotExpectedInteger(t) => {
                 write!(f, "expected integer type, got `{t}`")
             }
-            DiagnosticKind::UnaryMinusExpectedSignedInteger(t) => {
+            Self::UnaryMinusExpectedSignedInteger(t) => {
                 write!(f, "expected signed integer type, got `{t}`")
             }
             Self::CannotDereferenceNonPointer(t) => {
                 write!(f, "cannot dereference non-pointer type `{t}`")
             }
-            DiagnosticKind::CannotIndexIntoNonPointer(t) => {
+            Self::CannotIndexIntoNonPointer(t) => {
                 write!(f, "cannot index into non-pointer type `{t}`")
             }
-            DiagnosticKind::IndexOffsetMustBeInteger(t) => {
+            Self::IndexOffsetMustBeInteger(t) => {
                 write!(f, "index offset must be integer type, got `{t}`")
             }
-            DiagnosticKind::StructDoesNotHaveMember(t, member) => {
+            Self::StructDoesNotHaveMember(t, member) => {
                 write!(f, "struct `{t}` does not have member `{member}`")
             }
-            DiagnosticKind::StructMemberAccessOnNonStruct(t) => {
+            Self::StructMemberAccessOnNonStruct(t) => {
                 write!(f, "cannot access member of non-struct type `{t}`")
             }
-            DiagnosticKind::FunctionArgumentCountMismatch { expected, got } => {
+            Self::FunctionArgumentCountMismatch { expected, got } => {
                 write!(f, "expected `{expected}` arguments, got `{got}`",)
             }
-            DiagnosticKind::FunctionArgumentTypeMismatch { n, expected, got } => {
+            Self::FunctionArgumentTypeMismatch { n, expected, got } => {
                 write!(f, "expected `{expected}` for argument `{n}`, got `{got}`",)
             }
-            DiagnosticKind::CannotCallNonFunction(t) => {
+            Self::CannotCallNonFunction(t) => {
                 write!(f, "cannot call non-function type `{t}`")
             }
-            DiagnosticKind::TernaryConditionMustBeBoolean(t) => {
+            Self::TernaryConditionMustBeBoolean(t) => {
                 write!(f, "ternary condition must be boolean type, got `{t}`")
             }
-            DiagnosticKind::TernaryArmsMustHaveSameType(t1, t2) => {
+            Self::TernaryArmsMustHaveSameType(t1, t2) => {
                 write!(f, "ternary arms must have same type, got `{t1}` and `{t2}`")
             }
-            DiagnosticKind::ExpectedGot { expected, got } => {
+            Self::ExpectedGot { expected, got } => {
                 write!(f, "expected `{expected}`, got `{got}`")
             }
-            DiagnosticKind::ExpectedSameType(t1, t2) => {
+            Self::ExpectedSameType(t1, t2) => {
                 write!(
                     f,
                     "expected both sides to have the same type, got `{t1}` and `{t2}`"
@@ -237,8 +237,8 @@ impl MaybeIntersecting {
     /// Returns an [`Option`] holding the intersection between the two spans, if it exists.
     const fn intersection(&self) -> Option<(usize, usize)> {
         match self {
-            MaybeIntersecting::Disjoint => None,
-            MaybeIntersecting::Intersecting((a, b)) => Some((*a, *b)),
+            Self::Disjoint => None,
+            Self::Intersecting((a, b)) => Some((*a, *b)),
         }
     }
 }
