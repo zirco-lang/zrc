@@ -8,9 +8,7 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
-use std::fmt::Display;
-
-use anyhow::{Context as _, Error};
+use anyhow::Context as _;
 
 fn main() -> anyhow::Result<()> {
     let default_panic_hook = std::panic::take_hook();
@@ -42,9 +40,10 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Drive the compilation process.
 fn compile(content: &str) -> Result<String, zrc_diagnostics::Diagnostic> {
     Ok(zrc_codegen::cg_program(zrc_typeck::typeck::type_program(
-        zrc_parser::parser::parse_program(&content)?,
+        zrc_parser::parser::parse_program(content)?,
     )?)
     .expect("code generation should not fail"))
 }

@@ -336,7 +336,7 @@ pub enum Tok {
     // === SPECIAL ===
     /// Any string literal
     #[regex(r#""([^"\\]|\\.)*""#, string_slice)]
-    #[regex(r#""([^"\\]|\\.)*"#, |lex| {
+    #[regex(r#""([^"\\]|\\.)*"#, |_lex| {
         Err(InternalLexicalError::UnterminatedStringLiteral)
     })]
     StringLiteral(String),

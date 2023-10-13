@@ -1,6 +1,5 @@
 //! for expressions
 
-use anyhow::{bail, Context as _};
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity, Spanned as DiagnosticSpan};
 use zrc_parser::ast::{
     expr::{Assignment, Expr, ExprKind},
@@ -615,14 +614,16 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, zrc_diagnostics
             TypedExprKind::StringLiteral(s),
         ),
         ExprKind::Identifier(i) => {
-            let t = scope.get_value(&i).ok_or(Diagnostic(
-                Severity::Error,
-                DiagnosticSpan(
-                    expr.0 .0,
-                    DiagnosticKind::UnableToResolveIdentifier(i.clone()),
-                    expr.0 .2,
-                ),
-            ))?;
+            let t = scope.get_value(&i).ok_or_else(|| {
+                Diagnostic(
+                    Severity::Error,
+                    DiagnosticSpan(
+                        expr.0 .0,
+                        DiagnosticKind::UnableToResolveIdentifier(i.clone()),
+                        expr.0 .2,
+                    ),
+                )
+            })?;
             TypedExpr(t.clone(), TypedExprKind::Identifier(i))
         }
         ExprKind::BooleanLiteral(b) => TypedExpr(TastType::Bool, TypedExprKind::BooleanLiteral(b)),

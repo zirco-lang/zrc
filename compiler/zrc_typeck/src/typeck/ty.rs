@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 
-use anyhow::bail;
 use zrc_diagnostics::Diagnostic;
 use zrc_parser::ast::ty::{Type as ParserType, TypeKind as ParserTypeKind};
 

@@ -17,18 +17,22 @@ use ansi_term::{Color, Style};
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Spanned<T>(pub usize, pub T, pub usize);
 
+/// The severity of a [`Diagnostic`].
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Severity {
+    /// Error. Compilation will not continue.
     Error,
 }
 impl Severity {
+    /// Get the display [`Style`] of this severity
     fn style(&self) -> Style {
         match self {
             Self::Error => Color::Red.bold(),
         }
     }
 
-    fn text(&self) -> &'static str {
+    /// Get this severity's name
+    const fn text(&self) -> &'static str {
         match self {
             Self::Error => "error",
         }
@@ -40,15 +44,18 @@ impl Display for Severity {
     }
 }
 
+/// A diagnostic message produced by zrc
 #[derive(Debug)]
 pub struct Diagnostic(pub Severity, pub Spanned<DiagnosticKind>);
 impl Error for Diagnostic {}
 impl Display for Diagnostic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.0, self.1 .1.to_string())
+        write!(f, "{}: {}", self.0, self.1 .1)
     }
 }
 
+/// The list of possible errors
+#[allow(missing_docs)]
 #[derive(Debug)]
 pub enum DiagnosticKind {
     // LEXER ERRORS
@@ -152,7 +159,7 @@ impl Display for DiagnosticKind {
             DiagnosticKind::UnaryMinusExpectedSignedInteger(t) => {
                 write!(f, "expected signed integer type, got `{t}`")
             }
-            DiagnosticKind::CannotDereferenceNonPointer(t) => {
+            Self::CannotDereferenceNonPointer(t) => {
                 write!(f, "cannot dereference non-pointer type `{t}`")
             }
             DiagnosticKind::CannotIndexIntoNonPointer(t) => {
@@ -213,28 +220,30 @@ impl Display for DiagnosticKind {
     }
 }
 
+/// The intersection between two spans in the input
 #[derive(PartialEq, Debug, Clone)]
 enum MaybeIntersecting {
+    /// There is no intersection
     Disjoint,
-    /// May be equal
+    /// There is an intersection and they may be equal
     Intersecting((usize, usize)),
 }
 impl MaybeIntersecting {
-    fn is_disjoint(&self) -> bool {
-        matches!(self, MaybeIntersecting::Disjoint)
+    /// Returns `true` if the spans intersect.
+    const fn is_intersecting(&self) -> bool {
+        self.intersection().is_some()
     }
 
-    fn is_intersecting(&self) -> bool {
-        matches!(self, MaybeIntersecting::Intersecting(_))
-    }
-
-    fn intersection(&self) -> Option<(usize, usize)> {
+    /// Returns an [`Option`] holding the intersection between the two spans, if it exists.
+    const fn intersection(&self) -> Option<(usize, usize)> {
         match self {
             MaybeIntersecting::Disjoint => None,
             MaybeIntersecting::Intersecting((a, b)) => Some((*a, *b)),
         }
     }
 }
+
+/// Create a [`MaybeIntersecting`] from two spans
 fn intersect_spans(a: (usize, usize), b: (usize, usize)) -> MaybeIntersecting {
     if a.0 > b.1 || b.0 > a.1 {
         MaybeIntersecting::Disjoint
@@ -244,7 +253,7 @@ fn intersect_spans(a: (usize, usize), b: (usize, usize)) -> MaybeIntersecting {
 }
 
 /// Format and display the 'source window' -- the lines of span within str with the underline where the span lies.
-fn display_source_window(severity: Severity, span: (usize, usize), source: &str) -> String {
+fn display_source_window(severity: &Severity, span: (usize, usize), source: &str) -> String {
     // First, we need to reduce source into only the lines we need to display. A line should be displayed if *the line's span* intersects (see MaybeIntersecting and intersect_spans) with the span we are trying to display.
 
     // We can do this by iterating over the lines of source, and checking if the line's span intersects with the span we are trying to display. If it does, we add the line to a vector of lines to display.
@@ -304,12 +313,14 @@ fn display_source_window(severity: Severity, span: (usize, usize), source: &str)
 }
 
 impl Diagnostic {
+    /// Convert this [`Diagnostic`] to a printable string
+    #[must_use]
     pub fn print(&self, source: &str) -> String {
         format!(
             "{}: {}\n{}",
             self.0,
             Color::White.bold().paint(self.1 .1.to_string()),
-            display_source_window(self.0.clone(), (self.1 .0, self.1 .2), source)
+            display_source_window(&self.0.clone(), (self.1 .0, self.1 .2), source)
         )
     }
 }

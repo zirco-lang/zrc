@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 
-use anyhow::bail;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity, Spanned as DiagnosticSpan};
 use zrc_parser::ast::{
     stmt::{Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind},
@@ -183,7 +182,7 @@ pub fn process_let_declaration(
                                         expected: resolved_ty.to_string(),
                                         got: ty.to_string(),
                                     },
-                                    let_declaration.1.value.clone().unwrap().0 .2,
+                                    let_declaration.1.value.unwrap().0 .2,
                                 ),
                             ));
                         }
@@ -340,6 +339,9 @@ pub fn process_declaration(
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
+///
+/// # Panics
+/// Panics in some internal state failures.
 // TODO: Maybe the TAST should attach the BlockReturnActuality in each BlockStmt itself and preserve
 // it on sub-blocks in the TAST (this may be helpful in control flow analysis)
 #[allow(clippy::too_many_lines)]
@@ -365,30 +367,26 @@ pub fn type_block(
                     StmtKind::BreakStmt if can_use_break_continue => {
                         Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
                     }
-                    StmtKind::BreakStmt => {
-                        return Err(Diagnostic(
-                            Severity::Error,
-                            DiagnosticSpan(
-                                stmt.0 .0,
-                                DiagnosticKind::CannotUseBreakOutsideOfLoop,
-                                stmt.0 .2,
-                            ),
-                        ))
-                    }
+                    StmtKind::BreakStmt => Err(Diagnostic(
+                        Severity::Error,
+                        DiagnosticSpan(
+                            stmt.0 .0,
+                            DiagnosticKind::CannotUseBreakOutsideOfLoop,
+                            stmt.0 .2,
+                        ),
+                    )),
 
                     StmtKind::ContinueStmt if can_use_break_continue => {
                         Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
                     }
-                    StmtKind::ContinueStmt => {
-                        return Err(Diagnostic(
-                            Severity::Error,
-                            DiagnosticSpan(
-                                stmt.0 .0,
-                                DiagnosticKind::CannotUseContinueOutsideOfLoop,
-                                stmt.0 .2,
-                            ),
-                        ))
-                    }
+                    StmtKind::ContinueStmt => Err(Diagnostic(
+                        Severity::Error,
+                        DiagnosticSpan(
+                            stmt.0 .0,
+                            DiagnosticKind::CannotUseContinueOutsideOfLoop,
+                            stmt.0 .2,
+                        ),
+                    )),
 
                     StmtKind::DeclarationList(declarations) => Ok((
                         TypedStmt::DeclarationList(process_let_declaration(
@@ -570,7 +568,7 @@ pub fn type_block(
                                             expected: "bool".to_string(),
                                             got: inner_t_cond.0.to_string(),
                                         },
-                                        cond.clone().unwrap().0 .2,
+                                        cond.unwrap().0 .2,
                                     ),
                                 ));
                             }
@@ -647,16 +645,14 @@ pub fn type_block(
                             .transpose()?;
                         match (resolved_value, return_ability.clone()) {
                             // expects no return
-                            (_, BlockReturnAbility::MustNotReturn) => {
-                                return Err(Diagnostic(
-                                    Severity::Error,
-                                    DiagnosticSpan(
-                                        stmt.0 .0,
-                                        DiagnosticKind::CannotReturnHere,
-                                        stmt.0 .2,
-                                    ),
-                                ));
-                            }
+                            (_, BlockReturnAbility::MustNotReturn) => Err(Diagnostic(
+                                Severity::Error,
+                                DiagnosticSpan(
+                                    stmt.0 .0,
+                                    DiagnosticKind::CannotReturnHere,
+                                    stmt.0 .2,
+                                ),
+                            )),
 
                             // return; in void fn
                             (
@@ -673,38 +669,34 @@ pub fn type_block(
                                 None,
                                 BlockReturnAbility::MayReturn(BlockReturnType::Return(t))
                                 | BlockReturnAbility::MustReturn(BlockReturnType::Return(t)),
-                            ) => {
-                                return Err(Diagnostic(
-                                    Severity::Error,
-                                    DiagnosticSpan(
-                                        stmt.0 .0,
-                                        DiagnosticKind::ExpectedGot {
-                                            expected: t.to_string(),
-                                            got: "void".to_string(),
-                                        },
-                                        stmt.0 .2,
-                                    ),
-                                ));
-                            }
+                            ) => Err(Diagnostic(
+                                Severity::Error,
+                                DiagnosticSpan(
+                                    stmt.0 .0,
+                                    DiagnosticKind::ExpectedGot {
+                                        expected: t.to_string(),
+                                        got: "void".to_string(),
+                                    },
+                                    stmt.0 .2,
+                                ),
+                            )),
 
                             // return x; in fn expecting to return void
                             (
                                 Some(TypedExpr(ty, _)),
                                 BlockReturnAbility::MustReturn(BlockReturnType::Void)
                                 | BlockReturnAbility::MayReturn(BlockReturnType::Void),
-                            ) => {
-                                return Err(Diagnostic(
-                                    Severity::Error,
-                                    DiagnosticSpan(
-                                        stmt.0 .0,
-                                        DiagnosticKind::ExpectedGot {
-                                            expected: "void".to_string(),
-                                            got: ty.to_string(),
-                                        },
-                                        stmt.0 .2,
-                                    ),
-                                ));
-                            }
+                            ) => Err(Diagnostic(
+                                Severity::Error,
+                                DiagnosticSpan(
+                                    stmt.0 .0,
+                                    DiagnosticKind::ExpectedGot {
+                                        expected: "void".to_string(),
+                                        got: ty.to_string(),
+                                    },
+                                    stmt.0 .2,
+                                ),
+                            )),
 
                             // return x; in fn expecting to return x
                             (
@@ -718,7 +710,7 @@ pub fn type_block(
                                         BlockReturnActuality::WillReturn,
                                     ))
                                 } else {
-                                    return Err(Diagnostic(
+                                    Err(Diagnostic(
                                         Severity::Error,
                                         DiagnosticSpan(
                                             value.clone().unwrap().0 .0,
@@ -728,7 +720,7 @@ pub fn type_block(
                                             },
                                             value.unwrap().0 .2,
                                         ),
-                                    ));
+                                    ))
                                 }
                             }
                         }
@@ -773,25 +765,23 @@ pub fn type_block(
         (BlockReturnAbility::MayReturn(_), BlockReturnActuality::DoesNotReturn) => {
             Ok((tast_block, BlockReturnActuality::DoesNotReturn))
         }
-        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::MightReturn) => {
-            return Err(Diagnostic(
-                Severity::Error,
-                DiagnosticSpan(
-                    input_block.0,
-                    DiagnosticKind::ExpectedABlockToReturn,
-                    input_block.2,
-                ),
-            ));
-        }
+        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::MightReturn) => Err(Diagnostic(
+            Severity::Error,
+            DiagnosticSpan(
+                input_block.0,
+                DiagnosticKind::ExpectedABlockToReturn,
+                input_block.2,
+            ),
+        )),
         (BlockReturnAbility::MustReturn(_), BlockReturnActuality::DoesNotReturn) => {
-            return Err(Diagnostic(
+            Err(Diagnostic(
                 Severity::Error,
                 DiagnosticSpan(
                     input_block.0,
                     DiagnosticKind::ExpectedABlockToReturn,
                     input_block.2,
                 ),
-            ));
+            ))
         }
         (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => {
             panic!("block must not return, but a sub-block may return -- this should have been caught when checking that block");
