@@ -1,34 +1,77 @@
-name: Feature request
-description: Do you have a feature you'd like added to zrc or Zirco?
-title: "feat: Describe your request here..."
+name: Suggest a Feature
+description: >-
+    If there is a feature you would like added to Zirco or the compiler, please
+    suggest it here.
+title: "feat: describe your request..."
 labels:
-    - "scope: unknown"
-    - enhancement
+    - status/untriaged
+    - type/feat
 body:
+    - type: markdown
+      attributes:
+          value: |-
+              # Thank you for taking your time to suggest a new feature!
+              We're excited to see what we can do to accommodate your request.
     - type: checkboxes
-      id: confirmations
+      id: checks
       attributes:
-          label: "Please double-check the following:"
-          description: Before you create an issue, we ask that you verify the following.
+          label: Before we begin...
+          description: Please take a second to do the following.
           options:
-              - label: I have checked existing issues to ensure this is not a duplicate
-                required: true
-    - type: textarea
-      id: description
+              - label: I have searched the issue tracker for duplicates
+                required: false
+    - type: markdown
       attributes:
-          label: Describe your suggestion.
-          description: Provide a short and concise description of your idea..
-          placeholder: When displaying errors, show X instead of Y.
+          value: >-
+              ## Name Your Issue
+
+              Now that we've done that, it's time to give your feature request a good
+              name. Summarize what you're requesting and place it in the name of the
+              issue.
+
+
+              Once we've done that, it's time to collect some more information!
+    - type: textarea
+      id: request
+      attributes:
+          label: Describe the feature you are requesting.
+          description: Please describe what you would like added to Zirco.
       validations:
           required: true
     - type: textarea
-      id: code
+      id: pros
       attributes:
-          label: If applicable, provide example code.
-          description: Otherwise, leave this section empty.
+          label: How will this benefit the Zirco ecosystem?
+          description: >-
+              Please describe the benefits of your feature to the ecosystem as a
+              whole, not just yourself.
+          placeholder: zrc version 1.0.0 (...)
+      validations:
+          required: true
     - type: textarea
-      id: other
+      id: cons
       attributes:
-          label: Additional Context
-          description: Provide any other context that could help us implement your feature.
-          placeholder: "The current renderer shows Y in this format:"
+          label: How could this be contradictory to our goals?
+          description: Please describe any cons of adding your feature.
+      validations:
+          required: true
+    - type: textarea
+      id: context
+      attributes:
+          label: Other Context
+          description: >-
+              If there is any other context you believe will be helpful in
+              investigating this error, please provide it here.
+    - type: markdown
+      attributes:
+          value: >-
+              ## Thank you!
+
+              Again, thank you for your time in making this Zirco feature request. We
+              will get back to you with information on how the team feels about your
+              request shortly.
+    - type: markdown
+      attributes:
+          value: >-
+              This template was generated with [Issue Forms
+              Creator](https://issue-forms-creator.netlify.app)
