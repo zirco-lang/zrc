@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use anyhow::bail;
+use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::ty::{Type as ParserType, TypeKind as ParserTypeKind};
 
 use super::Scope;
@@ -12,8 +12,11 @@ use crate::tast::ty::Type as TastType;
 ///
 /// # Errors
 /// Errors if the identifier is not found in the type scope.
-pub fn resolve_type(scope: &Scope, ty: ParserType) -> anyhow::Result<TastType> {
-    Ok(match ty.0 .1 {
+pub fn resolve_type(
+    scope: &Scope,
+    ty: ParserType,
+) -> Result<TastType, zrc_diagnostics::Diagnostic> {
+    Ok(match ty.0.value() {
         ParserTypeKind::Identifier(x) => match x.as_str() {
             "i8" => TastType::I8,
             "u8" => TastType::U8,
@@ -25,19 +28,22 @@ pub fn resolve_type(scope: &Scope, ty: ParserType) -> anyhow::Result<TastType> {
             "u64" => TastType::U64,
             "bool" => TastType::Bool,
             _ => {
-                if let Some(t) = scope.get_type(&x) {
+                if let Some(t) = scope.get_type(x) {
                     t.clone()
                 } else {
-                    bail!("Unknown type {x}");
+                    return Err(Diagnostic(
+                        zrc_diagnostics::Severity::Error,
+                        ty.0.map(|x| DiagnosticKind::UnableToResolveType(x.to_string())),
+                    ));
                 }
             }
         },
-        ParserTypeKind::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t)?)),
+        ParserTypeKind::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t.clone())?)),
         ParserTypeKind::Struct(members) => TastType::Struct(
             members
                 .iter()
                 .map(|(k, v)| Ok((k.clone(), resolve_type(scope, v.clone())?)))
-                .collect::<anyhow::Result<HashMap<String, TastType>>>()?,
+                .collect::<Result<HashMap<String, TastType>, Diagnostic>>()?,
         ),
     })
 }

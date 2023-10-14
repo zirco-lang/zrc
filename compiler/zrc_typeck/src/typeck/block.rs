@@ -2,11 +2,11 @@
 
 use std::collections::HashMap;
 
-use anyhow::bail;
-use zrc_parser::ast::{
-    stmt::{Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind},
-    Spanned,
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+use zrc_parser::ast::stmt::{
+    Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind,
 };
+use zrc_utils::span::{Spannable, Spanned};
 
 use super::{resolve_type, type_expr, Scope};
 use crate::tast::{
@@ -94,10 +94,10 @@ pub enum BlockReturnActuality {
 /// Convert a single [AST statement](Stmt) like `x;` to a block statement `{ x;
 /// }` without converting `{ x; }` to `{ { x; } }`. This is preferred instead of
 /// `vec![x]` as it prevents extra nesting layers.
-fn coerce_stmt_into_block(stmt: Stmt) -> Vec<Stmt> {
-    match stmt.0 .1 {
-        StmtKind::BlockStmt(stmts) => stmts,
-        _ => vec![stmt],
+fn coerce_stmt_into_block(stmt: &Stmt) -> Spanned<Vec<Stmt>> {
+    match stmt.0.value().clone() {
+        StmtKind::BlockStmt(stmts) => stmts.in_span(stmt.0.span()),
+        _ => vec![stmt.clone()].in_span(stmt.0.span()),
     }
 }
 
@@ -110,68 +110,96 @@ fn coerce_stmt_into_block(stmt: Stmt) -> Vec<Stmt> {
 pub fn process_let_declaration(
     scope: &mut Scope,
     declarations: Vec<Spanned<AstLetDeclaration>>,
-) -> anyhow::Result<Vec<TastLetDeclaration>> {
+) -> Result<Vec<TastLetDeclaration>, zrc_diagnostics::Diagnostic> {
     declarations
         .into_iter()
-        .map(|let_declaration| -> anyhow::Result<TastLetDeclaration> {
-            if scope.get_value(&let_declaration.1.name.1).is_some() {
-                // TODO: In the future we may allow shadowing but currently no
-                bail!("Identifier {} already in use", let_declaration.1.name.1);
-            }
-
-            let typed_expr = let_declaration
-                .1
-                .value
-                .map(|expr| type_expr(scope, expr))
-                .transpose()?;
-            let resolved_ty = let_declaration
-                .1
-                .ty
-                .map(|ty| resolve_type(scope, ty))
-                .transpose()?;
-
-            let result_decl = match (typed_expr, resolved_ty) {
-                (None, None) => {
-                    bail!(
-                        "No explicit variable type present and no value to infer from".to_string()
-                    )
+        .map(
+            |let_declaration| -> Result<TastLetDeclaration, Diagnostic> {
+                if scope
+                    .get_value(let_declaration.value().name.value())
+                    .is_some()
+                {
+                    // TODO: In the future we may allow shadowing but currently no
+                    return Err(Diagnostic(
+                        Severity::Error,
+                        let_declaration
+                            .value()
+                            .name
+                            .clone()
+                            .map(DiagnosticKind::IdentifierAlreadyInUse),
+                    ));
                 }
 
-                // Explicitly typed with no value
-                (None, Some(ty)) => TastLetDeclaration {
-                    name: let_declaration.1.name.1,
-                    ty,
-                    value: None,
-                },
+                let typed_expr = let_declaration
+                    .value()
+                    .value
+                    .clone()
+                    .map(|expr| type_expr(scope, expr))
+                    .transpose()?;
+                let resolved_ty = let_declaration
+                    .value()
+                    .ty
+                    .clone()
+                    .map(|ty| resolve_type(scope, ty))
+                    .transpose()?;
 
-                // Infer type from value
-                (Some(TypedExpr(ty, ex)), None) => TastLetDeclaration {
-                    name: let_declaration.1.name.1,
-                    ty: ty.clone(),
-                    value: Some(TypedExpr(ty, ex)),
-                },
-
-                // Both explicitly typed and inferable
-                (Some(TypedExpr(ty, ex)), Some(resolved_ty)) => {
-                    if ty == resolved_ty {
-                        TastLetDeclaration {
-                            name: let_declaration.1.name.1,
-                            ty: ty.clone(),
-                            value: Some(TypedExpr(ty, ex)),
-                        }
-                    } else {
-                        bail!(
-                            concat!("Cannot assign value of type {} to binding of", " type {}"),
-                            ty,
-                            resolved_ty
-                        )
+                let result_decl = match (typed_expr, resolved_ty) {
+                    (None, None) => {
+                        return Err(Diagnostic(
+                            Severity::Error,
+                            let_declaration
+                                .span()
+                                .containing(DiagnosticKind::NoTypeNoValue),
+                        ));
                     }
-                }
-            };
-            scope.set_value(result_decl.name.clone(), result_decl.ty.clone());
-            Ok(result_decl)
-        })
-        .collect::<anyhow::Result<Vec<_>>>()
+
+                    // Explicitly typed with no value
+                    (None, Some(ty)) => TastLetDeclaration {
+                        name: let_declaration.value().name.clone().into_value(),
+                        ty,
+                        value: None,
+                    },
+
+                    // Infer type from value
+                    (Some(TypedExpr(ty, ex)), None) => TastLetDeclaration {
+                        name: let_declaration.value().name.clone().into_value(),
+                        ty: ty.clone(),
+                        value: Some(TypedExpr(ty, ex)),
+                    },
+
+                    // Both explicitly typed and inferable
+                    (Some(TypedExpr(ty, ex)), Some(resolved_ty)) => {
+                        if ty == resolved_ty {
+                            TastLetDeclaration {
+                                name: let_declaration.value().name.clone().into_value(),
+                                ty: ty.clone(),
+                                value: Some(TypedExpr(ty, ex)),
+                            }
+                        } else {
+                            return Err(Diagnostic(
+                                Severity::Error,
+                                let_declaration
+                                    .value()
+                                    .value
+                                    .clone()
+                                    .unwrap()
+                                    .0
+                                    .span()
+                                    .containing(
+                                        DiagnosticKind::InvalidAssignmentRightHandSideType {
+                                            expected: resolved_ty.to_string(),
+                                            got: ty.to_string(),
+                                        },
+                                    ),
+                            ));
+                        }
+                    }
+                };
+                scope.set_value(result_decl.name.clone(), result_decl.ty.clone());
+                Ok(result_decl)
+            },
+        )
+        .collect::<Result<Vec<_>, Diagnostic>>()
 }
 
 /// Process a top-level [AST declaration](AstDeclaration), insert it into the
@@ -185,7 +213,7 @@ pub fn process_let_declaration(
 pub fn process_declaration(
     global_scope: &mut Scope,
     declaration: AstDeclaration,
-) -> anyhow::Result<TypedDeclaration> {
+) -> Result<TypedDeclaration, zrc_diagnostics::Diagnostic> {
     Ok(match declaration {
         AstDeclaration::FunctionDeclaration {
             name,
@@ -193,8 +221,11 @@ pub fn process_declaration(
             return_type,
             body,
         } => {
-            if global_scope.get_value(&name.1).is_some() {
-                bail!("Identifier {} already in use", name.1);
+            if global_scope.get_value(name.value()).is_some() {
+                return Err(Diagnostic(
+                    Severity::Error,
+                    name.map(DiagnosticKind::IdentifierAlreadyInUse),
+                ));
             }
 
             let resolved_return_type = return_type
@@ -203,18 +234,18 @@ pub fn process_declaration(
                 .map_or(BlockReturnType::Void, BlockReturnType::Return);
 
             let resolved_parameters = parameters
-                .1
-                .into_iter()
-                .map(|parameter| -> anyhow::Result<TastArgumentDeclaration> {
+                .value()
+                .iter()
+                .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
                     Ok(TastArgumentDeclaration {
-                        name: parameter.1.name.1,
-                        ty: resolve_type(global_scope, parameter.1.ty)?,
+                        name: parameter.value().name.clone().into_value(),
+                        ty: resolve_type(global_scope, parameter.value().ty.clone())?,
                     })
                 })
-                .collect::<anyhow::Result<Vec<_>>>()?;
+                .collect::<Result<Vec<_>, Diagnostic>>()?;
 
             global_scope.set_value(
-                name.clone().1,
+                name.clone().into_value(),
                 TastType::Fn(
                     resolved_parameters
                         .iter()
@@ -225,7 +256,7 @@ pub fn process_declaration(
             );
 
             TypedDeclaration::FunctionDeclaration {
-                name: name.1,
+                name: name.into_value(),
                 parameters: resolved_parameters.clone(),
                 return_type: resolved_return_type.clone().into_option(),
                 body: if let Some(body) = body {
@@ -238,7 +269,7 @@ pub fn process_declaration(
                     Some(
                         type_block(
                             &function_scope,
-                            body.1,
+                            body,
                             false,
                             BlockReturnAbility::MustReturn(resolved_return_type),
                         )?
@@ -250,22 +281,31 @@ pub fn process_declaration(
             }
         }
         AstDeclaration::StructDeclaration { name, fields } => {
-            if global_scope.get_type(&name.1).is_some() {
-                bail!("Type name {} already in use", name.1);
+            if global_scope.get_type(name.value()).is_some() {
+                return Err(Diagnostic(
+                    Severity::Error,
+                    name.map(DiagnosticKind::IdentifierAlreadyInUse),
+                ));
             }
 
             let resolved_pairs = fields
-                .1
-                .into_iter()
-                .map(|(name, ty)| -> anyhow::Result<(String, TastType)> {
-                    Ok((name, resolve_type(global_scope, ty.1 .1)?))
+                .value()
+                .iter()
+                .map(|(name, ty)| -> Result<(String, TastType), Diagnostic> {
+                    Ok((
+                        name.clone(),
+                        resolve_type(global_scope, ty.value().1.clone())?,
+                    ))
                 })
-                .collect::<anyhow::Result<HashMap<_, _>>>()?;
+                .collect::<Result<HashMap<_, _>, Diagnostic>>()?;
 
-            global_scope.set_type(name.1.clone(), TastType::Struct(resolved_pairs.clone()));
+            global_scope.set_type(
+                name.value().clone(),
+                TastType::Struct(resolved_pairs.clone()),
+            );
 
             TypedDeclaration::StructDeclaration {
-                name: name.1,
+                name: name.into_value(),
                 fields: resolved_pairs,
             }
         }
@@ -304,41 +344,57 @@ pub fn process_declaration(
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
+///
+/// # Panics
+/// Panics in some internal state failures.
 // TODO: Maybe the TAST should attach the BlockReturnActuality in each BlockStmt itself and preserve
 // it on sub-blocks in the TAST (this may be helpful in control flow analysis)
 #[allow(clippy::too_many_lines)]
 #[allow(clippy::module_name_repetitions)]
 pub fn type_block(
     parent_scope: &Scope,
-    input_block: Vec<Stmt>,
+    input_block: Spanned<Vec<Stmt>>,
     can_use_break_continue: bool,
     return_ability: BlockReturnAbility,
-) -> anyhow::Result<(Vec<TypedStmt>, BlockReturnActuality)> {
+) -> Result<(Vec<TypedStmt>, BlockReturnActuality), zrc_diagnostics::Diagnostic> {
     let mut scope = parent_scope.clone();
+
+    let input_block_span = input_block.span();
 
     // At first, the block does not return.
     let (tast_block, return_actualities): (Vec<_>, Vec<_>) = input_block
+        .into_value()
         .into_iter()
         .map(
-            |stmt| -> anyhow::Result<(TypedStmt, BlockReturnActuality)> {
-                match stmt.0 .1 {
+            |stmt| -> Result<(TypedStmt, BlockReturnActuality), Diagnostic> {
+                match stmt.0.value() {
                     StmtKind::EmptyStmt => {
                         Ok((TypedStmt::EmptyStmt, BlockReturnActuality::DoesNotReturn))
                     }
                     StmtKind::BreakStmt if can_use_break_continue => {
                         Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
                     }
-                    StmtKind::BreakStmt => bail!("Cannot use break statement here"),
+                    StmtKind::BreakStmt => Err(Diagnostic(
+                        Severity::Error,
+                        stmt.0
+                            .span()
+                            .containing(DiagnosticKind::CannotUseBreakOutsideOfLoop),
+                    )),
 
                     StmtKind::ContinueStmt if can_use_break_continue => {
                         Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
                     }
-                    StmtKind::ContinueStmt => bail!("Cannot use continue statement here"),
+                    StmtKind::ContinueStmt => Err(Diagnostic(
+                        Severity::Error,
+                        stmt.0
+                            .span()
+                            .containing(DiagnosticKind::CannotUseContinueOutsideOfLoop),
+                    )),
 
                     StmtKind::DeclarationList(declarations) => Ok((
                         TypedStmt::DeclarationList(process_let_declaration(
                             &mut scope,
-                            declarations.1,
+                            declarations.clone().into_value(),
                         )?),
                         BlockReturnActuality::DoesNotReturn, /* because expressions can't return */
                     )),
@@ -348,15 +404,21 @@ pub fn type_block(
                         // branch is always taken (hence if it's WillReturn we can be WillReturn
                         // instead of MayReturn)
 
-                        let typed_cond = type_expr(&scope, cond)?;
+                        let typed_cond = type_expr(&scope, cond.clone())?;
 
                         if typed_cond.0 != TastType::Bool {
-                            bail!("If condition must be bool, not {}", typed_cond.0);
+                            return Err(Diagnostic(
+                                Severity::Error,
+                                cond.0.span().containing(DiagnosticKind::ExpectedGot {
+                                    expected: "bool".to_string(),
+                                    got: typed_cond.0.to_string(),
+                                }),
+                            ));
                         }
 
                         let (typed_then, then_return_actuality) = type_block(
                             &scope,
-                            coerce_stmt_into_block(*then),
+                            coerce_stmt_into_block(then.as_ref()),
                             can_use_break_continue,
                             // return ability of a sub-block is determined by this match:
                             match return_ability.clone() {
@@ -371,10 +433,11 @@ pub fn type_block(
                         )?;
 
                         let (typed_then_else, then_else_return_actuality) = then_else
+                            .clone()
                             .map(|then_else| {
                                 type_block(
                                     &scope,
-                                    coerce_stmt_into_block(*then_else),
+                                    coerce_stmt_into_block(then_else.as_ref()),
                                     can_use_break_continue,
                                     // return ability of a sub-block is determined by this match:
                                     match return_ability.clone() {
@@ -425,15 +488,21 @@ pub fn type_block(
                         // TODO: we might be able to prove that the body runs at least once or an
                         // infinite loop making this won't/will return statically
 
-                        let typed_cond = type_expr(&scope, cond)?;
+                        let typed_cond = type_expr(&scope, cond.clone())?;
 
                         if typed_cond.0 != TastType::Bool {
-                            bail!("While condition must be bool, not {}", typed_cond.0);
+                            return Err(Diagnostic(
+                                Severity::Error,
+                                cond.0.span().containing(DiagnosticKind::ExpectedGot {
+                                    expected: "bool".to_string(),
+                                    got: typed_cond.0.to_string(),
+                                }),
+                            ));
                         }
 
                         let (typed_body, body_return_actuality) = type_block(
                             &scope,
-                            coerce_stmt_into_block(*body),
+                            coerce_stmt_into_block(body.as_ref()),
                             true,
                             // return ability of a sub-block is determined by this match:
                             match return_ability.clone() {
@@ -477,17 +546,39 @@ pub fn type_block(
 
                         // if present, evaluate the declaration
                         let typed_init = init
-                            .map(|decl| process_let_declaration(&mut loop_scope, decl.1))
+                            .clone()
+                            .map(|decl| {
+                                process_let_declaration(&mut loop_scope, (*decl).into_value())
+                            })
                             .transpose()?;
 
-                        let typed_cond =
-                            cond.map(|cond| type_expr(&loop_scope, cond)).transpose()?;
-                        let typed_post =
-                            post.map(|post| type_expr(&loop_scope, post)).transpose()?;
+                        let typed_cond = cond
+                            .clone()
+                            .map(|cond| type_expr(&loop_scope, cond))
+                            .transpose()?;
+
+                        if let Some(inner_t_cond) = typed_cond.clone() {
+                            if inner_t_cond.0 != TastType::Bool {
+                                return Err(Diagnostic(
+                                    Severity::Error,
+                                    cond.clone().unwrap().0.span().containing(
+                                        DiagnosticKind::ExpectedGot {
+                                            expected: "bool".to_string(),
+                                            got: inner_t_cond.0.to_string(),
+                                        },
+                                    ),
+                                ));
+                            }
+                        }
+
+                        let typed_post = post
+                            .clone()
+                            .map(|post| type_expr(&loop_scope, post))
+                            .transpose()?;
 
                         let (typed_body, body_return_actuality) = type_block(
                             &loop_scope,
-                            coerce_stmt_into_block(*body),
+                            coerce_stmt_into_block(body.as_ref()),
                             true,
                             // return ability of a sub-block is determined by this match:
                             match return_ability.clone() {
@@ -526,7 +617,7 @@ pub fn type_block(
                     StmtKind::BlockStmt(body) => {
                         let (typed_body, return_actuality) = type_block(
                             &scope,
-                            body,
+                            body.clone().in_span(stmt.0.span()),
                             can_use_break_continue,
                             // return ability of a sub-block is determined by this match:
                             match return_ability.clone() {
@@ -543,17 +634,20 @@ pub fn type_block(
                     }
 
                     StmtKind::ExprStmt(expr) => Ok((
-                        TypedStmt::ExprStmt(type_expr(&scope, expr)?),
+                        TypedStmt::ExprStmt(type_expr(&scope, expr.clone())?),
                         BlockReturnActuality::DoesNotReturn,
                     )),
                     StmtKind::ReturnStmt(value) => {
-                        let resolved_value =
-                            value.map(|expr| type_expr(&scope, expr)).transpose()?;
+                        let resolved_value = value
+                            .clone()
+                            .map(|expr| type_expr(&scope, expr))
+                            .transpose()?;
                         match (resolved_value, return_ability.clone()) {
                             // expects no return
-                            (_, BlockReturnAbility::MustNotReturn) => {
-                                bail!("Cannot return from a block that must not return")
-                            }
+                            (_, BlockReturnAbility::MustNotReturn) => Err(Diagnostic(
+                                Severity::Error,
+                                stmt.0.span().containing(DiagnosticKind::CannotReturnHere),
+                            )),
 
                             // return; in void fn
                             (
@@ -570,22 +664,26 @@ pub fn type_block(
                                 None,
                                 BlockReturnAbility::MayReturn(BlockReturnType::Return(t))
                                 | BlockReturnAbility::MustReturn(BlockReturnType::Return(t)),
-                            ) => bail!(
-                                "Cannot return void from a block expecting a return type of {t}",
-                            ),
+                            ) => Err(Diagnostic(
+                                Severity::Error,
+                                stmt.0.span().containing(DiagnosticKind::ExpectedGot {
+                                    expected: t.to_string(),
+                                    got: "void".to_string(),
+                                }),
+                            )),
 
                             // return x; in fn expecting to return void
                             (
                                 Some(TypedExpr(ty, _)),
                                 BlockReturnAbility::MustReturn(BlockReturnType::Void)
                                 | BlockReturnAbility::MayReturn(BlockReturnType::Void),
-                            ) => bail!(
-                                concat!(
-                                    "Cannot return value of type {} from a block that must",
-                                    " return void"
-                                ),
-                                ty
-                            ),
+                            ) => Err(Diagnostic(
+                                Severity::Error,
+                                stmt.0.span().containing(DiagnosticKind::ExpectedGot {
+                                    expected: "void".to_string(),
+                                    got: ty.to_string(),
+                                }),
+                            )),
 
                             // return x; in fn expecting to return x
                             (
@@ -599,14 +697,15 @@ pub fn type_block(
                                         BlockReturnActuality::WillReturn,
                                     ))
                                 } else {
-                                    bail!(
-                                        concat!(
-                                            "Cannot return value of type {} from a block that",
-                                            " must return type {}"
+                                    Err(Diagnostic(
+                                        Severity::Error,
+                                        value.clone().unwrap().0.span().containing(
+                                            DiagnosticKind::ExpectedGot {
+                                                expected: t.to_string(),
+                                                got: ty.to_string(),
+                                            },
                                         ),
-                                        ty,
-                                        t
-                                    )
+                                    ))
                                 }
                             }
                         }
@@ -614,7 +713,7 @@ pub fn type_block(
                 }
             },
         )
-        .collect::<anyhow::Result<Vec<_>>>()?
+        .collect::<Result<Vec<_>, Diagnostic>>()?
         .into_iter()
         .unzip();
 
@@ -651,17 +750,21 @@ pub fn type_block(
         (BlockReturnAbility::MayReturn(_), BlockReturnActuality::DoesNotReturn) => {
             Ok((tast_block, BlockReturnActuality::DoesNotReturn))
         }
-        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::MightReturn) => {
-            bail!("Block must return, but no sub-block is guaranteed to return")
-        }
+        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::MightReturn) => Err(Diagnostic(
+            Severity::Error,
+            input_block_span.containing(DiagnosticKind::ExpectedABlockToReturn),
+        )),
         (BlockReturnAbility::MustReturn(_), BlockReturnActuality::DoesNotReturn) => {
-            bail!("Block must return, but no sub-block is guaranteed to return")
+            Err(Diagnostic(
+                Severity::Error,
+                input_block_span.containing(DiagnosticKind::ExpectedABlockToReturn),
+            ))
         }
         (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => {
-            bail!("Block must not return, but a sub-block may return")
+            panic!("block must not return, but a sub-block may return -- this should have been caught when checking that block");
         }
         (BlockReturnAbility::MustNotReturn, BlockReturnActuality::WillReturn) => {
-            bail!("Block must not return, but a sub-block may return")
+            panic!("block must not return, but a sub-block will return -- this should have been caught when checking that block");
         }
     }
 }

@@ -1,12 +1,11 @@
 [package]
-name = "zrc_typeck"
+name = "zrc_diagnostics"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.75"
-zrc_diagnostics = { version = "0.1.0", path = "../zrc_diagnostics" }
-zrc_parser = { version = "0.1.0", path = "../zrc_parser" }
+ansi_term = "0.12.1"
+line-span = "0.1.5"
 zrc_utils = { version = "0.1.0", path = "../zrc_utils" }

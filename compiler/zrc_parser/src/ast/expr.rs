@@ -3,6 +3,7 @@
 //! The main thing within this module you will need is the [`Expr`] struct.
 
 use std::fmt::Display;
+use zrc_utils::span::Spanned;
 
 /// Arithmetic operators
 ///
@@ -170,11 +171,11 @@ impl Display for Comparison {
 
 /// A Zirco expression
 #[derive(PartialEq, Debug, Clone)]
-pub struct Expr(pub super::Spanned<ExprKind>);
+pub struct Expr(pub Spanned<ExprKind>);
 
 impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0 .1.fmt(f)
+        self.0.value().fmt(f)
     }
 }
 
@@ -215,11 +216,11 @@ pub enum ExprKind {
     /// `a[b]`
     Index(Box<Expr>, Box<Expr>),
     /// `a.b`
-    Dot(Box<Expr>, super::Spanned<String>),
+    Dot(Box<Expr>, Spanned<String>),
     /// `a->b`
-    Arrow(Box<Expr>, super::Spanned<String>),
+    Arrow(Box<Expr>, Spanned<String>),
     /// `a(b, c, d, ...)`
-    Call(Box<Expr>, super::Spanned<Vec<Expr>>),
+    Call(Box<Expr>, Spanned<Vec<Expr>>),
 
     /// `a ? b : c`
     Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
@@ -235,9 +236,6 @@ pub enum ExprKind {
     Identifier(String),
     /// Any boolean literal.
     BooleanLiteral(bool),
-
-    /// An error occurred while parsing.
-    Error,
 }
 impl Display for ExprKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -247,7 +245,6 @@ impl Display for ExprKind {
             Self::StringLiteral(s) => write!(f, "{s}"),
             Self::Identifier(i) => write!(f, "{i}"),
             Self::BooleanLiteral(b) => write!(f, "{b}"),
-            Self::Error => write!(f, "error"),
             Self::Assignment(op, l, r) => write!(f, "{l} {op} {r}"),
             Self::Equality(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
             Self::Comparison(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
@@ -260,16 +257,17 @@ impl Display for ExprKind {
             Self::UnaryMinus(e) => write!(f, "-{e}"),
             Self::UnaryAddressOf(e) => write!(f, "&{e}"),
             Self::UnaryDereference(e) => write!(f, "*{e}"),
-            Self::Arrow(l, r) => write!(f, "{l}->{}", r.1),
+            Self::Arrow(l, r) => write!(f, "{l}->{}", r.value()),
             Self::Ternary(l, m, r) => write!(f, "{l} ? {m} : {r}"),
             Self::Index(a, b) => write!(f, "{a}[{b}]"),
-            Self::Dot(a, b) => write!(f, "{a}.{}", b.1),
+            Self::Dot(a, b) => write!(f, "{a}.{}", b.value()),
             Self::Cast(a, t) => write!(f, "{a} as {t}"),
             Self::Call(a, b) => write!(
                 f,
                 "{}({})",
                 a,
-                b.1.iter()
+                b.value()
+                    .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", ")

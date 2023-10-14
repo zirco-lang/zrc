@@ -1,6 +1,8 @@
 [workspace]
 members = [
     "compiler/zrc",
+    "compiler/zrc_utils",
+    "compiler/zrc_diagnostics",
     "compiler/zrc_parser",
     "compiler/zrc_typeck",
     "compiler/zrc_codegen",
