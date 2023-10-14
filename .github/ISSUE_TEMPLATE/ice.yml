@@ -1,9 +1,9 @@
-name: Report a Bug
-description: If your compiler has encountered a bug that is not an ICE, report it here.
-title: "bug: add your bug title here..."
+name: Report a Panic/ICE (Internal Compiler Error)
+description: If your compiler has crashed or panicked (called an ICE), report it here!
+title: "ice: panicked at 'explicit panic'"
 labels:
     - status/untriaged
-    - type/bug
+    - type/bug/ice
 body:
     - type: markdown
       attributes:
@@ -13,14 +13,6 @@ body:
               Compiler bugs are supposedly rare, so take a second to pat yourself on
               the back! By reporting a bug, you're improving the entire Zirco
               ecosystem as a whole.
-
-
-              ## Stop! Wait a second.
-
-              If your compiler has failed with a message saying "internal compiler
-              error," you are not in the right place. Please [create an ICE
-              report](https://github.com/zirco-lang/zrc/issues/new?template=ice.yml)
-              instead. Otherwise, let's go on...
     - type: checkboxes
       id: checks
       attributes:
@@ -37,53 +29,42 @@ body:
               ## Name Your Issue
 
               Now that we've done that, it's time to give your bug report a good name.
-              Summarize the bug you encountered and place it in the name of the issue.
+              If your compiler ICEd, you should see a large message on your screen.
+              Read through it and you will likely find a portion that says `thread
+              'main' panicked at '...'`. Replace "explicit panic" in the issue title
+              with the "..." from that panic message. This will help us handle your
+              report best.
 
 
               Once we've done that, it's time to collect some more information!
     - type: textarea
-      id: what-happened
+      id: ice-message
       attributes:
-          label: What happened?
-          description: Please describe the bug you encountered.
-      validations:
-          required: true
-    - type: textarea
-      id: version
-      attributes:
-          label: What version of Zirco are you running?
+          label: What was the ICE diagnostic?
           description: >-
-              Please paste the ENTIRE output of `zrc --version` below, including any
-              lines like "tainted files."
-          placeholder: zrc version 1.0.0 (...)
+              When your compiler panics, it produces some output that helps us
+              diagnose the issue. The entirety of your compiler's STDOUT is helpful in
+              determining how you were using the compiler. Please paste the **entire**
+              output when the panic occured.
+          placeholder: "error: internal compiler error encountered: thread panicked ..."
       validations:
           required: true
     - type: textarea
       id: repro
       attributes:
-          label: How can this bug be reproduced?
+          label: What were you doing when the panic occured?
           description: >-
-              Walk us through the steps. Show us what your `zrc` compilation flags
-              were and what code you were compiling, if applicable. Keep it concice
-              please!
+              Please describe how you invoked `zrc`, what you were trying to compille,
+              etc.
       validations:
           required: true
     - type: textarea
-      id: expected
+      id: repro-code
       attributes:
-          label: What behavior did you expect?
+          label: Provide an example of code that causes the panic.
           description: >-
-              Please tell us what you expected the compiler to do in the above
-              scenario.
-      validations:
-          required: true
-    - type: textarea
-      id: actual
-      attributes:
-          label: What actually happened?
-          description: >-
-              Please describe what really happened and how it differs from your
-              expected result.
+              Please share an example of code that causes the panic, or a link to a
+              GitHub repository etc. of what you were trying to compile.
       validations:
           required: true
     - type: textarea

@@ -8,7 +8,64 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
+use std::path::PathBuf;
+
 use anyhow::Context as _;
+use clap::{
+    builder::{styling::Reset, Resettable},
+    Parser,
+};
+use shadow_rs::shadow;
+
+shadow!(build);
+
+fn version() -> String {
+    format!(
+        "{zrc} version {version} ({commit}, {taint_string}) built for {target} on {time} ({mode} mode)\n{rust_version} ({rust_channel} on {build_os})\n{cargo_version}{taint_extra}",
+        zrc = build::PROJECT_NAME,
+        version = build::PKG_VERSION,
+        commit = build::COMMIT_HASH,
+        taint_string = match build::GIT_CLEAN {
+            true => "not tainted",
+            false => "tainted!"
+        },
+        target = build::BUILD_TARGET,
+        time = build::BUILD_TIME_3339,
+        mode = build::BUILD_RUST_CHANNEL,
+        rust_version = build::RUST_VERSION,
+        rust_channel = build::RUST_CHANNEL,
+        build_os = build::BUILD_OS,
+        cargo_version = build::CARGO_VERSION,
+
+        taint_extra = match build::GIT_CLEAN {
+            true => "".to_string(),
+            false => {
+                // git is tainted
+                format!("\ntainted files: {}", build::GIT_STATUS_FILE.lines().map(|x| format!("\n{}", {
+                    if x.ends_with(" (dirty)") {
+                        &x[..x.len()-" (dirty)".len()]
+                    } else if x.ends_with(" (staged)") {
+                        &x[..x.len()-" (staged)".len()]
+                    } else {
+                        &x // this should never actually happen
+                    }
+                })).collect::<String>())
+            }
+        }
+    )
+}
+
+/// The official Zirco compiler
+#[derive(Parser)]
+#[command(version=None)]
+struct Cli {
+    /// See what version of zrc you are using
+    #[arg(short, long)]
+    version: bool,
+
+    /// The path of the file to compile
+    path: Option<PathBuf>,
+}
 
 fn main() -> anyhow::Result<()> {
     let default_panic_hook = std::panic::take_hook();
@@ -20,16 +77,36 @@ fn main() -> anyhow::Result<()> {
         eprintln!(
             "note: compiler bugs threaten the Zirco ecosystem -- we would appreciate a bug report:"
         );
-        eprintln!("note: bug reporting link: https://github.com/zirco-lang/zrc/issues/new?template=bug.yml");
+        eprintln!("note: bug reporting link: https://github.com/zirco-lang/zrc/issues/new?template=ice.yml");
+        eprintln!();
+        eprintln!(
+            "{}",
+            version()
+                .lines()
+                .map(|line| format!("info: {line}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+        eprintln!();
+        eprintln!(
+            "info: command line arguments: {}",
+            std::env::args().collect::<Vec<_>>().join(" ")
+        );
         eprintln!();
         default_panic_hook(panic_info);
         eprintln!();
         eprintln!("error: end internal compiler error. compilation failed.");
     }));
 
-    let content =
-        std::fs::read_to_string(std::env::args().nth(1).context("no input file provided")?)
-            .context("failed to read input file")?;
+    let cli = Cli::parse();
+
+    if cli.version {
+        println!("{}", version());
+        return Ok(());
+    }
+
+    let content = std::fs::read_to_string(cli.path.context("no input file provided")?)
+        .context("failed to read input file")?;
 
     let result = compile(&content);
     match result {
