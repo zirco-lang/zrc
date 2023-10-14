@@ -45,7 +45,9 @@ body:
               When your compiler panics, it produces some output that helps us
               diagnose the issue. The entirety of your compiler's STDOUT is helpful in
               determining how you were using the compiler. Please paste the **entire**
-              output when the panic occured.
+              output when the panic occurred. Note that it will help us **much more** if
+              you can re-run the compiler with `RUST_BACKTRACE=full` before the executable
+              (e.g. `RUST_BACKTRACE=full zrc ...`). PLEASE consider doing this.
           placeholder: "error: internal compiler error encountered: thread panicked ..."
       validations:
           required: true

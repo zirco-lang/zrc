@@ -100,13 +100,13 @@ fn main() -> anyhow::Result<()> {
             "{}",
             version()
                 .lines()
-                .map(|line| format!("info: {line}"))
+                .map(|line| format!("note: {line}"))
                 .collect::<Vec<_>>()
                 .join("\n")
         );
         eprintln!();
         eprintln!(
-            "info: command line arguments: {}",
+            "note: command line arguments: {}",
             std::env::args().collect::<Vec<_>>().join(" ")
         );
         eprintln!();
