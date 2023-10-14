@@ -11,13 +11,17 @@
 use std::path::PathBuf;
 
 use anyhow::Context as _;
-use clap::{
-    builder::{styling::Reset, Resettable},
-    Parser,
-};
-use shadow_rs::shadow;
+use clap::Parser;
 
-shadow!(build);
+#[doc(hidden)]
+#[allow(clippy::all)]
+#[allow(clippy::nursery)]
+#[allow(clippy::pedantic)]
+#[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
+pub mod build {
+    include!(concat!(env!("OUT_DIR"), "/shadow.rs"));
+}
 
 fn version() -> String {
     format!(
