@@ -1,8 +1,13 @@
 //! Lexer and lexical errors
 //!
-//! This module contains a wrapper around a [logos] lexer that splits an input Zirco text into its individual tokens, which can be then passed into the internal Zirco parser.
+//! This module contains a wrapper around a [logos] lexer that splits an input
+//! Zirco text into its individual tokens, which can be then passed into the
+//! internal Zirco parser.
 //!
-//! You do not usually need to use this crate, as the [parser](super::parser) already creates [`ZircoLexer`] instances for you before passing them to the internal parser. However, there are some cases where it may be helpful, so it is kept public.
+//! You do not usually need to use this crate, as the [parser](super::parser)
+//! already creates [`ZircoLexer`] instances for you before passing them to the
+//! internal parser. However, there are some cases where it may be helpful, so
+//! it is kept public.
 //!
 //! # Example
 //! ```
@@ -21,14 +26,18 @@ use std::fmt::Display;
 use logos::{Lexer, Logos};
 
 /// Represents a lexer token within a certain span, or an error.
+/// The lexer uses its own Spanned type because LALRPOP expects them in this format. After parsing,
+/// they will be converted into [`zrc_utils::span::Spanned<T>`] instances.
 pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
 
-/// The error enum passed to the internal logos [`Lexer`]. Will be converted to a [`LexicalError`] by [`ZircoLexer`].
+/// The error enum passed to the internal logos [`Lexer`]. Will be converted to
+/// a [`LexicalError`] by [`ZircoLexer`].
 ///
 /// Do not use publicly.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum InternalLexicalError {
-    /// A generic lexing error. This is later converted to [`LexicalError::UnknownToken`].
+    /// A generic lexing error. This is later converted to
+    /// [`LexicalError::UnknownToken`].
     #[default]
     NoMatchingRule,
     /// A string literal was left unterminated.
@@ -42,24 +51,39 @@ pub enum InternalLexicalError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexicalError {
     /// An unknown token was encountered.
-    UnknownToken(usize, char, usize),
+    UnknownToken(zrc_utils::span::Spanned<char>),
     /// A string literal was left unterminated.
-    UnterminatedStringLiteral(usize, usize),
+    UnterminatedStringLiteral(zrc_utils::span::Span),
     /// A block comment ran to the end of the file. Remind the user that block
     /// comments nest.
-    UnterminatedBlockComment(usize, usize),
+    UnterminatedBlockComment(zrc_utils::span::Span),
 }
 impl Display for LexicalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnknownToken(s, char, e) => {
-                write!(f, "Unknown token '{char}' at position {s}-{e}")
+            Self::UnknownToken(char) => {
+                write!(
+                    f,
+                    "Unknown token '{}' at position {}",
+                    char.value(),
+                    char.span()
+                )
             }
-            Self::UnterminatedStringLiteral(start, end) => {
-                write!(f, "Unterminated string literal from {start} to {end}")
+            Self::UnterminatedStringLiteral(span) => {
+                write!(
+                    f,
+                    "Unterminated string literal from {} to {}",
+                    span.start(),
+                    span.end()
+                )
             }
-            Self::UnterminatedBlockComment(start, end) => {
-                write!(f, "Unterminated block comment from {start}-{end}")
+            Self::UnterminatedBlockComment(span) => {
+                write!(
+                    f,
+                    "Unterminated block comment from {} to {}",
+                    span.start(),
+                    span.end()
+                )
             }
         }
     }
@@ -448,14 +472,23 @@ impl<'input> Iterator for ZircoLexer<'input> {
         match token {
             Err(InternalLexicalError::NoMatchingRule) => {
                 let char = slice.chars().next().unwrap();
-                Some(Err(LexicalError::UnknownToken(span.start, char, span.end)))
+                Some(Err(LexicalError::UnknownToken(
+                    zrc_utils::span::Spanned::from_span_and_value(
+                        zrc_utils::span::Span::from_positions(span.start, span.end),
+                        char,
+                    ),
+                )))
             }
-            Err(InternalLexicalError::UnterminatedBlockComment) => Some(Err(
-                LexicalError::UnterminatedBlockComment(span.start, span.end),
-            )),
-            Err(InternalLexicalError::UnterminatedStringLiteral) => Some(Err(
-                LexicalError::UnterminatedStringLiteral(span.start, span.end),
-            )),
+            Err(InternalLexicalError::UnterminatedBlockComment) => {
+                Some(Err(LexicalError::UnterminatedBlockComment(
+                    zrc_utils::span::Span::from_positions(span.start, span.end),
+                )))
+            }
+            Err(InternalLexicalError::UnterminatedStringLiteral) => {
+                Some(Err(LexicalError::UnterminatedStringLiteral(
+                    zrc_utils::span::Span::from_positions(span.start, span.end),
+                )))
+            }
             Ok(token) => Some(Ok((span.start, token, span.end))),
         }
     }
@@ -489,7 +522,9 @@ mod tests {
         let tokens: Vec<_> = lexer.collect();
         assert_eq!(
             tokens,
-            vec![Err(LexicalError::UnterminatedStringLiteral(0, 4))]
+            vec![Err(LexicalError::UnterminatedStringLiteral(
+                zrc_utils::span::Span::from_positions(0, 4)
+            ))]
         );
     }
 
@@ -558,7 +593,9 @@ mod tests {
                 tokens,
                 vec![
                     Ok((0, Tok::Identifier("a".to_string()), 1)),
-                    Err(LexicalError::UnterminatedBlockComment(2, 7))
+                    Err(LexicalError::UnterminatedBlockComment(
+                        zrc_utils::span::Span::from_positions(2, 7)
+                    ))
                 ]
             );
         }

@@ -2,11 +2,11 @@
 
 use std::collections::HashMap;
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity, Spanned as DiagnosticSpan};
-use zrc_parser::ast::{
-    stmt::{Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind},
-    Spanned,
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+use zrc_parser::ast::stmt::{
+    Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind,
 };
+use zrc_utils::span::{Spannable, Spanned};
 
 use super::{resolve_type, type_expr, Scope};
 use crate::tast::{
@@ -94,10 +94,10 @@ pub enum BlockReturnActuality {
 /// Convert a single [AST statement](Stmt) like `x;` to a block statement `{ x;
 /// }` without converting `{ x; }` to `{ { x; } }`. This is preferred instead of
 /// `vec![x]` as it prevents extra nesting layers.
-fn coerce_stmt_into_block(stmt: Stmt) -> super::Spanned<Vec<Stmt>> {
-    match stmt.0 .1 {
-        StmtKind::BlockStmt(stmts) => Spanned(stmt.0 .0, stmts, stmt.0 .2),
-        _ => Spanned(stmt.0 .0, vec![stmt.clone()], stmt.0 .2),
+fn coerce_stmt_into_block(stmt: &Stmt) -> Spanned<Vec<Stmt>> {
+    match stmt.0.value().clone() {
+        StmtKind::BlockStmt(stmts) => stmts.in_span(stmt.0.span()),
+        _ => vec![stmt.clone()].in_span(stmt.0.span()),
     }
 }
 
@@ -115,27 +115,31 @@ pub fn process_let_declaration(
         .into_iter()
         .map(
             |let_declaration| -> Result<TastLetDeclaration, Diagnostic> {
-                if scope.get_value(&let_declaration.1.name.1).is_some() {
+                if scope
+                    .get_value(let_declaration.value().name.value())
+                    .is_some()
+                {
                     // TODO: In the future we may allow shadowing but currently no
                     return Err(Diagnostic(
                         Severity::Error,
-                        DiagnosticSpan(
-                            let_declaration.1.name.0,
-                            DiagnosticKind::IdentifierAlreadyInUse(let_declaration.1.name.1),
-                            let_declaration.1.name.2,
-                        ),
+                        let_declaration
+                            .value()
+                            .name
+                            .clone()
+                            .map(DiagnosticKind::IdentifierAlreadyInUse),
                     ));
                 }
 
                 let typed_expr = let_declaration
-                    .1
+                    .value()
                     .value
                     .clone()
                     .map(|expr| type_expr(scope, expr))
                     .transpose()?;
                 let resolved_ty = let_declaration
-                    .1
+                    .value()
                     .ty
+                    .clone()
                     .map(|ty| resolve_type(scope, ty))
                     .transpose()?;
 
@@ -143,24 +147,22 @@ pub fn process_let_declaration(
                     (None, None) => {
                         return Err(Diagnostic(
                             Severity::Error,
-                            DiagnosticSpan(
-                                let_declaration.0,
-                                DiagnosticKind::NoTypeNoValue,
-                                let_declaration.2,
-                            ),
+                            let_declaration
+                                .span()
+                                .containing(DiagnosticKind::NoTypeNoValue),
                         ));
                     }
 
                     // Explicitly typed with no value
                     (None, Some(ty)) => TastLetDeclaration {
-                        name: let_declaration.1.name.1,
+                        name: let_declaration.value().name.clone().into_value(),
                         ty,
                         value: None,
                     },
 
                     // Infer type from value
                     (Some(TypedExpr(ty, ex)), None) => TastLetDeclaration {
-                        name: let_declaration.1.name.1,
+                        name: let_declaration.value().name.clone().into_value(),
                         ty: ty.clone(),
                         value: Some(TypedExpr(ty, ex)),
                     },
@@ -169,21 +171,26 @@ pub fn process_let_declaration(
                     (Some(TypedExpr(ty, ex)), Some(resolved_ty)) => {
                         if ty == resolved_ty {
                             TastLetDeclaration {
-                                name: let_declaration.1.name.1,
+                                name: let_declaration.value().name.clone().into_value(),
                                 ty: ty.clone(),
                                 value: Some(TypedExpr(ty, ex)),
                             }
                         } else {
                             return Err(Diagnostic(
                                 Severity::Error,
-                                DiagnosticSpan(
-                                    let_declaration.1.value.clone().unwrap().0 .0,
-                                    DiagnosticKind::InvalidAssignmentRightHandSideType {
-                                        expected: resolved_ty.to_string(),
-                                        got: ty.to_string(),
-                                    },
-                                    let_declaration.1.value.unwrap().0 .2,
-                                ),
+                                let_declaration
+                                    .value()
+                                    .value
+                                    .clone()
+                                    .unwrap()
+                                    .0
+                                    .span()
+                                    .containing(
+                                        DiagnosticKind::InvalidAssignmentRightHandSideType {
+                                            expected: resolved_ty.to_string(),
+                                            got: ty.to_string(),
+                                        },
+                                    ),
                             ));
                         }
                     }
@@ -214,14 +221,10 @@ pub fn process_declaration(
             return_type,
             body,
         } => {
-            if global_scope.get_value(&name.1).is_some() {
+            if global_scope.get_value(name.value()).is_some() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    DiagnosticSpan(
-                        name.0,
-                        DiagnosticKind::IdentifierAlreadyInUse(name.1),
-                        name.2,
-                    ),
+                    name.map(DiagnosticKind::IdentifierAlreadyInUse),
                 ));
             }
 
@@ -231,18 +234,18 @@ pub fn process_declaration(
                 .map_or(BlockReturnType::Void, BlockReturnType::Return);
 
             let resolved_parameters = parameters
-                .1
-                .into_iter()
+                .value()
+                .iter()
                 .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
                     Ok(TastArgumentDeclaration {
-                        name: parameter.1.name.1,
-                        ty: resolve_type(global_scope, parameter.1.ty)?,
+                        name: parameter.value().name.clone().into_value(),
+                        ty: resolve_type(global_scope, parameter.value().ty.clone())?,
                     })
                 })
                 .collect::<Result<Vec<_>, Diagnostic>>()?;
 
             global_scope.set_value(
-                name.clone().1,
+                name.clone().into_value(),
                 TastType::Fn(
                     resolved_parameters
                         .iter()
@@ -253,7 +256,7 @@ pub fn process_declaration(
             );
 
             TypedDeclaration::FunctionDeclaration {
-                name: name.1,
+                name: name.into_value(),
                 parameters: resolved_parameters.clone(),
                 return_type: resolved_return_type.clone().into_option(),
                 body: if let Some(body) = body {
@@ -278,29 +281,31 @@ pub fn process_declaration(
             }
         }
         AstDeclaration::StructDeclaration { name, fields } => {
-            if global_scope.get_type(&name.1).is_some() {
+            if global_scope.get_type(name.value()).is_some() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    DiagnosticSpan(
-                        name.0,
-                        DiagnosticKind::IdentifierAlreadyInUse(name.1),
-                        name.2,
-                    ),
+                    name.map(DiagnosticKind::IdentifierAlreadyInUse),
                 ));
             }
 
             let resolved_pairs = fields
-                .1
-                .into_iter()
+                .value()
+                .iter()
                 .map(|(name, ty)| -> Result<(String, TastType), Diagnostic> {
-                    Ok((name, resolve_type(global_scope, ty.1 .1)?))
+                    Ok((
+                        name.clone(),
+                        resolve_type(global_scope, ty.value().1.clone())?,
+                    ))
                 })
                 .collect::<Result<HashMap<_, _>, Diagnostic>>()?;
 
-            global_scope.set_type(name.1.clone(), TastType::Struct(resolved_pairs.clone()));
+            global_scope.set_type(
+                name.value().clone(),
+                TastType::Struct(resolved_pairs.clone()),
+            );
 
             TypedDeclaration::StructDeclaration {
-                name: name.1,
+                name: name.into_value(),
                 fields: resolved_pairs,
             }
         }
@@ -348,19 +353,21 @@ pub fn process_declaration(
 #[allow(clippy::module_name_repetitions)]
 pub fn type_block(
     parent_scope: &Scope,
-    input_block: super::Spanned<Vec<Stmt>>,
+    input_block: Spanned<Vec<Stmt>>,
     can_use_break_continue: bool,
     return_ability: BlockReturnAbility,
 ) -> Result<(Vec<TypedStmt>, BlockReturnActuality), zrc_diagnostics::Diagnostic> {
     let mut scope = parent_scope.clone();
 
+    let input_block_span = input_block.span();
+
     // At first, the block does not return.
     let (tast_block, return_actualities): (Vec<_>, Vec<_>) = input_block
-        .1
+        .into_value()
         .into_iter()
         .map(
             |stmt| -> Result<(TypedStmt, BlockReturnActuality), Diagnostic> {
-                match stmt.0 .1 {
+                match stmt.0.value() {
                     StmtKind::EmptyStmt => {
                         Ok((TypedStmt::EmptyStmt, BlockReturnActuality::DoesNotReturn))
                     }
@@ -369,11 +376,9 @@ pub fn type_block(
                     }
                     StmtKind::BreakStmt => Err(Diagnostic(
                         Severity::Error,
-                        DiagnosticSpan(
-                            stmt.0 .0,
-                            DiagnosticKind::CannotUseBreakOutsideOfLoop,
-                            stmt.0 .2,
-                        ),
+                        stmt.0
+                            .span()
+                            .containing(DiagnosticKind::CannotUseBreakOutsideOfLoop),
                     )),
 
                     StmtKind::ContinueStmt if can_use_break_continue => {
@@ -381,17 +386,15 @@ pub fn type_block(
                     }
                     StmtKind::ContinueStmt => Err(Diagnostic(
                         Severity::Error,
-                        DiagnosticSpan(
-                            stmt.0 .0,
-                            DiagnosticKind::CannotUseContinueOutsideOfLoop,
-                            stmt.0 .2,
-                        ),
+                        stmt.0
+                            .span()
+                            .containing(DiagnosticKind::CannotUseContinueOutsideOfLoop),
                     )),
 
                     StmtKind::DeclarationList(declarations) => Ok((
                         TypedStmt::DeclarationList(process_let_declaration(
                             &mut scope,
-                            declarations.1,
+                            declarations.clone().into_value(),
                         )?),
                         BlockReturnActuality::DoesNotReturn, /* because expressions can't return */
                     )),
@@ -406,20 +409,16 @@ pub fn type_block(
                         if typed_cond.0 != TastType::Bool {
                             return Err(Diagnostic(
                                 Severity::Error,
-                                DiagnosticSpan(
-                                    cond.0 .0,
-                                    DiagnosticKind::ExpectedGot {
-                                        expected: "bool".to_string(),
-                                        got: typed_cond.0.to_string(),
-                                    },
-                                    cond.0 .2,
-                                ),
+                                cond.0.span().containing(DiagnosticKind::ExpectedGot {
+                                    expected: "bool".to_string(),
+                                    got: typed_cond.0.to_string(),
+                                }),
                             ));
                         }
 
                         let (typed_then, then_return_actuality) = type_block(
                             &scope,
-                            coerce_stmt_into_block(*then),
+                            coerce_stmt_into_block(then.as_ref()),
                             can_use_break_continue,
                             // return ability of a sub-block is determined by this match:
                             match return_ability.clone() {
@@ -434,10 +433,11 @@ pub fn type_block(
                         )?;
 
                         let (typed_then_else, then_else_return_actuality) = then_else
+                            .clone()
                             .map(|then_else| {
                                 type_block(
                                     &scope,
-                                    coerce_stmt_into_block(*then_else),
+                                    coerce_stmt_into_block(then_else.as_ref()),
                                     can_use_break_continue,
                                     // return ability of a sub-block is determined by this match:
                                     match return_ability.clone() {
@@ -493,20 +493,16 @@ pub fn type_block(
                         if typed_cond.0 != TastType::Bool {
                             return Err(Diagnostic(
                                 Severity::Error,
-                                DiagnosticSpan(
-                                    cond.0 .0,
-                                    DiagnosticKind::ExpectedGot {
-                                        expected: "bool".to_string(),
-                                        got: typed_cond.0.to_string(),
-                                    },
-                                    cond.0 .2,
-                                ),
+                                cond.0.span().containing(DiagnosticKind::ExpectedGot {
+                                    expected: "bool".to_string(),
+                                    got: typed_cond.0.to_string(),
+                                }),
                             ));
                         }
 
                         let (typed_body, body_return_actuality) = type_block(
                             &scope,
-                            coerce_stmt_into_block(*body),
+                            coerce_stmt_into_block(body.as_ref()),
                             true,
                             // return ability of a sub-block is determined by this match:
                             match return_ability.clone() {
@@ -550,7 +546,10 @@ pub fn type_block(
 
                         // if present, evaluate the declaration
                         let typed_init = init
-                            .map(|decl| process_let_declaration(&mut loop_scope, decl.1))
+                            .clone()
+                            .map(|decl| {
+                                process_let_declaration(&mut loop_scope, (*decl).into_value())
+                            })
                             .transpose()?;
 
                         let typed_cond = cond
@@ -562,24 +561,24 @@ pub fn type_block(
                             if inner_t_cond.0 != TastType::Bool {
                                 return Err(Diagnostic(
                                     Severity::Error,
-                                    DiagnosticSpan(
-                                        cond.clone().unwrap().0 .0,
+                                    cond.clone().unwrap().0.span().containing(
                                         DiagnosticKind::ExpectedGot {
                                             expected: "bool".to_string(),
                                             got: inner_t_cond.0.to_string(),
                                         },
-                                        cond.unwrap().0 .2,
                                     ),
                                 ));
                             }
                         }
 
-                        let typed_post =
-                            post.map(|post| type_expr(&loop_scope, post)).transpose()?;
+                        let typed_post = post
+                            .clone()
+                            .map(|post| type_expr(&loop_scope, post))
+                            .transpose()?;
 
                         let (typed_body, body_return_actuality) = type_block(
                             &loop_scope,
-                            coerce_stmt_into_block(*body),
+                            coerce_stmt_into_block(body.as_ref()),
                             true,
                             // return ability of a sub-block is determined by this match:
                             match return_ability.clone() {
@@ -618,7 +617,7 @@ pub fn type_block(
                     StmtKind::BlockStmt(body) => {
                         let (typed_body, return_actuality) = type_block(
                             &scope,
-                            Spanned(stmt.0 .0, body, stmt.0 .2),
+                            body.clone().in_span(stmt.0.span()),
                             can_use_break_continue,
                             // return ability of a sub-block is determined by this match:
                             match return_ability.clone() {
@@ -635,7 +634,7 @@ pub fn type_block(
                     }
 
                     StmtKind::ExprStmt(expr) => Ok((
-                        TypedStmt::ExprStmt(type_expr(&scope, expr)?),
+                        TypedStmt::ExprStmt(type_expr(&scope, expr.clone())?),
                         BlockReturnActuality::DoesNotReturn,
                     )),
                     StmtKind::ReturnStmt(value) => {
@@ -647,11 +646,7 @@ pub fn type_block(
                             // expects no return
                             (_, BlockReturnAbility::MustNotReturn) => Err(Diagnostic(
                                 Severity::Error,
-                                DiagnosticSpan(
-                                    stmt.0 .0,
-                                    DiagnosticKind::CannotReturnHere,
-                                    stmt.0 .2,
-                                ),
+                                stmt.0.span().containing(DiagnosticKind::CannotReturnHere),
                             )),
 
                             // return; in void fn
@@ -671,14 +666,10 @@ pub fn type_block(
                                 | BlockReturnAbility::MustReturn(BlockReturnType::Return(t)),
                             ) => Err(Diagnostic(
                                 Severity::Error,
-                                DiagnosticSpan(
-                                    stmt.0 .0,
-                                    DiagnosticKind::ExpectedGot {
-                                        expected: t.to_string(),
-                                        got: "void".to_string(),
-                                    },
-                                    stmt.0 .2,
-                                ),
+                                stmt.0.span().containing(DiagnosticKind::ExpectedGot {
+                                    expected: t.to_string(),
+                                    got: "void".to_string(),
+                                }),
                             )),
 
                             // return x; in fn expecting to return void
@@ -688,14 +679,10 @@ pub fn type_block(
                                 | BlockReturnAbility::MayReturn(BlockReturnType::Void),
                             ) => Err(Diagnostic(
                                 Severity::Error,
-                                DiagnosticSpan(
-                                    stmt.0 .0,
-                                    DiagnosticKind::ExpectedGot {
-                                        expected: "void".to_string(),
-                                        got: ty.to_string(),
-                                    },
-                                    stmt.0 .2,
-                                ),
+                                stmt.0.span().containing(DiagnosticKind::ExpectedGot {
+                                    expected: "void".to_string(),
+                                    got: ty.to_string(),
+                                }),
                             )),
 
                             // return x; in fn expecting to return x
@@ -712,13 +699,11 @@ pub fn type_block(
                                 } else {
                                     Err(Diagnostic(
                                         Severity::Error,
-                                        DiagnosticSpan(
-                                            value.clone().unwrap().0 .0,
+                                        value.clone().unwrap().0.span().containing(
                                             DiagnosticKind::ExpectedGot {
                                                 expected: t.to_string(),
                                                 got: ty.to_string(),
                                             },
-                                            value.unwrap().0 .2,
                                         ),
                                     ))
                                 }
@@ -767,20 +752,12 @@ pub fn type_block(
         }
         (BlockReturnAbility::MustReturn(_), BlockReturnActuality::MightReturn) => Err(Diagnostic(
             Severity::Error,
-            DiagnosticSpan(
-                input_block.0,
-                DiagnosticKind::ExpectedABlockToReturn,
-                input_block.2,
-            ),
+            input_block_span.containing(DiagnosticKind::ExpectedABlockToReturn),
         )),
         (BlockReturnAbility::MustReturn(_), BlockReturnActuality::DoesNotReturn) => {
             Err(Diagnostic(
                 Severity::Error,
-                DiagnosticSpan(
-                    input_block.0,
-                    DiagnosticKind::ExpectedABlockToReturn,
-                    input_block.2,
-                ),
+                input_block_span.containing(DiagnosticKind::ExpectedABlockToReturn),
             ))
         }
         (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => {

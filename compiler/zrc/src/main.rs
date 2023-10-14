@@ -23,15 +23,17 @@ pub mod build {
     include!(concat!(env!("OUT_DIR"), "/shadow.rs"));
 }
 
+/// Returns the string which represents the current Zirco version
 fn version() -> String {
     format!(
         "{zrc} version {version} ({commit}, {taint_string}) built for {target} on {time} ({mode} mode)\n{rust_version} ({rust_channel} on {build_os})\n{cargo_version}{taint_extra}",
         zrc = build::PROJECT_NAME,
         version = build::PKG_VERSION,
         commit = build::COMMIT_HASH,
-        taint_string = match build::GIT_CLEAN {
-            true => "not tainted",
-            false => "tainted!"
+        taint_string = if build::GIT_CLEAN {
+            "not tainted"
+        } else {
+            "tainted!"
         },
         target = build::BUILD_TARGET,
         time = build::BUILD_TIME_3339,
@@ -41,20 +43,13 @@ fn version() -> String {
         build_os = build::BUILD_OS,
         cargo_version = build::CARGO_VERSION,
 
-        taint_extra = match build::GIT_CLEAN {
-            true => "".to_string(),
-            false => {
-                // git is tainted
-                format!("\ntainted files: {}", build::GIT_STATUS_FILE.lines().map(|x| format!("\n{}", {
-                    if x.ends_with(" (dirty)") {
-                        &x[..x.len()-" (dirty)".len()]
-                    } else if x.ends_with(" (staged)") {
-                        &x[..x.len()-" (staged)".len()]
-                    } else {
-                        &x // this should never actually happen
-                    }
-                })).collect::<String>())
-            }
+        taint_extra = if build::GIT_CLEAN {
+            String::new()
+        } else {
+            // git is tainted
+            format!("\ntainted files: {}", build::GIT_STATUS_FILE.lines().map(|x| format!("\n{}", {
+                x.strip_suffix(" (dirty)").or_else(|| x.strip_suffix(" (staged)")).unwrap_or(x)
+            })).collect::<String>())   
         }
     )
 }

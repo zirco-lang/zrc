@@ -9,3 +9,4 @@ edition = "2021"
 anyhow = "1.0.75"
 zrc_diagnostics = { version = "0.1.0", path = "../zrc_diagnostics" }
 zrc_parser = { version = "0.1.0", path = "../zrc_parser" }
+zrc_utils = { version = "0.1.0", path = "../zrc_utils" }

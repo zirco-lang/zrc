@@ -1,13 +1,22 @@
 // DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY MODULE parser INSTEAD
-use super::ast::{Spanned, expr::{Expr,ExprKind,Arithmetic,Assignment,BinaryBitwise,Logical,Comparison,Equality}, stmt::{Stmt, ArgumentDeclaration, LetDeclaration, Declaration,StmtKind}, ty::{Type,TypeKind}};
-use super::lexer;
-use lalrpop_util::ErrorRecovery;
+
 use std::collections::HashMap;
+
+use zrc_utils::span::{Span, Spanned};
+
+use super::{
+    lexer,
+    ast::{
+        expr::*,
+        stmt::*,
+        ty::*,
+    }
+};
 
 grammar;
 
 Spanned<T>: Spanned<T> = {
-    <@L> <T> <@R> => Spanned(<>),
+    <l:@L> <x:T> <r:@R> => Spanned::from_span_and_value(Span::from_positions(l, r), x),
 }
 SpannedExpr<T>: Expr = {
     <Spanned<T>> => Expr(<>),
@@ -100,13 +109,13 @@ FunctionDeclaration: Declaration = {
         <s:Spanned<StmtList?>>
     "}" => Declaration::FunctionDeclaration {
         name: i,
-        parameters: Spanned(a.0, a.1.unwrap_or(Vec::new()), a.2),
+        parameters: a.map(|inner| inner.unwrap_or(Vec::new())),
         return_type: r,
-        body: Some(Spanned(s.0, s.1.unwrap_or(Vec::new()), s.2)),
+        body: Some(s.map(|inner| inner.unwrap_or(Vec::new()))),
     },
     "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?> ";" => Declaration::FunctionDeclaration {
         name: i,
-        parameters: Spanned(a.0, a.1.unwrap_or(Vec::new()), a.2),
+        parameters: a.map(|inner| inner.unwrap_or(Vec::new())),
         return_type: r,
         body: None,
     }
@@ -115,7 +124,13 @@ FunctionDeclaration: Declaration = {
 StructDeclaration: Declaration = {
     "struct" <i:Spanned<IDENTIFIER>> "{" <l:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}" => Declaration::StructDeclaration {
         name: i,
-        fields: Spanned(l.0, l.1.unwrap_or(Vec::new()).into_iter().map(|x| (x.1.0.1.clone(), x)).collect::<HashMap<_, _>>(), l.2),
+        fields: l.map(|inner| {
+            inner
+                .unwrap_or(Vec::new())
+                .into_iter()
+                .map(|x| (x.value().0.value().clone(), x))
+                .collect::<HashMap<_, _>>()
+        })
     }
 }
 
@@ -131,18 +146,18 @@ ArgumentDeclaration: ArgumentDeclaration = {
 LetDeclaration: Vec<Spanned<LetDeclaration>> = {
     "let" <l:CommaSeparatedWithoutTrailing<
         Spanned<(<Spanned<IDENTIFIER>> <(":" <Type>)?> <("=" <Assignment>)?>)>
-    >> ";" => l.into_iter().map(|Spanned(s, (i, t, v), e)| Spanned(s, LetDeclaration {
+    >> ";" => l.into_iter().map(|sp| sp.map(|(i, t, v)| LetDeclaration {
         name: i,
         ty: t,
         value: v,
-    }, e)).collect::<Vec<_>>(),
+    })).collect::<Vec<_>>(),
 };
 
 Type: Type = {
-    Spanned<IDENTIFIER> => Type(Spanned(<>.0, TypeKind::Identifier(<>.1), <>.2)),
-    Spanned<("*" <Type>)> => Type(Spanned(<>.0, TypeKind::Ptr(Box::new(<>.1)), <>.2)),
+    Spanned<IDENTIFIER> => Type(<>.map(|x| TypeKind::Identifier(x))),
+    Spanned<("*" <Type>)> => Type(<>.map(|x| TypeKind::Ptr(Box::new(x)))),
     Spanned<("struct" "{" <CommaSeparated<
-        (<IDENTIFIER> ":" <Type>)>?> "}")> => Type(Spanned(<>.0, TypeKind::Struct(<>.1.unwrap_or(Vec::new()).into_iter().collect::<HashMap<_, _>>()), <>.2)),
+        (<IDENTIFIER> ":" <Type>)>?> "}")> => Type(<>.map(|x| TypeKind::Struct(x.unwrap_or(Vec::new()).into_iter().collect::<HashMap<_, _>>()))),
 }
 
 FlowStmt: StmtKind = {
@@ -276,18 +291,18 @@ _Postfix: ExprKind = {
     <x:Postfix> "[" <i:Expr> "]" => ExprKind::Index(Box::new(x), Box::new(i)),
     <l:Postfix> "." <r:Spanned<IDENTIFIER>> => ExprKind::Dot(Box::new(l), r),
     <l:Postfix> "->" <r:Spanned<IDENTIFIER>> => ExprKind::Arrow(Box::new(l), r),
-    <i:Postfix> "(" <l:Spanned<ArgumentList?>> ")" => ExprKind::Call(Box::new(i), Spanned(l.0, l.1.unwrap_or(Vec::new()), l.2)),
+    <i:Postfix> "(" <l:Spanned<ArgumentList?>> ")" => ExprKind::Call(Box::new(i), l.map(|x| x.unwrap_or(Vec::new()))),
 };
 Postfix: Expr = ExprPrecedenceTier<_Postfix, Primary>;
 
 ArgumentList: Vec<Expr> = CommaSeparated<Assignment>;
 
 Primary: Expr = {
-    Spanned<NUMBER> => Expr(Spanned(<>.0, ExprKind::NumberLiteral(<>.1), <>.2)),
-    Spanned<STRING> => Expr(Spanned(<>.0, ExprKind::StringLiteral(<>.1), <>.2)),
-    Spanned<IDENTIFIER> => Expr(Spanned(<>.0, ExprKind::Identifier(<>.1), <>.2)),
-    Spanned<"true"> => Expr(Spanned(<>.0, ExprKind::BooleanLiteral(true), <>.2)),
-    Spanned<"false"> => Expr(Spanned(<>.0, ExprKind::BooleanLiteral(false), <>.2)),
+    Spanned<NUMBER> => Expr(<>.map(|n| ExprKind::NumberLiteral(n))),
+    Spanned<STRING> => Expr(<>.map(|s| ExprKind::StringLiteral(s))),
+    Spanned<IDENTIFIER> => Expr(<>.map(|i| ExprKind::Identifier(i))),
+    Spanned<"true"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(true))),
+    Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
     "(" <Expr> ")" => <>,
 };
 

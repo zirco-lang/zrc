@@ -1275,6 +1275,7 @@ version = "0.1.0"
 dependencies = [
  "ansi_term",
  "line-span",
+ "zrc_utils",
 ]
 
 [[package]]
@@ -1287,6 +1288,7 @@ dependencies = [
  "logos",
  "regex",
  "zrc_diagnostics",
+ "zrc_utils",
 ]
 
 [[package]]
@@ -1296,4 +1298,9 @@ dependencies = [
  "anyhow",
  "zrc_diagnostics",
  "zrc_parser",
+ "zrc_utils",
 ]
+
+[[package]]
+name = "zrc_utils"
+version = "0.1.0"

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use zrc_diagnostics::Diagnostic;
+use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::ty::{Type as ParserType, TypeKind as ParserTypeKind};
 
 use super::Scope;
@@ -16,7 +16,7 @@ pub fn resolve_type(
     scope: &Scope,
     ty: ParserType,
 ) -> Result<TastType, zrc_diagnostics::Diagnostic> {
-    Ok(match ty.0 .1 {
+    Ok(match ty.0.value() {
         ParserTypeKind::Identifier(x) => match x.as_str() {
             "i8" => TastType::I8,
             "u8" => TastType::U8,
@@ -28,21 +28,17 @@ pub fn resolve_type(
             "u64" => TastType::U64,
             "bool" => TastType::Bool,
             _ => {
-                if let Some(t) = scope.get_type(&x) {
+                if let Some(t) = scope.get_type(x) {
                     t.clone()
                 } else {
                     return Err(Diagnostic(
                         zrc_diagnostics::Severity::Error,
-                        zrc_diagnostics::Spanned(
-                            ty.0 .0,
-                            zrc_diagnostics::DiagnosticKind::UnableToResolveType(x),
-                            ty.0 .2,
-                        ),
+                        ty.0.map(|x| DiagnosticKind::UnableToResolveType(x.to_string())),
                     ));
                 }
             }
         },
-        ParserTypeKind::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t)?)),
+        ParserTypeKind::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t.clone())?)),
         ParserTypeKind::Struct(members) => TastType::Struct(
             members
                 .iter()

@@ -8,14 +8,11 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
-use line_span::LineSpanExt;
 use std::{error::Error, fmt::Display};
+use zrc_utils::span::{Span, Spanned};
 
 use ansi_term::{Color, Style};
-
-/// A token with an associated span within the input.
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct Spanned<T>(pub usize, pub T, pub usize);
+use line_span::LineSpanExt;
 
 /// The severity of a [`Diagnostic`].
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -50,7 +47,7 @@ pub struct Diagnostic(pub Severity, pub Spanned<DiagnosticKind>);
 impl Error for Diagnostic {}
 impl Display for Diagnostic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.0, self.1 .1)
+        write!(f, "{}: {}", self.0, self.1.value())
     }
 }
 
@@ -220,68 +217,49 @@ impl Display for DiagnosticKind {
     }
 }
 
-/// The intersection between two spans in the input
-#[derive(PartialEq, Debug, Clone)]
-enum MaybeIntersecting {
-    /// There is no intersection
-    Disjoint,
-    /// There is an intersection and they may be equal
-    Intersecting((usize, usize)),
-}
-impl MaybeIntersecting {
-    /// Returns `true` if the spans intersect.
-    const fn is_intersecting(&self) -> bool {
-        self.intersection().is_some()
-    }
+/// Format and display the 'source window' -- the lines of span within str with
+/// the underline where the span lies.
+fn display_source_window(severity: &Severity, span: Span, source: &str) -> String {
+    // First, we need to reduce source into only the lines we need to display. A
+    // line should be displayed if *the line's span* intersects (see
+    // MaybeIntersecting and intersect_spans) with the span we are trying to
+    // display.
 
-    /// Returns an [`Option`] holding the intersection between the two spans, if it exists.
-    const fn intersection(&self) -> Option<(usize, usize)> {
-        match self {
-            Self::Disjoint => None,
-            Self::Intersecting((a, b)) => Some((*a, *b)),
-        }
-    }
-}
-
-/// Create a [`MaybeIntersecting`] from two spans
-fn intersect_spans(a: (usize, usize), b: (usize, usize)) -> MaybeIntersecting {
-    if a.0 > b.1 || b.0 > a.1 {
-        MaybeIntersecting::Disjoint
-    } else {
-        MaybeIntersecting::Intersecting((std::cmp::max(a.0, b.0), std::cmp::min(a.1, b.1)))
-    }
-}
-
-/// Format and display the 'source window' -- the lines of span within str with the underline where the span lies.
-fn display_source_window(severity: &Severity, span: (usize, usize), source: &str) -> String {
-    // First, we need to reduce source into only the lines we need to display. A line should be displayed if *the line's span* intersects (see MaybeIntersecting and intersect_spans) with the span we are trying to display.
-
-    // We can do this by iterating over the lines of source, and checking if the line's span intersects with the span we are trying to display. If it does, we add the line to a vector of lines to display.
+    // We can do this by iterating over the lines of source, and checking if the
+    // line's span intersects with the span we are trying to display. If it does, we
+    // add the line to a vector of lines to display.
     let lines = source
         .line_spans()
         .enumerate()
         .filter(|(_, line)| {
-            intersect_spans(
-                (line.start(), line.ending()),
-                (span.0, span.1.saturating_sub(1)),
+            Span::intersect(
+                Span::from_positions(line.start(), line.ending()),
+                Span::from_positions(span.start(), span.end() - 1),
             )
-            .is_intersecting()
+            .is_some()
         })
         .map(|(n, line)| (n + 1, line))
-        // lines now represents all of the lines we will eventually be formatting into the output. we now need to find the span *within the line* that the span intersects with
+        // lines now represents all of the lines we will eventually be formatting into the output.
+        // we now need to find the span *within the line* that the span intersects with
         // we map each line to its string and intersecting span
         .map(|(n, line)| {
             (n, &source[line.start()..line.end()], {
-                let (s, e) = intersect_spans((line.start(), line.end()), (span.0, span.1))
-                    .intersection()
-                    .expect("line span should intersect with span");
-                (s - line.start(), e - line.start())
+                let intersection = Span::intersect(
+                    Span::from_positions(line.start(), line.ending()),
+                    Span::from_positions(span.start(), span.end() - 1),
+                )
+                .expect("line span should intersect with span");
+                (
+                    intersection.start() - line.start(),
+                    intersection.end() - line.start(),
+                )
             })
         })
         .collect::<Vec<_>>();
 
-    // Alright, cool. We now have an iterator over (line number, string, span within string) which can be used to build our display.
-    // How much padding goes on each line number?
+    // Alright, cool. We now have an iterator over (line number, string, span within
+    // string) which can be used to build our display. How much padding goes on
+    // each line number?
     let max_line_number_length = lines
         .iter()
         .map(|(line, _, _)| line.to_string().len())
@@ -319,8 +297,8 @@ impl Diagnostic {
         format!(
             "{}: {}\n{}",
             self.0,
-            Color::White.bold().paint(self.1 .1.to_string()),
-            display_source_window(&self.0.clone(), (self.1 .0, self.1 .2), source)
+            Color::White.bold().paint(self.1.value().to_string()),
+            display_source_window(&self.0.clone(), self.1.span(), source)
         )
     }
 }

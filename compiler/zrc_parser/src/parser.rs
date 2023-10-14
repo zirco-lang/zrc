@@ -1,17 +1,20 @@
 //! Parsing and parser errors
 //!
-//! This module contains thin wrappers around the generated parser for the Zirco programming language,
-//! along with some additional models for error handling.
+//! This module contains thin wrappers around the generated parser for the Zirco
+//! programming language, along with some additional models for error handling.
 //!
-//! In most cases, you will be using the [`parse_program`] function to parse some input code. In some
-//! more specific situations, you may need to use [`parse_expr`] to parse a singular expression.
+//! In most cases, you will be using the [`parse_program`] function to parse
+//! some input code. In some more specific situations, you may need to use
+//! [`parse_expr`] to parse a singular expression.
 //!
 //! # Error handling
-//! The parser returns a [`Result`] that either yields the parsed [AST](super::ast) or a
-//! [`ZircoParserError`]. For more information, read the documentation of [`ZircoParserError`].
+//! The parser returns a [`Result`] that either yields the parsed
+//! [AST](super::ast) or a [`ZircoParserError`]. For more information, read the
+//! documentation of [`ZircoParserError`].
 //!
 //! # Example
-//! For more examples, read the documentation for the corresponding parser function.
+//! For more examples, read the documentation for the corresponding parser
+//! function.
 //! ```
 //! use zrc_parser::parser::parse_program;
 //! let ast = parse_program("fn main() {}");
@@ -23,43 +26,52 @@ use std::{
 };
 
 use lalrpop_util::{ErrorRecovery, ParseError};
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity, Spanned as DiagnosticSpan};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
 
 use super::{
-    ast::{expr::Expr, stmt::Declaration, Spanned},
+    ast::{expr::Expr, stmt::Declaration},
     lexer,
 };
 use crate::internal_parser;
+use zrc_utils::span::{Span, Spanned};
 
 /// Representation of a parser error that may have returned a partial AST.
 ///
-/// In the Zirco parser, we are capable of recovering from some errors. This means that the parser
-/// may still return an AST in some cases even if a syntax error was encountered. This is useful
-/// for IDEs and other tools that want to provide syntax highlighting or other features that
-/// require at least a partial AST.
+/// In the Zirco parser, we are capable of recovering from some errors. This
+/// means that the parser may still return an AST in some cases even if a syntax
+/// error was encountered. This is useful for IDEs and other tools that want to
+/// provide syntax highlighting or other features that require at least a
+/// partial AST.
 ///
-/// When you receive the [`ZircoParserError::Recoverable`] variant, you can access the
-/// [`partial`](ZircoParserError::Recoverable::partial) field to obtain the partial AST. This AST
-/// is "partial" in the way that it may contain some `Error` tokens, such as [`ExprKind::Error`](super::ast::expr::ExprKind::Error).
+/// When you receive the [`ZircoParserError::Recoverable`] variant, you can
+/// access the [`partial`](ZircoParserError::Recoverable::partial) field to
+/// obtain the partial AST. This AST is "partial" in the way that it may contain
+/// some `Error` tokens, such as
+/// [`ExprKind::Error`](super::ast::expr::ExprKind::Error).
 ///
-/// In the case of the [`ZircoParserError::Fatal`] variant, you cannot access a partial AST as none
-/// was able to be recovered, and your application must just handle the corresponding LALRPOP [`ParseError`].
+/// In the case of the [`ZircoParserError::Fatal`] variant, you cannot access a
+/// partial AST as none was able to be recovered, and your application must just
+/// handle the corresponding LALRPOP [`ParseError`].
 ///
-/// This type is often found wrapped in a [`Result`] type, where the [`Ok`] variant contains the
-/// full AST and the [`Err`] variant contains a [`ZircoParserError`].
+/// This type is often found wrapped in a [`Result`] type, where the [`Ok`]
+/// variant contains the full AST and the [`Err`] variant contains a
+/// [`ZircoParserError`].
 #[derive(Debug, PartialEq, Eq)]
 pub enum ZircoParserError<T> {
-    /// The parser encountered an error, but was still able to produce a partial AST. This AST may
-    /// contain some `Error` tokens, such as [`ExprKind::Error`](super::ast::expr::ExprKind::Error).
+    /// The parser encountered an error, but was still able to produce a partial
+    /// AST. This AST may contain some `Error` tokens, such as
+    /// [`ExprKind::Error`](super::ast::expr::ExprKind::Error).
     Recoverable {
-        /// The list of [`ErrorRecovery`] instances corresponding with the errors that were encountered
-        /// during parsing.
+        /// The list of [`ErrorRecovery`] instances corresponding with the
+        /// errors that were encountered during parsing.
         errors: Vec<ErrorRecovery<usize, lexer::Tok, lexer::LexicalError>>,
-        /// The partial AST that was produced by the parser. This AST may contain some `Error` tokens,
+        /// The partial AST that was produced by the parser. This AST may
+        /// contain some `Error` tokens,
         /// such as [`ExprKind::Error`](super::ast::expr::ExprKind::Error).
         partial: T,
     },
-    /// The parser encountered an error, and was unable to produce a partial AST.
+    /// The parser encountered an error, and was unable to produce a partial
+    /// AST.
     Fatal(ParseError<usize, lexer::Tok, lexer::LexicalError>),
 }
 impl<T: Debug> Error for ZircoParserError<T> {}
@@ -85,16 +97,13 @@ fn parser_error_to_diagnostic(
     match error {
         ParseError::InvalidToken { location } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(location, DiagnosticKind::InvalidToken, location),
+            Span::from_positions(location, location).containing(DiagnosticKind::InvalidToken),
         ),
 
         ParseError::UnrecognizedEof { location, expected } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(
-                location - 1,
-                DiagnosticKind::UnexpectedEof(expected),
-                location,
-            ),
+            Span::from_positions(location - 1, location)
+                .containing(DiagnosticKind::UnexpectedEof(expected)),
         ),
 
         ParseError::UnrecognizedToken {
@@ -102,48 +111,46 @@ fn parser_error_to_diagnostic(
             expected,
         } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(
-                start,
-                DiagnosticKind::UnrecognizedToken(token.to_string(), expected),
-                end,
-            ),
+            Span::from_positions(start, end).containing(DiagnosticKind::UnrecognizedToken(
+                token.to_string(),
+                expected,
+            )),
         ),
 
         ParseError::ExtraToken {
             token: (start, token, end),
         } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(start, DiagnosticKind::ExtraToken(token.to_string()), end),
+            Span::from_positions(start, end)
+                .containing(DiagnosticKind::ExtraToken(token.to_string())),
         ),
 
         ParseError::User {
-            error: lexer::LexicalError::UnknownToken(start, tok, end),
+            error: lexer::LexicalError::UnknownToken(token),
+        } => Diagnostic(Severity::Error, token.map(DiagnosticKind::UnknownToken)),
+
+        ParseError::User {
+            error: lexer::LexicalError::UnterminatedBlockComment(span),
         } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(start, DiagnosticKind::UnknownToken(tok), end),
+            span.containing(DiagnosticKind::UnterminatedBlockComment),
         ),
 
         ParseError::User {
-            error: lexer::LexicalError::UnterminatedBlockComment(start, end),
+            error: lexer::LexicalError::UnterminatedStringLiteral(span),
         } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(start, DiagnosticKind::UnterminatedBlockComment, end),
-        ),
-
-        ParseError::User {
-            error: lexer::LexicalError::UnterminatedStringLiteral(start, end),
-        } => Diagnostic(
-            Severity::Error,
-            DiagnosticSpan(start, DiagnosticKind::UnterminatedStringLiteral, end),
+            span.containing(DiagnosticKind::UnterminatedStringLiteral),
         ),
     }
 }
 
 /// Parses a Zirco program, yielding a list of [`Declaration`]s.
 ///
-/// This function runs an **entire program** through the Zirco parser and returns either a complete
-/// [AST](super::ast) consisting of root [`Declaration`] nodes, or a list of [`ZircoParserError`]s
-/// in the case of a syntax error.
+/// This function runs an **entire program** through the Zirco parser and
+/// returns either a complete [AST](super::ast) consisting of root
+/// [`Declaration`] nodes, or a list of [`ZircoParserError`]s in the case of a
+/// syntax error.
 ///
 /// # Example
 /// Obtaining the AST of a program:
@@ -153,8 +160,8 @@ fn parser_error_to_diagnostic(
 /// ```
 ///
 /// # Errors
-/// This function returns [`Err`] with a [`ZircoParserError`] if any error was encountered while
-/// parsing the input program.
+/// This function returns [`Err`] with a [`ZircoParserError`] if any error was
+/// encountered while parsing the input program.
 pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration>>, Diagnostic> {
     internal_parser::ProgramParser::new()
         .parse(lexer::ZircoLexer::new(input))
@@ -163,9 +170,10 @@ pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration>>, Diagnosti
 
 /// Parses a singular Zirco expression, yielding an AST [`Expr`] node.
 ///
-/// This function only parses a single Zirco [expression](Expr), and not an entire program. Unless
-/// you are trying to do some special integration with partial programs, you probably want to use the
-/// [`parse_program`] function instead.
+/// This function only parses a single Zirco [expression](Expr), and not an
+/// entire program. Unless you are trying to do some special integration with
+/// partial programs, you probably want to use the [`parse_program`] function
+/// instead.
 ///
 /// # Example
 /// Obtaining the AST of an expression:
@@ -175,8 +183,8 @@ pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration>>, Diagnosti
 /// ```
 ///
 /// # Errors
-/// This function returns [`Err`] with a [`ZircoParserError`] if any error was encountered while
-/// parsing the input expression.
+/// This function returns [`Err`] with a [`ZircoParserError`] if any error was
+/// encountered while parsing the input expression.
 pub fn parse_expr(input: &str) -> Result<Expr, Diagnostic> {
     internal_parser::ExprParser::new()
         .parse(lexer::ZircoLexer::new(input))

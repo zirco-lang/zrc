@@ -6,6 +6,7 @@
         "lalrpop",
         "ptrtoint",
         "sdiv",
+        "Spannable",
         "srem",
         "structptr",
         "tast",
