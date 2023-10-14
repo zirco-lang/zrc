@@ -1,21 +1,23 @@
 //! Associations to spans within the input source
 //!
-//! This module declares two very helpful types, [`Span`] and [`Spanned<T>`], which both help the
-//! compiler associate things like tokens with locations within the source file. There is also a
-//! trait [`Spannable`] which allows some easier chained method calls.
+//! This module declares two very helpful types, [`Span`] and [`Spanned<T>`],
+//! which both help the compiler associate things like tokens with locations
+//! within the source file. There is also a trait [`Spannable`] which allows
+//! some easier chained method calls.
 //!
-//! Read the documentation for the types [`Span`] and [`Spanned<T>`], and the trait [`Spannable`]
-//! to learn more.
+//! Read the documentation for the types [`Span`] and [`Spanned<T>`], and the
+//! trait [`Spannable`] to learn more.
 
 use std::{fmt::Display, ops::RangeInclusive};
 
 /// Represents the start and end of some segment of a string
 ///
-/// A span represents the start and end of some span within a string. It can be sliced into a str,
-/// and various other operations. You can also create a [`Spanned<T>`] from a span using the
-/// [`Span::containing`] method.
+/// A span represents the start and end of some span within a string. It can be
+/// sliced into a str, and various other operations. You can also create a
+/// [`Spanned<T>`] from a span using the [`Span::containing`] method.
 ///
-/// These are often found within the [`Spanned<T>`] type. They can be obtained in a few ways:
+/// These are often found within the [`Spanned<T>`] type. They can be obtained
+/// in a few ways:
 /// - Direct construction ([`Span::from_positions`])
 /// - Methods on another Span ([`Span::intersect`])
 /// - Stripping the value from a [`Spanned<T>`] ([`Spanned::span`])
@@ -44,7 +46,8 @@ impl Span {
         self.1
     }
 
-    /// Convert this [`Span`] into a [`RangeInclusive`], good for slicing into your input
+    /// Convert this [`Span`] into a [`RangeInclusive`], good for slicing into
+    /// your input
     #[must_use]
     pub const fn range(&self) -> RangeInclusive<usize> {
         self.start()..=self.end()
@@ -79,13 +82,15 @@ impl Display for Span {
 
 /// Represents something (`T`) contained within a [`Span`].
 ///
-/// These are often found in many places throughout the compiler, such as attached to AST nodes or
-/// in diagnostics.
+/// These are often found in many places throughout the compiler, such as
+/// attached to AST nodes or in diagnostics.
 ///
 /// An instance of [`Spanned`] can be obtained in a few ways:
-/// - Direct construction from a [`Span`] and a value ([`Spanned::from_span_and_value`])
+/// - Direct construction from a [`Span`] and a value
+///   ([`Spanned::from_span_and_value`])
 /// - By attaching a value to a [`Span`] ([`Span::containing`])
-/// - By attaching a [`Span`] to a value (with the [`Spannable`] trait's [`Spannable::in_span`] method)
+/// - By attaching a [`Span`] to a value (with the [`Spannable`] trait's
+///   [`Spannable::in_span`] method)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Spanned<T>(Span, T);
 impl<T> Spanned<T> {
@@ -106,16 +111,16 @@ impl<T> Spanned<T> {
         &self.1
     }
 
-    /// Applies a function to the contained value, returning a new [`Spanned<T>`] instance with the
-    /// same associated [`Span`]
+    /// Applies a function to the contained value, returning a new
+    /// [`Spanned<T>`] instance with the same associated [`Span`]
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Spanned<U> {
         self.span().containing(f(self.into_value()))
     }
 
     /// "Strips" the [`Spanned<T>`] of its [`Span`], returning the inner value
     ///
-    /// This differs from [`Spanned::value`] because it consumes the [`Spanned<T>`] instance and
-    /// drops the [`Span`].
+    /// This differs from [`Spanned::value`] because it consumes the
+    /// [`Spanned<T>`] instance and drops the [`Span`].
     #[allow(clippy::missing_const_for_fn)]
     pub fn into_value(self) -> T {
         self.1
@@ -134,16 +139,17 @@ impl<T> Spanned<T> {
     }
 }
 
-/// A trait automatically implemented on all types that allows you to attach a [`Span`] to something,
-/// creating a [`Spanned<T>`] instance.
+/// A trait automatically implemented on all types that allows you to attach a
+/// [`Span`] to something, creating a [`Spanned<T>`] instance.
 pub trait Spannable
 where
     Self: Sized,
 {
     /// Attach a [`Span`] to this value, creating a [`Spanned<T>`] instance
     ///
-    /// This method can be used to attach a [`Span`] to any arbitrary value. It is a cleaner syntax
-    /// for the [`Spanned::from_span_and_value`] or [`Span::containing`] functions.
+    /// This method can be used to attach a [`Span`] to any arbitrary value. It
+    /// is a cleaner syntax for the [`Spanned::from_span_and_value`] or
+    /// [`Span::containing`] functions.
     fn in_span(self, span: Span) -> Spanned<Self>;
 }
 

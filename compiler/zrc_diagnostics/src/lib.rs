@@ -9,10 +9,10 @@
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
 use std::{error::Error, fmt::Display};
-use zrc_utils::span::{Span, Spanned};
 
 use ansi_term::{Color, Style};
 use line_span::LineSpanExt;
+use zrc_utils::span::{Span, Spanned};
 
 /// The severity of a [`Diagnostic`].
 #[derive(Clone, PartialEq, Eq, Debug)]

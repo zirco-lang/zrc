@@ -6,8 +6,9 @@
 
 use std::{collections::HashMap, fmt::Display};
 
-use super::{expr::Expr, ty::Type};
 use zrc_utils::span::Spanned;
+
+use super::{expr::Expr, ty::Type};
 
 /// A Zirco statement
 #[derive(PartialEq, Debug, Clone)]

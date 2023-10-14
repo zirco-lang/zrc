@@ -27,13 +27,13 @@ use std::{
 
 use lalrpop_util::{ErrorRecovery, ParseError};
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+use zrc_utils::span::{Span, Spanned};
 
 use super::{
     ast::{expr::Expr, stmt::Declaration},
     lexer,
 };
 use crate::internal_parser;
-use zrc_utils::span::{Span, Spanned};
 
 /// Representation of a parser error that may have returned a partial AST.
 ///

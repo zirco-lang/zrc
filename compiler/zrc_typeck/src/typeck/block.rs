@@ -761,10 +761,16 @@ pub fn type_block(
             ))
         }
         (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => {
-            panic!("block must not return, but a sub-block may return -- this should have been caught when checking that block");
+            panic!(concat!(
+                "block must not return, but a sub-block may return",
+                " -- this should have been caught when checking that block"
+            ));
         }
         (BlockReturnAbility::MustNotReturn, BlockReturnActuality::WillReturn) => {
-            panic!("block must not return, but a sub-block will return -- this should have been caught when checking that block");
+            panic!(concat!(
+                "block must not return, but a sub-block may return",
+                " -- this should have been caught when checking that block"
+            ));
         }
     }
 }

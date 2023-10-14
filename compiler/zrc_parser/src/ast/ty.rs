@@ -4,6 +4,7 @@
 //! contains all the different type kinds in Zirco.
 
 use std::{collections::HashMap, fmt::Display};
+
 use zrc_utils::span::Spanned;
 
 /// A valid Zirco AST type

@@ -26,7 +26,12 @@ pub mod build {
 /// Returns the string which represents the current Zirco version
 fn version() -> String {
     format!(
-        "{zrc} version {version} ({commit}, {taint_string}) built for {target} on {time} ({mode} mode)\n{rust_version} ({rust_channel} on {build_os})\n{cargo_version}{taint_extra}",
+        concat!(
+            "{zrc} version {version} ({commit}, {taint_string}) built for {target} on {time}",
+            " ({mode} mode)",
+            "\n{rust_version} ({rust_channel} on {build_os})\n",
+            "{cargo_version}{taint_extra}"
+        ),
         zrc = build::PROJECT_NAME,
         version = build::PKG_VERSION,
         commit = build::COMMIT_HASH,
@@ -42,14 +47,21 @@ fn version() -> String {
         rust_channel = build::RUST_CHANNEL,
         build_os = build::BUILD_OS,
         cargo_version = build::CARGO_VERSION,
-
         taint_extra = if build::GIT_CLEAN {
             String::new()
         } else {
             // git is tainted
-            format!("\ntainted files: {}", build::GIT_STATUS_FILE.lines().map(|x| format!("\n{}", {
-                x.strip_suffix(" (dirty)").or_else(|| x.strip_suffix(" (staged)")).unwrap_or(x)
-            })).collect::<String>())   
+            format!(
+                "\ntainted files: {}",
+                build::GIT_STATUS_FILE
+                    .lines()
+                    .map(|x| format!("\n{}", {
+                        x.strip_suffix(" (dirty)")
+                            .or_else(|| x.strip_suffix(" (staged)"))
+                            .unwrap_or(x)
+                    }))
+                    .collect::<String>()
+            )
         }
     )
 }
@@ -76,7 +88,10 @@ fn main() -> anyhow::Result<()> {
         eprintln!(
             "note: compiler bugs threaten the Zirco ecosystem -- we would appreciate a bug report:"
         );
-        eprintln!("note: bug reporting link: https://github.com/zirco-lang/zrc/issues/new?template=ice.yml");
+        eprintln!(concat!(
+            "note: bug reporting link:",
+            " https://github.com/zirco-lang/zrc/issues/new?template=ice.yml"
+        ));
         eprintln!();
         eprintln!(
             "{}",
