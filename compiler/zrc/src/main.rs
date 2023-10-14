@@ -8,7 +8,7 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
-use std::path::PathBuf;
+use std::{fmt::Write, path::PathBuf};
 
 use anyhow::Context as _;
 use clap::Parser;
@@ -52,15 +52,18 @@ fn version() -> String {
         } else {
             // git is tainted
             format!(
-                "\ntainted files: {}",
+                "\ntainted files:{}",
                 build::GIT_STATUS_FILE
                     .lines()
-                    .map(|x| format!("\n{}", {
-                        x.strip_suffix(" (dirty)")
-                            .or_else(|| x.strip_suffix(" (staged)"))
-                            .unwrap_or(x)
-                    }))
-                    .collect::<String>()
+                    .fold(String::new(), |mut output, x| {
+                        write!(output, "\n{}", {
+                            x.strip_suffix(" (dirty)")
+                                .or_else(|| x.strip_suffix(" (staged)"))
+                                .unwrap_or(x)
+                        })
+                        .unwrap();
+                        output
+                    })
             )
         }
     )
