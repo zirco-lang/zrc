@@ -7,10 +7,11 @@
 use std::{collections::HashMap, fmt::Display};
 
 use super::{expr::Expr, ty::Type};
+use zrc_utils::span::Spanned;
 
 /// A Zirco statement
 #[derive(PartialEq, Debug, Clone)]
-pub struct Stmt(pub super::Spanned<StmtKind>);
+pub struct Stmt(pub Spanned<StmtKind>);
 
 /// The enum representing all the different kinds of statements in Zirco
 ///
@@ -27,7 +28,7 @@ pub enum StmtKind {
     ForStmt {
         /// Runs once before the loop starts.
         // TODO: May also be able to be expressions?
-        init: Option<Box<super::Spanned<Vec<super::Spanned<LetDeclaration>>>>>,
+        init: Option<Box<Spanned<Vec<Spanned<LetDeclaration>>>>>,
         /// Runs before each iteration of the loop. If this evaluates to
         /// `false`, the loop will end. If this is [`None`], the loop
         /// will run forever.
@@ -50,7 +51,7 @@ pub enum StmtKind {
     /// `return;` or `return x;`
     ReturnStmt(Option<Expr>),
     /// A let declaration
-    DeclarationList(super::Spanned<Vec<super::Spanned<LetDeclaration>>>),
+    DeclarationList(Spanned<Vec<Spanned<LetDeclaration>>>),
 }
 
 /// A struct or function declaration at the top level of a file
@@ -59,25 +60,23 @@ pub enum Declaration {
     /// A declaration of a function
     FunctionDeclaration {
         /// The name of the function.
-        name: super::Spanned<String>,
+        name: Spanned<String>,
         /// The parameters of the function.
-        parameters: super::Spanned<Vec<super::Spanned<ArgumentDeclaration>>>,
+        parameters: Spanned<Vec<Spanned<ArgumentDeclaration>>>,
         /// The return type of the function. If set to [`None`], the function is
         /// void.
         return_type: Option<Type>,
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
-        body: Option<super::Spanned<Vec<Stmt>>>,
+        body: Option<Spanned<Vec<Stmt>>>,
     },
     /// A named declaration for a `struct`.
     StructDeclaration {
         /// The name of the newtype.
-        name: super::Spanned<String>,
+        name: Spanned<String>,
         /// The key-value pairs of the struct
         #[allow(clippy::type_complexity)]
-        fields: super::Spanned<
-            HashMap<String, super::Spanned<(super::Spanned<String>, super::ty::Type)>>,
-        >,
+        fields: Spanned<HashMap<String, Spanned<(Spanned<String>, super::ty::Type)>>>,
     },
 }
 
@@ -92,15 +91,15 @@ impl Display for Declaration {
             } => write!(
                 f,
                 "fn {}({}) -> {} {{\n{}\n}}",
-                name.1,
+                name.value(),
                 parameters
-                    .1
+                    .value()
                     .iter()
-                    .map(|x| x.1.to_string())
+                    .map(|x| x.value().to_string())
                     .collect::<Vec<String>>()
                     .join(", "),
-                r.0 .1,
-                body.1
+                r.0.value(),
+                body.value()
                     .iter()
                     .map(|stmt| format!("    {stmt}"))
                     .collect::<Vec<String>>()
@@ -114,14 +113,14 @@ impl Display for Declaration {
             } => write!(
                 f,
                 "fn {}({}) -> {};",
-                name.1,
+                name.value(),
                 parameters
-                    .1
+                    .value()
                     .iter()
-                    .map(|p| p.1.to_string())
+                    .map(|p| p.value().to_string())
                     .collect::<Vec<String>>()
                     .join(", "),
-                r.0 .1
+                r.0.value()
             ),
             Self::FunctionDeclaration {
                 name,
@@ -131,14 +130,14 @@ impl Display for Declaration {
             } => write!(
                 f,
                 "fn {}({}) {{\n{}\n}}",
-                name.1,
+                name.value(),
                 parameters
-                    .1
+                    .value()
                     .iter()
-                    .map(|x| x.1.to_string())
+                    .map(|x| x.value().to_string())
                     .collect::<Vec<String>>()
                     .join(", "),
-                body.1
+                body.value()
                     .iter()
                     .map(|stmt| format!("    {stmt}"))
                     .collect::<Vec<String>>()
@@ -152,22 +151,22 @@ impl Display for Declaration {
             } => write!(
                 f,
                 "fn {}({});",
-                name.1,
+                name.value(),
                 parameters
-                    .1
+                    .value()
                     .iter()
-                    .map(|p| p.1.to_string())
+                    .map(|p| p.value().to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
             Self::StructDeclaration { name, fields } => write!(
                 f,
                 "struct {} {{\n{}\n}}",
-                name.1,
+                name.value(),
                 fields
-                    .1
+                    .value()
                     .iter()
-                    .map(|(_, super::Spanned(_, (name, ty), _))| format!("    {}: {}", name.1, ty))
+                    .map(|(_, sp)| format!("    {}: {}", sp.value().0.value(), sp.value().1))
                     .collect::<Vec<_>>()
                     .join(",\n")
             ),
@@ -177,7 +176,7 @@ impl Display for Declaration {
 
 impl Display for Stmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0 .1.fmt(f)
+        self.0.value().fmt(f)
     }
 }
 impl Display for StmtKind {
@@ -197,8 +196,9 @@ impl Display for StmtKind {
                     "for ({} {}; {}) {body}",
                     init.clone().map_or(";".to_string(), |x| format!(
                         "let {};",
-                        x.1.iter()
-                            .map(|x| x.1.to_string())
+                        x.value()
+                            .iter()
+                            .map(|x| x.value().to_string())
                             .collect::<Vec<_>>()
                             .join(", ")
                     )),
@@ -224,8 +224,9 @@ impl Display for StmtKind {
                 write!(
                     f,
                     "let {};",
-                    d.1.iter()
-                        .map(|x| x.1.to_string())
+                    d.value()
+                        .iter()
+                        .map(|x| x.value().to_string())
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -238,7 +239,7 @@ impl Display for StmtKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct LetDeclaration {
     /// The name of the identifier.
-    pub name: super::Spanned<String>,
+    pub name: Spanned<String>,
     /// The type of the new symbol. If set to [`None`], the type will be
     /// inferred.
     pub ty: Option<Type>,
@@ -250,12 +251,12 @@ impl Display for LetDeclaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.ty {
             None => match &self.value {
-                None => write!(f, "{}", self.name.1),
-                Some(v) => write!(f, "{} = {}", self.name.1, v),
+                None => write!(f, "{}", self.name.value()),
+                Some(v) => write!(f, "{} = {}", self.name.value(), v),
             },
             Some(t) => match &self.value {
-                None => write!(f, "{}: {}", self.name.1, t),
-                Some(v) => write!(f, "{}: {} = {}", self.name.1, t, v),
+                None => write!(f, "{}: {}", self.name.value(), t),
+                Some(v) => write!(f, "{}: {} = {}", self.name.value(), t, v),
             },
         }
     }
@@ -265,13 +266,13 @@ impl Display for LetDeclaration {
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct ArgumentDeclaration {
     /// The name of the parameter.
-    pub name: super::Spanned<String>,
+    pub name: Spanned<String>,
     /// The type of the parameter.
     pub ty: Type,
 }
 
 impl Display for ArgumentDeclaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.name.1, self.ty)
+        write!(f, "{}: {}", self.name.value(), self.ty)
     }
 }

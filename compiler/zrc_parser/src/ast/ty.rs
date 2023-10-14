@@ -4,10 +4,11 @@
 //! contains all the different type kinds in Zirco.
 
 use std::{collections::HashMap, fmt::Display};
+use zrc_utils::span::Spanned;
 
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct Type(pub super::Spanned<TypeKind>);
+pub struct Type(pub Spanned<TypeKind>);
 
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -40,6 +41,6 @@ impl Display for TypeKind {
 }
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0 .1.fmt(f)
+        self.0.value().fmt(f)
     }
 }

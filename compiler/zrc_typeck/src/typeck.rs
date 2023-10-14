@@ -11,7 +11,8 @@ pub use block::{
 };
 pub use expr::type_expr;
 pub use ty::resolve_type;
-use zrc_parser::ast::{stmt::Declaration as AstDeclaration, Spanned};
+use zrc_parser::ast::stmt::Declaration as AstDeclaration;
+use zrc_utils::span::Spanned;
 
 use crate::tast::{stmt::TypedDeclaration, ty::Type as TastType};
 
@@ -85,6 +86,6 @@ pub fn type_program(
 
     program
         .into_iter()
-        .map(|declaration| process_declaration(&mut scope, declaration.1))
+        .map(|declaration| process_declaration(&mut scope, declaration.into_value()))
         .collect()
 }

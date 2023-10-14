@@ -14,7 +14,8 @@
 //!
 //! # Example
 //! For more examples, read the documentation for the corresponding parser
-//! function. ```
+//! function.
+//! ```
 //! use zrc_parser::parser::parse_program;
 //! let ast = parse_program("fn main() {}");
 //! ```
@@ -25,13 +26,14 @@ use std::{
 };
 
 use lalrpop_util::{ErrorRecovery, ParseError};
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity, Spanned as DiagnosticSpan};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
 
 use super::{
-    ast::{expr::Expr, stmt::Declaration, Spanned},
+    ast::{expr::Expr, stmt::Declaration},
     lexer,
 };
 use crate::internal_parser;
+use zrc_utils::span::{Span, Spanned};
 
 /// Representation of a parser error that may have returned a partial AST.
 ///
@@ -95,16 +97,13 @@ fn parser_error_to_diagnostic(
     match error {
         ParseError::InvalidToken { location } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(location, DiagnosticKind::InvalidToken, location),
+            Span::from_positions(location, location).containing(DiagnosticKind::InvalidToken),
         ),
 
         ParseError::UnrecognizedEof { location, expected } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(
-                location - 1,
-                DiagnosticKind::UnexpectedEof(expected),
-                location,
-            ),
+            Span::from_positions(location - 1, location)
+                .containing(DiagnosticKind::UnexpectedEof(expected)),
         ),
 
         ParseError::UnrecognizedToken {
@@ -112,39 +111,36 @@ fn parser_error_to_diagnostic(
             expected,
         } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(
-                start,
-                DiagnosticKind::UnrecognizedToken(token.to_string(), expected),
-                end,
-            ),
+            Span::from_positions(start, end).containing(DiagnosticKind::UnrecognizedToken(
+                token.to_string(),
+                expected,
+            )),
         ),
 
         ParseError::ExtraToken {
             token: (start, token, end),
         } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(start, DiagnosticKind::ExtraToken(token.to_string()), end),
+            Span::from_positions(start, end)
+                .containing(DiagnosticKind::ExtraToken(token.to_string())),
         ),
 
         ParseError::User {
-            error: lexer::LexicalError::UnknownToken(start, tok, end),
+            error: lexer::LexicalError::UnknownToken(token),
+        } => Diagnostic(Severity::Error, token.map(DiagnosticKind::UnknownToken)),
+
+        ParseError::User {
+            error: lexer::LexicalError::UnterminatedBlockComment(span),
         } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(start, DiagnosticKind::UnknownToken(tok), end),
+            span.containing(DiagnosticKind::UnterminatedBlockComment),
         ),
 
         ParseError::User {
-            error: lexer::LexicalError::UnterminatedBlockComment(start, end),
+            error: lexer::LexicalError::UnterminatedStringLiteral(span),
         } => Diagnostic(
             Severity::Error,
-            DiagnosticSpan(start, DiagnosticKind::UnterminatedBlockComment, end),
-        ),
-
-        ParseError::User {
-            error: lexer::LexicalError::UnterminatedStringLiteral(start, end),
-        } => Diagnostic(
-            Severity::Error,
-            DiagnosticSpan(start, DiagnosticKind::UnterminatedStringLiteral, end),
+            span.containing(DiagnosticKind::UnterminatedStringLiteral),
         ),
     }
 }
