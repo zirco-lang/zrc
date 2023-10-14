@@ -8,6 +8,8 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
+use std::path::PathBuf;
+
 use anyhow::Context as _;
 use clap::{
     builder::{styling::Reset, Resettable},
@@ -60,6 +62,9 @@ struct Cli {
     /// See what version of zrc you are using
     #[arg(short, long)]
     version: bool,
+
+    /// The path of the file to compile
+    path: Option<PathBuf>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -100,9 +105,8 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let content =
-        std::fs::read_to_string(std::env::args().nth(1).context("no input file provided")?)
-            .context("failed to read input file")?;
+    let content = std::fs::read_to_string(cli.path.context("no input file provided")?)
+        .context("failed to read input file")?;
 
     let result = compile(&content);
     match result {
