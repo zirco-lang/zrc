@@ -1,8 +1,13 @@
 //! Lexer and lexical errors
 //!
-//! This module contains a wrapper around a [logos] lexer that splits an input Zirco text into its individual tokens, which can be then passed into the internal Zirco parser.
+//! This module contains a wrapper around a [logos] lexer that splits an input
+//! Zirco text into its individual tokens, which can be then passed into the
+//! internal Zirco parser.
 //!
-//! You do not usually need to use this crate, as the [parser](super::parser) already creates [`ZircoLexer`] instances for you before passing them to the internal parser. However, there are some cases where it may be helpful, so it is kept public.
+//! You do not usually need to use this crate, as the [parser](super::parser)
+//! already creates [`ZircoLexer`] instances for you before passing them to the
+//! internal parser. However, there are some cases where it may be helpful, so
+//! it is kept public.
 //!
 //! # Example
 //! ```
@@ -23,12 +28,14 @@ use logos::{Lexer, Logos};
 /// Represents a lexer token within a certain span, or an error.
 pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
 
-/// The error enum passed to the internal logos [`Lexer`]. Will be converted to a [`LexicalError`] by [`ZircoLexer`].
+/// The error enum passed to the internal logos [`Lexer`]. Will be converted to
+/// a [`LexicalError`] by [`ZircoLexer`].
 ///
 /// Do not use publicly.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum InternalLexicalError {
-    /// A generic lexing error. This is later converted to [`LexicalError::UnknownToken`].
+    /// A generic lexing error. This is later converted to
+    /// [`LexicalError::UnknownToken`].
     #[default]
     NoMatchingRule,
     /// A string literal was left unterminated.

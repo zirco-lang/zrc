@@ -8,10 +8,10 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
-use line_span::LineSpanExt;
 use std::{error::Error, fmt::Display};
 
 use ansi_term::{Color, Style};
+use line_span::LineSpanExt;
 
 /// A token with an associated span within the input.
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -234,7 +234,8 @@ impl MaybeIntersecting {
         self.intersection().is_some()
     }
 
-    /// Returns an [`Option`] holding the intersection between the two spans, if it exists.
+    /// Returns an [`Option`] holding the intersection between the two spans, if
+    /// it exists.
     const fn intersection(&self) -> Option<(usize, usize)> {
         match self {
             Self::Disjoint => None,
@@ -252,11 +253,17 @@ fn intersect_spans(a: (usize, usize), b: (usize, usize)) -> MaybeIntersecting {
     }
 }
 
-/// Format and display the 'source window' -- the lines of span within str with the underline where the span lies.
+/// Format and display the 'source window' -- the lines of span within str with
+/// the underline where the span lies.
 fn display_source_window(severity: &Severity, span: (usize, usize), source: &str) -> String {
-    // First, we need to reduce source into only the lines we need to display. A line should be displayed if *the line's span* intersects (see MaybeIntersecting and intersect_spans) with the span we are trying to display.
+    // First, we need to reduce source into only the lines we need to display. A
+    // line should be displayed if *the line's span* intersects (see
+    // MaybeIntersecting and intersect_spans) with the span we are trying to
+    // display.
 
-    // We can do this by iterating over the lines of source, and checking if the line's span intersects with the span we are trying to display. If it does, we add the line to a vector of lines to display.
+    // We can do this by iterating over the lines of source, and checking if the
+    // line's span intersects with the span we are trying to display. If it does, we
+    // add the line to a vector of lines to display.
     let lines = source
         .line_spans()
         .enumerate()
@@ -268,7 +275,8 @@ fn display_source_window(severity: &Severity, span: (usize, usize), source: &str
             .is_intersecting()
         })
         .map(|(n, line)| (n + 1, line))
-        // lines now represents all of the lines we will eventually be formatting into the output. we now need to find the span *within the line* that the span intersects with
+        // lines now represents all of the lines we will eventually be formatting into the output.
+        // we now need to find the span *within the line* that the span intersects with
         // we map each line to its string and intersecting span
         .map(|(n, line)| {
             (n, &source[line.start()..line.end()], {
@@ -280,8 +288,9 @@ fn display_source_window(severity: &Severity, span: (usize, usize), source: &str
         })
         .collect::<Vec<_>>();
 
-    // Alright, cool. We now have an iterator over (line number, string, span within string) which can be used to build our display.
-    // How much padding goes on each line number?
+    // Alright, cool. We now have an iterator over (line number, string, span within
+    // string) which can be used to build our display. How much padding goes on
+    // each line number?
     let max_line_number_length = lines
         .iter()
         .map(|(line, _, _)| line.to_string().len())
