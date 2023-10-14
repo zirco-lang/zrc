@@ -1,64 +1,108 @@
-name: Bug report
-description: Found a bug in zrc? Report it here!
-title: "bug: Describe your issue here..."
+name: Report a Bug
+description: If your compiler has encountered a bug that is not an ICE, report it here.
+title: "bug: add your bug title here..."
 labels:
-    - bug
-    - "severity: unknown"
-    - "scope: unknown"
+    - status/untriaged
+    - type/bug
 body:
+    - type: markdown
+      attributes:
+          value: >-
+              # Thank you for taking your time to report a bug in Zirco!
+
+              Compiler bugs are supposedly rare, so take a second to pat yourself on
+              the back! By reporting a bug, you're improving the entire Zirco
+              ecosystem as a whole.
+
+
+              ## Stop! Wait a second.
+
+              If your compiler has failed with a message saying "internal compiler
+              error," you are not in the right place. Please [create an ICE
+              report](https://github.com/zirco-lang/zrc/issues/new?template=ice.yml)
+              instead. Otherwise, let's go on...
     - type: checkboxes
-      id: confirmations
+      id: checks
       attributes:
-          label: "Please double-check the following:"
-          description: Before you create an issue, we ask that you verify the following.
+          label: Before we begin...
+          description: Please take a second to do the following.
           options:
-              - label: I am using the latest version of zrc
-                required: true
-              - label: I have checked existing issues to ensure this is not a duplicate
-                required: true
-    - type: input
-      id: zrc-version
+              - label: I have updated the Zirco toolchain to the latest version
+                required: false
+              - label: I have searched the issue tracker for duplicates
+                required: false
+    - type: markdown
       attributes:
-          label: What version of zrc are you using?
-          description: This could be a commit SHA, a SemVer version like `v1.0.0`, etc.
-          placeholder: vX.Y.Z
+          value: >-
+              ## Name Your Issue
+
+              Now that we've done that, it's time to give your bug report a good name.
+              Summarize the bug you encountered and place it in the name of the issue.
+
+
+              Once we've done that, it's time to collect some more information!
+    - type: textarea
+      id: what-happened
+      attributes:
+          label: What happened?
+          description: Please describe the bug you encountered.
       validations:
           required: true
     - type: textarea
-      id: description
+      id: version
       attributes:
-          label: Describe your issue.
-          description: Provide a short and concise description of your problem.
-          placeholder: When I provide X, the compiler errors with Y.
+          label: What version of Zirco are you running?
+          description: >-
+              Please paste the ENTIRE output of `zrc --version` below, including any
+              lines like "tainted files."
+          placeholder: zrc version 1.0.0 (...)
+      validations:
+          required: true
+    - type: textarea
+      id: repro
+      attributes:
+          label: How can this bug be reproduced?
+          description: >-
+              Walk us through the steps. Show us what your `zrc` compilation flags
+              were and what code you were compiling, if applicable. Keep it concice
+              please!
       validations:
           required: true
     - type: textarea
       id: expected
       attributes:
-          label: What did you expect to happen?
-          description: Describe the intended behavior.
-          placeholder: The compiler would do X.
+          label: What behavior did you expect?
+          description: >-
+              Please tell us what you expected the compiler to do in the above
+              scenario.
       validations:
           required: true
     - type: textarea
       id: actual
       attributes:
           label: What actually happened?
-          description: What did zrc actually do?
-          placeholder: The compiler errored with Y.
+          description: >-
+              Please describe what really happened and how it differs from your
+              expected result.
       validations:
           required: true
     - type: textarea
-      id: code
+      id: context
       attributes:
-          label: If applicable, provide code to reproduce the bug.
+          label: Other Context
           description: >-
-              Otherwise, leave this section empty. Read about [Minimal, Reproducible
-              Examples](https://stackoverflow.com/help/minimal-reproducible-example)
-              at StackOverflow.
-    - type: textarea
-      id: other
+              If there is any other context you believe will be helpful in
+              investigating this error, please provide it here.
+    - type: markdown
       attributes:
-          label: Additional Context
-          description: Provide any other context that could help us reproduce this bug.
-          placeholder: I am using Ubuntu 22.04 with Node v18.12.1.
+          value: >-
+              ## Thank you!
+
+              Again, thank you for your time in reporting a bug in Zirco. We will get
+              back to you with information on how to at least work around it shortly.
+              For now, please wait as we investigate the bug.
+    - type: markdown
+      attributes:
+          value: >-
+              This template was generated with [Issue Forms
+              Creator](https://issue-forms-creator.netlify.app)

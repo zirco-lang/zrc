@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
         eprintln!(
             "note: compiler bugs threaten the Zirco ecosystem -- we would appreciate a bug report:"
         );
-        eprintln!("note: bug reporting link: https://github.com/zirco-lang/zrc/issues/new?template=bug.yml");
+        eprintln!("note: bug reporting link: https://github.com/zirco-lang/zrc/issues/new?template=ice.yml");
         eprintln!();
         default_panic_hook(panic_info);
         eprintln!();
