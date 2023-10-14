@@ -1,0 +1,89 @@
+name: Report a Panic/ICE (Internal Compiler Error)
+description: Template for bug reports
+title: "ice: panicked at 'explicit panic'"
+labels:
+    - status/untriaged
+    - type/bug/ice
+body:
+    - type: markdown
+      attributes:
+          value: >-
+              # Thank you for taking your time to report a bug in Zirco!
+
+              Compiler bugs are supposedly rare, so take a second to pat yourself on
+              the back! By reporting a bug, you're improving the entire Zirco
+              ecosystem as a whole.
+    - type: checkboxes
+      id: checks
+      attributes:
+          label: Before we begin...
+          description: Please take a second to do the following.
+          options:
+              - label: I have updated the Zirco toolchain to the latest version
+                required: false
+              - label: I have searched the issue tracker for duplicates
+                required: false
+    - type: markdown
+      attributes:
+          value: >-
+              ## Name Your Issue
+
+              Now that we've done that, it's time to give your bug report a good name.
+              If your compiler ICEd, you should see a large message on your screen.
+              Read through it and you will likely find a portion that says `thread
+              'main' panicked at '...'`. Replace "explicit panic" in the issue title
+              with the "..." from that panic message. This will help us handle your
+              report best.
+
+
+              Once we've done that, it's time to collect some more information!
+    - type: textarea
+      id: ice-message
+      attributes:
+          label: What was the ICE diagnostic?
+          description: >-
+              When your compiler panics, it produces some output that helps us
+              diagnose the issue. The entirety of your compiler's STDOUT is helpful in
+              determining how you were using the compiler. Please paste the **entire**
+              output when the panic occured.
+          placeholder: "error: internal compiler error encountered: thread panicked ..."
+      validations:
+          required: true
+    - type: textarea
+      id: repro
+      attributes:
+          label: What were you doing when the panic occured?
+          description: >-
+              Please describe how you invoked `zrc`, what you were trying to compille,
+              etc.
+      validations:
+          required: true
+    - type: textarea
+      id: repro-code
+      attributes:
+          label: Provide an example of code that causes the panic.
+          description: >-
+              Please share an example of code that causes the panic, or a link to a
+              GitHub repository etc. of what you were trying to compile.
+      validations:
+          required: true
+    - type: textarea
+      id: context
+      attributes:
+          label: Other Context
+          description: >-
+              If there is any other context you believe will be helpful in
+              investigating this error, please provide it here.
+    - type: markdown
+      attributes:
+          value: >-
+              ## Thank you!
+
+              Again, thank you for your time in reporting a bug in Zirco. We will get
+              back to you with information on how to at least work around it shortly.
+              For now, please wait as we investigate the bug.
+    - type: markdown
+      attributes:
+          value: >-
+              This template was generated with [Issue Forms
+              Creator](https://issue-forms-creator.netlify.app)
