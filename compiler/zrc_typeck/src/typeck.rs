@@ -37,8 +37,8 @@ impl Scope {
     #[must_use]
     pub fn new_empty() -> Self {
         Self {
-            type_scope: HashMap::new(),
             value_scope: HashMap::new(),
+            type_scope: HashMap::new(),
         }
     }
 
