@@ -17,27 +17,16 @@ pub fn resolve_type(
     ty: ParserType,
 ) -> Result<TastType, zrc_diagnostics::Diagnostic> {
     Ok(match ty.0.value() {
-        ParserTypeKind::Identifier(x) => match x.as_str() {
-            "i8" => TastType::I8,
-            "u8" => TastType::U8,
-            "i16" => TastType::I16,
-            "u16" => TastType::U16,
-            "i32" => TastType::I32,
-            "u32" => TastType::U32,
-            "i64" => TastType::I64,
-            "u64" => TastType::U64,
-            "bool" => TastType::Bool,
-            _ => {
-                if let Some(t) = scope.get_type(x) {
-                    t.clone()
-                } else {
-                    return Err(Diagnostic(
-                        zrc_diagnostics::Severity::Error,
-                        ty.0.map(|x| DiagnosticKind::UnableToResolveType(x.to_string())),
-                    ));
-                }
+        ParserTypeKind::Identifier(x) => {
+            if let Some(t) = scope.get_type(x) {
+                t.clone()
+            } else {
+                return Err(Diagnostic(
+                    zrc_diagnostics::Severity::Error,
+                    ty.0.map(|x| DiagnosticKind::UnableToResolveType(x.to_string())),
+                ));
             }
-        },
+        }
         ParserTypeKind::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t.clone())?)),
         ParserTypeKind::Struct(members) => TastType::Struct(
             members
