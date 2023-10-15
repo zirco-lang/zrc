@@ -246,7 +246,7 @@ fn display_source_window(severity: &Severity, span: Span, source: &str) -> Strin
             (n, &source[line.start()..line.end()], {
                 let intersection = Span::intersect(
                     Span::from_positions(line.start(), line.ending()),
-                    Span::from_positions(span.start(), span.end() - 1),
+                    Span::from_positions(span.start(), span.end()),
                 )
                 .expect("line span should intersect with span");
                 (
