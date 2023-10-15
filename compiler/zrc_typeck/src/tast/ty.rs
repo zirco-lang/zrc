@@ -7,7 +7,8 @@ use crate::typeck::BlockReturnType;
 /// The possible Zirco types
 #[derive(PartialEq, Debug, Clone)]
 pub enum Type {
-    // WHENEVER ADDING NEW PRIMITIVES HERE, ADD THEM TO THE TYPE SCOPE IN [`zrc_typeck::typeck::Scope::default`].
+    // WHENEVER ADDING NEW PRIMITIVES HERE, ADD THEM TO THE TYPE SCOPE IN
+    // [`zrc_typeck::typeck::Scope::default`].
     /// `i8`
     I8,
     /// `u8`
