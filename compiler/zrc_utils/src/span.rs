@@ -137,6 +137,32 @@ impl<T> Spanned<T> {
     pub const fn end(&self) -> usize {
         self.span().end()
     }
+
+    /// Converts a [`&Spanned<T>`][Spanned] to a [`Spanned<&T>`].
+    pub const fn as_ref(&self) -> Spanned<&T> {
+        self.span().containing(&self.1)
+    }
+}
+impl<T> Spanned<Option<T>> {
+    /// Converts a [`Spanned<Option<T>>`] to a [`Option<Spanned<T>>`].
+    /// Note: This is not reversible because if you wanted to create a
+    /// [`Spanned`] [`Some`] from [`None`], what span would you use?
+    pub fn transpose(self) -> Option<Spanned<T>> {
+        let span = self.span();
+        self.into_value().map(|x| x.in_span(span))
+    }
+}
+impl<T, E> Spanned<Result<T, E>> {
+    /// Converts a [`Spanned<Result<T, E>>`] to a [`Result<Spanned<T>,
+    /// Spanned<E>>`]. Note: This is not reversible. See the note on
+    /// [`Spanned<Option<T>>::transpose`].
+    #[allow(clippy::missing_errors_doc)] // just propagates input error
+    pub fn transpose(self) -> Result<Spanned<T>, Spanned<E>> {
+        let span = self.span();
+        self.into_value()
+            .map(|x| x.in_span(span))
+            .map_err(|x| x.in_span(span))
+    }
 }
 
 /// A trait automatically implemented on all types that allows you to attach a
@@ -158,4 +184,17 @@ impl<T: Sized> Spannable for T {
     fn in_span(self, span: Span) -> Spanned<Self> {
         Spanned::from_span_and_value(span, self)
     }
+}
+
+/// Create a [`Spanned<T>`] instance from two locations and a value.
+/// Simply just expands to a [`Spanned::from_span_and_value`] and
+/// [`Span::from_positions`] calls.
+///
+/// # Panics
+/// Panics if `start > end`.
+#[macro_export]
+macro_rules! spanned {
+    ($start:expr, $value:expr, $end:expr) => {
+        Spanned::from_span_and_value(Span::from_positions($start, $end), $value)
+    };
 }
