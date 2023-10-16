@@ -84,8 +84,3 @@ body:
               Again, thank you for your time in reporting a bug in Zirco. We will get
               back to you with information on how to at least work around it shortly.
               For now, please wait as we investigate the bug.
-    - type: markdown
-      attributes:
-          value: >-
-              This template was generated with [Issue Forms
-              Creator](https://issue-forms-creator.netlify.app)

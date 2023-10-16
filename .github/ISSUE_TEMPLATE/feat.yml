@@ -69,8 +69,3 @@ body:
               Again, thank you for your time in making this Zirco feature request. We
               will get back to you with information on how the team feels about your
               request shortly.
-    - type: markdown
-      attributes:
-          value: >-
-              This template was generated with [Issue Forms
-              Creator](https://issue-forms-creator.netlify.app)
