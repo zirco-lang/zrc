@@ -351,6 +351,8 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, zrc_diagnostics
                 // int == int is valid
             } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (at.0.clone(), bt.0.clone()) {
                 // *T == *U is valid
+            } else if at.0 == TastType::Bool && bt.0 == TastType::Bool {
+                // bool == bool is valid
             } else {
                 return Err(Diagnostic(
                     Severity::Error,

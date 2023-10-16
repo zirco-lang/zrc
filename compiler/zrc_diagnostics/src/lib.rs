@@ -197,7 +197,7 @@ impl Display for DiagnosticKind {
             }
             Self::EqualityOperators(t1, t2) => write!(
                 f,
-                "expected both sides to be the same integer or pointer type, got `{t1}` and `{t2}`"
+                "expected both sides to be the same integer, boolean or pointer type, got `{t1}` and `{t2}`"
             ),
             Self::InvalidCast(from, to) => write!(f, "cannot cast `{from}` to `{to}`"),
             Self::IdentifierAlreadyInUse(i) => write!(f, "identifier `{i}` already in use"),
