@@ -45,7 +45,6 @@ body:
           description: >-
               Please describe the benefits of your feature to the ecosystem as a
               whole, not just yourself.
-          placeholder: zrc version 1.0.0 (...)
       validations:
           required: true
     - type: textarea
