@@ -27,9 +27,15 @@ pub struct Scope {
     type_scope: HashMap<String, TastType>,
 }
 impl Scope {
-    /// Creates a new Scope with no values or types.
+    /// Creates a new Scope from just the defaults
     #[must_use]
     pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a new Scope without the primitives
+    #[must_use]
+    pub fn new_empty() -> Self {
         Self {
             value_scope: HashMap::new(),
             type_scope: HashMap::new(),
@@ -71,9 +77,24 @@ impl Scope {
         self.type_scope.insert(identifier, ty);
     }
 }
+
 impl Default for Scope {
     fn default() -> Self {
-        Self::new()
+        Self::from_scopes(
+            HashMap::from([]),
+            HashMap::from([
+                ("i8".to_string(), TastType::I8),
+                ("u8".to_string(), TastType::U8),
+                ("i16".to_string(), TastType::I16),
+                ("u16".to_string(), TastType::U16),
+                ("i32".to_string(), TastType::I32),
+                ("u32".to_string(), TastType::U32),
+                ("i64".to_string(), TastType::I64),
+                ("u64".to_string(), TastType::U64),
+                ("bool".to_string(), TastType::Bool),
+                // void is not producible
+            ]),
+        )
     }
 }
 
