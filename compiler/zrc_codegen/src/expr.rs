@@ -639,6 +639,8 @@ pub fn cg_expr(
 
         TypedExprKind::Cast(x, t) => {
             use zrc_typeck::tast::ty::Type::*;
+
+            // The legendary Cast Table. Contains the cast opcode used for T -> U
             let cast_opcode = match (x.0.clone(), t.clone()) {
                 (x, y) if x == y => "bitcast",
                 // signed -> signed = sext
@@ -674,6 +676,9 @@ pub fn cg_expr(
                 (I16, U16) | (U16, I16) => "bitcast",
                 (I32, U32) | (U32, I32) => "bitcast",
                 (I64, U64) | (U64, I64) => "bitcast",
+
+                (Bool, x) if x.is_signed_integer() => "sext",
+                (Bool, x) if x.is_unsigned_integer() => "zext",
 
                 (Ptr(_), Ptr(_)) => "bitcast",
                 (Ptr(_), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",

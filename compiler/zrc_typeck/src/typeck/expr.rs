@@ -509,6 +509,9 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, zrc_diagnostics
                         )),
                     ));
                 }
+            } else if xt.0 == TastType::Bool && tt.is_integer() {
+                // bool -> int cast is valid
+                TypedExpr(tt.clone(), TypedExprKind::Cast(Box::new(xt), tt))
             } else {
                 return Err(Diagnostic(
                     Severity::Error,
