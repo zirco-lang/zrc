@@ -440,13 +440,11 @@ pub fn cg_expr(
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
-            let result_reg = cg.new_reg();
+            let result_ptr = cg_alloc(cg, &bb, &result_typename);
 
-            cg_alloc(cg, &bb, &result_typename);
+            cg_store(cg, &bb, &result_typename, &result_ptr, &x_ptr)?;
 
-            cg_store(cg, &bb, &result_typename, &result_reg, &x_ptr)?;
-
-            (result_reg, bb)
+            (result_ptr, bb)
         }
 
         TypedExprKind::UnaryDereference(x) => {
