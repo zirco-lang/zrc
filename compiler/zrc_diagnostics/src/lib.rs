@@ -53,7 +53,7 @@ impl Display for Diagnostic {
 
 /// The list of possible errors
 #[allow(missing_docs)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DiagnosticKind {
     // LEXER ERRORS
     UnknownToken(String),
