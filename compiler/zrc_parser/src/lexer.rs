@@ -492,6 +492,91 @@ mod tests {
         );
     }
 
+    /// Tests that all tokens can be properly lexed, and that they all impl [`Display`] correctly.
+    #[test]
+    fn all_tokens_lex_and_display_correctly() {
+        let input = r#"+ - * / % == != > >= < <= && || ! & | ^ ~ << >> = += -= *= /= %= &= |= ^= <<= >>= ; , . : :: ? ( ) [ ] { } true false if else while for break continue return let fn as struct -> "str" 7_000 0xF_A 0b1_0 abc"#;
+        let tokens: Vec<Tok> = vec![
+            Tok::Plus,
+            Tok::Minus,
+            Tok::Star,
+            Tok::Slash,
+            Tok::Percent,
+            Tok::EqEq,
+            Tok::NotEq,
+            Tok::Greater,
+            Tok::GreaterEq,
+            Tok::Less,
+            Tok::LessEq,
+            Tok::LogicalAnd,
+            Tok::LogicalOr,
+            Tok::LogicalNot,
+            Tok::BitwiseAnd,
+            Tok::BitwiseOr,
+            Tok::BitwiseXor,
+            Tok::BitwiseNot,
+            Tok::BitwiseLeftShift,
+            Tok::BitwiseRightShift,
+            Tok::Assign,
+            Tok::PlusAssign,
+            Tok::MinusAssign,
+            Tok::StarAssign,
+            Tok::SlashAssign,
+            Tok::PercentAssign,
+            Tok::BitwiseAndAssign,
+            Tok::BitwiseOrAssign,
+            Tok::BitwiseXorAssign,
+            Tok::BitwiseLeftShiftAssign,
+            Tok::BitwiseRightShiftAssign,
+            Tok::Semicolon,
+            Tok::Comma,
+            Tok::Dot,
+            Tok::Colon,
+            Tok::ColonColon,
+            Tok::QuestionMark,
+            Tok::LeftParen,
+            Tok::RightParen,
+            Tok::LeftBracket,
+            Tok::RightBracket,
+            Tok::LeftBrace,
+            Tok::RightBrace,
+            Tok::True,
+            Tok::False,
+            Tok::If,
+            Tok::Else,
+            Tok::While,
+            Tok::For,
+            Tok::Break,
+            Tok::Continue,
+            Tok::Return,
+            Tok::Let,
+            Tok::Fn,
+            Tok::As,
+            Tok::Struct,
+            Tok::SmallArrow,
+            Tok::StringLiteral("\"str\"".to_string()),
+            Tok::NumberLiteral("7_000".to_string()),
+            Tok::NumberLiteral("0xF_A".to_string()),
+            Tok::NumberLiteral("0b1_0".to_string()),
+            Tok::Identifier("abc".to_string()),
+        ];
+
+        assert_eq!(
+            ZircoLexer::new(input)
+                .map(|x| x.transpose().unwrap().into_value())
+                .collect::<Vec<_>>(),
+            tokens
+        );
+        assert_eq!(
+            tokens
+                .into_iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
+            input
+        );
+    }
+
     /// Comment support
     mod comments {
         use super::*;
