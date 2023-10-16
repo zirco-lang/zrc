@@ -91,4 +91,11 @@ impl Type {
         use Type::{I16, I32, I64, I8};
         matches!(self, I8 | I16 | I32 | I64)
     }
+
+    /// Returns `true` if this is an unsigned integer type like [`Type::U8`].
+    #[must_use]
+    pub const fn is_unsigned_integer(&self) -> bool {
+        use Type::{U16, U32, U64, U8};
+        matches!(self, U8 | U16 | U32 | U64)
+    }
 }
