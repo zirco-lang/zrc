@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use zrc_utils::{span::{Span, Spanned}, spanned};
+use zrc_utils::{span::Spanned, spanned};
 
 use super::{
     lexer,

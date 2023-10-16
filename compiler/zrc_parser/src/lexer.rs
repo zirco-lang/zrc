@@ -31,8 +31,8 @@ use zrc_utils::span::{Span, Spanned};
 /// The error enum passed to the internal logos [`Lexer`]. Will be converted to
 /// a [`LexicalError`] later on by [`ZircoLexer`].
 ///
-/// Do not use publicly. This cannot be made private because the Tok enum is public and derives
-/// Lexer.
+/// Do not use publicly. This cannot be made private because the Tok enum is
+/// public and derives Lexer.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum InternalLexicalError {
     /// A generic lexing error. This is later converted to
@@ -46,9 +46,11 @@ pub enum InternalLexicalError {
     UnterminatedBlockComment,
 }
 
-/// An error encountered during lexing. You will usually find this wrapped in a [`Spanned<LexicalError>`].
+/// An error encountered during lexing. You will usually find this wrapped in a
+/// [`Spanned<LexicalError>`].
 ///
-/// Does not implement [`std::error::Error`] because it should be converted to a [`zrc_diagnostics::Diagnostic`].
+/// Does not implement [`std::error::Error`] because it should be converted to a
+/// [`zrc_diagnostics::Diagnostic`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexicalError {
     /// An unknown token was encountered.
@@ -459,8 +461,9 @@ impl<'input> Iterator for ZircoLexer<'input> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use zrc_utils::spanned;
+
+    use super::*;
 
     #[test]
     fn whitespace_should_be_skipped() {

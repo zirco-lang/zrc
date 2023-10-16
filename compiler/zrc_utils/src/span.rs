@@ -145,15 +145,17 @@ impl<T> Spanned<T> {
 }
 impl<T> Spanned<Option<T>> {
     /// Converts a [`Spanned<Option<T>>`] to a [`Option<Spanned<T>>`].
-    /// Note: This is not reversible because if you wanted to create a [`Spanned`] [`Some`] from [`None`], what span would you use?
+    /// Note: This is not reversible because if you wanted to create a
+    /// [`Spanned`] [`Some`] from [`None`], what span would you use?
     pub fn transpose(self) -> Option<Spanned<T>> {
         let span = self.span();
         self.into_value().map(|x| x.in_span(span))
     }
 }
 impl<T, E> Spanned<Result<T, E>> {
-    /// Converts a [`Spanned<Result<T, E>>`] to a [`Result<Spanned<T>, Spanned<E>>`].
-    /// Note: This is not reversible. See the note on [`Spanned<Option<T>>::transpose`].
+    /// Converts a [`Spanned<Result<T, E>>`] to a [`Result<Spanned<T>,
+    /// Spanned<E>>`]. Note: This is not reversible. See the note on
+    /// [`Spanned<Option<T>>::transpose`].
     #[allow(clippy::missing_errors_doc)] // just propagates input error
     pub fn transpose(self) -> Result<Spanned<T>, Spanned<E>> {
         let span = self.span();
@@ -185,7 +187,8 @@ impl<T: Sized> Spannable for T {
 }
 
 /// Create a [`Spanned<T>`] instance from two locations and a value.
-/// Simply just expands to a [`Spanned::from_span_and_value`] and [`Span::from_positions`] calls.
+/// Simply just expands to a [`Spanned::from_span_and_value`] and
+/// [`Span::from_positions`] calls.
 ///
 /// # Panics
 /// Panics if `start > end`.
