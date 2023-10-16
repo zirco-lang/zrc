@@ -111,6 +111,7 @@ pub enum DiagnosticKind {
 }
 
 impl Display for DiagnosticKind {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UnknownToken(c) => write!(f, "unknown token `{c}`"),
@@ -197,7 +198,11 @@ impl Display for DiagnosticKind {
             }
             Self::EqualityOperators(t1, t2) => write!(
                 f,
-                "expected both sides to be the same integer, boolean or pointer type, got `{t1}` and `{t2}`"
+                concat!(
+                    "expected both sides to be the same integer,",
+                    " boolean or pointer type, got `{}` and `{}`"
+                ),
+                t1, t2
             ),
             Self::InvalidCast(from, to) => write!(f, "cannot cast `{from}` to `{to}`"),
             Self::IdentifierAlreadyInUse(i) => write!(f, "identifier `{i}` already in use"),
