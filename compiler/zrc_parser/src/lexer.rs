@@ -464,6 +464,7 @@ mod tests {
     use zrc_utils::spanned;
 
     use super::*;
+    use zrc_utils::spanned;
 
     #[test]
     fn whitespace_should_be_skipped() {
