@@ -141,3 +141,39 @@ pub fn parse_expr(input: &str) -> Result<Expr, Diagnostic> {
         .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
         .map_err(parser_error_to_diagnostic)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::expr::Expr;
+    use zrc_utils::span::Spannable;
+
+    mod expr {
+        use super::*;
+
+        #[test]
+        fn all_arithmetic_operators_parse_as_expected() {
+            assert_eq!(
+                // ((1 + 1) - (((1 * 1) / 1) % 1))
+                parse_expr("1 + 1 - 1 * 1 / 1 % 1"),
+                Ok(Expr::sub(
+                    Expr::add(
+                        Expr::number("1".to_string().in_span(Span::from_positions(0, 1))),
+                        Expr::number("1".to_string().in_span(Span::from_positions(4, 5)))
+                    ),
+                    Expr::modulo(
+                        Expr::div(
+                            Expr::mul(
+                                Expr::number("1".to_string().in_span(Span::from_positions(8, 9))),
+                                Expr::number("1".to_string().in_span(Span::from_positions(12, 13)))
+                            ),
+                            Expr::number("1".to_string().in_span(Span::from_positions(16, 17)))
+                        ),
+                        Expr::number("1".to_string().in_span(Span::from_positions(20, 21)))
+                    )
+                ))
+            );
+        }
+    }
+    mod program {}
+}
