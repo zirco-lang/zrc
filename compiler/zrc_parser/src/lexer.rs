@@ -12,10 +12,12 @@
 //! # Example
 //! ```
 //! use zrc_parser::lexer::{ZircoLexer, Tok};
+//! use zrc_utils::{span::{Span, Spanned}, spanned};
+//!
 //! let mut lex = ZircoLexer::new("2 + 2");
-//! assert_eq!(lex.next(), Some(Ok((0, Tok::NumberLiteral("2".to_string()), 1))));
-//! assert_eq!(lex.next(), Some(Ok((2, Tok::Plus, 3))));
-//! assert_eq!(lex.next(), Some(Ok((4, Tok::NumberLiteral("2".to_string()), 5))));
+//! assert_eq!(lex.next(), Some(spanned!(0, Ok(Tok::NumberLiteral("2".to_string())), 1)));
+//! assert_eq!(lex.next(), Some(spanned!(2, Ok(Tok::Plus), 3)));
+//! assert_eq!(lex.next(), Some(spanned!(4, Ok(Tok::NumberLiteral("2".to_string())), 5)));
 //! assert_eq!(lex.next(), None);
 //! ```
 //!
@@ -24,17 +26,19 @@
 use std::fmt::Display;
 
 use logos::{Lexer, Logos};
+use zrc_utils::span::{Span, Spanned};
 
-/// Represents a lexer token within a certain span, or an error.
-/// The lexer uses its own Spanned type because LALRPOP expects them in this
-/// format. After parsing, they will be converted into
-/// [`zrc_utils::span::Spanned<T>`] instances.
-pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
+// /// Represents a lexer token within a certain span, or an error.
+// /// The lexer uses its own Spanned type because LALRPOP expects them in this
+// /// format. After parsing, they will be converted into
+// /// [`zrc_utils::span::Spanned<T>`] instances.
+// pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
 
 /// The error enum passed to the internal logos [`Lexer`]. Will be converted to
-/// a [`LexicalError`] by [`ZircoLexer`].
+/// a [`LexicalError`] later on by [`ZircoLexer`].
 ///
-/// Do not use publicly.
+/// Do not use publicly. This cannot be made private because the Tok enum is public and derives
+/// Lexer.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum InternalLexicalError {
     /// A generic lexing error. This is later converted to
@@ -48,46 +52,18 @@ pub enum InternalLexicalError {
     UnterminatedBlockComment,
 }
 
-/// An error encountered during lexing.
+/// An error encountered during lexing. You will usually find this wrapped in a [`Spanned<LexicalError>`].
+///
+/// Does not implement [`std::error::Error`] because it should be converted to a [`zrc_diagnostics::Diagnostic`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexicalError {
     /// An unknown token was encountered.
-    UnknownToken(zrc_utils::span::Spanned<char>),
+    UnknownToken(String),
     /// A string literal was left unterminated.
-    UnterminatedStringLiteral(zrc_utils::span::Span),
+    UnterminatedStringLiteral,
     /// A block comment ran to the end of the file. Remind the user that block
     /// comments nest.
-    UnterminatedBlockComment(zrc_utils::span::Span),
-}
-impl Display for LexicalError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::UnknownToken(char) => {
-                write!(
-                    f,
-                    "Unknown token '{}' at position {}",
-                    char.value(),
-                    char.span()
-                )
-            }
-            Self::UnterminatedStringLiteral(span) => {
-                write!(
-                    f,
-                    "Unterminated string literal from {} to {}",
-                    span.start(),
-                    span.end()
-                )
-            }
-            Self::UnterminatedBlockComment(span) => {
-                write!(
-                    f,
-                    "Unterminated block comment from {} to {}",
-                    span.start(),
-                    span.end()
-                )
-            }
-        }
-    }
+    UnterminatedBlockComment,
 }
 
 /// A lexer callback helper to obtain the currently matched token slice.
@@ -464,33 +440,25 @@ impl<'input> ZircoLexer<'input> {
 }
 
 impl<'input> Iterator for ZircoLexer<'input> {
-    type Item = Spanned<Tok, usize, LexicalError>;
+    type Item = Spanned<Result<Tok, LexicalError>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.lex.next()?;
-        let span = self.lex.span();
-        let slice = self.lex.slice().to_string();
+        let logos_span = self.lex.span();
+        let span = Span::from_positions(logos_span.start, logos_span.end);
+
         match token {
             Err(InternalLexicalError::NoMatchingRule) => {
-                let char = slice.chars().next().unwrap();
-                Some(Err(LexicalError::UnknownToken(
-                    zrc_utils::span::Spanned::from_span_and_value(
-                        zrc_utils::span::Span::from_positions(span.start, span.end),
-                        char,
-                    ),
-                )))
+                let slice = self.lex.slice().to_string();
+                Some(span.containing(Err(LexicalError::UnknownToken(slice))))
             }
             Err(InternalLexicalError::UnterminatedBlockComment) => {
-                Some(Err(LexicalError::UnterminatedBlockComment(
-                    zrc_utils::span::Span::from_positions(span.start, span.end),
-                )))
+                Some(span.containing(Err(LexicalError::UnterminatedBlockComment)))
             }
             Err(InternalLexicalError::UnterminatedStringLiteral) => {
-                Some(Err(LexicalError::UnterminatedStringLiteral(
-                    zrc_utils::span::Span::from_positions(span.start, span.end),
-                )))
+                Some(span.containing(Err(LexicalError::UnterminatedStringLiteral)))
             }
-            Ok(token) => Some(Ok((span.start, token, span.end))),
+            Ok(tok) => Some(span.containing(Ok(tok))),
         }
     }
 }
@@ -498,34 +466,31 @@ impl<'input> Iterator for ZircoLexer<'input> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zrc_utils::spanned;
 
-    /// Whitespace skipping works as expected
     #[test]
-    fn whitespace_skipping() {
+    fn whitespace_should_be_skipped() {
         let lexer = ZircoLexer::new(" t\t e \n\ns\nt\r\n  s");
-        let tokens: Vec<_> = lexer.map(|x| x.unwrap().1).collect();
+        let tokens: Vec<_> = lexer.map(|x| x.transpose().unwrap()).collect();
         assert_eq!(
             tokens,
             vec![
-                Tok::Identifier("t".to_string()),
-                Tok::Identifier("e".to_string()),
-                Tok::Identifier("s".to_string()),
-                Tok::Identifier("t".to_string()),
-                Tok::Identifier("s".to_string()),
+                spanned!(1, Tok::Identifier("t".to_string()), 2),
+                spanned!(4, Tok::Identifier("e".to_string()), 5),
+                spanned!(8, Tok::Identifier("s".to_string()), 9),
+                spanned!(10, Tok::Identifier("t".to_string()), 11),
+                spanned!(15, Tok::Identifier("s".to_string()), 16),
             ]
         );
     }
 
-    /// Unclosed strings
     #[test]
-    fn unclosed_string() {
+    fn unclosed_strings_should_error() {
         let lexer = ZircoLexer::new("\"abc");
         let tokens: Vec<_> = lexer.collect();
         assert_eq!(
             tokens,
-            vec![Err(LexicalError::UnterminatedStringLiteral(
-                zrc_utils::span::Span::from_positions(0, 4)
-            ))]
+            vec![spanned!(0, Err(LexicalError::UnterminatedStringLiteral), 4),]
         );
     }
 
@@ -544,13 +509,13 @@ mod tests {
                 "c // ghi\n",
                 "// jkl",
             ));
-            let tokens: Vec<_> = lexer.collect();
+            let tokens: Vec<_> = lexer.map(|x| x.transpose().unwrap()).collect();
             assert_eq!(
                 tokens,
                 vec![
-                    Ok((0, Tok::Identifier("a".to_string()), 1)),
-                    Ok((8, Tok::Identifier("b".to_string()), 9)),
-                    Ok((17, Tok::Identifier("c".to_string()), 18)),
+                    spanned!(0, Tok::Identifier("a".to_string()), 1),
+                    spanned!(8, Tok::Identifier("b".to_string()), 9),
+                    spanned!(17, Tok::Identifier("c".to_string()), 18),
                 ]
             );
         }
@@ -559,14 +524,14 @@ mod tests {
         #[test]
         fn multiline_comments_are_skipped() {
             let lexer = ZircoLexer::new("a\nb/* abc */c/*\naaa\n*/d");
-            let tokens: Vec<_> = lexer.collect();
+            let tokens: Vec<_> = lexer.map(|x| x.transpose().unwrap()).collect();
             assert_eq!(
                 tokens,
                 vec![
-                    Ok((0, Tok::Identifier("a".to_string()), 1)),
-                    Ok((2, Tok::Identifier("b".to_string()), 3)),
-                    Ok((12, Tok::Identifier("c".to_string()), 13)),
-                    Ok((22, Tok::Identifier("d".to_string()), 23))
+                    spanned!(0, Tok::Identifier("a".to_string()), 1),
+                    spanned!(2, Tok::Identifier("b".to_string()), 3),
+                    spanned!(12, Tok::Identifier("c".to_string()), 13),
+                    spanned!(22, Tok::Identifier("d".to_string()), 23),
                 ]
             );
         }
@@ -575,12 +540,12 @@ mod tests {
         #[test]
         fn nested_multiline_comments_are_skipped() {
             let lexer = ZircoLexer::new("a/* /* */ */b"); // should lex OK
-            let tokens: Vec<_> = lexer.collect();
+            let tokens: Vec<_> = lexer.map(|x| x.transpose().unwrap()).collect();
             assert_eq!(
                 tokens,
                 vec![
-                    Ok((0, Tok::Identifier("a".to_string()), 1)),
-                    Ok((12, Tok::Identifier("b".to_string()), 13))
+                    spanned!(0, Tok::Identifier("a".to_string()), 1),
+                    spanned!(12, Tok::Identifier("b".to_string()), 13),
                 ]
             );
         }
@@ -593,10 +558,8 @@ mod tests {
             assert_eq!(
                 tokens,
                 vec![
-                    Ok((0, Tok::Identifier("a".to_string()), 1)),
-                    Err(LexicalError::UnterminatedBlockComment(
-                        zrc_utils::span::Span::from_positions(2, 7)
-                    ))
+                    spanned!(0, Ok(Tok::Identifier("a".to_string())), 1),
+                    spanned!(2, Err(LexicalError::UnterminatedBlockComment), 7),
                 ]
             );
         }

@@ -56,7 +56,7 @@ impl Display for Diagnostic {
 #[derive(Debug)]
 pub enum DiagnosticKind {
     // LEXER ERRORS
-    UnknownToken(char),
+    UnknownToken(String),
     UnterminatedStringLiteral,
     UnterminatedBlockComment,
 

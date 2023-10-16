@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use zrc_utils::span::{Span, Spanned};
+use zrc_utils::{span::{Span, Spanned}, spanned};
 
 use super::{
     lexer,
@@ -16,7 +16,7 @@ use super::{
 grammar;
 
 Spanned<T>: Spanned<T> = {
-    <l:@L> <x:T> <r:@R> => Spanned::from_span_and_value(Span::from_positions(l, r), x),
+    <l:@L> <x:T> <r:@R> => spanned!(l, x, r),
 }
 SpannedExpr<T>: Expr = {
     <Spanned<T>> => Expr(<>),
@@ -308,7 +308,7 @@ Primary: Expr = {
 
 extern {
     type Location = usize;
-    type Error = lexer::LexicalError;
+    type Error = Spanned<lexer::LexicalError>;
 
     enum lexer::Tok {
         "+" => lexer::Tok::Plus,
