@@ -28,12 +28,6 @@ use std::fmt::Display;
 use logos::{Lexer, Logos};
 use zrc_utils::span::{Span, Spanned};
 
-// /// Represents a lexer token within a certain span, or an error.
-// /// The lexer uses its own Spanned type because LALRPOP expects them in this
-// /// format. After parsing, they will be converted into
-// /// [`zrc_utils::span::Spanned<T>`] instances.
-// pub type Spanned<Tok, Loc, Error> = Result<(Loc, Tok, Loc), Error>;
-
 /// The error enum passed to the internal logos [`Lexer`]. Will be converted to
 /// a [`LexicalError`] later on by [`ZircoLexer`].
 ///
