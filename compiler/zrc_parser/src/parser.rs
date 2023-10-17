@@ -86,7 +86,8 @@ fn parser_error_to_diagnostic(
 }
 
 /// Converts the [`lexer::ZircoLexer`] result type of
-/// [`Spanned<Result<Tok, LexicalError>>`] to something suitable to pass to LALRPOP.
+/// [`Spanned<Result<Tok, LexicalError>>`] to something suitable to pass to
+/// LALRPOP.
 fn zirco_lexer_span_to_lalrpop_span(
     spanned: Spanned<Result<lexer::Tok, lexer::LexicalError>>,
 ) -> Result<(usize, lexer::Tok, usize), Spanned<lexer::LexicalError>> {
@@ -144,9 +145,10 @@ pub fn parse_expr(input: &str) -> Result<Expr, Diagnostic> {
 
 #[cfg(test)]
 mod tests {
+    use zrc_utils::span::Spannable;
+
     use super::*;
     use crate::ast::expr::Expr;
-    use zrc_utils::span::Spannable;
 
     mod expr {
         use super::*;

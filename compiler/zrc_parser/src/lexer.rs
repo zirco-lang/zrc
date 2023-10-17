@@ -461,8 +461,9 @@ impl<'input> Iterator for ZircoLexer<'input> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use zrc_utils::spanned;
+
+    use super::*;
 
     #[test]
     fn whitespace_should_be_skipped() {
@@ -490,10 +491,15 @@ mod tests {
         );
     }
 
-    /// Tests that all tokens can be properly lexed, and that they all impl [`Display`] correctly.
+    /// Tests that all tokens can be properly lexed, and that they all impl
+    /// [`Display`] correctly.
     #[test]
     fn all_tokens_lex_and_display_correctly() {
-        let input = r#"+ - * / % == != > >= < <= && || ! & | ^ ~ << >> = += -= *= /= %= &= |= ^= <<= >>= ; , . : :: ? ( ) [ ] { } true false if else while for break continue return let fn as struct -> "str" 7_000 0xF_A 0b1_0 abc"#;
+        let input = concat!(
+            "+ - * / % == != > >= < <= && || ! & | ^ ~ << >> = += -= *= /= %= &= |= ^= <<= >>= ; ,",
+            " . : :: ? ( ) [ ] { } true false if else while for break continue return let fn as",
+            r#" struct -> "str" 7_000 0xF_A 0b1_0 abc"#
+        );
         let tokens: Vec<Tok> = vec![
             Tok::Plus,
             Tok::Minus,

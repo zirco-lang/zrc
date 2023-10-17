@@ -282,7 +282,8 @@ impl Display for ExprKind {
     }
 }
 
-// AST builder. We are able to infer the spans of many based on the start of their leftmost and the end of their rightmost operands.
+// AST builder. We are able to infer the spans of many based on the start of
+// their leftmost and the end of their rightmost operands.
 #[allow(missing_docs)]
 #[allow(clippy::missing_docs_in_private_items)]
 #[allow(clippy::should_implement_trait)]
@@ -511,7 +512,8 @@ impl Expr {
             prop.end()
         ))
     }
-    // The only nonterminal that needs a span because we can't tell when the ) ends. We also cannot guess the span of params because it may be empty.
+    // The only nonterminal that needs a span because we can't tell when the ) ends.
+    // We also cannot guess the span of params because it may be empty.
     #[must_use]
     pub fn call(span: Span, f: Self, params: Spanned<Vec<Self>>) -> Self {
         Self(ExprKind::Call(Box::new(f), params).in_span(span))
