@@ -156,8 +156,18 @@ LetDeclaration: Vec<Spanned<LetDeclaration>> = {
 Type: Type = {
     Spanned<IDENTIFIER> => Type(<>.map(|x| TypeKind::Identifier(x))),
     Spanned<("*" <Type>)> => Type(<>.map(|x| TypeKind::Ptr(Box::new(x)))),
-    Spanned<("struct" "{" <CommaSeparated<
-        (<IDENTIFIER> ":" <Type>)>?> "}")> => Type(<>.map(|x| TypeKind::Struct(x.unwrap_or(Vec::new()).into_iter().collect::<HashMap<_, _>>()))),
+    Spanned<("struct" "{" <Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}")> => 
+        Type(
+            <>.map(|x| {
+                TypeKind::Struct(x.map(|inner|
+                    inner
+                        .unwrap_or(Vec::new())
+                        .into_iter()
+                        .map(|x| (x.value().0.value().clone(), x))
+                        .collect::<HashMap<_, _>>())
+                )
+            })
+        ),
 }
 
 FlowStmt: StmtKind = {
@@ -291,7 +301,7 @@ _Postfix: ExprKind = {
     <x:Postfix> "[" <i:Expr> "]" => ExprKind::Index(Box::new(x), Box::new(i)),
     <l:Postfix> "." <r:Spanned<IDENTIFIER>> => ExprKind::Dot(Box::new(l), r),
     <l:Postfix> "->" <r:Spanned<IDENTIFIER>> => ExprKind::Arrow(Box::new(l), r),
-    <i:Postfix> "(" <l:Spanned<ArgumentList?>> ")" => ExprKind::Call(Box::new(i), l.map(|x| x.unwrap_or(Vec::new()))),
+    <i:Postfix> <c:Spanned<("(" <ArgumentList?> ")")>> => ExprKind::Call(Box::new(i), c.map(|x| x.unwrap_or(Vec::new()))),
 };
 Postfix: Expr = ExprPrecedenceTier<_Postfix, Primary>;
 

@@ -201,3 +201,126 @@ macro_rules! spanned {
         )
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spanned_macro_creates_spanned_item() {
+        assert_eq!(
+            spanned!(0, (), 3),
+            Spanned::from_span_and_value(Span::from_positions(0, 3), ())
+        );
+    }
+
+    mod span {
+        use super::*;
+
+        #[test]
+        fn span_from_positions_works_as_expected() {
+            let span = Span::from_positions(2, 7);
+            assert_eq!(span, Span(2, 7));
+            assert_eq!(span.start(), 2);
+            assert_eq!(span.end(), 7);
+            assert_eq!(span.range(), 2..=7);
+            assert_eq!(span.to_string(), "2-7".to_string());
+        }
+
+        #[test]
+        #[should_panic]
+        fn span_from_invalid_positions_panics() {
+            let _ = Span::from_positions(5, 0);
+        }
+
+        #[test]
+        fn span_intersection_with_overlap_returns_intersection() {
+            assert_eq!(
+                Span::intersect(Span::from_positions(0, 6), Span::from_positions(4, 10)),
+                Some(Span::from_positions(4, 6))
+            );
+        }
+
+        #[test]
+        fn span_intersections_with_disjoint_spans_returns_none() {
+            assert_eq!(
+                Span::intersect(Span::from_positions(0, 5), Span::from_positions(7, 10)),
+                None
+            );
+        }
+
+        #[test]
+        fn span_containing_returns_spanned() {
+            assert_eq!(
+                Span::from_positions(0, 3).containing(()),
+                spanned!(0, (), 3)
+            );
+        }
+    }
+
+    mod spanned {
+        use super::*;
+
+        #[test]
+        fn basic_methods_work_as_expected() {
+            let span = Span::from_positions(3, 6);
+            let spanned = Spanned::from_span_and_value(span, 0);
+
+            assert_eq!(spanned.span(), span);
+            assert_eq!(spanned.start(), 3);
+            assert_eq!(spanned.end(), 6);
+            assert_eq!(spanned.value(), &0);
+            assert_eq!(spanned.into_value(), 0);
+        }
+
+        #[test]
+        fn map_works_as_expected() {
+            let spanned = spanned!(3, 0, 6);
+
+            assert_eq!(spanned.map(|n| n == 0), spanned!(3, true, 6));
+        }
+
+        #[test]
+        fn as_ref_works_as_expected() {
+            let spanned = spanned!(3, 0, 6);
+
+            assert_eq!(spanned.as_ref(), spanned!(3, &0, 6));
+        }
+
+        #[test]
+        fn transpose_option_some_case() {
+            let spanned = spanned!(3, Some(0), 6);
+
+            assert_eq!(spanned.transpose(), Some(spanned!(3, 0, 6)));
+        }
+
+        #[test]
+        fn transpose_option_none_case() {
+            let spanned: Spanned<Option<()>> = spanned!(3, None, 6);
+
+            assert_eq!(spanned.transpose(), None);
+        }
+
+        #[test]
+        fn transpose_result_ok_case() {
+            let spanned: Spanned<Result<i32, ()>> = spanned!(3, Ok(0), 6);
+
+            assert_eq!(spanned.transpose(), Ok(spanned!(3, 0, 6)));
+        }
+
+        #[test]
+        fn transpose_result_err_case() {
+            let spanned: Spanned<Result<(), i32>> = spanned!(3, Err(0), 6);
+
+            assert_eq!(spanned.transpose(), Err(spanned!(3, 0, 6)));
+        }
+    }
+
+    #[test]
+    fn spannable_in_span_creates_spanned() {
+        assert_eq!(
+            7.in_span(Span::from_positions(3, 6)),
+            Spanned(Span(3, 6), 7),
+        );
+    }
+}

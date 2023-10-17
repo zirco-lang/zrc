@@ -42,7 +42,7 @@ impl Display for Severity {
 }
 
 /// A diagnostic message produced by zrc
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Diagnostic(pub Severity, pub Spanned<DiagnosticKind>);
 impl Error for Diagnostic {}
 impl Display for Diagnostic {
@@ -53,7 +53,7 @@ impl Display for Diagnostic {
 
 /// The list of possible errors
 #[allow(missing_docs)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DiagnosticKind {
     // LEXER ERRORS
     UnknownToken(String),
