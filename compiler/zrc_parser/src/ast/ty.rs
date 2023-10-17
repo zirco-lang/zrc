@@ -22,6 +22,7 @@ pub enum TypeKind {
     /// `*T`
     Ptr(Box<Type>),
     /// A direct struct type
+    #[allow(clippy::type_complexity)]
     Struct(Spanned<HashMap<String, Spanned<(Spanned<String>, Type)>>>),
 }
 
@@ -66,9 +67,10 @@ impl Type {
     }
 
     #[must_use]
+    #[allow(clippy::type_complexity)]
     pub fn struct_direct(
         span: Span,
-        keys: Spanned<HashMap<String, Spanned<(Spanned<String>, Type)>>>,
+        keys: Spanned<HashMap<String, Spanned<(Spanned<String>, Self)>>>,
     ) -> Self {
         Self(TypeKind::Struct(keys).in_span(span))
     }
