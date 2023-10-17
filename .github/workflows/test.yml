@@ -39,3 +39,5 @@ jobs:
                   args: -o lcov --engine llvm --skip-clean
             - name: Upload coverage
               uses: codecov/codecov-action@v3
+              with:
+                  fail_ci_if_error: true
