@@ -461,8 +461,6 @@ impl<'input> Iterator for ZircoLexer<'input> {
 
 #[cfg(test)]
 mod tests {
-    use zrc_utils::spanned;
-
     use super::*;
     use zrc_utils::spanned;
 
