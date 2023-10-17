@@ -30,8 +30,9 @@ pub fn resolve_type(
         ParserTypeKind::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t.clone())?)),
         ParserTypeKind::Struct(members) => TastType::Struct(
             members
+                .value()
                 .iter()
-                .map(|(k, v)| Ok((k.clone(), resolve_type(scope, v.clone())?)))
+                .map(|(k, v)| Ok((k.clone(), resolve_type(scope, v.value().clone().1)?)))
                 .collect::<Result<HashMap<String, TastType>, Diagnostic>>()?,
         ),
     })

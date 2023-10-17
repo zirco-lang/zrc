@@ -5,7 +5,10 @@
 
 use std::{collections::HashMap, fmt::Display};
 
-use zrc_utils::span::Spanned;
+use zrc_utils::{
+    span::{Span, Spannable, Spanned},
+    spanned,
+};
 
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -19,7 +22,7 @@ pub enum TypeKind {
     /// `*T`
     Ptr(Box<Type>),
     /// A direct struct type
-    Struct(HashMap<String, Type>),
+    Struct(Spanned<HashMap<String, Spanned<(Spanned<String>, Type)>>>),
 }
 
 impl Display for TypeKind {
@@ -29,9 +32,9 @@ impl Display for TypeKind {
             Self::Ptr(t) => write!(f, "*{t}"),
             Self::Struct(members) => {
                 write!(f, "struct {{ ")?;
-                for (i, m) in members.iter().enumerate() {
-                    write!(f, "{}: {}", m.0, m.1)?;
-                    if i < members.len() - 1 {
+                for (i, m) in members.value().iter().enumerate() {
+                    write!(f, "{}: {}", m.0, m.1.value().1)?;
+                    if i < members.value().len() - 1 {
                         write!(f, ", ")?;
                     }
                 }
@@ -43,5 +46,35 @@ impl Display for TypeKind {
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.value().fmt(f)
+    }
+}
+
+// AST builder. We are able to infer the spans of many based on the start of
+// their leftmost and the end of their rightmost operands.
+#[allow(missing_docs)]
+#[allow(clippy::missing_docs_in_private_items)]
+#[allow(clippy::should_implement_trait)]
+impl Type {
+    #[must_use]
+    pub fn ident(ident: Spanned<String>) -> Self {
+        let span = ident.span();
+        Self(spanned!(
+            span.start(),
+            TypeKind::Identifier(ident.into_value()),
+            ident.end()
+        ))
+    }
+
+    #[must_use]
+    pub fn struct_direct(
+        span: Span,
+        keys: Spanned<HashMap<String, Spanned<(Spanned<String>, Type)>>>,
+    ) -> Self {
+        Self(TypeKind::Struct(keys).in_span(span))
+    }
+
+    #[must_use]
+    pub fn ptr(span: Span, ty: Self) -> Self {
+        Self(TypeKind::Ptr(Box::new(ty)).in_span(span))
     }
 }

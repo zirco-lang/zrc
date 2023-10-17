@@ -149,9 +149,9 @@ mod tests {
 
     use super::*;
     use crate::ast::expr::Expr;
+    use crate::ast::ty::Type;
 
     mod expr {
-
         use super::*;
 
         #[test]
@@ -323,13 +323,11 @@ mod tests {
 
         #[test]
         fn casts_parse_as_expected() {
-            use crate::ast::ty::{Type, TypeKind};
-
             assert_eq!(
                 parse_expr("x as T"),
                 Ok(Expr::cast(
                     Expr::ident(spanned!(0, "x".to_string(), 1)),
-                    Type(spanned!(5, TypeKind::Identifier("T".to_string()), 6))
+                    Type::ident(spanned!(5, "T".to_string(), 6))
                 ))
             );
         }
