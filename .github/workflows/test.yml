@@ -31,10 +31,12 @@ jobs:
             - name: Install cargo-tarpaulin
               uses: actions-rs/cargo@v1
               with:
-                  command: install cargo-tarpaulin
+                  command: install
+                  args: cargo-tarpaulin
             - name: cargo test
               uses: actions-rs/cargo@v1
               with:
-                  command: tarpaulin -o lcov --envine llvm
+                  command: tarpaulin
+                  args: -o lcov --engine llvm
             - name: Upload coverage
               uses: codecov/codecov-action@v3
