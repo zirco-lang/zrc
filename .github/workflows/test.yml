@@ -28,7 +28,13 @@ jobs:
               uses: r7kamura/rust-problem-matchers@v1
             - name: Use dependency cache
               uses: Swatinem/rust-cache@v2
+            - name: Install cargo-tarpaulin
+              uses: actions-rs/cargo@v1
+              with:
+                  command: install cargo-tarpaulin
             - name: cargo test
               uses: actions-rs/cargo@v1
               with:
-                  command: test
+                  command: tarpaulin -o lcov --envine llvm
+            - name: Upload coverage
+              uses: codecov/codecov-action@v3
