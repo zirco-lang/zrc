@@ -195,6 +195,9 @@ impl<T: Sized> Spannable for T {
 #[macro_export]
 macro_rules! spanned {
     ($start:expr, $value:expr, $end:expr) => {
-        Spanned::from_span_and_value(Span::from_positions($start, $end), $value)
+        $crate::span::Spanned::from_span_and_value(
+            $crate::span::Span::from_positions($start, $end),
+            $value,
+        )
     };
 }
