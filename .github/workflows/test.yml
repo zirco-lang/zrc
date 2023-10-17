@@ -26,9 +26,16 @@ jobs:
                   components: rustfmt, clippy
             - name: Install Rust problem matchers
               uses: r7kamura/rust-problem-matchers@v1
+            - name: Install cargo-tarpaulin
+              uses: taiki-e/install-action@v2
+              with:
+                  tool: cargo-tarpaulin
             - name: Use dependency cache
               uses: Swatinem/rust-cache@v2
             - name: cargo test
               uses: actions-rs/cargo@v1
               with:
-                  command: test
+                  command: tarpaulin
+                  args: -o lcov --engine llvm --skip-clean
+            - name: Upload coverage
+              uses: codecov/codecov-action@v3
