@@ -392,7 +392,7 @@ impl Expr {
     }
     #[must_use]
     pub fn neq(lhs: Self, rhs: Self) -> Self {
-        Self::equality(Equality::Eq, lhs, rhs)
+        Self::equality(Equality::Neq, lhs, rhs)
     }
 
     fn comparison(op: Comparison, lhs: Self, rhs: Self) -> Self {
@@ -447,54 +447,32 @@ impl Expr {
         Self::arithmetic(Arithmetic::Modulo, lhs, rhs)
     }
 
+    // Span needed as the unary op may be in a different position than the expr
     #[must_use]
-    pub fn not(expr: Self) -> Self {
-        Self(spanned!(
-            expr.0.start(),
-            ExprKind::UnaryNot(Box::new(expr)),
-            expr.0.end()
-        ))
+    pub fn not(sp: Span, expr: Self) -> Self {
+        Self(ExprKind::UnaryNot(Box::new(expr)).in_span(sp))
     }
     #[must_use]
-    pub fn bit_not(expr: Self) -> Self {
-        Self(spanned!(
-            expr.0.start(),
-            ExprKind::UnaryBitwiseNot(Box::new(expr)),
-            expr.0.end()
-        ))
+    pub fn bit_not(sp: Span, expr: Self) -> Self {
+        Self(ExprKind::UnaryBitwiseNot(Box::new(expr)).in_span(sp))
     }
     #[must_use]
-    pub fn neg(expr: Self) -> Self {
-        Self(spanned!(
-            expr.0.start(),
-            ExprKind::UnaryMinus(Box::new(expr)),
-            expr.0.end()
-        ))
+    pub fn neg(sp: Span, expr: Self) -> Self {
+        Self(ExprKind::UnaryMinus(Box::new(expr)).in_span(sp))
     }
     #[must_use]
-    pub fn address_of(expr: Self) -> Self {
-        Self(spanned!(
-            expr.0.start(),
-            ExprKind::UnaryAddressOf(Box::new(expr)),
-            expr.0.end()
-        ))
+    pub fn address_of(sp: Span, expr: Self) -> Self {
+        Self(ExprKind::UnaryAddressOf(Box::new(expr)).in_span(sp))
     }
     #[must_use]
-    pub fn deref(expr: Self) -> Self {
-        Self(spanned!(
-            expr.0.start(),
-            ExprKind::UnaryDereference(Box::new(expr)),
-            expr.0.end()
-        ))
+    pub fn deref(sp: Span, expr: Self) -> Self {
+        Self(ExprKind::UnaryDereference(Box::new(expr)).in_span(sp))
     }
 
+    /// Span is needed for right brace
     #[must_use]
-    pub fn index(lhs: Self, rhs: Self) -> Self {
-        Self(spanned!(
-            lhs.0.start(),
-            ExprKind::Index(Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
-        ))
+    pub fn index(sp: Span, lhs: Self, rhs: Self) -> Self {
+        Self(ExprKind::Index(Box::new(lhs), Box::new(rhs)).in_span(sp))
     }
     #[must_use]
     pub fn dot(expr: Self, prop: Spanned<String>) -> Self {
