@@ -148,8 +148,7 @@ mod tests {
     use zrc_utils::spanned;
 
     use super::*;
-    use crate::ast::expr::Expr;
-    use crate::ast::ty::Type;
+    use crate::ast::{expr::Expr, ty::Type};
 
     mod expr {
         use super::*;
