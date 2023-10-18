@@ -8,7 +8,10 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
-use std::{fmt::Write, path::PathBuf};
+use std::{
+    fmt::{Display, Write},
+    path::PathBuf,
+};
 
 use anyhow::Context as _;
 use clap::Parser;
@@ -79,6 +82,47 @@ struct Cli {
 
     /// The path of the file to compile
     path: Option<PathBuf>,
+
+    /// What output format to emit
+    #[arg(long)]
+    #[clap(default_value_t = OutputFormat::Llvm)]
+    emit: OutputFormat,
+}
+
+/// The list of possible outputs `zrc` can emit in
+///
+/// Usually you will want to use `llvm`.
+#[derive(Clone, clap::ValueEnum)]
+enum OutputFormat {
+    /// LLVM IR
+    Llvm,
+    /// The Zirco AST, in Rust-like format
+    AstDebug,
+    /// The Zirco AST, in Rust-like format with indentation
+    AstDebugPretty,
+    /// The Zirco AST, stringified to Zirco code again
+    ///
+    /// This usually looks like your code with a bunch of parenthesis added.
+    Ast,
+    /// The Zirco TAST, in Rust-like format
+    TastDebug,
+    /// The Zirco TAST, in Rust-like format with indentation
+    TastDebugPretty,
+    /// The Zirco TAST, stringified to Zirco-like code
+    Tast,
+}
+impl Display for OutputFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Llvm => write!(f, "llvm"),
+            Self::AstDebug => write!(f, "ast-debug"),
+            Self::AstDebugPretty => write!(f, "ast-debug-pretty"),
+            Self::Ast => write!(f, "ast"),
+            Self::TastDebug => write!(f, "tast-debug"),
+            Self::TastDebugPretty => write!(f, "tast-debug-pretty"),
+            Self::Tast => write!(f, "tast"),
+        }
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -125,7 +169,7 @@ fn main() -> anyhow::Result<()> {
     let content = std::fs::read_to_string(cli.path.context("no input file provided")?)
         .context("failed to read input file")?;
 
-    let result = compile(&content);
+    let result = compile(&cli.emit, &content);
     match result {
         Err(diagnostic) => eprintln!("{}", diagnostic.print(&content)),
         Ok(x) => println!("{x}"),
@@ -135,9 +179,38 @@ fn main() -> anyhow::Result<()> {
 }
 
 /// Drive the compilation process.
-fn compile(content: &str) -> Result<String, zrc_diagnostics::Diagnostic> {
-    Ok(zrc_codegen::cg_program(zrc_typeck::typeck::type_program(
-        zrc_parser::parser::parse_program(content)?,
-    )?)
-    .expect("code generation should not fail"))
+fn compile(emit: &OutputFormat, content: &str) -> Result<String, zrc_diagnostics::Diagnostic> {
+    match emit {
+        OutputFormat::Llvm => Ok(zrc_codegen::cg_program(zrc_typeck::typeck::type_program(
+            zrc_parser::parser::parse_program(content)?,
+        )?)
+        .expect("code generation should not fail")),
+
+        OutputFormat::Ast => Ok(zrc_parser::parser::parse_program(content)?
+            .into_iter()
+            .map(|x| format!("{}", x.into_value()))
+            .collect::<Vec<_>>()
+            .join("\n")),
+        OutputFormat::AstDebug => Ok(format!("{:?}", zrc_parser::parser::parse_program(content)?)),
+        OutputFormat::AstDebugPretty => Ok(format!(
+            "{:#?}",
+            zrc_parser::parser::parse_program(content)?
+        )),
+
+        OutputFormat::Tast => Ok(zrc_typeck::typeck::type_program(
+            zrc_parser::parser::parse_program(content)?,
+        )?
+        .into_iter()
+        .map(|x| x.to_string())
+        .collect::<Vec<_>>()
+        .join("\n")),
+        OutputFormat::TastDebug => Ok(format!(
+            "{:?}",
+            zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?
+        )),
+        OutputFormat::TastDebugPretty => Ok(format!(
+            "{:#?}",
+            zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?
+        )),
+    }
 }
