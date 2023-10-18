@@ -32,8 +32,9 @@ pub fn resolve_type(
     })
 }
 
-/// Resolve the types within the [`IndexMap`]s used by [`ParserTypeKind::Struct`] and ensure keys are
-/// unique, returning the value to be passed to [`TastType::Struct`].
+/// Resolve the types within the [`IndexMap`]s used by
+/// [`ParserTypeKind::Struct`] and ensure keys are unique, returning the value
+/// to be passed to [`TastType::Struct`].
 ///
 /// # Errors
 /// Errors if a key is not unique or is unresolvable.
