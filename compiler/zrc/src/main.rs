@@ -13,7 +13,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{bail, Context as _};
+use anyhow::bail;
 use clap::Parser;
 
 #[doc(hidden)]
@@ -82,6 +82,12 @@ struct Cli {
 
     /// The path of the file to compile
     path: Option<PathBuf>,
+
+    /// The path of the file to write the output to
+    /// If not provided, the output will be written to stdout
+    #[arg(short, long)]
+    #[clap(default_value = "-")]
+    out_file: PathBuf,
 
     /// What output format to emit
     #[arg(long)]
@@ -168,7 +174,7 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let Some(path)= cli.path else {
+    let Some(path) = cli.path else {
         bail!("no input file provided");
     };
 
@@ -189,7 +195,26 @@ fn main() -> anyhow::Result<()> {
     let result = compile(&cli.emit, &content);
     match result {
         Err(diagnostic) => eprintln!("{}", diagnostic.print(&content)),
-        Ok(x) => println!("{x}"),
+        Ok(x) => {
+            let mut output: Box<dyn std::io::Write> =
+                if cli.out_file.clone().into_os_string() == "-" {
+                    Box::new(std::io::stdout())
+                } else {
+                    match std::fs::OpenOptions::new()
+                        .write(true)
+                        .truncate(true)
+                        .create(true)
+                        .open(cli.out_file)
+                    {
+                        Ok(file) => Box::new(file),
+                        Err(err) => {
+                            bail!(err);
+                        }
+                    }
+                };
+
+            write!(output, "{x}")?;
+        }
     }
 
     Ok(())
