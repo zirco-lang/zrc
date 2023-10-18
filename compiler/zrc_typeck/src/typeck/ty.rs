@@ -43,7 +43,7 @@ pub fn resolve_struct_keys(
     members: &Spanned<IndexMap<String, Spanned<(Spanned<String>, ParserType)>>>,
 ) -> Result<IndexMap<String, TastType>, Diagnostic> {
     let mut map = IndexMap::new();
-    for (k, v) in members.value().iter() {
+    for (k, v) in members.value() {
         if map.contains_key(k) {
             return Err(Diagnostic(
                 zrc_diagnostics::Severity::Error,
