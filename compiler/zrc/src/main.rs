@@ -13,7 +13,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::Context as _;
+use anyhow::{bail, Context as _};
 use clap::Parser;
 
 #[doc(hidden)]
@@ -168,8 +168,23 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let content = std::fs::read_to_string(cli.path.context("no input file provided")?)
-        .context("failed to read input file")?;
+    let Some(path)= cli.path else {
+        bail!("no input file provided");
+    };
+
+    let mut input: Box<dyn std::io::Read + 'static> = if path.clone().into_os_string() == "-" {
+        Box::new(std::io::stdin())
+    } else {
+        match std::fs::File::open(&path) {
+            Ok(file) => Box::new(file),
+            Err(err) => {
+                bail!(err);
+            }
+        }
+    };
+
+    let mut content = String::new();
+    input.read_to_string(&mut content)?;
 
     let result = compile(&cli.emit, &content);
     match result {
