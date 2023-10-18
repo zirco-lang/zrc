@@ -108,6 +108,7 @@ pub enum DiagnosticKind {
     CannotUseContinueOutsideOfLoop,
     CannotReturnHere,
     ExpectedABlockToReturn,
+    DuplicateStructMember(String),
 }
 
 impl Display for DiagnosticKind {
@@ -218,6 +219,7 @@ impl Display for DiagnosticKind {
             Self::ExpectedABlockToReturn => {
                 write!(f, "expected a block to be guaranteed to return")
             }
+            Self::DuplicateStructMember(key) => write!(f, "duplicate struct member `{key}`"),
         }
     }
 }

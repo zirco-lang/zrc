@@ -1,7 +1,5 @@
 //! for blocks
 
-use std::collections::HashMap;
-
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
 use zrc_parser::ast::stmt::{
     Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind,
@@ -288,25 +286,13 @@ pub fn process_declaration(
                 ));
             }
 
-            let resolved_pairs = fields
-                .value()
-                .iter()
-                .map(|(name, ty)| -> Result<(String, TastType), Diagnostic> {
-                    Ok((
-                        name.clone(),
-                        resolve_type(global_scope, ty.value().1.clone())?,
-                    ))
-                })
-                .collect::<Result<HashMap<_, _>, Diagnostic>>()?;
+            let fields = super::ty::resolve_struct_keys(fields)?;
 
-            global_scope.set_type(
-                name.value().clone(),
-                TastType::Struct(resolved_pairs.clone()),
-            );
+            global_scope.set_type(name.value().clone(), TastType::Struct(fields.clone()));
 
             TypedDeclaration::StructDeclaration {
                 name: name.into_value(),
-                fields: resolved_pairs,
+                fields,
             }
         }
     })

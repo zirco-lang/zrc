@@ -1,6 +1,8 @@
 //! Statement representation for the Zirco [TAST](super)
 
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
+
+use indexmap::IndexMap;
 
 use super::{expr::TypedExpr, ty::Type};
 
@@ -85,8 +87,8 @@ pub enum TypedDeclaration {
     StructDeclaration {
         /// The name of the newtype.
         name: String,
-        /// The key-value pairs of the struct
-        fields: HashMap<String, super::ty::Type>,
+        /// The key-value pairs of the struct. Ordered by declaration order.
+        fields: IndexMap<String, super::ty::Type>,
     },
 }
 
