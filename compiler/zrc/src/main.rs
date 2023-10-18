@@ -159,6 +159,8 @@ fn main() -> anyhow::Result<()> {
         eprintln!("error: end internal compiler error. compilation failed.");
     }));
 
+    std::env::set_var("RUST_BACKTRACE", "1");
+
     let cli = Cli::parse();
 
     if cli.version {
