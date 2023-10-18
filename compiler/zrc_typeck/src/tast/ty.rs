@@ -1,6 +1,8 @@
 //! Type representation for the Zirco [TAST](super)
 
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
+
+use indexmap::IndexMap;
 
 use crate::typeck::BlockReturnType;
 
@@ -34,8 +36,8 @@ pub enum Type {
     Ptr(Box<Type>),
     /// `fn(A, B) -> T`
     Fn(Vec<Type>, Box<BlockReturnType>),
-    /// Struct type literals
-    Struct(HashMap<String, Type>),
+    /// Struct type literals. Ordered by declaration order.
+    Struct(IndexMap<String, Type>),
 }
 
 impl Display for Type {

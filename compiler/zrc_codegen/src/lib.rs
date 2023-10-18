@@ -191,18 +191,6 @@ impl BasicBlock {
     }
 }
 
-/// Determine the order of the values within a struct.
-///
-/// FIXME: This MUST use insertion order in the future for C FFI compat, instead
-/// of our.. alphabetical order approach?
-fn determine_order_of_struct(
-    values: HashMap<String, zrc_typeck::tast::ty::Type>,
-) -> Vec<(String, zrc_typeck::tast::ty::Type)> {
-    let mut values = values.into_iter().collect::<Vec<_>>();
-    values.sort_by_key(|(k, _)| k.clone());
-    values
-}
-
 fn get_llvm_typename(ty: zrc_typeck::tast::ty::Type) -> String {
     use zrc_typeck::tast::ty::Type;
 
@@ -225,9 +213,9 @@ fn get_llvm_typename(ty: zrc_typeck::tast::ty::Type) -> String {
         ),
         Type::Struct(entries) => format!(
             "{{ {} }}",
-            determine_order_of_struct(entries)
+            entries
                 .into_iter()
-                .map(|(_, v)| format!("{v}"))
+                .map(|(_, v)| get_llvm_typename(v))
                 .collect::<Vec<_>>()
                 .join(", ")
         ),

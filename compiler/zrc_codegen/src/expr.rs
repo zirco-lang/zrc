@@ -1,8 +1,7 @@
 use anyhow::{bail, Context as _};
 
 use super::{
-    cg_alloc, cg_load, cg_store, determine_order_of_struct, get_llvm_typename, BasicBlock, CgScope,
-    FunctionCg, ModuleCg,
+    cg_alloc, cg_load, cg_store, get_llvm_typename, BasicBlock, CgScope, FunctionCg, ModuleCg,
 };
 
 /// Returns a register containing a pointer to the place inputted
@@ -75,7 +74,7 @@ pub fn cg_place(
 
             let key_idx = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Struct(entries) => {
-                    determine_order_of_struct(entries)
+                    entries
                         .into_iter()
                         .enumerate()
                         .find(|(_, (k, _))| k == &key)
@@ -117,7 +116,7 @@ pub fn cg_place(
 
             let key_idx = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Struct(entries) => {
-                    determine_order_of_struct(entries)
+                    entries
                         .into_iter()
                         .enumerate()
                         .find(|(_, (k, _))| k == &key)
@@ -534,7 +533,7 @@ pub fn cg_expr(
 
             let key_idx = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Struct(entries) => {
-                    determine_order_of_struct(entries)
+                    entries
                         .into_iter()
                         .enumerate()
                         .find(|(_, (k, _))| k == &prop)
@@ -572,7 +571,7 @@ pub fn cg_expr(
 
             let key_idx = match x.0.clone() {
                 zrc_typeck::tast::ty::Type::Struct(entries) => {
-                    determine_order_of_struct(entries)
+                    entries
                         .into_iter()
                         .enumerate()
                         .find(|(_, (k, _))| k == &prop)

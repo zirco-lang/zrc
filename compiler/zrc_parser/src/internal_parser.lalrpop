@@ -1,6 +1,6 @@
 // DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY MODULE parser INSTEAD
 
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use zrc_utils::{span::Spanned, spanned};
 
@@ -129,7 +129,7 @@ StructDeclaration: Declaration = {
                 .unwrap_or(Vec::new())
                 .into_iter()
                 .map(|x| (x.value().0.value().clone(), x))
-                .collect::<HashMap<_, _>>()
+                .collect::<IndexMap<_, _>>()
         })
     }
 }
@@ -164,7 +164,7 @@ Type: Type = {
                         .unwrap_or(Vec::new())
                         .into_iter()
                         .map(|x| (x.value().0.value().clone(), x))
-                        .collect::<HashMap<_, _>>())
+                        .collect::<IndexMap<_, _>>())
                 )
             })
         ),

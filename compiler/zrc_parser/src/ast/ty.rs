@@ -3,8 +3,9 @@
 //! The main thing within this module you will need is the [`Type`] struct. It
 //! contains all the different type kinds in Zirco.
 
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
+use indexmap::IndexMap;
 use zrc_utils::{
     span::{Span, Spannable, Spanned},
     spanned,
@@ -23,7 +24,7 @@ pub enum TypeKind {
     Ptr(Box<Type>),
     /// A direct struct type
     #[allow(clippy::type_complexity)]
-    Struct(Spanned<HashMap<String, Spanned<(Spanned<String>, Type)>>>),
+    Struct(Spanned<IndexMap<String, Spanned<(Spanned<String>, Type)>>>),
 }
 
 impl Display for TypeKind {
@@ -70,7 +71,7 @@ impl Type {
     #[allow(clippy::type_complexity)]
     pub fn struct_direct(
         span: Span,
-        keys: Spanned<HashMap<String, Spanned<(Spanned<String>, Self)>>>,
+        keys: Spanned<IndexMap<String, Spanned<(Spanned<String>, Self)>>>,
     ) -> Self {
         Self(TypeKind::Struct(keys).in_span(span))
     }

@@ -4,8 +4,9 @@
 //! contains all the different statement kinds in Zirco. Some other structs and
 //! enums exist to supplement this enum.
 
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
+use indexmap::IndexMap;
 use zrc_utils::span::Spanned;
 
 use super::{expr::Expr, ty::Type};
@@ -75,9 +76,9 @@ pub enum Declaration {
     StructDeclaration {
         /// The name of the newtype.
         name: Spanned<String>,
-        /// The key-value pairs of the struct
+        /// The key-value pairs of the struct. Ordered by declaration order.
         #[allow(clippy::type_complexity)]
-        fields: Spanned<HashMap<String, Spanned<(Spanned<String>, super::ty::Type)>>>,
+        fields: Spanned<IndexMap<String, Spanned<(Spanned<String>, super::ty::Type)>>>,
     },
 }
 
