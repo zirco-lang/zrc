@@ -25,8 +25,11 @@ pub fn cg_place(
             (reg, bb.clone())
         }
         PlaceKind::Deref(x) => {
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
-            (x_ptr, bb)
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
+
+            let x_reg = cg_load(cg, &bb, &get_llvm_typename(x.0), &x_ptr)?;
+
+            (x_reg, bb)
         }
         PlaceKind::Index(x, index) => {
             let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
@@ -58,60 +61,9 @@ pub fn cg_place(
 
             (result_reg, bb)
         }
-        PlaceKind::Arrow(x, key) => {
-            let (x_ptr, bb) = cg_place(module, cg, bb, scope, *x.clone())?;
-
-            let x_typename = get_llvm_typename(x.0.clone());
-
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
-
-            let result_typename = match x.0.clone() {
-                zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
-                _ => unreachable!(), // per typeck, this is always a pointer
-            };
-
-            let result_reg = cg.new_reg();
-
-            let key_idx = match x.0.clone() {
-                zrc_typeck::tast::ty::Type::Struct(entries) => {
-                    entries
-                        .into_iter()
-                        .enumerate()
-                        .find(|(_, (k, _))| k == &key)
-                        .with_context(|| format!("Struct {} has no field {}", x.0, key))?
-                        .0
-                }
-                _ => unreachable!(), // per typeck, this is always a struct
-            };
-
-            #[allow(clippy::uninlined_format_args)] // for line length
-            bb.add_instruction(
-                cg,
-                &format!(
-                    "{} = getelementptr {}, {} {}, i32 0, i32 0, i32 {}",
-                    result_reg, result_typename, x_typename, x_reg, key_idx
-                ),
-            )?;
-
-            (result_reg, bb)
-        }
         PlaceKind::Dot(x, key) => {
             let (x_ptr, bb) = cg_place(module, cg, bb, scope, *x.clone())?;
 
-            let x_typename = get_llvm_typename(x.0.clone());
-
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
-
-            let result_typename = match x.0.clone() {
-                zrc_typeck::tast::ty::Type::Struct(entries) => get_llvm_typename(
-                    entries
-                        .get(&key)
-                        .with_context(|| format!("Struct {} has no field {}", x.0.clone(), key))?
-                        .clone(),
-                ),
-                _ => unreachable!(), // per typeck, this is always a struct
-            };
-
             let result_reg = cg.new_reg();
 
             let key_idx = match x.0.clone() {
@@ -130,8 +82,12 @@ pub fn cg_place(
             bb.add_instruction(
                 cg,
                 &format!(
-                    "{} = getelementptr {}, {} {}, i32 0, i32 {}",
-                    result_reg, result_typename, x_typename, x_reg, key_idx
+                    "{} = getelementptr {}, ptr {}, i32 0, i32 {}",
+                    result_reg,
+                    get_llvm_typename(x.0.clone()),
+                    // x_typename,
+                    x_ptr,
+                    key_idx
                 ),
             )?;
 
@@ -447,15 +403,17 @@ pub fn cg_expr(
         }
 
         TypedExprKind::UnaryDereference(x) => {
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
+            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
 
             let result_typename = get_llvm_typename(expr.0.clone());
 
-            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr)?;
+            let x_reg = cg_load(cg, &bb, &get_llvm_typename(x.0), &x_ptr)?;
+
+            let result_reg = cg_load(cg, &bb, &result_typename, &x_reg)?;
 
             let result_ptr = cg_alloc(cg, &bb, &result_typename);
 
-            cg_store(cg, &bb, &result_typename, &result_ptr, &x_reg)?;
+            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
 
             (result_ptr, bb)
         }
@@ -548,44 +506,6 @@ pub fn cg_expr(
                 cg,
                 &format!(
                     "{} = getelementptr {}, {} {}, i32 0, i32 {}",
-                    result_reg, result_typename, x_typename, x_reg, key_idx
-                ),
-            )?;
-
-            (result_reg, bb)
-        }
-
-        TypedExprKind::Arrow(x, prop) => {
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
-
-            let x_typename = get_llvm_typename(x.0.clone());
-
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
-
-            let result_typename = match x.0.clone() {
-                zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
-                _ => unreachable!(), // per typeck, this is always a pointer
-            };
-
-            let result_reg = cg.new_reg();
-
-            let key_idx = match x.0.clone() {
-                zrc_typeck::tast::ty::Type::Struct(entries) => {
-                    entries
-                        .into_iter()
-                        .enumerate()
-                        .find(|(_, (k, _))| k == &prop)
-                        .with_context(|| format!("Struct {} has no field {}", x.0.clone(), prop))?
-                        .0
-                }
-                _ => unreachable!(), // per typeck, this is always a struct
-            };
-
-            #[allow(clippy::uninlined_format_args)] // for line length
-            bb.add_instruction(
-                cg,
-                &format!(
-                    "{} = getelementptr {}, {} {}, i32 0, i32 0, i32 {}",
                     result_reg, result_typename, x_typename, x_reg, key_idx
                 ),
             )?;

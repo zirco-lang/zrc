@@ -28,8 +28,6 @@ pub enum PlaceKind {
     Index(Box<TypedExpr>, Box<TypedExpr>),
     /// `x.y`
     Dot(Box<Place>, String),
-    /// `x -> y`
-    Arrow(Box<Place>, String),
 }
 
 /// The kind of a [`TypedExpr`]
@@ -69,8 +67,6 @@ pub enum TypedExprKind {
     Index(Box<TypedExpr>, Box<TypedExpr>),
     /// `a.b`
     Dot(Box<TypedExpr>, String),
-    /// `a->b`
-    Arrow(Box<TypedExpr>, String),
     /// `a(b, c, d, ...)`
     Call(Box<TypedExpr>, Vec<TypedExpr>),
 
@@ -109,7 +105,6 @@ impl Display for TypedExprKind {
             Self::UnaryMinus(e) => write!(f, "-{e}"),
             Self::UnaryAddressOf(e) => write!(f, "&{e}"),
             Self::UnaryDereference(e) => write!(f, "*{e}"),
-            Self::Arrow(l, r) => write!(f, "{l}->{r}"),
             Self::Ternary(l, m, r) => write!(f, "{l} ? {m} : {r}"),
             Self::Index(a, b) => write!(f, "{a}[{b}]"),
             Self::Dot(a, b) => write!(f, "{a}.{b}"),
@@ -132,7 +127,6 @@ impl Display for PlaceKind {
             Self::Variable(s) => write!(f, "{s}"),
             Self::Index(a, b) => write!(f, "{a}[{b}]"),
             Self::Dot(a, b) => write!(f, "{a}.{b}"),
-            Self::Arrow(a, b) => write!(f, "{a}->{b}"),
         }
     }
 }

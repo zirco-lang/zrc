@@ -46,10 +46,6 @@ fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, zrc_diagnostics::
             expr.0,
             PlaceKind::Dot(Box::new(expr_to_place(span, *x)?), y),
         ),
-        TypedExprKind::Arrow(x, y) => Place(
-            expr.0,
-            PlaceKind::Arrow(Box::new(expr_to_place(span, *x)?), y),
-        ),
         _ => {
             return Err(zrc_diagnostics::Diagnostic(
                 zrc_diagnostics::Severity::Error,
