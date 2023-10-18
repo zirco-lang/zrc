@@ -1,7 +1,5 @@
 // DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY MODULE parser INSTEAD
 
-use indexmap::IndexMap;
-
 use zrc_utils::{span::Spanned, spanned};
 
 use super::{
@@ -127,9 +125,6 @@ StructDeclaration: Declaration = {
         fields: l.map(|inner| {
             inner
                 .unwrap_or(Vec::new())
-                .into_iter()
-                .map(|x| (x.value().0.value().clone(), x))
-                .collect::<IndexMap<_, _>>()
         })
     }
 }
@@ -161,10 +156,7 @@ Type: Type = {
             <>.map(|x| {
                 TypeKind::Struct(x.map(|inner|
                     inner
-                        .unwrap_or(Vec::new())
-                        .into_iter()
-                        .map(|x| (x.value().0.value().clone(), x))
-                        .collect::<IndexMap<_, _>>())
+                        .unwrap_or(Vec::new()))
                 )
             })
         ),

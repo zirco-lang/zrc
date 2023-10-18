@@ -286,7 +286,7 @@ pub fn process_declaration(
                 ));
             }
 
-            let fields = super::ty::resolve_struct_keys(&fields)?;
+            let fields = super::ty::resolve_struct_keys(fields)?;
 
             global_scope.set_type(name.value().clone(), TastType::Struct(fields.clone()));
 

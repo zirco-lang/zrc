@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
-indexmap = "2.0.2"
 lalrpop-util = { version = "0.20.0" }
 logos = "0.13.0"
 regex = "1.10.2"

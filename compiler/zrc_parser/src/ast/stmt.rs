@@ -6,7 +6,6 @@
 
 use std::fmt::Display;
 
-use indexmap::IndexMap;
 use zrc_utils::span::Spanned;
 
 use super::{expr::Expr, ty::Type};
@@ -78,7 +77,7 @@ pub enum Declaration {
         name: Spanned<String>,
         /// The key-value pairs of the struct. Ordered by declaration order.
         #[allow(clippy::type_complexity)]
-        fields: Spanned<IndexMap<String, Spanned<(Spanned<String>, super::ty::Type)>>>,
+        fields: Spanned<Vec<Spanned<(Spanned<String>, super::ty::Type)>>>,
     },
 }
 
@@ -168,7 +167,7 @@ impl Display for Declaration {
                 fields
                     .value()
                     .iter()
-                    .map(|(_, sp)| format!("    {}: {}", sp.value().0.value(), sp.value().1))
+                    .map(|sp| format!("    {}: {}", sp.value().0.value(), sp.value().1))
                     .collect::<Vec<_>>()
                     .join(",\n")
             ),

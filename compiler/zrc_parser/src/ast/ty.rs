@@ -5,7 +5,6 @@
 
 use std::fmt::Display;
 
-use indexmap::IndexMap;
 use zrc_utils::{
     span::{Span, Spannable, Spanned},
     spanned,
@@ -24,7 +23,7 @@ pub enum TypeKind {
     Ptr(Box<Type>),
     /// A direct struct type
     #[allow(clippy::type_complexity)]
-    Struct(Spanned<IndexMap<String, Spanned<(Spanned<String>, Type)>>>),
+    Struct(Spanned<Vec<Spanned<(Spanned<String>, Type)>>>),
 }
 
 impl Display for TypeKind {
@@ -35,7 +34,7 @@ impl Display for TypeKind {
             Self::Struct(members) => {
                 write!(f, "struct {{ ")?;
                 for (i, m) in members.value().iter().enumerate() {
-                    write!(f, "{}: {}", m.0, m.1.value().1)?;
+                    write!(f, "{}: {}", m.value().0.value(), m.value().1)?;
                     if i < members.value().len() - 1 {
                         write!(f, ", ")?;
                     }
@@ -69,10 +68,7 @@ impl Type {
 
     #[must_use]
     #[allow(clippy::type_complexity)]
-    pub fn struct_direct(
-        span: Span,
-        keys: Spanned<IndexMap<String, Spanned<(Spanned<String>, Self)>>>,
-    ) -> Self {
+    pub fn struct_direct(span: Span, keys: Spanned<Vec<Spanned<(Spanned<String>, Self)>>>) -> Self {
         Self(TypeKind::Struct(keys).in_span(span))
     }
 

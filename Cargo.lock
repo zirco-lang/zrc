@@ -1305,7 +1305,6 @@ name = "zrc_parser"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "indexmap 2.0.2",
  "lalrpop",
  "lalrpop-util",
  "logos",

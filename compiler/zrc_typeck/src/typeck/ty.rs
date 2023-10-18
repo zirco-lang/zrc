@@ -28,7 +28,7 @@ pub fn resolve_type(
             }
         }
         ParserTypeKind::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t.clone())?)),
-        ParserTypeKind::Struct(members) => TastType::Struct(resolve_struct_keys(members)?),
+        ParserTypeKind::Struct(members) => TastType::Struct(resolve_struct_keys(members.clone())?),
     })
 }
 
@@ -40,20 +40,21 @@ pub fn resolve_type(
 /// Errors if a key is not unique or is unresolvable.
 #[allow(clippy::type_complexity)]
 pub fn resolve_struct_keys(
-    members: &Spanned<IndexMap<String, Spanned<(Spanned<String>, ParserType)>>>,
+    members: Spanned<Vec<Spanned<(Spanned<String>, ParserType)>>>,
 ) -> Result<IndexMap<String, TastType>, Diagnostic> {
     let mut map = IndexMap::new();
-    for (k, v) in members.value() {
-        if map.contains_key(k) {
+    for sp in members.into_value() {
+        let (k, v) = sp.value();
+        if map.contains_key(k.value()) {
             return Err(Diagnostic(
                 zrc_diagnostics::Severity::Error,
-                v.as_ref()
+                sp.as_ref()
                     .map(|x| DiagnosticKind::DuplicateStructMember(x.0.value().clone())),
             ));
         }
         map.insert(
-            k.clone(),
-            resolve_type(&Scope::default(), v.value().1.clone())?,
+            k.value().clone(),
+            resolve_type(&Scope::default(), v.clone())?,
         );
     }
     Ok(map)
