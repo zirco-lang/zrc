@@ -23,6 +23,7 @@ SpannedStmt<T>: Stmt = {
     <Spanned<T>> => Stmt(<>),
 }
 
+#[inline]
 CommaSeparated<T>: Vec<T> = {
     <e:T> <mut v:("," <T>)*> ","? => {
         let mut new = vec![e];
@@ -107,13 +108,13 @@ FunctionDeclaration: Declaration = {
         <s:Spanned<StmtList?>>
     "}" => Declaration::FunctionDeclaration {
         name: i,
-        parameters: a.map(|inner| inner.unwrap_or(Vec::new())),
+        parameters: a.map(|inner| inner.unwrap_or(ArgumentDeclarationList::empty())),
         return_type: r,
         body: Some(s.map(|inner| inner.unwrap_or(Vec::new()))),
     },
     "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?> ";" => Declaration::FunctionDeclaration {
         name: i,
-        parameters: a.map(|inner| inner.unwrap_or(Vec::new())),
+        parameters: a.map(|inner| inner.unwrap_or(ArgumentDeclarationList::empty())),
         return_type: r,
         body: None,
     }
@@ -129,7 +130,10 @@ StructDeclaration: Declaration = {
     }
 }
 
-ArgumentDeclarationList = CommaSeparated<Spanned<ArgumentDeclaration>>;
+ArgumentDeclarationList: ArgumentDeclarationList = {
+    <CommaSeparated<Spanned<ArgumentDeclaration>>> => ArgumentDeclarationList::NonVariadic(<>),
+    <CommaSeparated<Spanned<ArgumentDeclaration>>> "," "..." => ArgumentDeclarationList::Variadic(<>),
+};
 
 ArgumentDeclaration: ArgumentDeclaration = {
     <i:Spanned<IDENTIFIER>> ":" <t:Type> => ArgumentDeclaration {
@@ -380,5 +384,6 @@ extern {
         "as" => lexer::Tok::As,
         "struct" => lexer::Tok::Struct,
         "->" => lexer::Tok::SmallArrow,
+        "..." => lexer::Tok::Ellipsis,
     }
 }

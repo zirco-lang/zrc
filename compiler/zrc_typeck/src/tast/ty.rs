@@ -6,6 +6,8 @@ use indexmap::IndexMap;
 
 use crate::typeck::BlockReturnType;
 
+use super::stmt::ArgumentDeclarationList;
+
 /// The possible Zirco types
 #[derive(PartialEq, Debug, Clone)]
 pub enum Type {
@@ -35,7 +37,7 @@ pub enum Type {
     /// `*T`
     Ptr(Box<Type>),
     /// `fn(A, B) -> T`
-    Fn(Vec<Type>, Box<BlockReturnType>),
+    Fn(ArgumentDeclarationList, Box<BlockReturnType>),
     /// Struct type literals. Ordered by declaration order.
     Struct(IndexMap<String, Type>),
 }
@@ -57,10 +59,7 @@ impl Display for Type {
             Self::Fn(args, brt) => write!(
                 f,
                 "(fn({}){})",
-                args.iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", "),
+                args,
                 match *brt {
                     BlockReturnType::Return(ret) => format!(" -> {ret}"),
                     BlockReturnType::Void => String::new(),

@@ -63,7 +63,7 @@ pub enum Declaration {
         /// The name of the function.
         name: Spanned<String>,
         /// The parameters of the function.
-        parameters: Spanned<Vec<Spanned<ArgumentDeclaration>>>,
+        parameters: Spanned<ArgumentDeclarationList>,
         /// The return type of the function. If set to [`None`], the function is
         /// void.
         return_type: Option<Type>,
@@ -81,6 +81,38 @@ pub enum Declaration {
     },
 }
 
+/// The list of arguments on a [`Declaration::FunctionDeclaration`]
+///
+/// May be variadic or not.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArgumentDeclarationList {
+    Variadic(Vec<Spanned<ArgumentDeclaration>>),
+    NonVariadic(Vec<Spanned<ArgumentDeclaration>>),
+}
+impl ArgumentDeclarationList {
+    pub fn empty() -> Self {
+        Self::NonVariadic(vec![])
+    }
+}
+impl Display for ArgumentDeclarationList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (Self::Variadic(args) | Self::NonVariadic(args)) = self;
+
+        write!(
+            f,
+            "{}{}",
+            args.iter()
+                .map(|x| x.value().to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+            match self {
+                Self::Variadic(_) => ", ...",
+                Self::NonVariadic(_) => "",
+            }
+        )
+    }
+}
+
 impl Display for Declaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -93,12 +125,7 @@ impl Display for Declaration {
                 f,
                 "fn {}({}) -> {} {{\n{}\n}}",
                 name.value(),
-                parameters
-                    .value()
-                    .iter()
-                    .map(|x| x.value().to_string())
-                    .collect::<Vec<String>>()
-                    .join(", "),
+                parameters.value(),
                 r.0.value(),
                 body.value()
                     .iter()
@@ -115,12 +142,7 @@ impl Display for Declaration {
                 f,
                 "fn {}({}) -> {};",
                 name.value(),
-                parameters
-                    .value()
-                    .iter()
-                    .map(|p| p.value().to_string())
-                    .collect::<Vec<String>>()
-                    .join(", "),
+                parameters.value(),
                 r.0.value()
             ),
             Self::FunctionDeclaration {
@@ -132,12 +154,7 @@ impl Display for Declaration {
                 f,
                 "fn {}({}) {{\n{}\n}}",
                 name.value(),
-                parameters
-                    .value()
-                    .iter()
-                    .map(|x| x.value().to_string())
-                    .collect::<Vec<String>>()
-                    .join(", "),
+                parameters.value(),
                 body.value()
                     .iter()
                     .map(|stmt| format!("    {stmt}"))
@@ -149,17 +166,7 @@ impl Display for Declaration {
                 parameters,
                 return_type: None,
                 body: None,
-            } => write!(
-                f,
-                "fn {}({});",
-                name.value(),
-                parameters
-                    .value()
-                    .iter()
-                    .map(|p| p.value().to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            } => write!(f, "fn {}({});", name.value(), parameters.value()),
             Self::StructDeclaration { name, fields } => write!(
                 f,
                 "struct {} {{\n{}\n}}",
