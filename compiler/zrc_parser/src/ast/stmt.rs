@@ -84,13 +84,17 @@ pub enum Declaration {
 /// The list of arguments on a [`Declaration::FunctionDeclaration`]
 ///
 /// May be variadic or not.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArgumentDeclarationList {
+    /// `(a, b, ...)`
     Variadic(Vec<Spanned<ArgumentDeclaration>>),
+    /// `(a, b)` without `...`
     NonVariadic(Vec<Spanned<ArgumentDeclaration>>),
 }
 impl ArgumentDeclarationList {
-    pub fn empty() -> Self {
+    /// Create the [`ArgumentDeclarationList`] for just `()`
+    #[must_use]
+    pub const fn empty() -> Self {
         Self::NonVariadic(vec![])
     }
 }

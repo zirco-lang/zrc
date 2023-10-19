@@ -216,10 +216,9 @@ pub fn process_declaration(
 ) -> Result<TypedDeclaration, zrc_diagnostics::Diagnostic> {
     Ok(match declaration {
         AstDeclaration::FunctionDeclaration {
-            name,
             parameters,
-            return_type,
             body: Some(_),
+            ..
         } if matches!(
             parameters.value(),
             zrc_parser::ast::stmt::ArgumentDeclarationList::Variadic(_)

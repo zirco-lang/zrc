@@ -254,7 +254,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, zrc_diagnostics
                     }
 
                     for (i, (arg_type, arg_t)) in arg_types.iter().zip(args_t.iter()).enumerate() {
-                        if &arg_type.ty != &arg_t.0 {
+                        if arg_type.ty != arg_t.0 {
                             return Err(Diagnostic(
                                 Severity::Error,
                                 args.value()[i].0.span().containing(
@@ -287,7 +287,7 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, zrc_diagnostics
                     for (i, (arg_type, arg_t)) in
                         beginning_arg_types.iter().zip(args_t.iter()).enumerate()
                     {
-                        if &arg_type.ty != &arg_t.0 {
+                        if arg_type.ty != arg_t.0 {
                             return Err(Diagnostic(
                                 Severity::Error,
                                 args.value()[i].0.span().containing(

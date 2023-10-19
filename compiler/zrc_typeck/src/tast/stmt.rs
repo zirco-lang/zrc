@@ -97,11 +97,15 @@ pub enum TypedDeclaration {
 /// May be variadic or not. Variadic only exists on extern.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentDeclarationList {
+    /// `(a, b, ...)`
     Variadic(Vec<ArgumentDeclaration>),
+    /// `(a, b)` without `...`
     NonVariadic(Vec<ArgumentDeclaration>),
 }
 impl ArgumentDeclarationList {
-    pub fn empty() -> Self {
+    /// Create the [`ArgumentDeclarationList`] for just `()`
+    #[must_use]
+    pub const fn empty() -> Self {
         Self::NonVariadic(vec![])
     }
 }
@@ -113,7 +117,7 @@ impl Display for ArgumentDeclarationList {
             f,
             "{}{}",
             args.iter()
-                .map(|x| x.to_string())
+                .map(std::string::ToString::to_string)
                 .collect::<Vec<String>>()
                 .join(", "),
             match self {
@@ -151,7 +155,7 @@ impl Display for TypedDeclaration {
                 parameters,
                 return_type: Some(r),
                 body: None,
-            } => write!(f, "fn {name}({}) -> {r};", parameters),
+            } => write!(f, "fn {name}({parameters}) -> {r};"),
             Self::FunctionDeclaration {
                 name,
                 parameters,
@@ -159,8 +163,7 @@ impl Display for TypedDeclaration {
                 body: Some(body),
             } => write!(
                 f,
-                "fn {name}({}) {{\n{}\n}}",
-                parameters,
+                "fn {name}({parameters}) {{\n{}\n}}",
                 body.iter()
                     .map(|stmt| stmt
                         .to_string()
@@ -176,7 +179,7 @@ impl Display for TypedDeclaration {
                 parameters,
                 return_type: None,
                 body: None,
-            } => write!(f, "fn {name}({});", parameters),
+            } => write!(f, "fn {name}({parameters});"),
             Self::StructDeclaration { name, fields } => write!(
                 f,
                 "struct {name} {{\n{}\n}}",
