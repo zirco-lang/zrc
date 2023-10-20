@@ -63,7 +63,7 @@ pub enum TypedExprKind<'input> {
     /// `-x`
     UnaryMinus(Box<TypedExpr<'input>>),
     /// `&x`
-    UnaryAddressOf(Box<TypedExpr<'input>>),
+    UnaryAddressOf(Box<Place<'input>>),
     /// `*x`
     UnaryDereference(Box<TypedExpr<'input>>),
 

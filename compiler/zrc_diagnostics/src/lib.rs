@@ -72,7 +72,7 @@ pub enum DiagnosticKind {
     // TYPE CHECKER ERRORS
     UnableToResolveType(String),
     UnableToResolveIdentifier(String),
-    AssignmentToNonPlace(String),
+    NotAnLvalue(String),
     InvalidAssignmentRightHandSideType {
         expected: String,
         got: String,
@@ -144,8 +144,11 @@ impl Display for DiagnosticKind {
             Self::UnableToResolveIdentifier(i) => {
                 write!(f, "unable to resolve identifier `{i}`")
             }
-            Self::AssignmentToNonPlace(expr) => {
-                write!(f, "cannot assign to non-place expression `{expr}`")
+            Self::NotAnLvalue(expr) => {
+                write!(
+                    f,
+                    "`{expr}` is not a valid lvalue for assignment or address-of"
+                )
             }
             Self::InvalidAssignmentRightHandSideType { expected, got } => write!(
                 f,
