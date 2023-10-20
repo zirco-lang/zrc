@@ -240,7 +240,7 @@ pub fn type_expr<'input>(
             }
         }
         ExprKind::Call(f, args) => {
-            let ft = type_expr(scope, *f)?;
+            let ft = type_expr(scope, *f.clone())?;
             let args_t = args
                 .value()
                 .iter()
@@ -275,7 +275,10 @@ pub fn type_expr<'input>(
 
                 TypedExpr(
                     ret_type.into_option().unwrap_or(TastType::Void),
-                    TypedExprKind::Call(Box::new(ft), args_t),
+                    TypedExprKind::Call(
+                        Box::new(expr_to_place((*f).clone().0.span(), ft)?),
+                        args_t,
+                    ),
                 )
             } else {
                 return Err(Diagnostic(

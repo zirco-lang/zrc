@@ -72,7 +72,7 @@ pub enum TypedExprKind<'input> {
     /// `a.b`
     Dot(Box<Place<'input>>, &'input str),
     /// `a(b, c, d, ...)`
-    Call(Box<TypedExpr<'input>>, Vec<TypedExpr<'input>>),
+    Call(Box<Place<'input>>, Vec<TypedExpr<'input>>),
 
     /// `a ? b : c`
     Ternary(

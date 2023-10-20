@@ -459,7 +459,7 @@ pub fn cg_expr(
 
         TypedExprKind::Call(f, args) => {
             let old_f = f.clone();
-            let (f, bb) = cg_expr(module, cg, bb, scope, *f)?;
+            let (f, bb) = cg_place(module, cg, bb, scope, *f)?;
 
             let result_reg = cg.new_reg();
 
@@ -483,7 +483,9 @@ pub fn cg_expr(
                 &format!(
                     "{} = call {} {}({})",
                     result_reg,
-                    get_llvm_typename(old_f.0),
+                    get_llvm_typename(old_f.0)
+                        .strip_suffix('*')
+                        .expect("fp type didn't end in *, could not trim it"),
                     f,
                     args
                 ),
