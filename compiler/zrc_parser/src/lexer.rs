@@ -52,9 +52,9 @@ pub enum InternalLexicalError {
 /// Does not implement [`std::error::Error`] because it should be converted to a
 /// [`zrc_diagnostics::Diagnostic`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LexicalError {
+pub enum LexicalError<'input> {
     /// An unknown token was encountered.
-    UnknownToken(String),
+    UnknownToken(&'input str),
     /// A string literal was left unterminated.
     UnterminatedStringLiteral,
     /// A block comment ran to the end of the file. Remind the user that block
@@ -63,8 +63,8 @@ pub enum LexicalError {
 }
 
 /// A lexer callback helper to obtain the currently matched token slice.
-fn string_slice(lex: &Lexer<'_, Tok>) -> String {
-    lex.slice().to_string()
+fn str_slice<'input>(lex: &Lexer<'input, Tok<'input>>) -> &'input str {
+    lex.slice()
 }
 
 /// Zirco uses nested block comments -- a regular expression can't match this
@@ -72,8 +72,8 @@ fn string_slice(lex: &Lexer<'_, Tok>) -> String {
 /// the lexer and basically consumes characters in our input until we reach the
 /// end of the comment. See also: [logos#307](https://github.com/maciejhirsz/logos/issues/307)
 /// See also: [zrc#14](https://github.com/zirco-lang/zrc/pull/14)
-fn handle_block_comment_start(
-    lex: &mut Lexer<'_, Tok>,
+fn handle_block_comment_start<'input>(
+    lex: &mut Lexer<'input, Tok<'input>>,
 ) -> logos::FilterResult<(), InternalLexicalError> {
     let mut depth = 1;
     // This contains all of the remaining tokens in our input except for the opening
@@ -133,7 +133,7 @@ fn handle_block_comment_start(
     skip r"//[^\r\n]*(\r\n|\n)?", // single-line comments
     // multi-line comments are handled by a callback: see handle_block_comment_start.
 )]
-pub enum Tok {
+pub enum Tok<'input> {
     // Handle nested block comments -- this does not need its own token type and can be attached
     // to whatever token is directly below this. The handle_block_comment_start will either Skip
     // the matched characters or throw an error. It will never return a token.
@@ -332,22 +332,22 @@ pub enum Tok {
 
     // === SPECIAL ===
     /// Any string literal
-    #[regex(r#""([^"\\]|\\.)*""#, string_slice)]
+    #[regex(r#""([^"\\]|\\.)*""#, str_slice)]
     #[regex(r#""([^"\\]|\\.)*"#, |_lex| {
         Err(InternalLexicalError::UnterminatedStringLiteral)
     })]
-    StringLiteral(String),
+    StringLiteral(&'input str),
     /// Any number literal
     // FIXME: Do not accept multiple decimal points like "123.456.789"
-    #[regex(r"[0-9][0-9\._]*", string_slice)]
-    #[regex(r"0x[0-9a-fA-F_]+", string_slice)]
-    #[regex(r"0b[01_]+", string_slice)]
-    NumberLiteral(String),
+    #[regex(r"[0-9][0-9\._]*", str_slice)]
+    #[regex(r"0x[0-9a-fA-F_]+", str_slice)]
+    #[regex(r"0b[01_]+", str_slice)]
+    NumberLiteral(&'input str),
     /// Any identifier
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", string_slice)]
-    Identifier(String),
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", str_slice)]
+    Identifier(&'input str),
 }
-impl Display for Tok {
+impl<'input> Display for Tok<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -376,7 +376,7 @@ impl Display for Tok {
                 Self::Minus => "-".to_string(),
                 Self::MinusAssign => "-=".to_string(),
                 Self::NotEq => "!=".to_string(),
-                Self::NumberLiteral(n) => n.clone(),
+                Self::NumberLiteral(n) => (*n).to_string(),
                 Self::Percent => "%".to_string(),
                 Self::PercentAssign => "%=".to_string(),
                 Self::Plus => "+".to_string(),
@@ -392,7 +392,7 @@ impl Display for Tok {
                 Self::SmallArrow => "->".to_string(),
                 Self::Star => "*".to_string(),
                 Self::StarAssign => "*=".to_string(),
-                Self::StringLiteral(s) => s.clone(),
+                Self::StringLiteral(s) => (*s).to_string(),
                 Self::Struct => "struct".to_string(),
                 Self::True => "true".to_string(),
                 Self::While => "while".to_string(),
@@ -412,7 +412,7 @@ impl Display for Tok {
                 Self::GreaterEq => ">=".to_string(),
                 Self::Less => "<".to_string(),
                 Self::LessEq => "<=".to_string(),
-                Self::Identifier(i) => i.clone(),
+                Self::Identifier(i) => (*i).to_string(),
             }
         )
     }
@@ -422,7 +422,7 @@ impl Display for Tok {
 #[allow(clippy::module_name_repetitions)]
 pub struct ZircoLexer<'input> {
     /// The internal [`Lexer`] we wrap
-    lex: Lexer<'input, Tok>,
+    lex: Lexer<'input, Tok<'input>>,
 }
 
 impl<'input> ZircoLexer<'input> {
@@ -436,7 +436,7 @@ impl<'input> ZircoLexer<'input> {
 }
 
 impl<'input> Iterator for ZircoLexer<'input> {
-    type Item = Spanned<Result<Tok, LexicalError>>;
+    type Item = Spanned<Result<Tok<'input>, LexicalError<'input>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.lex.next()?;
@@ -445,7 +445,7 @@ impl<'input> Iterator for ZircoLexer<'input> {
 
         match token {
             Err(InternalLexicalError::NoMatchingRule) => {
-                let slice = self.lex.slice().to_string();
+                let slice = self.lex.slice();
                 Some(span.containing(Err(LexicalError::UnknownToken(slice))))
             }
             Err(InternalLexicalError::UnterminatedBlockComment) => {
@@ -472,11 +472,11 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                spanned!(1, Tok::Identifier("t".to_string()), 2),
-                spanned!(4, Tok::Identifier("e".to_string()), 5),
-                spanned!(8, Tok::Identifier("s".to_string()), 9),
-                spanned!(10, Tok::Identifier("t".to_string()), 11),
-                spanned!(15, Tok::Identifier("s".to_string()), 16),
+                spanned!(1, Tok::Identifier("t"), 2),
+                spanned!(4, Tok::Identifier("e"), 5),
+                spanned!(8, Tok::Identifier("s"), 9),
+                spanned!(10, Tok::Identifier("t"), 11),
+                spanned!(15, Tok::Identifier("s"), 16),
             ]
         );
     }
@@ -558,11 +558,11 @@ mod tests {
             Tok::As,
             Tok::Struct,
             Tok::SmallArrow,
-            Tok::StringLiteral("\"str\"".to_string()),
-            Tok::NumberLiteral("7_000".to_string()),
-            Tok::NumberLiteral("0xF_A".to_string()),
-            Tok::NumberLiteral("0b1_0".to_string()),
-            Tok::Identifier("abc".to_string()),
+            Tok::StringLiteral("\"str\""),
+            Tok::NumberLiteral("7_000"),
+            Tok::NumberLiteral("0xF_A"),
+            Tok::NumberLiteral("0b1_0"),
+            Tok::Identifier("abc"),
         ];
 
         assert_eq!(
@@ -600,9 +600,9 @@ mod tests {
             assert_eq!(
                 tokens,
                 vec![
-                    spanned!(0, Tok::Identifier("a".to_string()), 1),
-                    spanned!(8, Tok::Identifier("b".to_string()), 9),
-                    spanned!(17, Tok::Identifier("c".to_string()), 18),
+                    spanned!(0, Tok::Identifier("a"), 1),
+                    spanned!(8, Tok::Identifier("b"), 9),
+                    spanned!(17, Tok::Identifier("c"), 18),
                 ]
             );
         }
@@ -615,10 +615,10 @@ mod tests {
             assert_eq!(
                 tokens,
                 vec![
-                    spanned!(0, Tok::Identifier("a".to_string()), 1),
-                    spanned!(2, Tok::Identifier("b".to_string()), 3),
-                    spanned!(12, Tok::Identifier("c".to_string()), 13),
-                    spanned!(22, Tok::Identifier("d".to_string()), 23),
+                    spanned!(0, Tok::Identifier("a"), 1),
+                    spanned!(2, Tok::Identifier("b"), 3),
+                    spanned!(12, Tok::Identifier("c"), 13),
+                    spanned!(22, Tok::Identifier("d"), 23),
                 ]
             );
         }
@@ -631,8 +631,8 @@ mod tests {
             assert_eq!(
                 tokens,
                 vec![
-                    spanned!(0, Tok::Identifier("a".to_string()), 1),
-                    spanned!(12, Tok::Identifier("b".to_string()), 13),
+                    spanned!(0, Tok::Identifier("a"), 1),
+                    spanned!(12, Tok::Identifier("b"), 13),
                 ]
             );
         }
@@ -645,7 +645,7 @@ mod tests {
             assert_eq!(
                 tokens,
                 vec![
-                    spanned!(0, Ok(Tok::Identifier("a".to_string())), 1),
+                    spanned!(0, Ok(Tok::Identifier("a")), 1),
                     spanned!(2, Err(LexicalError::UnterminatedBlockComment), 7),
                 ]
             );

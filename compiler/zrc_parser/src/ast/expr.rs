@@ -175,9 +175,9 @@ impl Display for Comparison {
 
 /// A Zirco expression
 #[derive(PartialEq, Debug, Clone)]
-pub struct Expr(pub Spanned<ExprKind>);
+pub struct Expr<'input>(pub Spanned<ExprKind<'input>>);
 
-impl Display for Expr {
+impl<'input> Display for Expr<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.value().fmt(f)
     }
@@ -189,59 +189,59 @@ impl Display for Expr {
 /// used by the parser to represent the AST in the expression position.
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
-pub enum ExprKind {
+pub enum ExprKind<'input> {
     /// `a, b`
-    Comma(Box<Expr>, Box<Expr>),
+    Comma(Box<Expr<'input>>, Box<Expr<'input>>),
 
     /// Assignment operations
-    Assignment(Assignment, Box<Expr>, Box<Expr>),
+    Assignment(Assignment, Box<Expr<'input>>, Box<Expr<'input>>),
     /// Bitwise operations
-    BinaryBitwise(BinaryBitwise, Box<Expr>, Box<Expr>),
+    BinaryBitwise(BinaryBitwise, Box<Expr<'input>>, Box<Expr<'input>>),
     /// Logical operations
-    Logical(Logical, Box<Expr>, Box<Expr>),
+    Logical(Logical, Box<Expr<'input>>, Box<Expr<'input>>),
     /// Equality checks
-    Equality(Equality, Box<Expr>, Box<Expr>),
+    Equality(Equality, Box<Expr<'input>>, Box<Expr<'input>>),
     /// Comparisons
-    Comparison(Comparison, Box<Expr>, Box<Expr>),
+    Comparison(Comparison, Box<Expr<'input>>, Box<Expr<'input>>),
     /// Arithmetic operations
-    Arithmetic(Arithmetic, Box<Expr>, Box<Expr>),
+    Arithmetic(Arithmetic, Box<Expr<'input>>, Box<Expr<'input>>),
 
     /// `!x`
-    UnaryNot(Box<Expr>),
+    UnaryNot(Box<Expr<'input>>),
     /// `~x`
-    UnaryBitwiseNot(Box<Expr>),
+    UnaryBitwiseNot(Box<Expr<'input>>),
     /// `-x`
-    UnaryMinus(Box<Expr>),
+    UnaryMinus(Box<Expr<'input>>),
     /// `&x`
-    UnaryAddressOf(Box<Expr>),
+    UnaryAddressOf(Box<Expr<'input>>),
     /// `*x`
-    UnaryDereference(Box<Expr>),
+    UnaryDereference(Box<Expr<'input>>),
 
     /// `a[b]`
-    Index(Box<Expr>, Box<Expr>),
+    Index(Box<Expr<'input>>, Box<Expr<'input>>),
     /// `a.b`
-    Dot(Box<Expr>, Spanned<String>),
+    Dot(Box<Expr<'input>>, Spanned<&'input str>),
     /// `a->b`
-    Arrow(Box<Expr>, Spanned<String>),
+    Arrow(Box<Expr<'input>>, Spanned<&'input str>),
     /// `a(b, c, d, ...)`
-    Call(Box<Expr>, Spanned<Vec<Expr>>),
+    Call(Box<Expr<'input>>, Spanned<Vec<Expr<'input>>>),
 
     /// `a ? b : c`
-    Ternary(Box<Expr>, Box<Expr>, Box<Expr>),
+    Ternary(Box<Expr<'input>>, Box<Expr<'input>>, Box<Expr<'input>>),
 
     /// `x as T`
-    Cast(Box<Expr>, super::ty::Type),
+    Cast(Box<Expr<'input>>, super::ty::Type<'input>),
 
     /// Any numeric literal.
-    NumberLiteral(String),
+    NumberLiteral(&'input str),
     /// Any string literal.
-    StringLiteral(String),
+    StringLiteral(&'input str),
     /// Any identifier.
-    Identifier(String),
+    Identifier(&'input str),
     /// Any boolean literal.
     BooleanLiteral(bool),
 }
-impl Display for ExprKind {
+impl<'input> Display for ExprKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(")?;
         match self {
@@ -287,7 +287,7 @@ impl Display for ExprKind {
 #[allow(missing_docs)]
 #[allow(clippy::missing_docs_in_private_items)]
 #[allow(clippy::should_implement_trait)]
-impl Expr {
+impl<'input> Expr<'input> {
     #[must_use]
     pub fn comma(lhs: Self, rhs: Self) -> Self {
         Self(spanned!(
@@ -475,7 +475,7 @@ impl Expr {
         Self(ExprKind::Index(Box::new(lhs), Box::new(rhs)).in_span(sp))
     }
     #[must_use]
-    pub fn dot(expr: Self, prop: Spanned<String>) -> Self {
+    pub fn dot(expr: Self, prop: Spanned<&'input str>) -> Self {
         Self(spanned!(
             expr.0.start(),
             ExprKind::Dot(Box::new(expr), prop),
@@ -483,7 +483,7 @@ impl Expr {
         ))
     }
     #[must_use]
-    pub fn arrow(expr: Self, prop: Spanned<String>) -> Self {
+    pub fn arrow(expr: Self, prop: Spanned<&'input str>) -> Self {
         Self(spanned!(
             expr.0.start(),
             ExprKind::Arrow(Box::new(expr), prop),
@@ -505,7 +505,7 @@ impl Expr {
         ))
     }
     #[must_use]
-    pub fn cast(expr: Self, ty: super::ty::Type) -> Self {
+    pub fn cast(expr: Self, ty: super::ty::Type<'input>) -> Self {
         Self(spanned!(
             expr.0.start(),
             ExprKind::Cast(Box::new(expr), ty),
@@ -515,7 +515,7 @@ impl Expr {
 
     // These all need spans because they can't be guessed
     #[must_use]
-    pub fn number(lit: Spanned<String>) -> Self {
+    pub fn number(lit: Spanned<&'input str>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),
@@ -524,7 +524,7 @@ impl Expr {
         ))
     }
     #[must_use]
-    pub fn string(lit: Spanned<String>) -> Self {
+    pub fn string(lit: Spanned<&'input str>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),
@@ -533,7 +533,7 @@ impl Expr {
         ))
     }
     #[must_use]
-    pub fn ident(lit: Spanned<String>) -> Self {
+    pub fn ident(lit: Spanned<&'input str>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),

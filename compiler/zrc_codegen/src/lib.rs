@@ -53,10 +53,10 @@ impl Default for ModuleCg {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct FunctionCg {
+pub struct FunctionCg<'input> {
     name: String,
-    parameters: Vec<(String, zrc_typeck::tast::ty::Type)>,
-    ret: zrc_typeck::typeck::BlockReturnType,
+    parameters: Vec<(String, zrc_typeck::tast::ty::Type<'input>)>,
+    ret: zrc_typeck::typeck::BlockReturnType<'input>,
     blocks: Vec<BasicBlockData>,
     next_instruction_id: Counter,
     /// One of our design decisions involves using memory registers extremely
@@ -65,13 +65,13 @@ pub struct FunctionCg {
     /// in the function. For this reason, the allocas are located here.
     allocations: Vec<String>,
 }
-impl FunctionCg {
+impl<'input> FunctionCg<'input> {
     pub fn new(
         name: String,
-        ret: zrc_typeck::typeck::BlockReturnType,
-        parameters: Vec<(String, zrc_typeck::tast::ty::Type)>,
-        parent_scope: &CgScope,
-    ) -> (Self, BasicBlock, CgScope) {
+        ret: zrc_typeck::typeck::BlockReturnType<'input>,
+        parameters: Vec<(&'input str, zrc_typeck::tast::ty::Type<'input>)>,
+        parent_scope: &CgScope<'input>,
+    ) -> (Self, BasicBlock, CgScope<'input>) {
         let mut scope = parent_scope.clone();
         let mut cg = Self {
             blocks: vec![BasicBlockData::new(0)],
@@ -103,7 +103,7 @@ impl FunctionCg {
             .unwrap(); // we KNOW cg is this bb already
 
             // insert the parameter into the scope
-            scope.insert(&parameter.0, &ptr);
+            scope.insert(parameter.0, ptr);
         }
 
         (cg, bb, scope)
@@ -129,7 +129,7 @@ impl FunctionCg {
         Ok(())
     }
 }
-impl Display for FunctionCg {
+impl<'input> Display for FunctionCg<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
@@ -248,11 +248,11 @@ fn cg_store(
 }
 
 #[derive(PartialEq, Clone, Debug)]
-pub struct CgScope {
+pub struct CgScope<'input> {
     /// Maps identifiers to their LLVM register
-    identifiers: HashMap<String, String>,
+    identifiers: HashMap<&'input str, String>,
 }
-impl CgScope {
+impl<'input> CgScope<'input> {
     pub fn new() -> Self {
         Self {
             identifiers: HashMap::new(),
@@ -263,11 +263,11 @@ impl CgScope {
         self.identifiers.get(ident)
     }
 
-    pub fn insert(&mut self, ident: &str, reg: &str) {
-        self.identifiers.insert(ident.to_string(), reg.to_string());
+    pub fn insert(&mut self, ident: &'input str, reg: String) {
+        self.identifiers.insert(ident, reg);
     }
 }
-impl Default for CgScope {
+impl<'input> Default for CgScope<'input> {
     fn default() -> Self {
         Self::new()
     }

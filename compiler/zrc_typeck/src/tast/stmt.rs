@@ -8,17 +8,17 @@ use super::{expr::TypedExpr, ty::Type};
 
 /// A declaration created with `let`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct LetDeclaration {
+pub struct LetDeclaration<'input> {
     /// The name of the identifier.
-    pub name: String,
+    pub name: &'input str,
     /// The type of the new symbol. If set to [`None`], the type will be
     /// inferred.
-    pub ty: Type, // types are definite after inference
+    pub ty: Type<'input>, // types are definite after inference
     /// The value to associate with the new symbol.
-    pub value: Option<TypedExpr>,
+    pub value: Option<TypedExpr<'input>>,
 }
 
-impl Display for LetDeclaration {
+impl<'input> Display for LetDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.value {
             Some(v) => write!(f, "{}: {} = {}", self.name, self.ty, v),
@@ -31,30 +31,34 @@ impl Display for LetDeclaration {
 /// after type checking
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::module_name_repetitions)]
-pub enum TypedStmt {
+pub enum TypedStmt<'input> {
     // all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here
     // (basically if (x) y has become if (x) {y})
     /// `if (x) y` or `if (x) y else z`
-    IfStmt(TypedExpr, Vec<TypedStmt>, Option<Vec<TypedStmt>>),
+    IfStmt(
+        TypedExpr<'input>,
+        Vec<TypedStmt<'input>>,
+        Option<Vec<TypedStmt<'input>>>,
+    ),
     /// `while (x) y`
-    WhileStmt(TypedExpr, Vec<TypedStmt>),
+    WhileStmt(TypedExpr<'input>, Vec<TypedStmt<'input>>),
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
-        init: Option<Box<Vec<LetDeclaration>>>,
+        init: Option<Box<Vec<LetDeclaration<'input>>>>,
         /// Runs before each iteration of the loop. If this evaluates to
         /// `false`, the loop will end. If this is [`None`], the loop
         /// will run forever.
-        cond: Option<TypedExpr>,
+        cond: Option<TypedExpr<'input>>,
         /// Runs after each iteration of the loop.
-        post: Option<TypedExpr>,
+        post: Option<TypedExpr<'input>>,
         /// The body of the loop.
-        body: Vec<TypedStmt>,
+        body: Vec<TypedStmt<'input>>,
     },
     /// `{ ... }`
-    BlockStmt(Vec<TypedStmt>),
+    BlockStmt(Vec<TypedStmt<'input>>),
     /// `x;`
-    ExprStmt(TypedExpr),
+    ExprStmt(TypedExpr<'input>),
     /// `;`
     EmptyStmt,
     /// `continue;`
@@ -62,37 +66,37 @@ pub enum TypedStmt {
     /// `break;`
     BreakStmt,
     /// `return;` or `return x;`
-    ReturnStmt(Option<TypedExpr>),
+    ReturnStmt(Option<TypedExpr<'input>>),
     /// A let declaration
-    DeclarationList(Vec<LetDeclaration>),
+    DeclarationList(Vec<LetDeclaration<'input>>),
 }
 
 /// A struct or function declaration at the top level of a file
 #[derive(Debug, Clone, PartialEq)]
-pub enum TypedDeclaration {
+pub enum TypedDeclaration<'input> {
     /// A declaration of a function
     FunctionDeclaration {
         /// The name of the function.
-        name: String,
+        name: &'input str,
         /// The parameters of the function.
-        parameters: Vec<ArgumentDeclaration>,
+        parameters: Vec<ArgumentDeclaration<'input>>,
         /// The return type of the function. If set to [`None`], the function is
         /// void.
-        return_type: Option<Type>,
+        return_type: Option<Type<'input>>,
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
-        body: Option<Vec<TypedStmt>>,
+        body: Option<Vec<TypedStmt<'input>>>,
     },
     /// A named declaration for a `struct`.
     StructDeclaration {
         /// The name of the newtype.
-        name: String,
+        name: &'input str,
         /// The key-value pairs of the struct. Ordered by declaration order.
-        fields: IndexMap<String, super::ty::Type>,
+        fields: IndexMap<&'input str, super::ty::Type<'input>>,
     },
 }
 
-impl Display for TypedDeclaration {
+impl<'input> Display for TypedDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::FunctionDeclaration {
@@ -182,7 +186,7 @@ impl Display for TypedDeclaration {
     }
 }
 
-impl Display for TypedStmt {
+impl<'input> Display for TypedStmt<'input> {
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -294,13 +298,13 @@ impl Display for TypedStmt {
 
 /// A special form of [`LetDeclaration`] used for function parameters.
 #[derive(PartialEq, Debug, Clone)]
-pub struct ArgumentDeclaration {
+pub struct ArgumentDeclaration<'input> {
     /// The name of the parameter.
-    pub name: String,
+    pub name: &'input str,
     /// The type of the parameter.
-    pub ty: Type,
+    pub ty: Type<'input>,
 }
-impl Display for ArgumentDeclaration {
+impl<'input> Display for ArgumentDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.name, self.ty)
     }

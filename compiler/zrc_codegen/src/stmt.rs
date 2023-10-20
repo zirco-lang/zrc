@@ -18,12 +18,12 @@ pub struct LoopBreakaway {
 
 /// Declares the variable, creating its allocation and also evaluating the
 /// assignment.
-pub fn cg_let_declaration(
+pub fn cg_let_declaration<'input>(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
     bb: &BasicBlock,
-    scope: &mut CgScope,
-    declarations: Vec<zrc_typeck::tast::stmt::LetDeclaration>,
+    scope: &mut CgScope<'input>,
+    declarations: Vec<zrc_typeck::tast::stmt::LetDeclaration<'input>>,
 ) -> anyhow::Result<BasicBlock> {
     let mut bb = bb.clone();
 
@@ -32,7 +32,7 @@ pub fn cg_let_declaration(
         let ptr = cg_alloc(cg, &bb, &get_llvm_typename(let_declaration.ty.clone()));
 
         // store it in scope
-        scope.insert(&let_declaration.name, &ptr);
+        scope.insert(let_declaration.name, ptr);
 
         if let Some(value) = let_declaration.value {
             bb = cg_expr(
@@ -334,7 +334,7 @@ pub fn cg_program(
             } => {
                 // Must happen before creating `cg` as FunctionCg::new() clones it and
                 // recursion would be impossible w/o this
-                global_scope.insert(&name, &format!("@{name}"));
+                global_scope.insert(name, format!("@{name}"));
 
                 let (mut cg, bb, fn_scope) = FunctionCg::new(
                     format!("@{name}"),
@@ -357,7 +357,7 @@ pub fn cg_program(
                 return_type,
                 body: None,
             } => {
-                global_scope.insert(&name, &format!("@{name}"));
+                global_scope.insert(name, format!("@{name}"));
 
                 module.declarations.push(format!(
                     "declare {} @{}({})",
