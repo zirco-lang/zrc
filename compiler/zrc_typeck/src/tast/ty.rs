@@ -4,9 +4,8 @@ use std::fmt::Display;
 
 use indexmap::IndexMap;
 
-use crate::typeck::BlockReturnType;
-
 use super::stmt::ArgumentDeclarationList;
+use crate::typeck::BlockReturnType;
 
 /// The possible Zirco types
 #[derive(PartialEq, Debug, Clone)]

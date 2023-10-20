@@ -343,11 +343,16 @@ pub fn cg_program(
                         None => zrc_typeck::typeck::BlockReturnType::Void,
                     },
                     {
-                        let zrc_typeck::tast::stmt::ArgumentDeclarationList::NonVariadic(p) = parameters else {
+                        let zrc_typeck::tast::stmt::ArgumentDeclarationList::NonVariadic(p) =
+                            parameters
+                        else {
                             panic!("non-extern function had variadic arguments");
                         };
                         p
-                    }.into_iter().map(|x| (x.name, x.ty)).collect(),
+                    }
+                    .into_iter()
+                    .map(|x| (x.name, x.ty))
+                    .collect(),
                     &global_scope,
                 );
 
