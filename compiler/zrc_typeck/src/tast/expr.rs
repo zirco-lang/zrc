@@ -70,7 +70,7 @@ pub enum TypedExprKind<'input> {
     /// `a[b]`
     Index(Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
     /// `a.b`
-    Dot(Box<TypedExpr<'input>>, &'input str),
+    Dot(Box<Place<'input>>, &'input str),
     /// `a(b, c, d, ...)`
     Call(Box<TypedExpr<'input>>, Vec<TypedExpr<'input>>),
 
