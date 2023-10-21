@@ -430,7 +430,21 @@ pub fn type_expr<'input>(
                 ));
             }
 
-            if at.0 != bt.0 {
+            if matches!(
+                op,
+                zrc_parser::ast::expr::BinaryBitwise::Shl
+                    | zrc_parser::ast::expr::BinaryBitwise::Shr
+            ) {
+                if !at.0.is_signed_integer() {
+                    return Err(Diagnostic(
+                        Severity::Error,
+                        a.0.span().containing(DiagnosticKind::ExpectedGot {
+                            expected: "signed integer".to_string(),
+                            got: at.0.to_string(),
+                        }),
+                    ));
+                }
+            } else if at.0 != bt.0 {
                 return Err(Diagnostic(
                     Severity::Error,
                     expr_span.containing(DiagnosticKind::ExpectedSameType(
