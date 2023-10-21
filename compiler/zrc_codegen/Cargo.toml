@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
+inkwell = { git = "https://github.com/TheDan64/inkwell", version = "0.2.0", features = ["llvm16-0"] }
 zrc_typeck = { version = "0.1.0", path = "../zrc_typeck" }
