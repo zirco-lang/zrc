@@ -9,7 +9,7 @@ use crate::typeck::BlockReturnType;
 
 /// The possible Zirco types
 #[derive(PartialEq, Debug, Clone)]
-pub enum Type {
+pub enum Type<'input> {
     // WHENEVER ADDING NEW PRIMITIVES HERE, ADD THEM TO THE TYPE SCOPE IN
     // [`zrc_typeck::typeck::Scope::default`].
     /// `i8`
@@ -34,14 +34,17 @@ pub enum Type {
     Bool, /* TODO: need an "any Int" type that implicitly casts to all int types but becomes
            * i32 when assigned to a value */
     /// `*T`
-    Ptr(Box<Type>),
+    Ptr(Box<Type<'input>>),
     /// `fn(A, B) -> T`
-    Fn(ArgumentDeclarationList, Box<BlockReturnType>),
+    Fn(
+        ArgumentDeclarationList<'input>,
+        Box<BlockReturnType<'input>>,
+    ),
     /// Struct type literals. Ordered by declaration order.
-    Struct(IndexMap<String, Type>),
+    Struct(IndexMap<&'input str, Type<'input>>),
 }
 
-impl Display for Type {
+impl<'input> Display for Type<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.clone() {
             Self::I8 => write!(f, "i8"),
@@ -77,7 +80,7 @@ impl Display for Type {
     }
 }
 
-impl Type {
+impl<'input> Type<'input> {
     /// Returns `true` if this is an integer type like [`Type::I8`].
     #[must_use]
     pub const fn is_integer(&self) -> bool {

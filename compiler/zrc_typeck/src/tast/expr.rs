@@ -8,85 +8,93 @@ pub use zrc_parser::ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality,
 /// type](super::ty::Type) attached to it.
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
-pub struct TypedExpr(pub super::ty::Type, pub TypedExprKind);
+pub struct TypedExpr<'input>(pub super::ty::Type<'input>, pub TypedExprKind<'input>);
 
 /// The left hand side of an assignment.
 #[derive(PartialEq, Debug, Clone)]
-pub struct Place(pub super::ty::Type, pub PlaceKind);
+pub struct Place<'input>(pub super::ty::Type<'input>, pub PlaceKind<'input>);
 /// The valid left-hand-side of a [`TypedExprKind::Assignment`].
 ///
 /// Places may be:
 /// - A variable or an property access of a place
 /// - A dereference or index into any expression yielding a pointer
 #[derive(PartialEq, Debug, Clone)]
-pub enum PlaceKind {
+pub enum PlaceKind<'input> {
     /// `*x`
-    Deref(Box<TypedExpr>),
+    Deref(Box<TypedExpr<'input>>),
     /// `x`
-    Variable(String),
+    Variable(&'input str),
     /// `x[y]`
-    Index(Box<TypedExpr>, Box<TypedExpr>),
+    Index(Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
     /// `x.y`
-    Dot(Box<Place>, String),
+    Dot(Box<Place<'input>>, &'input str),
 }
 
 /// The kind of a [`TypedExpr`]
 #[derive(PartialEq, Debug, Clone)]
-pub enum TypedExprKind {
+pub enum TypedExprKind<'input> {
     /// `a, b`
-    Comma(Box<TypedExpr>, Box<TypedExpr>),
+    Comma(Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
 
     /// `a = b`
     ///
     /// `a += b` is desugared to `a = a + b` by the type checker.
-    Assignment(Box<Place>, Box<TypedExpr>),
+    Assignment(Box<Place<'input>>, Box<TypedExpr<'input>>),
 
     /// Bitwise operations
-    BinaryBitwise(BinaryBitwise, Box<TypedExpr>, Box<TypedExpr>),
+    BinaryBitwise(
+        BinaryBitwise,
+        Box<TypedExpr<'input>>,
+        Box<TypedExpr<'input>>,
+    ),
     /// Logical operations
-    Logical(Logical, Box<TypedExpr>, Box<TypedExpr>),
+    Logical(Logical, Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
     /// Equality checks
-    Equality(Equality, Box<TypedExpr>, Box<TypedExpr>),
+    Equality(Equality, Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
     /// Comparisons
-    Comparison(Comparison, Box<TypedExpr>, Box<TypedExpr>),
+    Comparison(Comparison, Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
     /// Arithmetic operations
-    Arithmetic(Arithmetic, Box<TypedExpr>, Box<TypedExpr>),
+    Arithmetic(Arithmetic, Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
 
     /// `!x`
-    UnaryNot(Box<TypedExpr>),
+    UnaryNot(Box<TypedExpr<'input>>),
     /// `~x`
-    UnaryBitwiseNot(Box<TypedExpr>),
+    UnaryBitwiseNot(Box<TypedExpr<'input>>),
     /// `-x`
-    UnaryMinus(Box<TypedExpr>),
+    UnaryMinus(Box<TypedExpr<'input>>),
     /// `&x`
-    UnaryAddressOf(Box<TypedExpr>),
+    UnaryAddressOf(Box<TypedExpr<'input>>),
     /// `*x`
-    UnaryDereference(Box<TypedExpr>),
+    UnaryDereference(Box<TypedExpr<'input>>),
 
     /// `a[b]`
-    Index(Box<TypedExpr>, Box<TypedExpr>),
+    Index(Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
     /// `a.b`
-    Dot(Box<TypedExpr>, String),
+    Dot(Box<TypedExpr<'input>>, &'input str),
     /// `a(b, c, d, ...)`
-    Call(Box<TypedExpr>, Vec<TypedExpr>),
+    Call(Box<TypedExpr<'input>>, Vec<TypedExpr<'input>>),
 
     /// `a ? b : c`
-    Ternary(Box<TypedExpr>, Box<TypedExpr>, Box<TypedExpr>),
+    Ternary(
+        Box<TypedExpr<'input>>,
+        Box<TypedExpr<'input>>,
+        Box<TypedExpr<'input>>,
+    ),
 
     /// `x as T`
-    Cast(Box<TypedExpr>, super::ty::Type),
+    Cast(Box<TypedExpr<'input>>, super::ty::Type<'input>),
 
     /// Any numeric literal.
-    NumberLiteral(String),
-    /// Any string literal.
-    StringLiteral(String),
+    NumberLiteral(&'input str),
+    /// Any string literal.bool
+    StringLiteral(&'input str),
     /// Any identifier.
-    Identifier(String),
+    Identifier(&'input str),
     /// Any boolean literal.
     BooleanLiteral(bool),
 }
 
-impl Display for TypedExprKind {
+impl<'input> Display for TypedExprKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NumberLiteral(n) => write!(f, "{n}"),
@@ -120,7 +128,7 @@ impl Display for TypedExprKind {
         }
     }
 }
-impl Display for PlaceKind {
+impl<'input> Display for PlaceKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Deref(e) => write!(f, "*{e}"),
@@ -130,13 +138,13 @@ impl Display for PlaceKind {
         }
     }
 }
-impl Display for Place {
+impl<'input> Display for Place<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}) as ({})", self.1, self.0)
     }
 }
 
-impl Display for TypedExpr {
+impl<'input> Display for TypedExpr<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(({}) as ({}))", self.1, self.0)
     }

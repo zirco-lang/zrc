@@ -11,15 +11,15 @@ use super::{
     }
 };
 
-grammar;
+grammar<'input>;
 
 Spanned<T>: Spanned<T> = {
     <l:@L> <x:T> <r:@R> => spanned!(l, x, r),
 }
-SpannedExpr<T>: Expr = {
+SpannedExpr<T>: Expr<'input> = {
     <Spanned<T>> => Expr(<>),
 }
-SpannedStmt<T>: Stmt = {
+SpannedStmt<T>: Stmt<'input> = {
     <Spanned<T>> => Stmt(<>),
 }
 
@@ -40,17 +40,17 @@ CommaSeparatedWithoutTrailing<T>: Vec<T> = {
     }
 }
 
-pub Program: Vec<Spanned<Declaration>> = Spanned<Declaration>*;
+pub Program: Vec<Spanned<Declaration<'input>>> = Spanned<Declaration>*;
 
 // See https://en.wikipedia.org/wiki/Dangling_else#Avoiding_the_conflict_in_LR_parsers for why this
 // is necessary. The ClosedStmt rule REQUIRES that an 'else' clause is used, meaning that it will
 // attach to the inner 'if' statement.
-Stmt: Stmt = {
+Stmt: Stmt<'input> = {
     SpannedStmt<OpenStmt>,
     SpannedStmt<ClosedStmt>
 }
 
-OpenStmt: StmtKind = {
+OpenStmt: StmtKind<'input> = {
     "if" "(" <e:Expr> ")" <s:Stmt> => StmtKind::IfStmt(e, Box::new(s), None),
     "if" "(" <a:Expr> ")" <b:SpannedStmt<ClosedStmt>> "else" <c:SpannedStmt<OpenStmt>> => 
         StmtKind::IfStmt(a, Box::new(b), Some(Box::new(c))),
@@ -69,7 +69,7 @@ OpenStmt: StmtKind = {
     },
 };
 
-ClosedStmt: StmtKind = {
+ClosedStmt: StmtKind<'input> = {
     <SimpleStmt>,
 
     "if" "(" <a:Expr> ")" <b:SpannedStmt<ClosedStmt>> "else" <c:SpannedStmt<ClosedStmt>> =>
@@ -89,7 +89,7 @@ ClosedStmt: StmtKind = {
     },
 };
 
-SimpleStmt: StmtKind = {
+SimpleStmt: StmtKind<'input> = {
     <Expr> ";" => StmtKind::ExprStmt(<>),
     ";" => StmtKind::EmptyStmt,
     "{" <l:StmtList?> "}" => StmtKind::BlockStmt(l.unwrap_or(Vec::new())),
@@ -98,12 +98,12 @@ SimpleStmt: StmtKind = {
 };
 
 // For declarations at the global scope
-Declaration: Declaration = {
+Declaration: Declaration<'input> = {
     <FunctionDeclaration>,
     <StructDeclaration>,
 };
 
-FunctionDeclaration: Declaration = {
+FunctionDeclaration: Declaration<'input> = {
     "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?> "{"
         <s:Spanned<StmtList?>>
     "}" => Declaration::FunctionDeclaration {
@@ -120,7 +120,7 @@ FunctionDeclaration: Declaration = {
     }
 };
 
-StructDeclaration: Declaration = {
+StructDeclaration: Declaration<'input>= {
     "struct" <i:Spanned<IDENTIFIER>> "{" <l:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}" => Declaration::StructDeclaration {
         name: i,
         fields: l.map(|inner| {
@@ -130,19 +130,19 @@ StructDeclaration: Declaration = {
     }
 }
 
-ArgumentDeclarationList: ArgumentDeclarationList = {
+ArgumentDeclarationList: ArgumentDeclarationList<'input> = {
     <CommaSeparated<Spanned<ArgumentDeclaration>>> => ArgumentDeclarationList::NonVariadic(<>),
     <CommaSeparated<Spanned<ArgumentDeclaration>>> "," "..." => ArgumentDeclarationList::Variadic(<>),
 };
 
-ArgumentDeclaration: ArgumentDeclaration = {
+ArgumentDeclaration: ArgumentDeclaration<'input> = {
     <i:Spanned<IDENTIFIER>> ":" <t:Type> => ArgumentDeclaration {
         name: i,
         ty: t
     }
 };
 
-LetDeclaration: Vec<Spanned<LetDeclaration>> = {
+LetDeclaration: Vec<Spanned<LetDeclaration<'input>>> = {
     "let" <l:CommaSeparatedWithoutTrailing<
         Spanned<(<Spanned<IDENTIFIER>> <(":" <Type>)?> <("=" <Assignment>)?>)>
     >> ";" => l.into_iter().map(|sp| sp.map(|(i, t, v)| LetDeclaration {
@@ -152,7 +152,7 @@ LetDeclaration: Vec<Spanned<LetDeclaration>> = {
     })).collect::<Vec<_>>(),
 };
 
-Type: Type = {
+Type: Type<'input> = {
     Spanned<IDENTIFIER> => Type(<>.map(|x| TypeKind::Identifier(x))),
     Spanned<("*" <Type>)> => Type(<>.map(|x| TypeKind::Ptr(Box::new(x)))),
     Spanned<("struct" "{" <Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}")> => 
@@ -166,15 +166,15 @@ Type: Type = {
         ),
 }
 
-FlowStmt: StmtKind = {
+FlowStmt: StmtKind<'input> = {
     "continue" ";" => StmtKind::ContinueStmt,
     "break" ";" => StmtKind::BreakStmt,
     "return" <e:Expr?> ";" => StmtKind::ReturnStmt(e),
 };
 
-StmtList: Vec<Stmt> = Stmt+;
+StmtList: Vec<Stmt<'input>> = Stmt+;
 
-pub Expr: Expr = Comma;
+pub Expr: Expr<'input> = Comma;
 
 // Because ( <EXPR> ) should be spanned as ( @L <EXPR> @R ) not @L ( <EXPR> ) @R, Primary must
 // yield Expr so it can preserve a unique span. This means all other varients must also yield Primary
@@ -192,17 +192,17 @@ pub Expr: Expr = Comma;
 //         <s:@L> <l:Comma> "," <r:Assignment> <e:@R> => Expr(Spanned(s, ExprKind::Comma(Box::new(l), Box::new(r)), e)),
 //         <Assignment>,
 //     }
-ExprPrecedenceTier<T, Next>: Expr = {
+ExprPrecedenceTier<T, Next>: Expr<'input> = {
     SpannedExpr<T>,
     <Next>,
 }
 
-_Comma: ExprKind = {
+_Comma: ExprKind<'input> = {
     <l:Comma> "," <r:Assignment> => ExprKind::Comma(Box::new(l), Box::new(r)),
 }
 Comma = ExprPrecedenceTier<_Comma, Assignment>;
 
-_Assignment: ExprKind = {
+_Assignment: ExprKind<'input> = {
     <lhs:Unary> "=" <rhs:Assignment> => ExprKind::Assignment(Assignment::Standard, Box::new(lhs), Box::new(rhs)),
     <lhs:Unary> "+=" <rhs:Assignment> => ExprKind::Assignment(Assignment::Arithmetic(Arithmetic::Addition), Box::new(lhs), Box::new(rhs)),
     <lhs:Unary> "-=" <rhs:Assignment> => ExprKind::Assignment(Assignment::Arithmetic(Arithmetic::Subtraction), Box::new(lhs), Box::new(rhs)),
@@ -217,93 +217,93 @@ _Assignment: ExprKind = {
 };
 Assignment = ExprPrecedenceTier<_Assignment, Ternary>;
 
-_Ternary: ExprKind = {
+_Ternary: ExprKind<'input> = {
     <l:Logical> "?" <c:Expr> ":" <r:Ternary> => ExprKind::Ternary(Box::new(l), Box::new(c), Box::new(r)),
 };
 Ternary = ExprPrecedenceTier<_Ternary, Logical>;
 
-Logical: Expr = LogicalOr;
-_LogicalOr: ExprKind = {
+Logical: Expr<'input> = LogicalOr;
+_LogicalOr: ExprKind<'input> = {
     <l:LogicalOr> "||" <r:LogicalAnd> => ExprKind::Logical(Logical::Or, Box::new(l), Box::new(r)),
 };
 LogicalOr = ExprPrecedenceTier<_LogicalOr, LogicalAnd>;
-_LogicalAnd: ExprKind = {
+_LogicalAnd: ExprKind<'input> = {
     <l:LogicalAnd> "&&" <r:Equality> => ExprKind::Logical(Logical::And, Box::new(l), Box::new(r)),
 };
 LogicalAnd = ExprPrecedenceTier<_LogicalAnd, Bitwise>;
 
-Bitwise: Expr = BitwiseOr;
-_BitwiseOr: ExprKind = {
+Bitwise: Expr<'input> = BitwiseOr;
+_BitwiseOr: ExprKind<'input> = {
     <l:BitwiseOr> "|" <r:BitwiseXor> => ExprKind::BinaryBitwise(BinaryBitwise::Or, Box::new(l), Box::new(r)),
 };
-BitwiseOr: Expr = ExprPrecedenceTier<_BitwiseOr, BitwiseXor>;
-_BitwiseXor: ExprKind = {
+BitwiseOr: Expr<'input> = ExprPrecedenceTier<_BitwiseOr, BitwiseXor>;
+_BitwiseXor: ExprKind<'input> = {
     <l:BitwiseXor> "^" <r:BitwiseAnd> => ExprKind::BinaryBitwise(BinaryBitwise::Xor, Box::new(l), Box::new(r)),
 };
-BitwiseXor: Expr = ExprPrecedenceTier<_BitwiseXor, BitwiseAnd>;
-_BitwiseAnd: ExprKind = {
+BitwiseXor: Expr<'input> = ExprPrecedenceTier<_BitwiseXor, BitwiseAnd>;
+_BitwiseAnd: ExprKind<'input> = {
     <l:BitwiseAnd> "&" <r:Equality> => ExprKind::BinaryBitwise(BinaryBitwise::And, Box::new(l), Box::new(r)),
 }
-BitwiseAnd: Expr = ExprPrecedenceTier<_BitwiseAnd, Equality>;
+BitwiseAnd: Expr<'input> = ExprPrecedenceTier<_BitwiseAnd, Equality>;
 
-_Equality: ExprKind = {
+_Equality: ExprKind<'input> = {
     <l:Equality> "==" <r:Comparison> => ExprKind::Equality(Equality::Eq, Box::new(l), Box::new(r)),
     <l:Equality> "!=" <r:Comparison> => ExprKind::Equality(Equality::Neq, Box::new(l), Box::new(r)),
 };
-Equality: Expr = ExprPrecedenceTier<_Equality, Comparison>;
+Equality: Expr<'input> = ExprPrecedenceTier<_Equality, Comparison>;
 
-_Comparison: ExprKind = {
+_Comparison: ExprKind<'input> = {
     <l:Comparison> ">" <r:BitShift> => ExprKind::Comparison(Comparison::Gt, Box::new(l), Box::new(r)),
     <l:Comparison> ">=" <r:BitShift> => ExprKind::Comparison(Comparison::Gte, Box::new(l), Box::new(r)),
     <l:Comparison> "<" <r:BitShift> => ExprKind::Comparison(Comparison::Lt, Box::new(l), Box::new(r)),
     <l:Comparison> "<=" <r:BitShift> => ExprKind::Comparison(Comparison::Lte, Box::new(l), Box::new(r)),
 };
-Comparison: Expr = ExprPrecedenceTier<_Comparison, BitShift>;
+Comparison: Expr<'input> = ExprPrecedenceTier<_Comparison, BitShift>;
 
-_BitShift: ExprKind = {
+_BitShift: ExprKind<'input> = {
     <l:BitShift> ">>" <r:Term> => ExprKind::BinaryBitwise(BinaryBitwise::Shr, Box::new(l), Box::new(r)),
     <l:BitShift> "<<" <r:Term> => ExprKind::BinaryBitwise(BinaryBitwise::Shl, Box::new(l), Box::new(r)),
 };
-BitShift: Expr = ExprPrecedenceTier<_BitShift, Term>;
+BitShift: Expr<'input> = ExprPrecedenceTier<_BitShift, Term>;
 
-_Term: ExprKind = {
+_Term: ExprKind<'input> = {
     <l:Term> "+" <r:Factor> => ExprKind::Arithmetic(Arithmetic::Addition, Box::new(l), Box::new(r)),
     <l:Term> "-" <r:Factor> => ExprKind::Arithmetic(Arithmetic::Subtraction, Box::new(l), Box::new(r)),
 };
-Term: Expr = ExprPrecedenceTier<_Term, Factor>;
+Term: Expr<'input> = ExprPrecedenceTier<_Term, Factor>;
 
-_Factor: ExprKind = {
+_Factor: ExprKind<'input> = {
     <l:Factor> "/" <r:Cast> => ExprKind::Arithmetic(Arithmetic::Division, Box::new(l), Box::new(r)),
     <l:Factor> "*" <r:Cast> => ExprKind::Arithmetic(Arithmetic::Multiplication, Box::new(l), Box::new(r)),
     <l:Factor> "%" <r:Cast> => ExprKind::Arithmetic(Arithmetic::Modulo, Box::new(l), Box::new(r)),
 };
-Factor: Expr = ExprPrecedenceTier<_Factor, Cast>;
+Factor: Expr<'input> = ExprPrecedenceTier<_Factor, Cast>;
 
-_Cast: ExprKind = {
+_Cast: ExprKind<'input> = {
     <e:Unary> "as" <t:Type> => ExprKind::Cast(Box::new(e), t),
 };
-Cast: Expr = ExprPrecedenceTier<_Cast, Unary>;
+Cast: Expr<'input> = ExprPrecedenceTier<_Cast, Unary>;
 
-_Unary: ExprKind = {
+_Unary: ExprKind<'input> = {
     "!" <Unary> => ExprKind::UnaryNot(Box::new(<>)),
     "-" <Unary> => ExprKind::UnaryMinus(Box::new(<>)),
     "~" <Unary> => ExprKind::UnaryBitwiseNot(Box::new(<>)),
     "&" <Unary> => ExprKind::UnaryAddressOf(Box::new(<>)),
     "*" <Unary> => ExprKind::UnaryDereference(Box::new(<>)),
 };
-Unary: Expr = ExprPrecedenceTier<_Unary, Postfix>;
+Unary: Expr<'input> = ExprPrecedenceTier<_Unary, Postfix>;
 
-_Postfix: ExprKind = {
+_Postfix: ExprKind<'input> = {
     <x:Postfix> "[" <i:Expr> "]" => ExprKind::Index(Box::new(x), Box::new(i)),
     <l:Postfix> "." <r:Spanned<IDENTIFIER>> => ExprKind::Dot(Box::new(l), r),
     <l:Postfix> "->" <r:Spanned<IDENTIFIER>> => ExprKind::Arrow(Box::new(l), r),
     <i:Postfix> <c:Spanned<("(" <ArgumentList?> ")")>> => ExprKind::Call(Box::new(i), c.map(|x| x.unwrap_or(Vec::new()))),
 };
-Postfix: Expr = ExprPrecedenceTier<_Postfix, Primary>;
+Postfix: Expr<'input> = ExprPrecedenceTier<_Postfix, Primary>;
 
-ArgumentList: Vec<Expr> = CommaSeparated<Assignment>;
+ArgumentList: Vec<Expr<'input>> = CommaSeparated<Assignment>;
 
-Primary: Expr = {
+Primary: Expr<'input> = {
     Spanned<NUMBER> => Expr(<>.map(|n| ExprKind::NumberLiteral(n))),
     Spanned<STRING> => Expr(<>.map(|s| ExprKind::StringLiteral(s))),
     Spanned<IDENTIFIER> => Expr(<>.map(|i| ExprKind::Identifier(i))),
@@ -314,9 +314,9 @@ Primary: Expr = {
 
 extern {
     type Location = usize;
-    type Error = Spanned<lexer::LexicalError>;
+    type Error = Spanned<lexer::LexicalError<'input>>;
 
-    enum lexer::Tok {
+    enum lexer::Tok<'input> {
         "+" => lexer::Tok::Plus,
         "-" => lexer::Tok::Minus,
         "*" => lexer::Tok::Star,
@@ -366,9 +366,9 @@ extern {
         "[" => lexer::Tok::LeftBracket,
         "]" => lexer::Tok::RightBracket,
 
-        STRING => lexer::Tok::StringLiteral(<String>),
-        NUMBER => lexer::Tok::NumberLiteral(<String>),
-        IDENTIFIER => lexer::Tok::Identifier(<String>),
+        STRING => lexer::Tok::StringLiteral(<&'input str>),
+        NUMBER => lexer::Tok::NumberLiteral(<&'input str>),
+        IDENTIFIER => lexer::Tok::Identifier(<&'input str>),
 
         "true" => lexer::Tok::True,
         "false" => lexer::Tok::False,

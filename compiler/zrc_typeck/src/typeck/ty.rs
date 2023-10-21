@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::ty::{Type as ParserType, TypeKind as ParserTypeKind};
-use zrc_utils::span::Spanned;
+use zrc_utils::span::{Spannable, Spanned};
 
 use super::Scope;
 use crate::tast::ty::Type as TastType;
@@ -12,23 +12,27 @@ use crate::tast::ty::Type as TastType;
 ///
 /// # Errors
 /// Errors if the identifier is not found in the type scope.
-pub fn resolve_type(
-    scope: &Scope,
-    ty: ParserType,
-) -> Result<TastType, zrc_diagnostics::Diagnostic> {
-    Ok(match ty.0.value() {
+pub fn resolve_type<'input>(
+    scope: &Scope<'input>,
+    ty: ParserType<'input>,
+) -> Result<TastType<'input>, zrc_diagnostics::Diagnostic> {
+    let span = ty.0.span();
+    Ok(match ty.0.into_value() {
         ParserTypeKind::Identifier(x) => {
             if let Some(t) = scope.get_type(x) {
                 t.clone()
             } else {
                 return Err(Diagnostic(
                     zrc_diagnostics::Severity::Error,
-                    ty.0.map(|x| DiagnosticKind::UnableToResolveType(x.to_string())),
+                    DiagnosticKind::UnableToResolveType(x.to_string()).in_span(span),
                 ));
             }
         }
-        ParserTypeKind::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t.clone())?)),
-        ParserTypeKind::Struct(members) => TastType::Struct(resolve_struct_keys(members.clone())?),
+        ParserTypeKind::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t)?)),
+        ParserTypeKind::Struct(members) => TastType::Struct(resolve_struct_keys(
+            scope,
+            members.map(|x| x.into_iter().collect::<Vec<_>>()),
+        )?),
     })
 }
 
@@ -39,23 +43,21 @@ pub fn resolve_type(
 /// # Errors
 /// Errors if a key is not unique or is unresolvable.
 #[allow(clippy::type_complexity)]
-pub fn resolve_struct_keys(
-    members: Spanned<Vec<Spanned<(Spanned<String>, ParserType)>>>,
-) -> Result<IndexMap<String, TastType>, Diagnostic> {
-    let mut map = IndexMap::new();
+pub fn resolve_struct_keys<'input>(
+    scope: &Scope<'input>,
+    members: Spanned<Vec<Spanned<(Spanned<&'input str>, ParserType<'input>)>>>,
+) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {
+    let mut map: IndexMap<&'input str, TastType> = IndexMap::new();
     for sp in members.into_value() {
         let (k, v) = sp.value();
         if map.contains_key(k.value()) {
             return Err(Diagnostic(
                 zrc_diagnostics::Severity::Error,
                 sp.as_ref()
-                    .map(|x| DiagnosticKind::DuplicateStructMember(x.0.value().clone())),
+                    .map(|x| DiagnosticKind::DuplicateStructMember((*x.0.value()).to_string())),
             ));
         }
-        map.insert(
-            k.value().clone(),
-            resolve_type(&Scope::default(), v.clone())?,
-        );
+        map.insert(k.value(), resolve_type(scope, v.clone())?);
     }
     Ok(map)
 }

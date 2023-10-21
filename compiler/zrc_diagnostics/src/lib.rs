@@ -52,6 +52,8 @@ impl Display for Diagnostic {
 }
 
 /// The list of possible errors
+// These remain as Strings, not 'input str slices, to avoid circular dependencies (it's either use
+// String, or use Tok, because str would be to-string()d from some tokens)
 #[allow(missing_docs)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum DiagnosticKind {

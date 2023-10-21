@@ -20,13 +20,13 @@ use crate::tast::{stmt::TypedDeclaration, ty::Type as TastType};
 ///
 /// Cloning it resembles the creation of a subscope.
 #[derive(Debug, Clone)]
-pub struct Scope {
+pub struct Scope<'input> {
     /// Maps identifiers for values to their types.
-    value_scope: HashMap<String, TastType>,
+    value_scope: HashMap<&'input str, TastType<'input>>,
     /// Maps type names to their actual type representations.
-    type_scope: HashMap<String, TastType>,
+    type_scope: HashMap<&'input str, TastType<'input>>,
 }
-impl Scope {
+impl<'input> Scope<'input> {
     /// Creates a new Scope from just the defaults
     #[must_use]
     pub fn new() -> Self {
@@ -46,8 +46,8 @@ impl Scope {
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
     pub fn from_scopes(
-        value_scope: HashMap<String, TastType>,
-        type_scope: HashMap<String, TastType>,
+        value_scope: HashMap<&'input str, TastType<'input>>,
+        type_scope: HashMap<&'input str, TastType<'input>>,
     ) -> Self {
         Self {
             value_scope,
@@ -57,41 +57,41 @@ impl Scope {
 
     /// Gets a value-identifier's type from this [`Scope`]
     #[must_use]
-    pub fn get_value(&self, identifier: &String) -> Option<&TastType> {
+    pub fn get_value<'a>(&'a self, identifier: &'input str) -> Option<&'a TastType<'input>> {
         self.value_scope.get(identifier)
     }
 
     /// Gets a type-identifier's type from this [`Scope`]
     #[must_use]
-    pub fn get_type(&self, identifier: &String) -> Option<&TastType> {
+    pub fn get_type<'a>(&'a self, identifier: &'input str) -> Option<&'a TastType<'input>> {
         self.type_scope.get(identifier)
     }
 
     /// Sets a value-identifier's type in this [`Scope`]
-    pub fn set_value(&mut self, identifier: String, ty: TastType) {
+    pub fn set_value(&mut self, identifier: &'input str, ty: TastType<'input>) {
         self.value_scope.insert(identifier, ty);
     }
 
     /// Sets a type-identifier's type in this [`Scope`]
-    pub fn set_type(&mut self, identifier: String, ty: TastType) {
+    pub fn set_type(&mut self, identifier: &'input str, ty: TastType<'input>) {
         self.type_scope.insert(identifier, ty);
     }
 }
 
-impl Default for Scope {
+impl<'input> Default for Scope<'input> {
     fn default() -> Self {
         Self::from_scopes(
             HashMap::from([]),
             HashMap::from([
-                ("i8".to_string(), TastType::I8),
-                ("u8".to_string(), TastType::U8),
-                ("i16".to_string(), TastType::I16),
-                ("u16".to_string(), TastType::U16),
-                ("i32".to_string(), TastType::I32),
-                ("u32".to_string(), TastType::U32),
-                ("i64".to_string(), TastType::I64),
-                ("u64".to_string(), TastType::U64),
-                ("bool".to_string(), TastType::Bool),
+                ("i8", TastType::I8),
+                ("u8", TastType::U8),
+                ("i16", TastType::I16),
+                ("u16", TastType::U16),
+                ("i32", TastType::I32),
+                ("u32", TastType::U32),
+                ("i64", TastType::I64),
+                ("u64", TastType::U64),
+                ("bool", TastType::Bool),
                 // void is not producible
             ]),
         )

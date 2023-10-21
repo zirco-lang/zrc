@@ -12,7 +12,7 @@ use super::{expr::Expr, ty::Type};
 
 /// A Zirco statement
 #[derive(PartialEq, Debug, Clone)]
-pub struct Stmt(pub Spanned<StmtKind>);
+pub struct Stmt<'input>(pub Spanned<StmtKind<'input>>);
 
 /// The enum representing all the different kinds of statements in Zirco
 ///
@@ -20,29 +20,29 @@ pub struct Stmt(pub Spanned<StmtKind>);
 /// used by the parser to represent the AST in the statement position.
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
-pub enum StmtKind {
+pub enum StmtKind<'input> {
     /// `if (x) y` or `if (x) y else z`
-    IfStmt(Expr, Box<Stmt>, Option<Box<Stmt>>),
+    IfStmt(Expr<'input>, Box<Stmt<'input>>, Option<Box<Stmt<'input>>>),
     /// `while (x) y`
-    WhileStmt(Expr, Box<Stmt>),
+    WhileStmt(Expr<'input>, Box<Stmt<'input>>),
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
         // TODO: May also be able to be expressions?
-        init: Option<Box<Spanned<Vec<Spanned<LetDeclaration>>>>>,
+        init: Option<Box<Spanned<Vec<Spanned<LetDeclaration<'input>>>>>>,
         /// Runs before each iteration of the loop. If this evaluates to
         /// `false`, the loop will end. If this is [`None`], the loop
         /// will run forever.
-        cond: Option<Expr>,
+        cond: Option<Expr<'input>>,
         /// Runs after each iteration of the loop.
-        post: Option<Expr>,
+        post: Option<Expr<'input>>,
         /// The body of the loop.
-        body: Box<Stmt>,
+        body: Box<Stmt<'input>>,
     },
     /// `{ ... }`
-    BlockStmt(Vec<Stmt>),
+    BlockStmt(Vec<Stmt<'input>>),
     /// `x;`
-    ExprStmt(Expr),
+    ExprStmt(Expr<'input>),
     /// `;`
     EmptyStmt,
     /// `continue;`
@@ -50,34 +50,34 @@ pub enum StmtKind {
     /// `break;`
     BreakStmt,
     /// `return;` or `return x;`
-    ReturnStmt(Option<Expr>),
+    ReturnStmt(Option<Expr<'input>>),
     /// A let declaration
-    DeclarationList(Spanned<Vec<Spanned<LetDeclaration>>>),
+    DeclarationList(Spanned<Vec<Spanned<LetDeclaration<'input>>>>),
 }
 
 /// A struct or function declaration at the top level of a file
 #[derive(PartialEq, Debug, Clone)]
-pub enum Declaration {
+pub enum Declaration<'input> {
     /// A declaration of a function
     FunctionDeclaration {
         /// The name of the function.
-        name: Spanned<String>,
+        name: Spanned<&'input str>,
         /// The parameters of the function.
-        parameters: Spanned<ArgumentDeclarationList>,
+        parameters: Spanned<ArgumentDeclarationList<'input>>,
         /// The return type of the function. If set to [`None`], the function is
         /// void.
-        return_type: Option<Type>,
+        return_type: Option<Type<'input>>,
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
-        body: Option<Spanned<Vec<Stmt>>>,
+        body: Option<Spanned<Vec<Stmt<'input>>>>,
     },
     /// A named declaration for a `struct`.
     StructDeclaration {
         /// The name of the newtype.
-        name: Spanned<String>,
+        name: Spanned<&'input str>,
         /// The key-value pairs of the struct. Ordered by declaration order.
         #[allow(clippy::type_complexity)]
-        fields: Spanned<Vec<Spanned<(Spanned<String>, super::ty::Type)>>>,
+        fields: Spanned<Vec<Spanned<(Spanned<&'input str>, super::ty::Type<'input>)>>>,
     },
 }
 
@@ -85,20 +85,20 @@ pub enum Declaration {
 ///
 /// May be variadic or not.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ArgumentDeclarationList {
+pub enum ArgumentDeclarationList<'input> {
     /// `(a, b, ...)`
-    Variadic(Vec<Spanned<ArgumentDeclaration>>),
+    Variadic(Vec<Spanned<ArgumentDeclaration<'input>>>),
     /// `(a, b)` without `...`
-    NonVariadic(Vec<Spanned<ArgumentDeclaration>>),
+    NonVariadic(Vec<Spanned<ArgumentDeclaration<'input>>>),
 }
-impl ArgumentDeclarationList {
+impl<'input> ArgumentDeclarationList<'input> {
     /// Create the [`ArgumentDeclarationList`] for just `()`
     #[must_use]
     pub const fn empty() -> Self {
         Self::NonVariadic(vec![])
     }
 }
-impl Display for ArgumentDeclarationList {
+impl<'input> Display for ArgumentDeclarationList<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (Self::Variadic(args) | Self::NonVariadic(args)) = self;
 
@@ -117,7 +117,7 @@ impl Display for ArgumentDeclarationList {
     }
 }
 
-impl Display for Declaration {
+impl<'input> Display for Declaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::FunctionDeclaration {
@@ -186,12 +186,12 @@ impl Display for Declaration {
     }
 }
 
-impl Display for Stmt {
+impl<'input> Display for Stmt<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.value().fmt(f)
     }
 }
-impl Display for StmtKind {
+impl<'input> Display for StmtKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::IfStmt(e, s, None) => write!(f, "if ({e}) {s}"),
@@ -249,17 +249,17 @@ impl Display for StmtKind {
 
 /// A declaration created with `let`.
 #[derive(Debug, Clone, PartialEq)]
-pub struct LetDeclaration {
+pub struct LetDeclaration<'input> {
     /// The name of the identifier.
-    pub name: Spanned<String>,
+    pub name: Spanned<&'input str>,
     /// The type of the new symbol. If set to [`None`], the type will be
     /// inferred.
-    pub ty: Option<Type>,
+    pub ty: Option<Type<'input>>,
     /// The value to associate with the new symbol.
-    pub value: Option<Expr>,
+    pub value: Option<Expr<'input>>,
 }
 
-impl Display for LetDeclaration {
+impl<'input> Display for LetDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.ty {
             None => match &self.value {
@@ -276,14 +276,14 @@ impl Display for LetDeclaration {
 
 /// A special form of [`LetDeclaration`] used for function parameters.
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct ArgumentDeclaration {
+pub struct ArgumentDeclaration<'input> {
     /// The name of the parameter.
-    pub name: Spanned<String>,
+    pub name: Spanned<&'input str>,
     /// The type of the parameter.
-    pub ty: Type,
+    pub ty: Type<'input>,
 }
 
-impl Display for ArgumentDeclaration {
+impl<'input> Display for ArgumentDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.name.value(), self.ty)
     }
