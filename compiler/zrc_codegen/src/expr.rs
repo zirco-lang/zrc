@@ -464,8 +464,6 @@ pub fn cg_expr(
             let old_f = f.clone();
             let (f, bb) = cg_place(module, cg, bb, scope, *f)?;
 
-            let result_reg = cg.new_reg();
-
             let mut bb = bb;
             let old_args = args;
             let mut args = vec![];
@@ -481,20 +479,37 @@ pub fn cg_expr(
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            bb.add_instruction(
-                cg,
-                &format!(
-                    "{} = call {} {}({})",
-                    result_reg,
-                    get_llvm_typename(old_f.0)
-                        .strip_suffix('*')
-                        .expect("fp type didn't end in *, could not trim it"),
-                    f,
-                    args
-                ),
-            )?;
+            if expr.0 == zrc_typeck::tast::ty::Type::Void {
+                bb.add_instruction(
+                    cg,
+                    &format!(
+                        "call {} {}({})",
+                        get_llvm_typename(old_f.0)
+                            .strip_suffix('*')
+                            .expect("fp type didn't end in *, could not trim it"),
+                        f,
+                        args
+                    ),
+                )?;
 
-            (result_reg, bb)
+                ("undef".to_string(), bb)
+            } else {
+                let result_reg = cg.new_reg();
+
+                bb.add_instruction(
+                    cg,
+                    &format!(
+                        "{} = call {} {}({})",
+                        result_reg,
+                        get_llvm_typename(old_f.0)
+                            .strip_suffix('*')
+                            .expect("fp type didn't end in *, could not trim it"),
+                        f,
+                        args
+                    ),
+                )?;
+                (result_reg, bb)
+            }
         }
 
         TypedExprKind::Cast(x, t) => {
