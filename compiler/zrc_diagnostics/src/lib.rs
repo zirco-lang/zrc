@@ -86,8 +86,8 @@ pub enum DiagnosticKind {
     StructDoesNotHaveMember(String, String),
     StructMemberAccessOnNonStruct(String),
     FunctionArgumentCountMismatch {
-        expected: usize,
-        got: usize,
+        expected: String,
+        got: String,
     },
     FunctionArgumentTypeMismatch {
         n: usize, // counts from 0
@@ -111,6 +111,7 @@ pub enum DiagnosticKind {
     CannotReturnHere,
     ExpectedABlockToReturn,
     DuplicateStructMember(String),
+    VariadicFunctionMustBeExternal,
 }
 
 impl Display for DiagnosticKind {
@@ -222,6 +223,10 @@ impl Display for DiagnosticKind {
                 write!(f, "expected a block to be guaranteed to return")
             }
             Self::DuplicateStructMember(key) => write!(f, "duplicate struct member `{key}`"),
+            Self::VariadicFunctionMustBeExternal => write!(
+                f,
+                "cannot use variadic arguments (`...`) on a non-external function"
+            ),
         }
     }
 }

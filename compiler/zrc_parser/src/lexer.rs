@@ -329,6 +329,9 @@ pub enum Tok<'input> {
     /// The operator `->`
     #[token("->")]
     SmallArrow,
+    /// The `...` for variadic functions
+    #[token("...")]
+    Ellipsis,
 
     // === SPECIAL ===
     /// Any string literal
@@ -413,6 +416,7 @@ impl<'input> Display for Tok<'input> {
                 Self::Less => "<".to_string(),
                 Self::LessEq => "<=".to_string(),
                 Self::Identifier(i) => (*i).to_string(),
+                Self::Ellipsis => "...".to_string(),
             }
         )
     }

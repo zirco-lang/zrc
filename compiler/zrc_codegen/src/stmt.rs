@@ -342,7 +342,17 @@ pub fn cg_program(
                         Some(x) => zrc_typeck::typeck::BlockReturnType::Return(x),
                         None => zrc_typeck::typeck::BlockReturnType::Void,
                     },
-                    parameters.into_iter().map(|x| (x.name, x.ty)).collect(),
+                    {
+                        let zrc_typeck::tast::stmt::ArgumentDeclarationList::NonVariadic(p) =
+                            parameters
+                        else {
+                            panic!("non-extern function had variadic arguments");
+                        };
+                        p
+                    }
+                    .into_iter()
+                    .map(|x| (x.name, x.ty))
+                    .collect(),
                     &global_scope,
                 );
 
@@ -363,13 +373,32 @@ pub fn cg_program(
                     "declare {} @{}({})",
                     get_llvm_typename(return_type.unwrap_or(zrc_typeck::tast::ty::Type::Void)),
                     name,
-                    parameters
-                        .iter()
-                        .map(|zrc_typeck::tast::stmt::ArgumentDeclaration { ty, .. }| {
-                            get_llvm_typename(ty.clone())
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ")
+                    match parameters {
+                        zrc_typeck::tast::stmt::ArgumentDeclarationList::NonVariadic(
+                            parameters,
+                        ) => parameters
+                            .iter()
+                            .map(|zrc_typeck::tast::stmt::ArgumentDeclaration { ty, .. }| {
+                                get_llvm_typename(ty.clone())
+                            })
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        zrc_typeck::tast::stmt::ArgumentDeclarationList::Variadic(parameters) =>
+                            format!(
+                                "{}, ...",
+                                parameters
+                                    .iter()
+                                    .map(
+                                        |zrc_typeck::tast::stmt::ArgumentDeclaration {
+                                             ty, ..
+                                         }| {
+                                            get_llvm_typename(ty.clone())
+                                        }
+                                    )
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            ),
+                    }
                 ));
             }
         }

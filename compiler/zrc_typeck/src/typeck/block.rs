@@ -2,12 +2,14 @@
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
 use zrc_parser::ast::stmt::{
-    Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration, Stmt, StmtKind,
+    ArgumentDeclarationList, Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration,
+    Stmt, StmtKind,
 };
 use zrc_utils::span::{Spannable, Spanned};
 
 use super::{resolve_type, type_expr, Scope};
 use crate::tast::{
+    self,
     expr::TypedExpr,
     stmt::{
         ArgumentDeclaration as TastArgumentDeclaration, LetDeclaration as TastLetDeclaration,
@@ -213,6 +215,21 @@ pub fn process_declaration<'input>(
 ) -> Result<TypedDeclaration<'input>, zrc_diagnostics::Diagnostic> {
     Ok(match declaration {
         AstDeclaration::FunctionDeclaration {
+            parameters,
+            body: Some(_),
+            ..
+        } if matches!(
+            parameters.value(),
+            zrc_parser::ast::stmt::ArgumentDeclarationList::Variadic(_)
+        ) =>
+        {
+            return Err(Diagnostic(
+                Severity::Error,
+                parameters.map(|_| DiagnosticKind::VariadicFunctionMustBeExternal),
+            ));
+        }
+
+        AstDeclaration::FunctionDeclaration {
             name,
             parameters,
             return_type,
@@ -230,8 +247,11 @@ pub fn process_declaration<'input>(
                 .transpose()?
                 .map_or(BlockReturnType::Void, BlockReturnType::Return);
 
-            let resolved_parameters = parameters
-                .value()
+            let (zrc_parser::ast::stmt::ArgumentDeclarationList::NonVariadic(inner_params)
+            | zrc_parser::ast::stmt::ArgumentDeclarationList::Variadic(inner_params)) =
+                parameters.value();
+
+            let resolved_parameters = inner_params
                 .iter()
                 .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
                     Ok(TastArgumentDeclaration {
@@ -244,17 +264,34 @@ pub fn process_declaration<'input>(
             global_scope.set_value(
                 name.into_value(),
                 TastType::Fn(
-                    resolved_parameters
-                        .iter()
-                        .map(|x| x.ty.clone())
-                        .collect::<Vec<_>>(),
+                    match parameters.value() {
+                        ArgumentDeclarationList::NonVariadic(_) => {
+                            tast::stmt::ArgumentDeclarationList::NonVariadic(
+                                resolved_parameters.clone(),
+                            )
+                        }
+                        ArgumentDeclarationList::Variadic(_) => {
+                            tast::stmt::ArgumentDeclarationList::Variadic(
+                                resolved_parameters.clone(),
+                            )
+                        }
+                    },
                     Box::new(resolved_return_type.clone()),
                 ),
             );
 
             TypedDeclaration::FunctionDeclaration {
                 name: name.into_value(),
-                parameters: resolved_parameters.clone(),
+                parameters: match parameters.value() {
+                    ArgumentDeclarationList::NonVariadic(_) => {
+                        tast::stmt::ArgumentDeclarationList::NonVariadic(
+                            resolved_parameters.clone(),
+                        )
+                    }
+                    ArgumentDeclarationList::Variadic(_) => {
+                        tast::stmt::ArgumentDeclarationList::Variadic(resolved_parameters.clone())
+                    }
+                },
                 return_type: resolved_return_type.clone().into_option(),
                 body: if let Some(body) = body {
                     let mut function_scope = global_scope.clone();
