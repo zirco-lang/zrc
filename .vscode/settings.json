@@ -4,6 +4,7 @@
         "bitcast",
         "inttoptr",
         "lalrpop",
+        "Lvalue",
         "ptrtoint",
         "sdiv",
         "Spannable",

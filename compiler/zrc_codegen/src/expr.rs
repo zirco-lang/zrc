@@ -391,7 +391,7 @@ pub fn cg_expr(
         }
 
         TypedExprKind::UnaryAddressOf(x) => {
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
+            let (x_ptr, bb) = cg_place(module, cg, bb, scope, *x)?;
 
             let result_typename = get_llvm_typename(expr.0.clone());
 

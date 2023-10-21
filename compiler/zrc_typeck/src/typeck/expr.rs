@@ -54,7 +54,7 @@ fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, zrc_diagnostics::
         _ => {
             return Err(zrc_diagnostics::Diagnostic(
                 zrc_diagnostics::Severity::Error,
-                span.containing(DiagnosticKind::AssignmentToNonPlace(expr.to_string())),
+                span.containing(DiagnosticKind::NotAnLvalue(expr.to_string())),
             ))
         }
     })
@@ -144,7 +144,7 @@ pub fn type_expr<'input>(
             let t = type_expr(scope, *x)?;
             TypedExpr(
                 TastType::Ptr(Box::new(t.0.clone())),
-                TypedExprKind::UnaryAddressOf(Box::new(t)),
+                TypedExprKind::UnaryAddressOf(Box::new(expr_to_place(expr_span, t)?)),
             )
         }
         ExprKind::UnaryDereference(x) => {
