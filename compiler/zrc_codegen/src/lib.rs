@@ -205,11 +205,21 @@ fn get_llvm_typename(ty: zrc_typeck::tast::ty::Type) -> String {
         Type::Fn(params, ret) => format!(
             "{} ({})*",
             get_llvm_typename(ret.into_tast_type()),
-            params
-                .into_iter()
-                .map(get_llvm_typename)
-                .collect::<Vec<_>>()
-                .join(", ")
+            match params {
+                zrc_typeck::tast::stmt::ArgumentDeclarationList::NonVariadic(params) => params
+                    .into_iter()
+                    .map(|x| get_llvm_typename(x.ty))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                zrc_typeck::tast::stmt::ArgumentDeclarationList::Variadic(params) => format!(
+                    "{}, ...",
+                    params
+                        .into_iter()
+                        .map(|x| get_llvm_typename(x.ty))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            }
         ),
         Type::Struct(entries) => format!(
             "{{ {} }}",

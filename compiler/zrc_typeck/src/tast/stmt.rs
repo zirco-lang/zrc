@@ -79,7 +79,7 @@ pub enum TypedDeclaration<'input> {
         /// The name of the function.
         name: &'input str,
         /// The parameters of the function.
-        parameters: Vec<ArgumentDeclaration<'input>>,
+        parameters: ArgumentDeclarationList<'input>,
         /// The return type of the function. If set to [`None`], the function is
         /// void.
         return_type: Option<Type<'input>>,
@@ -96,6 +96,42 @@ pub enum TypedDeclaration<'input> {
     },
 }
 
+/// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]
+///
+/// May be variadic or not. Variadic only exists on extern.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArgumentDeclarationList<'input> {
+    /// `(a, b, ...)`
+    Variadic(Vec<ArgumentDeclaration<'input>>),
+    /// `(a, b)` without `...`
+    NonVariadic(Vec<ArgumentDeclaration<'input>>),
+}
+impl<'input> ArgumentDeclarationList<'input> {
+    /// Create the [`ArgumentDeclarationList`] for just `()`
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self::NonVariadic(vec![])
+    }
+}
+impl<'input> Display for ArgumentDeclarationList<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (Self::Variadic(args) | Self::NonVariadic(args)) = self;
+
+        write!(
+            f,
+            "{}{}",
+            args.iter()
+                .map(std::string::ToString::to_string)
+                .collect::<Vec<String>>()
+                .join(", "),
+            match self {
+                Self::Variadic(_) => ", ...",
+                Self::NonVariadic(_) => "",
+            }
+        )
+    }
+}
+
 impl<'input> Display for TypedDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -107,11 +143,7 @@ impl<'input> Display for TypedDeclaration<'input> {
             } => write!(
                 f,
                 "fn {name}({}) -> {r} {{\n{}\n}}",
-                parameters
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", "),
+                parameters,
                 body.iter()
                     .map(|stmt| stmt
                         .to_string()
@@ -127,15 +159,7 @@ impl<'input> Display for TypedDeclaration<'input> {
                 parameters,
                 return_type: Some(r),
                 body: None,
-            } => write!(
-                f,
-                "fn {name}({}) -> {r};",
-                parameters
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            } => write!(f, "fn {name}({parameters}) -> {r};"),
             Self::FunctionDeclaration {
                 name,
                 parameters,
@@ -143,12 +167,7 @@ impl<'input> Display for TypedDeclaration<'input> {
                 body: Some(body),
             } => write!(
                 f,
-                "fn {name}({}) {{\n{}\n}}",
-                parameters
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", "),
+                "fn {name}({parameters}) {{\n{}\n}}",
                 body.iter()
                     .map(|stmt| stmt
                         .to_string()
@@ -164,15 +183,7 @@ impl<'input> Display for TypedDeclaration<'input> {
                 parameters,
                 return_type: None,
                 body: None,
-            } => write!(
-                f,
-                "fn {name}({});",
-                parameters
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            } => write!(f, "fn {name}({parameters});"),
             Self::StructDeclaration { name, fields } => write!(
                 f,
                 "struct {name} {{\n{}\n}}",

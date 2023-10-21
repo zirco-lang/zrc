@@ -8,6 +8,7 @@ use super::Scope;
 use crate::{
     tast::{
         expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
+        stmt::ArgumentDeclarationList,
         ty::Type as TastType,
     },
     typeck::resolve_type,
@@ -247,44 +248,78 @@ pub fn type_expr<'input>(
                 .map(|x| type_expr(scope, x.clone()))
                 .collect::<Result<Vec<TypedExpr>, Diagnostic>>()?;
 
-            if let TastType::Fn(arg_types, ret_type) = ft.0.clone() {
-                if arg_types.len() != args_t.len() {
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        expr_span.containing(DiagnosticKind::FunctionArgumentCountMismatch {
-                            expected: arg_types.len(),
-                            got: args_t.len(),
-                        }),
-                    ));
-                }
-
-                for (i, (arg_type, arg_t)) in arg_types.iter().zip(args_t.iter()).enumerate() {
-                    if arg_type != &arg_t.0 {
+            match ft.0.clone() {
+                TastType::Fn(ArgumentDeclarationList::NonVariadic(arg_types), ret_type) => {
+                    if arg_types.len() != args_t.len() {
                         return Err(Diagnostic(
                             Severity::Error,
-                            args.value()[i].0.span().containing(
-                                DiagnosticKind::FunctionArgumentTypeMismatch {
-                                    n: i,
-                                    expected: arg_type.to_string(),
-                                    got: arg_t.0.to_string(),
-                                },
-                            ),
+                            expr_span.containing(DiagnosticKind::FunctionArgumentCountMismatch {
+                                expected: arg_types.len().to_string(),
+                                got: args_t.len().to_string(),
+                            }),
                         ));
                     }
-                }
 
-                TypedExpr(
-                    ret_type.into_option().unwrap_or(TastType::Void),
-                    TypedExprKind::Call(
-                        Box::new(expr_to_place((*f).clone().0.span(), ft)?),
-                        args_t,
-                    ),
-                )
-            } else {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::CannotCallNonFunction(ft.to_string())),
-                ));
+                    for (i, (arg_type, arg_t)) in arg_types.iter().zip(args_t.iter()).enumerate() {
+                        if arg_type.ty != arg_t.0 {
+                            return Err(Diagnostic(
+                                Severity::Error,
+                                args.value()[i].0.span().containing(
+                                    DiagnosticKind::FunctionArgumentTypeMismatch {
+                                        n: i,
+                                        expected: arg_type.to_string(),
+                                        got: arg_t.0.to_string(),
+                                    },
+                                ),
+                            ));
+                        }
+                    }
+
+                    TypedExpr(
+                        ret_type.into_option().unwrap_or(TastType::Void),
+                        TypedExprKind::Call(Box::new(expr_to_place((*f).0.span(), ft)?), args_t),
+                    )
+                }
+                TastType::Fn(ArgumentDeclarationList::Variadic(beginning_arg_types), ret_type) => {
+                    if beginning_arg_types.len() > args_t.len() {
+                        return Err(Diagnostic(
+                            Severity::Error,
+                            expr_span.containing(DiagnosticKind::FunctionArgumentCountMismatch {
+                                expected: format!("at least {}", beginning_arg_types.len()),
+                                got: args_t.len().to_string(),
+                            }),
+                        ));
+                    }
+
+                    for (i, (arg_type, arg_t)) in
+                        beginning_arg_types.iter().zip(args_t.iter()).enumerate()
+                    {
+                        if arg_type.ty != arg_t.0 {
+                            return Err(Diagnostic(
+                                Severity::Error,
+                                args.value()[i].0.span().containing(
+                                    DiagnosticKind::FunctionArgumentTypeMismatch {
+                                        n: i,
+                                        expected: arg_type.to_string(),
+                                        got: arg_t.0.to_string(),
+                                    },
+                                ),
+                            ));
+                        }
+                    }
+
+                    // the rest may be any, so we don't need to check them
+                    TypedExpr(
+                        ret_type.into_option().unwrap_or(TastType::Void),
+                        TypedExprKind::Call(Box::new(expr_to_place((*f).0.span(), ft)?), args_t),
+                    )
+                }
+                _ => {
+                    return Err(Diagnostic(
+                        Severity::Error,
+                        expr_span.containing(DiagnosticKind::CannotCallNonFunction(ft.to_string())),
+                    ));
+                }
             }
         }
 
@@ -398,7 +433,21 @@ pub fn type_expr<'input>(
                 ));
             }
 
-            if at.0 != bt.0 {
+            if matches!(
+                op,
+                zrc_parser::ast::expr::BinaryBitwise::Shl
+                    | zrc_parser::ast::expr::BinaryBitwise::Shr
+            ) {
+                if !at.0.is_signed_integer() {
+                    return Err(Diagnostic(
+                        Severity::Error,
+                        a.0.span().containing(DiagnosticKind::ExpectedGot {
+                            expected: "signed integer".to_string(),
+                            got: at.0.to_string(),
+                        }),
+                    ));
+                }
+            } else if at.0 != bt.0 {
                 return Err(Diagnostic(
                     Severity::Error,
                     expr_span.containing(DiagnosticKind::ExpectedSameType(
