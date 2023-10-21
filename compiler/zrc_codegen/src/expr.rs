@@ -93,9 +93,10 @@ pub fn cg_place(
 }
 
 /// Returns either a literal or a register holding the result of the expression.
-/// The old expression code generator used allocations for every expression, so 2 + 2 involved
-/// allocating space for both constants and the result and relying on SROA to optimize it away.
-/// However, expression results will never mutate, it's *assignments* / places that are mutated.
+/// The old expression code generator used allocations for every expression, so
+/// 2 + 2 involved allocating space for both constants and the result and
+/// relying on SROA to optimize it away. However, expression results will never
+/// mutate, it's *assignments* / places that are mutated.
 pub fn cg_expr(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
@@ -164,10 +165,12 @@ pub fn cg_expr(
             if_false_bb.add_instruction(cg, &format!("br label {end_bb}"))?;
 
             let result_reg = cg.new_reg();
+            #[allow(clippy::uninlined_format_args)] // for line length
             end_bb.add_instruction(
                 cg,
                 &format!(
-                    "{result_reg} = phi {result_typename} [ {if_true}, {if_true_bb} ], [ {if_false}, {if_false_bb} ]",
+                    "{} = phi {} [ {}, {} ], [ {}, {} ]",
+                    result_reg, result_typename, if_true, if_true_bb, if_false, if_false_bb
                 ),
             )?;
 
