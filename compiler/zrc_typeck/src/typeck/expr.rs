@@ -14,7 +14,11 @@ use crate::{
 };
 
 /// Desugar an assignment like `x += y` to `x = x + y`.
-fn desugar_assignment(mode: Assignment, lhs: Expr, rhs: Expr) -> (Expr, Expr) {
+fn desugar_assignment<'input>(
+    mode: Assignment,
+    lhs: Expr<'input>,
+    rhs: Expr<'input>,
+) -> (Expr<'input>, Expr<'input>) {
     match mode {
         Assignment::Standard => (lhs, rhs),
         Assignment::Arithmetic(op) => (
@@ -64,7 +68,10 @@ fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, zrc_diagnostics::
 /// Errors if a type checker error is encountered.
 #[allow(clippy::too_many_lines)] // FIXME: make this fn shorter
 #[allow(clippy::module_name_repetitions)]
-pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, zrc_diagnostics::Diagnostic> {
+pub fn type_expr<'input>(
+    scope: &Scope<'input>,
+    expr: Expr<'input>,
+) -> Result<TypedExpr<'input>, zrc_diagnostics::Diagnostic> {
     let expr_span = expr.0.span();
     Ok(match expr.0.into_value() {
         ExprKind::Comma(a, b) => {
@@ -185,16 +192,13 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, zrc_diagnostics
 
             if let TastType::Struct(fields) = obj_t.0.clone() {
                 if let Some(t) = fields.get(key.value()) {
-                    TypedExpr(
-                        t.clone(),
-                        TypedExprKind::Dot(Box::new(obj_t), key.value().clone()),
-                    )
+                    TypedExpr(t.clone(), TypedExprKind::Dot(Box::new(obj_t), key.value()))
                 } else {
                     return Err(Diagnostic(
                         Severity::Error,
                         expr_span.containing(DiagnosticKind::StructDoesNotHaveMember(
                             obj_t.to_string(),
-                            key.into_value(),
+                            key.into_value().to_string(),
                         )),
                     ));
                 }
@@ -527,10 +531,10 @@ pub fn type_expr(scope: &Scope, expr: Expr) -> Result<TypedExpr, zrc_diagnostics
             TypedExprKind::StringLiteral(s),
         ),
         ExprKind::Identifier(i) => {
-            let t = scope.get_value(&i).ok_or_else(|| {
+            let t = scope.get_value(i).ok_or_else(|| {
                 Diagnostic(
                     Severity::Error,
-                    expr_span.containing(DiagnosticKind::UnableToResolveIdentifier(i.clone())),
+                    expr_span.containing(DiagnosticKind::UnableToResolveIdentifier(i.to_string())),
                 )
             })?;
             TypedExpr(t.clone(), TypedExprKind::Identifier(i))

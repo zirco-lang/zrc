@@ -19,7 +19,7 @@ pub fn cg_place(
     Ok(match place.1 {
         PlaceKind::Variable(x) => {
             let reg = scope
-                .get(&x)
+                .get(x)
                 .with_context(|| format!("Identifier {} not found in scope", x))?
                 .clone();
             (reg, bb.clone())
@@ -154,7 +154,7 @@ pub fn cg_expr(
         TypedExprKind::NumberLiteral(n) => {
             let typename = get_llvm_typename(expr.0.clone());
             let reg = cg_alloc(cg, bb, &typename);
-            cg_store(cg, bb, &typename, &reg, &n)?;
+            cg_store(cg, bb, &typename, &reg, n)?;
             (reg, bb.clone())
         }
         TypedExprKind::BooleanLiteral(b) => {
@@ -433,7 +433,7 @@ pub fn cg_expr(
 
         TypedExprKind::Identifier(id) => {
             let reg = scope
-                .get(&id)
+                .get(id)
                 .with_context(|| format!("Identifier {} not found in scope", id))?
                 .clone();
             (reg, bb.clone())

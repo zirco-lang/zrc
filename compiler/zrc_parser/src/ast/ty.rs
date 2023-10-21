@@ -12,21 +12,21 @@ use zrc_utils::{
 
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct Type(pub Spanned<TypeKind>);
+pub struct Type<'input>(pub Spanned<TypeKind<'input>>);
 
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub enum TypeKind {
+pub enum TypeKind<'input> {
     /// An identifier, such as `i32`
-    Identifier(String),
+    Identifier(&'input str),
     /// `*T`
-    Ptr(Box<Type>),
+    Ptr(Box<Type<'input>>),
     /// A direct struct type
     #[allow(clippy::type_complexity)]
-    Struct(Spanned<Vec<Spanned<(Spanned<String>, Type)>>>),
+    Struct(Spanned<Vec<Spanned<(Spanned<&'input str>, Type<'input>)>>>),
 }
 
-impl Display for TypeKind {
+impl<'input> Display for TypeKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Identifier(i) => write!(f, "{i}"),
@@ -44,7 +44,7 @@ impl Display for TypeKind {
         }
     }
 }
-impl Display for Type {
+impl<'input> Display for Type<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.value().fmt(f)
     }
@@ -55,9 +55,9 @@ impl Display for Type {
 #[allow(missing_docs)]
 #[allow(clippy::missing_docs_in_private_items)]
 #[allow(clippy::should_implement_trait)]
-impl Type {
+impl<'input> Type<'input> {
     #[must_use]
-    pub fn ident(ident: Spanned<String>) -> Self {
+    pub fn ident(ident: Spanned<&'input str>) -> Self {
         let span = ident.span();
         Self(spanned!(
             span.start(),
@@ -68,7 +68,10 @@ impl Type {
 
     #[must_use]
     #[allow(clippy::type_complexity)]
-    pub fn struct_direct(span: Span, keys: Spanned<Vec<Spanned<(Spanned<String>, Self)>>>) -> Self {
+    pub fn struct_direct(
+        span: Span,
+        keys: Spanned<Vec<Spanned<(Spanned<&'input str>, Self)>>>,
+    ) -> Self {
         Self(TypeKind::Struct(keys).in_span(span))
     }
 
