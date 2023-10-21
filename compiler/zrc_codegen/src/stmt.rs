@@ -1,8 +1,6 @@
 use anyhow::bail;
 
-use super::{
-    cg_alloc, cg_expr, cg_load, get_llvm_typename, BasicBlock, CgScope, FunctionCg, ModuleCg,
-};
+use super::{cg_alloc, cg_expr, get_llvm_typename, BasicBlock, CgScope, FunctionCg, ModuleCg};
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
 /// instructions. It is passed to [`cg_block`] to allow it to properly handle
@@ -25,7 +23,7 @@ pub fn cg_let_declaration<'input>(
     scope: &mut CgScope<'input>,
     declarations: Vec<zrc_typeck::tast::stmt::LetDeclaration<'input>>,
 ) -> anyhow::Result<BasicBlock> {
-    let mut bb = bb.clone();
+    let mut bb = *bb;
 
     for let_declaration in declarations {
         // allocate space for it
@@ -76,7 +74,7 @@ pub fn cg_block(
     let mut scope = parent_scope.clone();
 
     block.into_iter().try_fold(
-        Some(bb.clone()),
+        Some(*bb),
         |bb, stmt| -> anyhow::Result<Option<BasicBlock>> {
             let Some(bb) = bb else {
                 // we hit a return statement already, so we're done
@@ -86,17 +84,16 @@ pub fn cg_block(
                 TypedStmt::EmptyStmt => Some(bb),
                 TypedStmt::ExprStmt(expr) => Some(cg_expr(module, cg, &bb, &scope, expr)?.1),
                 TypedStmt::IfStmt(cond, then, then_else) => {
-                    let (cond_ptr, bb) = cg_expr(module, cg, &bb, &scope, cond)?;
+                    let (cond, bb) = cg_expr(module, cg, &bb, &scope, cond)?;
 
                     let then_else = then_else.unwrap_or(vec![]);
 
                     let then_bb = cg.new_bb();
                     let then_else_bb = cg.new_bb();
 
-                    let cond_reg = cg_load(cg, &bb, "i1", &cond_ptr)?;
                     bb.add_instruction(
                         cg,
-                        &format!("br i1 {cond_reg}, label {then_bb}, label {then_else_bb}",),
+                        &format!("br i1 {cond}, label {then_bb}, label {then_else_bb}",),
                     )?;
 
                     let then_bb = cg_block(module, cg, &then_bb, &scope, then, breakaway.clone())?;
@@ -138,9 +135,8 @@ pub fn cg_block(
                 }
 
                 TypedStmt::ReturnStmt(Some(ex)) => {
-                    let (ex_ptr, bb) = cg_expr(module, cg, &bb, &scope, ex.clone())?;
+                    let (ex_reg, bb) = cg_expr(module, cg, &bb, &scope, ex.clone())?;
                     let ex_type = get_llvm_typename(ex.0);
-                    let ex_reg = cg_load(cg, &bb, &ex_type, &ex_ptr)?;
                     bb.add_instruction(cg, &format!("ret {ex_type} {ex_reg}"))?;
 
                     None
@@ -223,11 +219,8 @@ pub fn cg_block(
                             header
                         }
                         Some(cond) => {
-                            let (cond_ptr, header) =
+                            let (cond_reg, header) =
                                 cg_expr(module, cg, &header, &scope, cond.clone())?;
-
-                            let cond_reg =
-                                cg_load(cg, &header, &get_llvm_typename(cond.0), &cond_ptr)?;
 
                             header.add_instruction(
                                 cg,
@@ -246,8 +239,8 @@ pub fn cg_block(
                         &scope,
                         body_code,
                         Some(LoopBreakaway {
-                            on_break: exit.clone(),
-                            on_continue: latch.clone(),
+                            on_break: exit,
+                            on_continue: latch,
                         }),
                     )?;
 
@@ -283,8 +276,7 @@ pub fn cg_block(
                     let body = cg.new_bb();
                     let exit = cg.new_bb();
 
-                    let (cond_ptr, header) = cg_expr(module, cg, &header, &scope, cond.clone())?;
-                    let cond_reg = cg_load(cg, &header, &get_llvm_typename(cond.0), &cond_ptr)?;
+                    let (cond_reg, header) = cg_expr(module, cg, &header, &scope, cond.clone())?;
 
                     header.add_instruction(
                         cg,
@@ -298,8 +290,8 @@ pub fn cg_block(
                         &scope,
                         body_code,
                         Some(LoopBreakaway {
-                            on_break: exit.clone(),
-                            on_continue: header.clone(),
+                            on_break: exit,
+                            on_continue: header,
                         }),
                     )?;
 

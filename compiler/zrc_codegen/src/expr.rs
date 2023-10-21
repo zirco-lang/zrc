@@ -1,10 +1,8 @@
 use anyhow::{bail, Context as _};
 
-use super::{
-    cg_alloc, cg_load, cg_store, get_llvm_typename, BasicBlock, CgScope, FunctionCg, ModuleCg,
-};
+use super::{cg_load, get_llvm_typename, BasicBlock, CgScope, FunctionCg, ModuleCg};
 
-/// Returns a register containing a pointer to the place inputted
+/// Returns a pointer to the place referred to along with the basic block
 pub fn cg_place(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
@@ -12,8 +10,6 @@ pub fn cg_place(
     scope: &CgScope,
     place: zrc_typeck::tast::expr::Place,
 ) -> anyhow::Result<(String, BasicBlock)> {
-    // Again, produces a REGISTER holding the pointer.
-
     use zrc_typeck::tast::expr::PlaceKind;
 
     Ok(match place.1 {
@@ -22,7 +18,7 @@ pub fn cg_place(
                 .get(x)
                 .with_context(|| format!("Identifier {} not found in scope", x))?
                 .clone();
-            (reg, bb.clone())
+            (reg, *bb)
         }
         PlaceKind::Deref(x) => {
             let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
@@ -96,8 +92,11 @@ pub fn cg_place(
     })
 }
 
-/// Returns a register containing a pointer to the result of the expression
-/// along with the basic block to continue adding statements from.
+/// Returns either a literal or a register holding the result of the expression.
+/// The old expression code generator used allocations for every expression, so
+/// 2 + 2 involved allocating space for both constants and the result and
+/// relying on SROA to optimize it away. However, expression results will never
+/// mutate, it's *assignments* / places that are mutated.
 pub fn cg_expr(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
@@ -106,109 +105,110 @@ pub fn cg_expr(
     expr: zrc_typeck::tast::expr::TypedExpr,
 ) -> anyhow::Result<(String, BasicBlock)> {
     use zrc_typeck::tast::expr::TypedExprKind;
-    // Remember you must ALWAYS return a POINTER register. This is an intentional
-    // design choice for now. llvm can optimize away the pointer if it wants to.
 
     Ok(match expr.1 {
-        TypedExprKind::Ternary(condition, lhs, rhs) => {
-            let (condition_ptr, bb) = cg_expr(module, cg, bb, scope, *condition)?;
-            // condition_ptr: i1*
+        TypedExprKind::NumberLiteral(n) => (n.to_string(), *bb),
+        TypedExprKind::BooleanLiteral(b) => (b.to_string(), *bb),
+
+        TypedExprKind::Comma(lhs, rhs) => {
+            let (_, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
+            cg_expr(module, cg, &bb, scope, *rhs)?
+        }
+
+        TypedExprKind::Ternary(cond, lhs, rhs) => {
+            let (cond, bb) = cg_expr(module, cg, bb, scope, *cond)?;
+
+            // If lhs and rhs are registers, the code generated will look like:
+            //   entry:
+            //       ...
+            //       %cond = ...
+            //       br i1 %cond, label %if_true, label %if_false
+            //   if_true:
+            //       ... yields %lhs
+            //       br label %end
+            //   if_false:
+            //       ... yields %rhs
+            //       br label %end
+            //   end:
+            //       %yield = phi TY [ %lhs, %if_true ], [ %rhs, %if_false ]
+            //
+            // If they are constants, the code generated will load as:
+            //   entry:
+            //       ...
+            //       %cond = ...
+            //       br i1 %cond, label %if_true, label %if_false
+            //   if_true:
+            //       br label %end
+            //   if_false:
+            //       br label %end
+            //   end:
+            //       %yield = phi TY [ LHS VALUE, %if_true ], [ RHS VALUE, %if_false ]
+            //
+            // This is just a weird way to `select` and will be inlined.
+
+            let result_typename = get_llvm_typename(expr.0.clone());
 
             let if_true_bb = cg.new_bb();
             let if_false_bb = cg.new_bb();
 
-            // load the condition
-            let condition_reg = cg_load(cg, &bb, "i1", &condition_ptr)?;
-            // and branch on it
             bb.add_instruction(
                 cg,
-                &format!("br i1 {condition_reg}, label {if_true_bb}, label {if_false_bb}"),
+                &format!("br i1 {cond}, label {if_true_bb}, label {if_false_bb}"),
             )?;
 
-            // generate the expressions on both sides
-            let (if_true_ptr, if_true_bb) = cg_expr(module, cg, &if_true_bb, scope, *lhs)?;
-            let (if_false_ptr, if_false_bb) = cg_expr(module, cg, &if_false_bb, scope, *rhs)?;
-            // if_true_ptr is a pointer accessible on the true side and vice versa
+            let (if_true, if_true_bb) = cg_expr(module, cg, &if_true_bb, scope, *lhs)?;
+            let (if_false, if_false_bb) = cg_expr(module, cg, &if_false_bb, scope, *rhs)?;
 
-            let terminating_bb = cg.new_bb();
+            let end_bb = cg.new_bb();
 
-            // branch to the terminating bb
-            if_true_bb.add_instruction(cg, &format!("br label {terminating_bb}"))?;
-            if_false_bb.add_instruction(cg, &format!("br label {terminating_bb}"))?;
+            if_true_bb.add_instruction(cg, &format!("br label {end_bb}"))?;
+            if_false_bb.add_instruction(cg, &format!("br label {end_bb}"))?;
 
-            let result_ptr = cg.new_reg();
-
-            // now generate a phi node
+            let result_reg = cg.new_reg();
             #[allow(clippy::uninlined_format_args)] // for line length
-            terminating_bb.add_instruction(
+            end_bb.add_instruction(
                 cg,
                 &format!(
-                    "{} = phi ptr [{}, {}], [{}, {}]",
-                    result_ptr, if_false_ptr, if_false_bb, if_true_ptr, if_true_bb
+                    "{} = phi {} [ {}, {} ], [ {}, {} ]",
+                    result_reg, result_typename, if_true, if_true_bb, if_false, if_false_bb
                 ),
             )?;
 
-            (result_ptr, terminating_bb)
-        }
-
-        TypedExprKind::NumberLiteral(n) => {
-            let typename = get_llvm_typename(expr.0.clone());
-            let reg = cg_alloc(cg, bb, &typename);
-            cg_store(cg, bb, &typename, &reg, n)?;
-            (reg, bb.clone())
-        }
-        TypedExprKind::BooleanLiteral(b) => {
-            let typename = get_llvm_typename(expr.0.clone());
-            let reg = cg_alloc(cg, bb, &typename);
-            cg_store(cg, bb, &typename, &reg, &b.to_string())?;
-            (reg, bb.clone())
-        }
-
-        TypedExprKind::Comma(lhs, rhs) => {
-            let (_, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
-            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
-            (rhs_ptr, bb)
+            (result_reg, end_bb)
         }
 
         TypedExprKind::BinaryBitwise(op, lhs, rhs) => {
-            let (lhs_ptr, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
-            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
+            let (lhs, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
+            let (rhs, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
 
-            let result_typename = get_llvm_typename(expr.0.clone());
-            let result_ptr = cg_alloc(cg, &bb, &result_typename);
-
-            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr)?;
-            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr)?;
+            let result_type = get_llvm_typename(expr.0.clone());
 
             let op = match op {
                 zrc_typeck::tast::expr::BinaryBitwise::And => "and",
                 zrc_typeck::tast::expr::BinaryBitwise::Or => "or",
                 zrc_typeck::tast::expr::BinaryBitwise::Xor => "xor",
                 zrc_typeck::tast::expr::BinaryBitwise::Shl => "shl",
-                zrc_typeck::tast::expr::BinaryBitwise::Shr => "lshr", // should it be ashr?
+                zrc_typeck::tast::expr::BinaryBitwise::Shr if expr.0.is_unsigned_integer() => {
+                    "lshr"
+                }
+                zrc_typeck::tast::expr::BinaryBitwise::Shr if expr.0.is_signed_integer() => "ashr",
+                zrc_typeck::tast::expr::BinaryBitwise::Shr => unreachable!(),
             };
 
             let result_reg = cg.new_reg();
 
             bb.add_instruction(
                 cg,
-                &format!("{result_reg} = {op} {result_typename} {lhs_reg}, {rhs_reg}"),
+                &format!("{result_reg} = {op} {result_type} {lhs}, {rhs}"),
             )?;
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
 
-            (result_ptr, bb)
+            (result_reg, bb)
         }
 
         TypedExprKind::Equality(op, lhs, rhs) => {
-            // it's either *T == *U or iN == iN
-
-            let (lhs_ptr, bb) = cg_expr(module, cg, bb, scope, *lhs.clone())?;
-            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
-
-            let operand_typename = get_llvm_typename(lhs.0.clone());
-
-            let lhs_reg = cg_load(cg, &bb, &operand_typename, &lhs_ptr)?;
-            let rhs_reg = cg_load(cg, &bb, &operand_typename, &rhs_ptr)?;
+            let operand_typename = get_llvm_typename((*lhs).0.clone());
+            let (lhs, bb) = cg_expr(module, cg, bb, scope, *lhs.clone())?;
+            let (rhs, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
 
             let op = match op {
                 zrc_typeck::tast::expr::Equality::Eq => "icmp eq",
@@ -219,23 +219,16 @@ pub fn cg_expr(
 
             bb.add_instruction(
                 cg,
-                &format!("{result_reg} = {op} {operand_typename} {lhs_reg}, {rhs_reg}"),
+                &format!("{result_reg} = {op} {operand_typename} {lhs}, {rhs}"),
             )?;
 
-            let result_ptr = cg_alloc(cg, &bb, "i1");
-            cg_store(cg, &bb, "i1", &result_ptr, &result_reg)?;
-
-            (result_ptr, bb)
+            (result_reg, bb)
         }
 
         TypedExprKind::Comparison(op, lhs, rhs) => {
-            let (lhs_ptr, bb) = cg_expr(module, cg, bb, scope, *lhs.clone())?;
-            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
-
-            let result_typename = get_llvm_typename(lhs.0.clone());
-
-            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr)?;
-            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr)?;
+            let operand_typename = get_llvm_typename((*lhs).0.clone());
+            let (lhs, bb) = cg_expr(module, cg, bb, scope, *lhs.clone())?;
+            let (rhs, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
 
             // the operands are integers
             let op = match (op, expr.0.clone()) {
@@ -262,51 +255,51 @@ pub fn cg_expr(
 
             bb.add_instruction(
                 cg,
-                &format!("{result_reg} = {op} {result_typename} {lhs_reg}, {rhs_reg}"),
+                &format!("{result_reg} = {op} {operand_typename} {lhs}, {rhs}"),
             )?;
 
-            let result_ptr = cg_alloc(cg, &bb, "i1");
-            cg_store(cg, &bb, "i1", &result_ptr, &result_reg)?;
-
-            (result_ptr, bb)
+            (result_reg, bb)
         }
+
         TypedExprKind::Arithmetic(op, lhs, rhs) => {
-            let (lhs_ptr, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
-            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
+            let (lhs, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
+            let (rhs, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
 
-            let result_typename = get_llvm_typename(expr.0.clone());
-
-            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr)?;
-            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr)?;
+            let result_type = get_llvm_typename(expr.0.clone());
 
             let op = match op {
                 zrc_typeck::tast::expr::Arithmetic::Addition => "add",
-                zrc_typeck::tast::expr::Arithmetic::Subtraction => "sub",
+                zrc_typeck::tast::expr::Arithmetic::Division if expr.0.is_signed_integer() => {
+                    "sdiv"
+                }
+                zrc_typeck::tast::expr::Arithmetic::Division if expr.0.is_unsigned_integer() => {
+                    "udiv"
+                }
+                zrc_typeck::tast::expr::Arithmetic::Division => unreachable!(),
+                zrc_typeck::tast::expr::Arithmetic::Modulo if expr.0.is_signed_integer() => "srem",
+                zrc_typeck::tast::expr::Arithmetic::Modulo if expr.0.is_unsigned_integer() => {
+                    "urem"
+                }
+                zrc_typeck::tast::expr::Arithmetic::Modulo => unreachable!(),
                 zrc_typeck::tast::expr::Arithmetic::Multiplication => "mul",
-                zrc_typeck::tast::expr::Arithmetic::Division => "sdiv",
-                zrc_typeck::tast::expr::Arithmetic::Modulo => "srem",
+                zrc_typeck::tast::expr::Arithmetic::Subtraction => "sub",
             };
 
             let result_reg = cg.new_reg();
 
             bb.add_instruction(
                 cg,
-                &format!("{result_reg} = {op} {result_typename} {lhs_reg}, {rhs_reg}"),
+                &format!("{result_reg} = {op} {result_type} {lhs}, {rhs}"),
             )?;
 
-            let result_ptr = cg_alloc(cg, &bb, &result_typename);
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
-
-            (result_ptr, bb)
+            (result_reg, bb)
         }
+
         TypedExprKind::Logical(op, lhs, rhs) => {
-            let (lhs_ptr, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
-            let (rhs_ptr, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
+            let (lhs, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
+            let (rhs, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
 
-            let result_typename = get_llvm_typename(expr.0.clone());
-
-            let lhs_reg = cg_load(cg, &bb, &result_typename, &lhs_ptr)?;
-            let rhs_reg = cg_load(cg, &bb, &result_typename, &rhs_ptr)?;
+            let result_type = get_llvm_typename(expr.0.clone());
 
             // "and/or i1" works for bools
             let op = match op {
@@ -318,117 +311,79 @@ pub fn cg_expr(
 
             bb.add_instruction(
                 cg,
-                &format!("{result_reg} = {op} {result_typename} {lhs_reg}, {rhs_reg}"),
+                &format!("{result_reg} = {op} {result_type} {lhs}, {rhs}"),
             )?;
 
-            let result_ptr = cg_alloc(cg, &bb, &result_typename);
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
-
-            (result_ptr, bb)
+            (result_reg, bb)
         }
 
         TypedExprKind::UnaryBitwiseNot(x) => {
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
+            let (x, bb) = cg_expr(module, cg, bb, scope, *x)?;
 
-            let result_typename = get_llvm_typename(expr.0.clone());
-
-            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr)?;
+            let result_type = get_llvm_typename(expr.0.clone());
 
             let result_reg = cg.new_reg();
 
-            bb.add_instruction(
-                cg,
-                &format!("{result_reg} = xor {result_typename} {x_reg}, -1"),
-            )?;
+            bb.add_instruction(cg, &format!("{result_reg} = xor {result_type} {x}, -1"))?;
 
-            let result_ptr = cg_alloc(cg, &bb, &result_typename);
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
-
-            (result_ptr, bb)
+            (result_reg, bb)
         }
 
         TypedExprKind::UnaryNot(x) => {
             // x is bool
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
+            let (x, bb) = cg_expr(module, cg, bb, scope, *x)?;
 
-            let result_typename = get_llvm_typename(expr.0.clone());
-
-            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr)?;
+            let result_type = get_llvm_typename(expr.0.clone());
 
             let result_reg = cg.new_reg();
 
-            bb.add_instruction(
-                cg,
-                &format!("{result_reg} = xor {result_typename} {x_reg}, 1"),
-            )?;
+            bb.add_instruction(cg, &format!("{result_reg} = xor {result_type} {x}, 1"))?;
 
-            let result_ptr = cg_alloc(cg, &bb, &result_typename);
-
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
-
-            (result_ptr, bb)
+            (result_reg, bb)
         }
 
         TypedExprKind::UnaryMinus(x) => {
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x)?;
+            let (x, bb) = cg_expr(module, cg, bb, scope, *x)?;
 
-            let result_typename = get_llvm_typename(expr.0.clone());
-
-            let x_reg = cg_load(cg, &bb, &result_typename, &x_ptr)?;
+            let result_type = get_llvm_typename(expr.0.clone());
 
             let result_reg = cg.new_reg();
 
-            bb.add_instruction(
-                cg,
-                &format!("{result_reg} = sub {result_typename} 0, {x_reg}"),
-            )?;
+            bb.add_instruction(cg, &format!("{result_reg} = sub {result_type} 0, {x}"))?;
 
-            let result_ptr = cg_alloc(cg, &bb, &result_typename);
-
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
-
-            (result_ptr, bb)
+            (result_reg, bb)
         }
 
         TypedExprKind::UnaryAddressOf(x) => {
-            let (x_ptr, bb) = cg_place(module, cg, bb, scope, *x)?;
+            let (x, bb) = cg_place(module, cg, bb, scope, *x)?;
 
-            let result_typename = get_llvm_typename(expr.0.clone());
-
-            let result_ptr = cg_alloc(cg, &bb, &result_typename);
-
-            cg_store(cg, &bb, &result_typename, &result_ptr, &x_ptr)?;
-
-            (result_ptr, bb)
+            (x, bb)
         }
 
         TypedExprKind::UnaryDereference(x) => {
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
+            let (x, bb) = cg_expr(module, cg, bb, scope, *x)?;
 
-            let result_typename = get_llvm_typename(expr.0.clone());
+            let result_type = get_llvm_typename(expr.0.clone());
 
-            let x_reg = cg_load(cg, &bb, &get_llvm_typename(x.0), &x_ptr)?;
+            let result_reg = cg.new_reg();
 
-            let result_reg = cg_load(cg, &bb, &result_typename, &x_reg)?;
+            bb.add_instruction(cg, &format!("{result_reg} = load {result_type}, {x}"))?;
 
-            let result_ptr = cg_alloc(cg, &bb, &result_typename);
-
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
-
-            (result_ptr, bb)
+            (result_reg, bb)
         }
 
         TypedExprKind::Assignment(place, value) => {
-            let (place_ptr, bb) = cg_place(module, cg, bb, scope, *place)?;
-            let (value_ptr, bb) = cg_expr(module, cg, &bb, scope, *value.clone())?;
+            let (new_value, bb) = cg_expr(module, cg, bb, scope, *value.clone())?;
+            let (ptr, bb) = cg_place(module, cg, &bb, scope, *place)?;
 
-            let value_typename = get_llvm_typename(value.0.clone());
+            let value_type = get_llvm_typename((value).clone().0);
 
-            let value_reg = cg_load(cg, &bb, &value_typename, &value_ptr)?;
+            bb.add_instruction(
+                cg,
+                &format!("store {} {}, ptr {}", value_type, new_value, ptr),
+            )?;
 
-            cg_store(cg, &bb, &value_typename, &place_ptr, &value_reg)?;
-
-            (place_ptr, bb)
+            (new_value, bb)
         }
 
         TypedExprKind::Identifier(id) => {
@@ -436,20 +391,18 @@ pub fn cg_expr(
                 .get(id)
                 .with_context(|| format!("Identifier {} not found in scope", id))?
                 .clone();
-            (reg, bb.clone())
+
+            let value = cg_load(cg, bb, &get_llvm_typename(expr.0), &reg)?;
+
+            (value, *bb)
         }
 
         TypedExprKind::Index(x, index) => {
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
-            let (index_ptr, bb) = cg_expr(module, cg, &bb, scope, *index.clone())?;
-
-            let x_typename = get_llvm_typename(x.clone().0);
-
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
+            let (ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
 
             let index_typename = get_llvm_typename(index.0.clone());
 
-            let index_reg = cg_load(cg, &bb, &index_typename, &index_ptr)?;
+            let (index_reg, bb) = cg_expr(module, cg, &bb, scope, *index)?;
 
             let result_typename = match x.0 {
                 zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
@@ -463,29 +416,17 @@ pub fn cg_expr(
                 cg,
                 &format!(
                     "{} = getelementptr {}, {} {}, {} {}",
-                    result_reg, result_typename, x_typename, x_reg, index_typename, index_reg
+                    result_reg, result_typename, result_typename, ptr, index_typename, index_reg
                 ),
             )?;
 
-            (result_reg, bb)
+            let value = cg_load(cg, &bb, &result_typename, &result_reg)?;
+
+            (value, bb)
         }
 
         TypedExprKind::Dot(x, prop) => {
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
-
-            let x_typename = get_llvm_typename(x.0.clone());
-
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
-
-            let result_typename = match x.0.clone() {
-                zrc_typeck::tast::ty::Type::Struct(entries) => get_llvm_typename(
-                    entries
-                        .get(&prop)
-                        .with_context(|| format!("Struct {} has no field {}", x.0.clone(), prop))?
-                        .clone(),
-                ),
-                _ => unreachable!(), // per typeck, this is always a struct
-            };
+            let (ptr, bb) = cg_place(module, cg, bb, scope, *x.clone())?;
 
             let result_reg = cg.new_reg();
 
@@ -505,54 +446,69 @@ pub fn cg_expr(
             bb.add_instruction(
                 cg,
                 &format!(
-                    "{} = getelementptr {}, {} {}, i32 0, i32 {}",
-                    result_reg, result_typename, x_typename, x_reg, key_idx
+                    "{} = getelementptr {}, ptr {}, i32 0, i32 {}",
+                    result_reg,
+                    get_llvm_typename(x.0.clone()),
+                    // x_typename,
+                    ptr,
+                    key_idx
                 ),
             )?;
 
-            (result_reg, bb)
+            let value = cg_load(cg, &bb, &get_llvm_typename(expr.0), &result_reg)?;
+
+            (value, bb)
         }
 
         TypedExprKind::Call(f, args) => {
-            let (f_ptr, bb) = cg_expr(module, cg, bb, scope, *f)?;
+            let old_f = f.clone();
+            let (f, bb) = cg_place(module, cg, bb, scope, *f)?;
+
+            let mut bb = bb;
+            let old_args = args;
+            let mut args = vec![];
+            for arg in old_args {
+                let (new_arg, new_bb) = cg_expr(module, cg, &bb, scope, arg.clone())?;
+                bb = new_bb;
+                args.push((new_arg, arg.0));
+            }
 
             let args = args
                 .into_iter()
-                .map(|arg| {
-                    let (arg_ptr, bb) = cg_expr(module, cg, &bb, scope, arg.clone())?;
-                    let arg_typename = get_llvm_typename(arg.0);
-                    let arg_reg = cg_load(cg, &bb, &arg_typename, &arg_ptr)?;
-                    Ok(format!("{arg_typename} {arg_reg}"))
-                })
-                .collect::<anyhow::Result<Vec<_>>>()?;
+                .map(|arg| format!("{} {}", get_llvm_typename(arg.1), arg.0))
+                .collect::<Vec<_>>()
+                .join(", ");
 
-            let args = args.join(", ");
+            if expr.0 == zrc_typeck::tast::ty::Type::Void {
+                bb.add_instruction(
+                    cg,
+                    &format!(
+                        "call {} {}({})",
+                        get_llvm_typename(old_f.0)
+                            .strip_suffix('*')
+                            .expect("fp type didn't end in *, could not trim it"),
+                        f,
+                        args
+                    ),
+                )?;
 
-            let result_typename = get_llvm_typename(expr.0.clone());
-
-            if result_typename == "void" {
-                bb.add_instruction(cg, &format!("call {result_typename} {f_ptr}({args})"))?;
-
-                let undef = cg_alloc(cg, &bb, "i8");
-
-                // store the undefined value here as `void` results should never be loaded but
-                // our code generator expects a loadable value
-                cg_store(cg, &bb, "i8", &undef, "undef")?;
-
-                (undef, bb)
+                ("undef".to_string(), bb)
             } else {
                 let result_reg = cg.new_reg();
 
                 bb.add_instruction(
                     cg,
-                    &format!("{result_reg} = call {result_typename} {f_ptr}({args})"),
+                    &format!(
+                        "{} = call {} {}({})",
+                        result_reg,
+                        get_llvm_typename(old_f.0)
+                            .strip_suffix('*')
+                            .expect("fp type didn't end in *, could not trim it"),
+                        f,
+                        args
+                    ),
                 )?;
-
-                let result_ptr = cg_alloc(cg, &bb, &result_typename);
-
-                cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
-
-                (result_ptr, bb)
+                (result_reg, bb)
             }
         }
 
@@ -606,27 +562,25 @@ pub fn cg_expr(
                 (Fn(_, _), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
                 _ => bail!("invalid cast from {} to {}", x.0, t),
             };
+            let old_x = x.clone();
 
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
-
-            let x_typename = get_llvm_typename(x.0.clone());
-
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
-
-            let result_typename = get_llvm_typename(expr.0.clone());
+            let (x, bb) = cg_expr(module, cg, bb, scope, *x)?;
 
             let result_reg = cg.new_reg();
 
             bb.add_instruction(
                 cg,
-                &format!("{result_reg} = {cast_opcode} {x_typename} {x_reg} to {result_typename}"),
+                &format!(
+                    "{} = {} {} {} to {}",
+                    result_reg,
+                    cast_opcode,
+                    get_llvm_typename(old_x.0),
+                    x,
+                    get_llvm_typename(t),
+                ),
             )?;
 
-            let result_ptr = cg_alloc(cg, &bb, &result_typename);
-
-            cg_store(cg, &bb, &result_typename, &result_ptr, &result_reg)?;
-
-            (result_ptr, bb)
+            (result_reg, bb)
         }
 
         TypedExprKind::StringLiteral(s) => {
@@ -637,11 +591,7 @@ pub fn cg_expr(
                 &s[1..s.len() - 1]
             ));
 
-            let result_reg = cg_alloc(cg, bb, "ptr"); // u8*
-
-            cg_store(cg, bb, "ptr", &result_reg, &format!("@.str{id}"))?;
-
-            (result_reg, bb.clone())
+            (format!("@.str{id}"), *bb)
         }
     })
 }

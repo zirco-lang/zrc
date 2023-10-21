@@ -176,7 +176,7 @@ impl BasicBlockData {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub struct BasicBlock {
     id: usize,
 }

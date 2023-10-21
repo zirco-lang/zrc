@@ -47,10 +47,7 @@ fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, zrc_diagnostics::
         TypedExprKind::UnaryDereference(x) => Place(expr.0, PlaceKind::Deref(x)),
         TypedExprKind::Identifier(x) => Place(expr.0, PlaceKind::Variable(x)),
         TypedExprKind::Index(x, y) => Place(expr.0, PlaceKind::Index(x, y)),
-        TypedExprKind::Dot(x, y) => Place(
-            expr.0,
-            PlaceKind::Dot(Box::new(expr_to_place(span, *x)?), y),
-        ),
+        TypedExprKind::Dot(x, y) => Place(expr.0, PlaceKind::Dot(x, y)),
         _ => {
             return Err(zrc_diagnostics::Diagnostic(
                 zrc_diagnostics::Severity::Error,
@@ -189,11 +186,17 @@ pub fn type_expr<'input>(
         }
 
         ExprKind::Dot(obj, key) => {
-            let obj_t = type_expr(scope, *obj)?;
+            let obj_t = type_expr(scope, *obj.clone())?;
 
             if let TastType::Struct(fields) = obj_t.0.clone() {
                 if let Some(t) = fields.get(key.value()) {
-                    TypedExpr(t.clone(), TypedExprKind::Dot(Box::new(obj_t), key.value()))
+                    TypedExpr(
+                        t.clone(),
+                        TypedExprKind::Dot(
+                            Box::new(expr_to_place(obj.0.span(), obj_t)?),
+                            key.value(),
+                        ),
+                    )
                 } else {
                     return Err(Diagnostic(
                         Severity::Error,
@@ -238,7 +241,7 @@ pub fn type_expr<'input>(
             }
         }
         ExprKind::Call(f, args) => {
-            let ft = type_expr(scope, *f)?;
+            let ft = type_expr(scope, *f.clone())?;
             let args_t = args
                 .value()
                 .iter()
@@ -274,7 +277,7 @@ pub fn type_expr<'input>(
 
                     TypedExpr(
                         ret_type.into_option().unwrap_or(TastType::Void),
-                        TypedExprKind::Call(Box::new(ft), args_t),
+                        TypedExprKind::Call(Box::new(expr_to_place((*f).0.span(), ft)?), args_t),
                     )
                 }
                 TastType::Fn(ArgumentDeclarationList::Variadic(beginning_arg_types), ret_type) => {
@@ -308,7 +311,7 @@ pub fn type_expr<'input>(
                     // the rest may be any, so we don't need to check them
                     TypedExpr(
                         ret_type.into_option().unwrap_or(TastType::Void),
-                        TypedExprKind::Call(Box::new(ft), args_t),
+                        TypedExprKind::Call(Box::new(expr_to_place((*f).0.span(), ft)?), args_t),
                     )
                 }
                 _ => {
