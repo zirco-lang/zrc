@@ -34,8 +34,11 @@
     clippy::unimplemented,
     clippy::unneeded_field_pattern,
     clippy::wildcard_enum_match_arm,
-    clippy::print_stderr, // These should be enabled in any user-facing code but forbidden in things like the parser
-    clippy::print_stdout  // Ditto
+
+    // These should be enabled in any non-user-facing code, like the parser, but not in the
+    // frontend.
+    clippy::print_stderr,
+    clippy::print_stdout
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
