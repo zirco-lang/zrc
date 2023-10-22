@@ -53,11 +53,14 @@ lalrpop_mod!(
     /// [`parser`].** There is almost *no* reason you would need this module
     /// instead, unless you need to handle the underlying errors manually,
     /// which I doubt.
-    #[allow(clippy::all)]
-    #[allow(clippy::nursery)]
-    #[allow(clippy::pedantic)]
-    #[allow(missing_docs)]
-    #[allow(clippy::missing_docs_in_private_items)]
+    #[allow(
+        clippy::all,
+        clippy::nursery,
+        clippy::pedantic,
+        missing_docs,
+        clippy::missing_docs_in_private_items,
+        clippy::restriction
+    )]
     internal_parser
 );
 

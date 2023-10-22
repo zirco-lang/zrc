@@ -45,11 +45,14 @@ use anyhow::bail;
 use clap::Parser;
 
 #[doc(hidden)]
-#[allow(clippy::all)]
-#[allow(clippy::nursery)]
-#[allow(clippy::pedantic)]
-#[allow(missing_docs)]
-#[allow(clippy::missing_docs_in_private_items)]
+#[allow(
+    clippy::all,
+    clippy::nursery,
+    clippy::pedantic,
+    missing_docs,
+    clippy::missing_docs_in_private_items,
+    clippy::restriction
+)]
 pub mod build {
     include!(concat!(env!("OUT_DIR"), "/shadow.rs"));
 }
