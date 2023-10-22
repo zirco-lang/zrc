@@ -30,11 +30,11 @@ impl<'input> Display for TypeKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Identifier(i) => write!(f, "{i}"),
-            Self::Ptr(t) => write!(f, "*{t}"),
+            Self::Ptr(pointee_ty) => write!(f, "*{pointee_ty}"),
             Self::Struct(members) => {
                 write!(f, "struct {{ ")?;
-                for (i, m) in members.value().iter().enumerate() {
-                    write!(f, "{}: {}", m.value().0.value(), m.value().1)?;
+                for (i, member) in members.value().iter().enumerate() {
+                    write!(f, "{}: {}", member.value().0.value(), member.value().1)?;
                     if i < members.value().len() - 1 {
                         write!(f, ", ")?;
                     }
