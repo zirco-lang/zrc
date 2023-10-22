@@ -8,12 +8,12 @@ use zrc_typeck::tast::{
     },
     ty::Type,
 };
-use zrc_typeck::typeck::{BlockReturnAbility, BlockReturnActuality, BlockReturnType};
+use zrc_typeck::typeck::BlockReturnType;
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
 /// instructions. It is passed to [`cg_block`] to allow it to properly handle
 /// break and continue.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct LoopBreakaway {
     /// Points to the exit basic block.
     on_break: BasicBlock,
@@ -38,7 +38,7 @@ pub fn cg_let_declaration<'input>(
 
     for let_declaration in declarations {
         // allocate space for it
-        let ptr = cg_alloc(cg, &bb, &get_llvm_typename(let_declaration.ty.clone()));
+        let ptr = cg_alloc(cg, bb, &get_llvm_typename(let_declaration.ty.clone()));
 
         // store it in scope
         scope.insert(let_declaration.name, ptr);
@@ -73,7 +73,7 @@ pub fn cg_let_declaration<'input>(
 ///
 /// # Errors
 /// Errors if an internal code generation error occurred. This is always a bug.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::needless_pass_by_value)]
 pub fn cg_block(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
@@ -320,6 +320,8 @@ pub fn cg_block(
     )
 }
 
+/// # Errors
+/// Errors on internal code generation failure.
 pub fn cg_program(program: Vec<TypedDeclaration>) -> anyhow::Result<String> {
     let mut module = ModuleCg::new();
     let mut global_scope = CgScope::new();
@@ -341,10 +343,7 @@ pub fn cg_program(program: Vec<TypedDeclaration>) -> anyhow::Result<String> {
 
                 let (mut cg, bb, fn_scope) = FunctionCg::new(
                     format!("@{name}"),
-                    match return_type {
-                        Some(x) => BlockReturnType::Return(x),
-                        None => BlockReturnType::Void,
-                    },
+                    return_type.map_or_else(|| BlockReturnType::Void, BlockReturnType::Return),
                     {
                         let ArgumentDeclarationList::NonVariadic(params) =
                             parameters

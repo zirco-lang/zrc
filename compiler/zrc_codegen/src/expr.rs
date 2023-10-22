@@ -32,7 +32,7 @@ pub fn cg_place(
         PlaceKind::Deref(x) => {
             let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
 
-            let x_reg = cg_load(cg, &bb, &get_llvm_typename(x.0), &x_ptr)?;
+            let x_reg = cg_load(cg, bb, &get_llvm_typename(x.0), &x_ptr)?;
 
             (x_reg, bb)
         }
@@ -42,11 +42,11 @@ pub fn cg_place(
 
             let x_typename = get_llvm_typename(x.clone().0);
 
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
+            let x_reg = cg_load(cg, bb, &x_typename, &x_ptr)?;
 
             let index_typename = get_llvm_typename(index.0.clone());
 
-            let index_reg = cg_load(cg, &bb, &index_typename, &index_ptr)?;
+            let index_reg = cg_load(cg, bb, &index_typename, &index_ptr)?;
 
             #[allow(clippy::wildcard_enum_match_arm)]
             let result_typename = match x.0 {
@@ -111,7 +111,7 @@ pub fn cg_place(
 ///
 /// # Errors
 /// Errors on an internal code generation error.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::module_name_repetitions)]
 pub fn cg_expr(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
@@ -274,10 +274,10 @@ pub fn cg_expr(
                 Arithmetic::Addition => "add",
                 Arithmetic::Division if expr.0.is_signed_integer() => "sdiv",
                 Arithmetic::Division if expr.0.is_unsigned_integer() => "udiv",
-                Arithmetic::Division => unreachable!(),
                 Arithmetic::Modulo if expr.0.is_signed_integer() => "srem",
                 Arithmetic::Modulo if expr.0.is_unsigned_integer() => "urem",
-                Arithmetic::Modulo => unreachable!(),
+                // should always match one of the above
+                Arithmetic::Modulo | Arithmetic::Division => unreachable!(),
                 Arithmetic::Multiplication => "mul",
                 Arithmetic::Subtraction => "sub",
             };
@@ -375,10 +375,7 @@ pub fn cg_expr(
 
             let value_type = get_llvm_typename((value).clone().0);
 
-            bb.add_instruction(
-                cg,
-                &format!("store {} {}, ptr {}", value_type, new_value, ptr),
-            )?;
+            bb.add_instruction(cg, &format!("store {value_type} {new_value}, ptr {ptr}"))?;
 
             (new_value, bb)
         }
@@ -389,7 +386,7 @@ pub fn cg_expr(
                 .with_context(|| format!("Identifier {} not found in scope", id))?
                 .clone();
 
-            let value = cg_load(cg, bb, &get_llvm_typename(expr.0), &reg)?;
+            let value = cg_load(cg, *bb, &get_llvm_typename(expr.0), &reg)?;
 
             (value, *bb)
         }
@@ -401,6 +398,7 @@ pub fn cg_expr(
 
             let (index_reg, bb) = cg_expr(module, cg, &bb, scope, *index)?;
 
+            #[allow(clippy::wildcard_enum_match_arm)]
             let result_typename = match x.0 {
                 Type::Ptr(x) => get_llvm_typename(*x),
                 _ => unreachable!(), // per typeck, this is always a pointer
@@ -417,7 +415,7 @@ pub fn cg_expr(
                 ),
             )?;
 
-            let value = cg_load(cg, &bb, &result_typename, &result_reg)?;
+            let value = cg_load(cg, bb, &result_typename, &result_reg)?;
 
             (value, bb)
         }
@@ -427,6 +425,7 @@ pub fn cg_expr(
 
             let result_reg = cg.new_reg();
 
+            #[allow(clippy::wildcard_enum_match_arm)]
             let key_idx = match x.0.clone() {
                 Type::Struct(entries) => {
                     entries
@@ -452,7 +451,7 @@ pub fn cg_expr(
                 ),
             )?;
 
-            let value = cg_load(cg, &bb, &get_llvm_typename(expr.0), &result_reg)?;
+            let value = cg_load(cg, bb, &get_llvm_typename(expr.0), &result_reg)?;
 
             (value, bb)
         }
@@ -509,11 +508,11 @@ pub fn cg_expr(
             }
         }
 
-        TypedExprKind::Cast(x, t) => {
+        TypedExprKind::Cast(x, ty) => {
             use zrc_typeck::tast::ty::Type::*;
 
             // The legendary Cast Table. Contains the cast opcode used for T -> U
-            let cast_opcode = match (x.0.clone(), t.clone()) {
+            let cast_opcode = match (x.0.clone(), ty.clone()) {
                 (x, y) if x == y => "bitcast",
                 // signed -> signed = sext
                 // signed -> unsigned = sext
@@ -558,7 +557,7 @@ pub fn cg_expr(
                 (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Ptr(_)) => "inttoptr",
                 (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Fn(_, _)) => "inttoptr",
                 (Fn(_, _), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
-                _ => bail!("invalid cast from {} to {}", x.0, t),
+                _ => bail!("invalid cast from {} to {}", x.0, ty),
             };
             let old_x = x.clone();
 
@@ -574,7 +573,7 @@ pub fn cg_expr(
                     cast_opcode,
                     get_llvm_typename(old_x.0),
                     x,
-                    get_llvm_typename(t),
+                    get_llvm_typename(ty),
                 ),
             )?;
 

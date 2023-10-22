@@ -50,7 +50,7 @@ use std::{collections::HashMap, fmt::Display};
 use anyhow::Context as _;
 pub use expr::cg_expr;
 pub use stmt::{cg_block, cg_program};
-use zrc_typeck::tast::ty::Type;
+use zrc_typeck::tast::{stmt::ArgumentDeclarationList, ty::Type};
 
 #[derive(PartialEq, Debug, Clone)]
 struct Counter {
@@ -137,12 +137,12 @@ impl<'input> FunctionCg<'input> {
 
         for (id, parameter) in parameters.into_iter().enumerate() {
             // promote all of the parameters passed by value into allocas
-            let ptr = cg_alloc(&mut cg, &bb, &get_llvm_typename(parameter.1.clone()));
+            let ptr = cg_alloc(&mut cg, bb, &get_llvm_typename(parameter.1.clone()));
 
             // store the parameter into the alloca
             cg_store(
                 &mut cg,
-                &bb,
+                bb,
                 &get_llvm_typename(parameter.1),
                 &ptr,
                 &format!("%p{id}"),
@@ -215,8 +215,8 @@ struct BasicBlockData {
     instructions: Vec<String>,
 }
 impl BasicBlockData {
-    fn new(id: usize) -> Self {
-        BasicBlockData {
+    const fn new(id: usize) -> Self {
+        Self {
             id,
             instructions: Vec::new(),
         }
@@ -251,12 +251,12 @@ fn get_llvm_typename(ty: Type) -> String {
             "{} ({})*",
             get_llvm_typename(ret.into_tast_type()),
             match params {
-                zrc_typeck::tast::stmt::ArgumentDeclarationList::NonVariadic(params) => params
+                ArgumentDeclarationList::NonVariadic(params) => params
                     .into_iter()
                     .map(|x| get_llvm_typename(x.ty))
                     .collect::<Vec<_>>()
                     .join(", "),
-                zrc_typeck::tast::stmt::ArgumentDeclarationList::Variadic(params) => format!(
+                ArgumentDeclarationList::Variadic(params) => format!(
                     "{}, ...",
                     params
                         .into_iter()
@@ -270,7 +270,7 @@ fn get_llvm_typename(ty: Type) -> String {
             "{{ {} }}",
             entries
                 .into_iter()
-                .map(|(_, v)| get_llvm_typename(v))
+                .map(|(_, value)| get_llvm_typename(value))
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
@@ -279,13 +279,13 @@ fn get_llvm_typename(ty: Type) -> String {
 
 /// Allocates a new register and returns it. This also properly handles the
 /// alloca instruction needing to be at the beginning of a basic block.
-fn cg_alloc(cg: &mut FunctionCg, _bb: &BasicBlock, ty: &str) -> String {
+fn cg_alloc(cg: &mut FunctionCg, _bb: BasicBlock, ty: &str) -> String {
     let reg = cg.new_reg();
     cg.allocations.push(format!("{reg} = alloca {ty}"));
     reg
 }
 /// Loads a type `T` from a `T*`
-fn cg_load(cg: &mut FunctionCg, bb: &BasicBlock, ty: &str, ptr: &str) -> anyhow::Result<String> {
+fn cg_load(cg: &mut FunctionCg, bb: BasicBlock, ty: &str, ptr: &str) -> anyhow::Result<String> {
     let reg = cg.new_reg();
     bb.add_instruction(cg, &format!("{reg} = load {ty}, ptr {ptr}"))?;
     Ok(reg)
@@ -293,7 +293,7 @@ fn cg_load(cg: &mut FunctionCg, bb: &BasicBlock, ty: &str, ptr: &str) -> anyhow:
 /// Stores a type `T` to a `T*`
 fn cg_store(
     cg: &mut FunctionCg,
-    bb: &BasicBlock,
+    bb: BasicBlock,
     ty: &str,
     ptr: &str,
     value: &str,
@@ -302,7 +302,7 @@ fn cg_store(
     Ok(())
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct CgScope<'input> {
     /// Maps identifiers to their LLVM register
     identifiers: HashMap<&'input str, String>,
@@ -315,6 +315,7 @@ impl<'input> CgScope<'input> {
         }
     }
 
+    #[must_use]
     pub fn get(&self, ident: &str) -> Option<&String> {
         self.identifiers.get(ident)
     }
