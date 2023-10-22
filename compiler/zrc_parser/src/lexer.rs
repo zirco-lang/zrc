@@ -395,7 +395,7 @@ impl<'input> Display for Tok<'input> {
                 Self::SmallArrow => "->".to_string(),
                 Self::Star => "*".to_string(),
                 Self::StarAssign => "*=".to_string(),
-                Self::StringLiteral(s) => (*s).to_string(),
+                Self::StringLiteral(str) => (*str).to_string(),
                 Self::Struct => "struct".to_string(),
                 Self::True => "true".to_string(),
                 Self::While => "while".to_string(),

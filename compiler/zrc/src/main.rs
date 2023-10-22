@@ -10,7 +10,6 @@
     clippy::as_conversions,
     clippy::dbg_macro,
     clippy::decimal_literal_representation,
-    clippy::default_numeric_fallback,
     clippy::deref_by_slicing,
     clippy::disallowed_script_idents,
     clippy::else_if_without_else,
@@ -23,7 +22,6 @@
     clippy::multiple_inherent_impl,
     clippy::multiple_unsafe_ops_per_block,
     clippy::non_ascii_literal,
-    clippy::pattern_type_mismatch,
     clippy::redundant_type_annotations,
     clippy::rest_pat_in_fully_bound_structs,
     clippy::same_name_method,
@@ -149,7 +147,7 @@ enum OutputFormat {
 }
 impl Display for OutputFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
+        match *self {
             Self::Llvm => write!(f, "llvm"),
             Self::AstDebug => write!(f, "ast-debug"),
             Self::AstDebugPretty => write!(f, "ast-debug-pretty"),
@@ -252,7 +250,7 @@ fn main() -> anyhow::Result<()> {
 
 /// Drive the compilation process.
 fn compile(emit: &OutputFormat, content: &str) -> Result<String, zrc_diagnostics::Diagnostic> {
-    match emit {
+    match *emit {
         OutputFormat::Llvm => Ok(zrc_codegen::cg_program(zrc_typeck::typeck::type_program(
             zrc_parser::parser::parse_program(content)?,
         )?)

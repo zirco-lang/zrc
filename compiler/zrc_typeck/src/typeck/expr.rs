@@ -1,7 +1,7 @@
 //! for expressions
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
-use zrc_parser::ast::expr::{Assignment, Expr, ExprKind};
+use zrc_parser::ast::expr::{Assignment, BinaryBitwise, Expr, ExprKind};
 use zrc_utils::span::{Span, Spanned};
 
 use super::Scope;
@@ -43,6 +43,7 @@ fn desugar_assignment<'input>(
 
 /// Validate an expr into a place
 fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, zrc_diagnostics::Diagnostic> {
+    #[allow(clippy::wildcard_enum_match_arm)]
     Ok(match expr.1 {
         TypedExprKind::UnaryDereference(x) => Place(expr.0, PlaceKind::Deref(x)),
         TypedExprKind::Identifier(x) => Place(expr.0, PlaceKind::Variable(x)),
@@ -72,9 +73,9 @@ pub fn type_expr<'input>(
 ) -> Result<TypedExpr<'input>, zrc_diagnostics::Diagnostic> {
     let expr_span = expr.0.span();
     Ok(match expr.0.into_value() {
-        ExprKind::Comma(a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
+        ExprKind::Comma(lhs, rhs) => {
+            let at = type_expr(scope, *lhs)?;
+            let bt = type_expr(scope, *rhs)?;
             TypedExpr(
                 bt.clone().0,
                 TypedExprKind::Comma(Box::new(at), Box::new(bt)),
@@ -104,55 +105,60 @@ pub fn type_expr<'input>(
         }
 
         ExprKind::UnaryNot(x) => {
-            let t = type_expr(scope, *x)?;
-            if t.0 != TastType::Bool {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::UnaryNotExpectedBoolean(t.0.to_string())),
-                ));
-            }
-            TypedExpr(t.0.clone(), TypedExprKind::UnaryNot(Box::new(t)))
-        }
-        ExprKind::UnaryBitwiseNot(x) => {
-            let t = type_expr(scope, *x)?;
-            if !t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::UnaryBitwiseNotExpectedInteger(
-                        t.0.to_string(),
-                    )),
-                ));
-            }
-            TypedExpr(t.0.clone(), TypedExprKind::UnaryBitwiseNot(Box::new(t)))
-        }
-        ExprKind::UnaryMinus(x) => {
-            let t = type_expr(scope, *x)?;
-            if !t.0.is_signed_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::UnaryMinusExpectedSignedInteger(
-                        t.0.to_string(),
-                    )),
-                ));
-            }
-            TypedExpr(t.0.clone(), TypedExprKind::UnaryMinus(Box::new(t)))
-        }
-        ExprKind::UnaryAddressOf(x) => {
-            let t = type_expr(scope, *x)?;
-            TypedExpr(
-                TastType::Ptr(Box::new(t.0.clone())),
-                TypedExprKind::UnaryAddressOf(Box::new(expr_to_place(expr_span, t)?)),
-            )
-        }
-        ExprKind::UnaryDereference(x) => {
-            let t = type_expr(scope, *x)?;
-            if let TastType::Ptr(tt) = t.clone().0 {
-                TypedExpr(*tt, TypedExprKind::UnaryDereference(Box::new(t)))
-            } else {
+            let x_ty = type_expr(scope, *x)?;
+            if x_ty.0 != TastType::Bool {
                 return Err(Diagnostic(
                     Severity::Error,
                     expr_span
-                        .containing(DiagnosticKind::CannotDereferenceNonPointer(t.0.to_string())),
+                        .containing(DiagnosticKind::UnaryNotExpectedBoolean(x_ty.0.to_string())),
+                ));
+            }
+            TypedExpr(x_ty.0.clone(), TypedExprKind::UnaryNot(Box::new(x_ty)))
+        }
+        ExprKind::UnaryBitwiseNot(x) => {
+            let x_ty = type_expr(scope, *x)?;
+            if !x_ty.0.is_integer() {
+                return Err(Diagnostic(
+                    Severity::Error,
+                    expr_span.containing(DiagnosticKind::UnaryBitwiseNotExpectedInteger(
+                        x_ty.0.to_string(),
+                    )),
+                ));
+            }
+            TypedExpr(
+                x_ty.0.clone(),
+                TypedExprKind::UnaryBitwiseNot(Box::new(x_ty)),
+            )
+        }
+        ExprKind::UnaryMinus(x) => {
+            let x_ty = type_expr(scope, *x)?;
+            if !x_ty.0.is_signed_integer() {
+                return Err(Diagnostic(
+                    Severity::Error,
+                    expr_span.containing(DiagnosticKind::UnaryMinusExpectedSignedInteger(
+                        x_ty.0.to_string(),
+                    )),
+                ));
+            }
+            TypedExpr(x_ty.0.clone(), TypedExprKind::UnaryMinus(Box::new(x_ty)))
+        }
+        ExprKind::UnaryAddressOf(x) => {
+            let x_ty = type_expr(scope, *x)?;
+            TypedExpr(
+                TastType::Ptr(Box::new(x_ty.0.clone())),
+                TypedExprKind::UnaryAddressOf(Box::new(expr_to_place(expr_span, x_ty)?)),
+            )
+        }
+        ExprKind::UnaryDereference(x) => {
+            let x_ty = type_expr(scope, *x)?;
+            if let TastType::Ptr(tt) = x_ty.clone().0 {
+                TypedExpr(*tt, TypedExprKind::UnaryDereference(Box::new(x_ty)))
+            } else {
+                return Err(Diagnostic(
+                    Severity::Error,
+                    expr_span.containing(DiagnosticKind::CannotDereferenceNonPointer(
+                        x_ty.0.to_string(),
+                    )),
                 ));
             }
         }
@@ -170,9 +176,9 @@ pub fn type_expr<'input>(
                 ));
             }
 
-            if let TastType::Ptr(t) = ptr_t.0.clone() {
+            if let TastType::Ptr(points_to_ty) = ptr_t.0.clone() {
                 TypedExpr(
-                    *t,
+                    *points_to_ty,
                     TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_t)),
                 )
             } else {
@@ -189,9 +195,9 @@ pub fn type_expr<'input>(
             let obj_t = type_expr(scope, *obj.clone())?;
 
             if let TastType::Struct(fields) = obj_t.0.clone() {
-                if let Some(t) = fields.get(key.value()) {
+                if let Some(ty) = fields.get(key.value()) {
                     TypedExpr(
-                        t.clone(),
+                        ty.clone(),
                         TypedExprKind::Dot(
                             Box::new(expr_to_place(obj.0.span(), obj_t)?),
                             key.value(),
@@ -248,6 +254,7 @@ pub fn type_expr<'input>(
                 .map(|x| type_expr(scope, x.clone()))
                 .collect::<Result<Vec<TypedExpr>, Diagnostic>>()?;
 
+            #[allow(clippy::wildcard_enum_match_arm)]
             match ft.0.clone() {
                 TastType::Fn(ArgumentDeclarationList::NonVariadic(arg_types), ret_type) => {
                     if arg_types.len() != args_t.len() {
@@ -355,245 +362,260 @@ pub fn type_expr<'input>(
             )
         }
 
-        ExprKind::Logical(op, a, b) => {
-            let at = type_expr(scope, *a.clone())?;
-            let bt = type_expr(scope, *b.clone())?;
+        ExprKind::Logical(op, lhs, rhs) => {
+            let lhs_t = type_expr(scope, *lhs.clone())?;
+            let rhs_t = type_expr(scope, *rhs.clone())?;
 
-            if at.0 != TastType::Bool {
+            if lhs_t.0 != TastType::Bool {
                 return Err(Diagnostic(
                     Severity::Error,
-                    a.0.span().containing(DiagnosticKind::ExpectedGot {
+                    lhs.0.span().containing(DiagnosticKind::ExpectedGot {
                         expected: "bool".to_string(),
-                        got: at.0.to_string(),
+                        got: lhs_t.0.to_string(),
                     }),
                 ));
             }
 
-            if bt.0 != TastType::Bool {
+            if rhs_t.0 != TastType::Bool {
                 return Err(Diagnostic(
                     Severity::Error,
-                    b.0.span().containing(DiagnosticKind::ExpectedGot {
+                    rhs.0.span().containing(DiagnosticKind::ExpectedGot {
                         expected: "bool".to_string(),
-                        got: bt.0.to_string(),
+                        got: rhs_t.0.to_string(),
                     }),
                 ));
             }
 
             TypedExpr(
                 TastType::Bool,
-                TypedExprKind::Logical(op, Box::new(at), Box::new(bt)),
+                TypedExprKind::Logical(op, Box::new(lhs_t), Box::new(rhs_t)),
             )
         }
-        ExprKind::Equality(op, a, b) => {
-            let at = type_expr(scope, *a)?;
-            let bt = type_expr(scope, *b)?;
+        ExprKind::Equality(op, lhs, rhs) => {
+            let lhs_t = type_expr(scope, *lhs)?;
+            let rhs_t = type_expr(scope, *rhs)?;
 
-            if at.0.is_integer() && bt.0.is_integer() && at.0 == bt.0 {
+            if lhs_t.0.is_integer() && rhs_t.0.is_integer() && lhs_t.0 == rhs_t.0 {
                 // int == int is valid
-            } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (at.0.clone(), bt.0.clone()) {
+            } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (lhs_t.0.clone(), rhs_t.0.clone())
+            {
                 // *T == *U is valid
-            } else if at.0 == TastType::Bool && bt.0 == TastType::Bool {
+            } else if lhs_t.0 == TastType::Bool && rhs_t.0 == TastType::Bool {
                 // bool == bool is valid
             } else {
                 return Err(Diagnostic(
                     Severity::Error,
                     expr_span.containing(DiagnosticKind::EqualityOperators(
-                        at.0.to_string(),
-                        bt.0.to_string(),
+                        lhs_t.0.to_string(),
+                        rhs_t.0.to_string(),
                     )),
                 ));
             }
 
             TypedExpr(
                 TastType::Bool,
-                TypedExprKind::Equality(op, Box::new(at), Box::new(bt)),
+                TypedExprKind::Equality(op, Box::new(lhs_t), Box::new(rhs_t)),
             )
         }
-        ExprKind::BinaryBitwise(op, a, b) => {
-            let at = type_expr(scope, *a.clone())?;
-            let bt = type_expr(scope, *b.clone())?;
+        ExprKind::BinaryBitwise(op, lhs, rhs) => {
+            let lhs_t = type_expr(scope, *lhs.clone())?;
+            let rhs_t = type_expr(scope, *rhs.clone())?;
 
-            if !at.0.is_integer() {
+            if !lhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    a.0.span().containing(DiagnosticKind::ExpectedGot {
+                    lhs.0.span().containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
-                        got: at.0.to_string(),
+                        got: lhs_t.0.to_string(),
                     }),
                 ));
             }
 
-            if !bt.0.is_integer() {
+            if !rhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    b.0.span().containing(DiagnosticKind::ExpectedGot {
+                    rhs.0.span().containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
-                        got: bt.0.to_string(),
+                        got: rhs_t.0.to_string(),
                     }),
                 ));
             }
 
-            if matches!(
-                op,
-                zrc_parser::ast::expr::BinaryBitwise::Shl
-                    | zrc_parser::ast::expr::BinaryBitwise::Shr
-            ) {
-                if !at.0.is_signed_integer() {
+            #[allow(clippy::else_if_without_else)]
+            if matches!(op, BinaryBitwise::Shl | BinaryBitwise::Shr) {
+                if !lhs_t.0.is_signed_integer() {
                     return Err(Diagnostic(
                         Severity::Error,
-                        a.0.span().containing(DiagnosticKind::ExpectedGot {
+                        lhs.0.span().containing(DiagnosticKind::ExpectedGot {
                             expected: "signed integer".to_string(),
-                            got: at.0.to_string(),
+                            got: lhs_t.0.to_string(),
                         }),
                     ));
                 }
-            } else if at.0 != bt.0 {
+            } else if lhs_t.0 != rhs_t.0 {
                 return Err(Diagnostic(
                     Severity::Error,
                     expr_span.containing(DiagnosticKind::ExpectedSameType(
-                        at.0.to_string(),
-                        bt.0.to_string(),
+                        lhs_t.0.to_string(),
+                        rhs_t.0.to_string(),
                     )),
                 ));
             }
 
             TypedExpr(
-                at.0.clone(),
-                TypedExprKind::BinaryBitwise(op, Box::new(at), Box::new(bt)),
+                lhs_t.0.clone(),
+                TypedExprKind::BinaryBitwise(op, Box::new(lhs_t), Box::new(rhs_t)),
             )
         }
-        ExprKind::Comparison(op, a, b) => {
-            let at = type_expr(scope, *a.clone())?;
-            let bt = type_expr(scope, *b.clone())?;
+        ExprKind::Comparison(op, lhs, rhs) => {
+            let lhs_t = type_expr(scope, *lhs.clone())?;
+            let rhs_t = type_expr(scope, *rhs.clone())?;
 
-            if !at.0.is_integer() {
+            if !lhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    a.0.span().containing(DiagnosticKind::ExpectedGot {
+                    lhs.0.span().containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
-                        got: at.0.to_string(),
+                        got: lhs_t.0.to_string(),
                     }),
                 ));
             }
 
-            if !bt.0.is_integer() {
+            if !rhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    b.0.span().containing(DiagnosticKind::ExpectedGot {
+                    rhs.0.span().containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
-                        got: bt.0.to_string(),
+                        got: rhs_t.0.to_string(),
                     }),
                 ));
             }
 
-            if at.0 != bt.0 {
+            if lhs_t.0 != rhs_t.0 {
                 return Err(Diagnostic(
                     Severity::Error,
                     expr_span.containing(DiagnosticKind::ExpectedSameType(
-                        at.0.to_string(),
-                        bt.0.to_string(),
+                        lhs_t.0.to_string(),
+                        rhs_t.0.to_string(),
                     )),
                 ));
             }
 
             TypedExpr(
                 TastType::Bool,
-                TypedExprKind::Comparison(op, Box::new(at), Box::new(bt)),
+                TypedExprKind::Comparison(op, Box::new(lhs_t), Box::new(rhs_t)),
             )
         }
-        ExprKind::Arithmetic(op, a, b) => {
-            let at = type_expr(scope, *a.clone())?;
-            let bt = type_expr(scope, *b.clone())?;
+        ExprKind::Arithmetic(op, lhs, rhs) => {
+            let lhs_t = type_expr(scope, *lhs.clone())?;
+            let rhs_t = type_expr(scope, *rhs.clone())?;
 
-            if !at.0.is_integer() {
+            if !lhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    a.0.span().containing(DiagnosticKind::ExpectedGot {
+                    lhs.0.span().containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
-                        got: at.0.to_string(),
+                        got: lhs_t.0.to_string(),
                     }),
                 ));
             }
 
-            if !bt.0.is_integer() {
+            if !rhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    b.0.span().containing(DiagnosticKind::ExpectedGot {
+                    rhs.0.span().containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
-                        got: bt.0.to_string(),
+                        got: rhs_t.0.to_string(),
                     }),
                 ));
             }
 
-            if at.0 != bt.0 {
+            if lhs_t.0 != rhs_t.0 {
                 return Err(Diagnostic(
                     Severity::Error,
                     expr_span.containing(DiagnosticKind::ExpectedSameType(
-                        at.0.to_string(),
-                        bt.0.to_string(),
+                        lhs_t.0.to_string(),
+                        rhs_t.0.to_string(),
                     )),
                 ));
             }
 
             TypedExpr(
-                at.0.clone(),
-                TypedExprKind::Arithmetic(op, Box::new(at), Box::new(bt)),
+                lhs_t.0.clone(),
+                TypedExprKind::Arithmetic(op, Box::new(lhs_t), Box::new(rhs_t)),
             )
         }
 
-        ExprKind::Cast(x, t) => {
-            let xt = type_expr(scope, *x)?;
-            let tt = resolve_type(scope, t)?;
+        ExprKind::Cast(x, ty) => {
+            let x_t = type_expr(scope, *x)?;
+            let resolved_ty = resolve_type(scope, ty)?;
 
-            if xt.0.is_integer() && tt.is_integer() {
+            if x_t.0.is_integer() && resolved_ty.is_integer() {
                 // int -> int cast is valid
-                TypedExpr(tt.clone(), TypedExprKind::Cast(Box::new(xt), tt))
-            } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (xt.0.clone(), tt.clone()) {
+                TypedExpr(
+                    resolved_ty.clone(),
+                    TypedExprKind::Cast(Box::new(x_t), resolved_ty),
+                )
+            } else if let (TastType::Ptr(_), TastType::Ptr(_)) =
+                (x_t.0.clone(), resolved_ty.clone())
+            {
                 // *T -> *U cast is valid
-                TypedExpr(tt.clone(), TypedExprKind::Cast(Box::new(xt), tt))
-            } else if let (TastType::Ptr(_), _) | (_, TastType::Ptr(_)) = (xt.0.clone(), tt.clone())
+                TypedExpr(
+                    resolved_ty.clone(),
+                    TypedExprKind::Cast(Box::new(x_t), resolved_ty),
+                )
+            } else if let (TastType::Ptr(_), _) | (_, TastType::Ptr(_)) =
+                (x_t.0.clone(), resolved_ty.clone())
             {
                 // ensure one is an int
-                if xt.0.is_integer() || tt.is_integer() {
+                if x_t.0.is_integer() || resolved_ty.is_integer() {
                     // *T -> int or int -> *T cast is valid
-                    TypedExpr(tt.clone(), TypedExprKind::Cast(Box::new(xt), tt))
+                    TypedExpr(
+                        resolved_ty.clone(),
+                        TypedExprKind::Cast(Box::new(x_t), resolved_ty),
+                    )
                 } else {
                     return Err(Diagnostic(
                         Severity::Error,
                         expr_span.containing(DiagnosticKind::InvalidCast(
-                            xt.0.to_string(),
-                            tt.to_string(),
+                            x_t.0.to_string(),
+                            resolved_ty.to_string(),
                         )),
                     ));
                 }
-            } else if xt.0 == TastType::Bool && tt.is_integer() {
+            } else if x_t.0 == TastType::Bool && resolved_ty.is_integer() {
                 // bool -> int cast is valid
-                TypedExpr(tt.clone(), TypedExprKind::Cast(Box::new(xt), tt))
+                TypedExpr(
+                    resolved_ty.clone(),
+                    TypedExprKind::Cast(Box::new(x_t), resolved_ty),
+                )
             } else {
                 return Err(Diagnostic(
                     Severity::Error,
                     expr_span.containing(DiagnosticKind::InvalidCast(
-                        xt.0.to_string(),
-                        tt.to_string(),
+                        x_t.0.to_string(),
+                        resolved_ty.to_string(),
                     )),
                 ));
             }
         }
 
         ExprKind::NumberLiteral(n) => TypedExpr(TastType::I32, TypedExprKind::NumberLiteral(n)),
-        ExprKind::StringLiteral(s) => TypedExpr(
+        ExprKind::StringLiteral(str) => TypedExpr(
             TastType::Ptr(Box::new(TastType::U8)),
-            TypedExprKind::StringLiteral(s),
+            TypedExprKind::StringLiteral(str),
         ),
         ExprKind::Identifier(i) => {
-            let t = scope.get_value(i).ok_or_else(|| {
+            let ty = scope.get_value(i).ok_or_else(|| {
                 Diagnostic(
                     Severity::Error,
                     expr_span.containing(DiagnosticKind::UnableToResolveIdentifier(i.to_string())),
                 )
             })?;
-            TypedExpr(t.clone(), TypedExprKind::Identifier(i))
+            TypedExpr(ty.clone(), TypedExprKind::Identifier(i))
         }
-        ExprKind::BooleanLiteral(b) => TypedExpr(TastType::Bool, TypedExprKind::BooleanLiteral(b)),
+        ExprKind::BooleanLiteral(value) => {
+            TypedExpr(TastType::Bool, TypedExprKind::BooleanLiteral(value))
+        }
     })
 }

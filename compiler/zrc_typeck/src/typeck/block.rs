@@ -36,7 +36,7 @@ impl<'input> BlockReturnType<'input> {
     pub fn into_option(self) -> Option<TastType<'input>> {
         match self {
             Self::Void => None,
-            Self::Return(t) => Some(t),
+            Self::Return(return_type) => Some(return_type),
         }
     }
 
@@ -46,7 +46,7 @@ impl<'input> BlockReturnType<'input> {
     pub fn into_tast_type(self) -> TastType<'input> {
         match self {
             Self::Void => TastType::Void,
-            Self::Return(t) => t,
+            Self::Return(return_type) => return_type,
         }
     }
 }
@@ -95,6 +95,7 @@ pub enum BlockReturnActuality {
 /// }` without converting `{ x; }` to `{ { x; } }`. This is preferred instead of
 /// `vec![x]` as it prevents extra nesting layers.
 fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
+    #[allow(clippy::wildcard_enum_match_arm)]
     stmt.0.clone().map(|value| match value {
         StmtKind::BlockStmt(stmts) => stmts,
         _ => vec![stmt],
@@ -218,11 +219,7 @@ pub fn process_declaration<'input>(
             parameters,
             body: Some(_),
             ..
-        } if matches!(
-            parameters.value(),
-            zrc_parser::ast::stmt::ArgumentDeclarationList::Variadic(_)
-        ) =>
-        {
+        } if matches!(parameters.value(), ArgumentDeclarationList::Variadic(_)) => {
             return Err(Diagnostic(
                 Severity::Error,
                 parameters.map(|_| DiagnosticKind::VariadicFunctionMustBeExternal),
@@ -247,9 +244,8 @@ pub fn process_declaration<'input>(
                 .transpose()?
                 .map_or(BlockReturnType::Void, BlockReturnType::Return);
 
-            let (zrc_parser::ast::stmt::ArgumentDeclarationList::NonVariadic(inner_params)
-            | zrc_parser::ast::stmt::ArgumentDeclarationList::Variadic(inner_params)) =
-                parameters.value();
+            let (ArgumentDeclarationList::NonVariadic(inner_params)
+            | ArgumentDeclarationList::Variadic(inner_params)) = parameters.value();
 
             let resolved_parameters = inner_params
                 .iter()
@@ -684,12 +680,12 @@ pub fn type_block<'input>(
                             // return; in fn with required return type
                             (
                                 None,
-                                BlockReturnAbility::MayReturn(BlockReturnType::Return(t))
-                                | BlockReturnAbility::MustReturn(BlockReturnType::Return(t)),
+                                BlockReturnAbility::MayReturn(BlockReturnType::Return(return_ty))
+                                | BlockReturnAbility::MustReturn(BlockReturnType::Return(return_ty)),
                             ) => Err(Diagnostic(
                                 Severity::Error,
                                 stmt_span.containing(DiagnosticKind::ExpectedGot {
-                                    expected: t.to_string(),
+                                    expected: return_ty.to_string(),
                                     got: "void".to_string(),
                                 }),
                             )),
@@ -710,10 +706,10 @@ pub fn type_block<'input>(
                             // return x; in fn expecting to return x
                             (
                                 Some(TypedExpr(ty, ex)),
-                                BlockReturnAbility::MustReturn(BlockReturnType::Return(t))
-                                | BlockReturnAbility::MayReturn(BlockReturnType::Return(t)),
+                                BlockReturnAbility::MustReturn(BlockReturnType::Return(return_ty))
+                                | BlockReturnAbility::MayReturn(BlockReturnType::Return(return_ty)),
                             ) => {
-                                if ty == t {
+                                if ty == return_ty {
                                     Ok((
                                         TypedStmt::ReturnStmt(Some(TypedExpr(ty, ex))),
                                         BlockReturnActuality::WillReturn,
@@ -723,7 +719,7 @@ pub fn type_block<'input>(
                                         Severity::Error,
                                         value.clone().unwrap().0.span().containing(
                                             DiagnosticKind::ExpectedGot {
-                                                expected: t.to_string(),
+                                                expected: return_ty.to_string(),
                                                 got: ty.to_string(),
                                             },
                                         ),

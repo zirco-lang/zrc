@@ -91,9 +91,9 @@ fn parser_error_to_diagnostic(
 fn zirco_lexer_span_to_lalrpop_span<'input>(
     spanned: Spanned<Result<lexer::Tok<'input>, lexer::LexicalError<'input>>>,
 ) -> Result<(usize, lexer::Tok<'input>, usize), Spanned<lexer::LexicalError<'input>>> {
-    spanned.transpose().map(|s| {
-        let span = s.span();
-        (span.start(), s.into_value(), span.end())
+    spanned.transpose().map(|spanned_tok| {
+        let span = spanned_tok.span();
+        (span.start(), spanned_tok.into_value(), span.end())
     })
 }
 
