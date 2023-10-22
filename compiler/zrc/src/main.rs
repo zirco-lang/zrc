@@ -34,9 +34,7 @@
     clippy::undocumented_unsafe_blocks,
     clippy::unimplemented,
     clippy::unneeded_field_pattern,
-    clippy::wildcard_enum_match_arm,
-    clippy::print_stderr, // These should be enabled in any user-facing code but forbidden in things like the parser
-    clippy::print_stdout  // Ditto
+    clippy::wildcard_enum_match_arm
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
