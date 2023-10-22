@@ -5,6 +5,7 @@
         "inttoptr",
         "lalrpop",
         "Lvalue",
+        "preheader",
         "ptrtoint",
         "sdiv",
         "Spannable",

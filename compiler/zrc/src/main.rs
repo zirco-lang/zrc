@@ -225,8 +225,7 @@ fn compile(emit: &OutputFormat, content: &str) -> Result<String, zrc_diagnostics
     match emit {
         OutputFormat::Llvm => Ok(zrc_codegen::cg_program(zrc_typeck::typeck::type_program(
             zrc_parser::parser::parse_program(content)?,
-        )?)
-        .expect("code generation should not fail")),
+        )?)),
 
         OutputFormat::Ast => Ok(zrc_parser::parser::parse_program(content)?
             .into_iter()
