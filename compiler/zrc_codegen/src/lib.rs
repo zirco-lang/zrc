@@ -3,8 +3,6 @@
     clippy::cargo,
     clippy::nursery,
     clippy::pedantic,
-    clippy::missing_docs_in_private_items,
-    missing_docs,
     clippy::absolute_paths,
     clippy::as_conversions,
     clippy::dbg_macro,
@@ -38,7 +36,11 @@
     clippy::print_stderr,
     clippy::print_stdout
 )]
-#![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
+#![allow(
+    clippy::multiple_crate_versions,
+    clippy::cargo_common_metadata,
+    clippy::missing_panics_doc
+)]
 
 pub mod expr;
 pub mod stmt;
@@ -48,14 +50,15 @@ use std::{collections::HashMap, fmt::Display};
 use anyhow::Context as _;
 pub use expr::cg_expr;
 pub use stmt::{cg_block, cg_program};
+use zrc_typeck::tast::ty::Type;
 
 #[derive(PartialEq, Debug, Clone)]
 struct Counter {
     value: usize,
 }
 impl Counter {
-    fn new(initial_value: usize) -> Self {
-        Counter {
+    const fn new(initial_value: usize) -> Self {
+        Self {
             value: initial_value,
         }
     }
@@ -73,6 +76,7 @@ pub struct ModuleCg {
     global_constant_id: Counter,
 }
 impl ModuleCg {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             declarations: Vec::new(),
@@ -83,7 +87,7 @@ impl ModuleCg {
 impl Display for ModuleCg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for decl in &self.declarations {
-            writeln!(f, "{}", decl)?;
+            writeln!(f, "{decl}")?;
         }
         Ok(())
     }
@@ -97,7 +101,7 @@ impl Default for ModuleCg {
 #[derive(PartialEq, Debug, Clone)]
 pub struct FunctionCg<'input> {
     name: String,
-    parameters: Vec<(String, zrc_typeck::tast::ty::Type<'input>)>,
+    parameters: Vec<(String, Type<'input>)>,
     ret: zrc_typeck::typeck::BlockReturnType<'input>,
     blocks: Vec<BasicBlockData>,
     next_instruction_id: Counter,
@@ -108,10 +112,11 @@ pub struct FunctionCg<'input> {
     allocations: Vec<String>,
 }
 impl<'input> FunctionCg<'input> {
+    #[must_use]
     pub fn new(
         name: String,
         ret: zrc_typeck::typeck::BlockReturnType<'input>,
-        parameters: Vec<(&'input str, zrc_typeck::tast::ty::Type<'input>)>,
+        parameters: Vec<(&'input str, Type<'input>)>,
         parent_scope: &CgScope<'input>,
     ) -> (Self, BasicBlock, CgScope<'input>) {
         let mut scope = parent_scope.clone();
@@ -164,7 +169,7 @@ impl<'input> FunctionCg<'input> {
         format!("%l{}", self.next_instruction_id.next())
     }
 
-    fn add_instruction_to_bb(&mut self, bb: &BasicBlock, instr: &str) -> anyhow::Result<()> {
+    fn add_instruction_to_bb(&mut self, bb: BasicBlock, instr: &str) -> anyhow::Result<()> {
         let bb = self.blocks.get_mut(bb.id).context("Invalid BB ID")?;
         bb.instructions.push(instr.to_string());
 
@@ -187,15 +192,15 @@ impl<'input> Display for FunctionCg<'input> {
         for (i, bb) in self.blocks.iter().enumerate() {
             if i == 0 {
                 for instr in &self.allocations {
-                    writeln!(f, "    {}", instr)?;
+                    writeln!(f, "    {instr}")?;
                 }
                 for instr in &bb.instructions {
-                    writeln!(f, "    {}", instr)?;
+                    writeln!(f, "    {instr}")?;
                 }
             } else {
                 writeln!(f, "bb{}:", bb.id)?;
                 for instr in &bb.instructions {
-                    writeln!(f, "    {}", instr)?;
+                    writeln!(f, "    {instr}")?;
                 }
             }
         }
@@ -218,7 +223,7 @@ impl BasicBlockData {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub struct BasicBlock {
     id: usize,
 }
@@ -228,14 +233,12 @@ impl Display for BasicBlock {
     }
 }
 impl BasicBlock {
-    fn add_instruction(&self, cg: &mut FunctionCg, instr: &str) -> anyhow::Result<()> {
+    fn add_instruction(self, cg: &mut FunctionCg, instr: &str) -> anyhow::Result<()> {
         cg.add_instruction_to_bb(self, instr)
     }
 }
 
-fn get_llvm_typename(ty: zrc_typeck::tast::ty::Type) -> String {
-    use zrc_typeck::tast::ty::Type;
-
+fn get_llvm_typename(ty: Type) -> String {
     match ty {
         Type::I8 | Type::U8 => "i8".to_string(),
         Type::I16 | Type::U16 => "i16".to_string(),
