@@ -509,6 +509,7 @@ pub fn cg_expr(
         }
 
         TypedExprKind::Cast(x, ty) => {
+            #[allow(clippy::enum_glob_use)]
             use zrc_typeck::tast::ty::Type::*;
 
             // The legendary Cast Table. Contains the cast opcode used for T -> U
@@ -525,38 +526,35 @@ pub fn cg_expr(
                 // int -> fn = inttoptr
                 // fn -> int = ptrtoint
                 (Bool, I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64)
-                | (U8, I16 | U16 | I32 | U32 | I64 | U64) => "zext",
-                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Bool) => "trunc",
+                | (U8, I16 | U16 | I32 | U32 | I64 | U64)
+                | (U16, I32 | U32 | I64 | U64)
+                | (U32, I64 | U64) => "zext",
+                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Bool)
+                | (I16 | U16 | I32 | U32 | I64 | U64, I8 | U8)
+                | (I64 | U64, I32 | U32)
+                | (I32 | U32 | I64 | U64, I16 | U16) => "trunc",
 
-                (I8, I16 | U16 | I32 | U32 | I64 | U64) => "sext",
-                (U8, I16 | U16 | I32 | U32 | I64 | U64) => "zext",
-                (I16, I32 | U32 | I64 | U64) => "sext",
-                (U16, I32 | U32 | I64 | U64) => "zext",
-                (I32, I64 | U64) => "sext",
-                (U32, I64 | U64) => "zext",
-
-                (I16 | U16 | I32 | U32 | I64 | U64, I8) => "trunc",
-                (I16 | U16 | I32 | U32 | I64 | U64, U8) => "trunc",
-                (I32 | U32 | I64 | U64, I16) => "trunc",
-                (I32 | U32 | I64 | U64, U16) => "trunc",
-                (I64 | U64, I32) => "trunc",
-                (I64 | U64, U32) => "trunc",
+                (I8, I16 | U16 | I32 | U32 | I64 | U64)
+                | (I16, I32 | U32 | I64 | U64)
+                | (I32, I64 | U64) => "sext",
 
                 // also handle things like I32 => U32
                 // is this even the correct way to do it?
-                (I8, U8) | (U8, I8) => "bitcast",
-                (I16, U16) | (U16, I16) => "bitcast",
-                (I32, U32) | (U32, I32) => "bitcast",
-                (I64, U64) | (U64, I64) => "bitcast",
+                (I8, U8)
+                | (U8, I8)
+                | (I16, U16)
+                | (U16, I16)
+                | (I32, U32)
+                | (U32, I32)
+                | (I64, U64)
+                | (U64, I64)
+                | (Ptr(_), Ptr(_)) => "bitcast",
 
                 (Bool, x) if x.is_signed_integer() => "sext",
                 (Bool, x) if x.is_unsigned_integer() => "zext",
 
-                (Ptr(_), Ptr(_)) => "bitcast",
-                (Ptr(_), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
-                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Ptr(_)) => "inttoptr",
-                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Fn(_, _)) => "inttoptr",
-                (Fn(_, _), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
+                (Ptr(_) | Fn(_, _), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
+                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Ptr(_) | Fn(_, _)) => "inttoptr",
                 _ => bail!("invalid cast from {} to {}", x.0, ty),
             };
             let old_x = x.clone();

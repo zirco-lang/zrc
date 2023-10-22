@@ -385,6 +385,7 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
+    #[allow(clippy::same_name_method)]
     pub fn eq(lhs: Self, rhs: Self) -> Self {
         Self::equality(Equality::Eq, lhs, rhs)
     }
