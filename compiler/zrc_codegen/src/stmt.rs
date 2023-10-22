@@ -1,6 +1,14 @@
 use anyhow::bail;
 
 use super::{cg_alloc, cg_expr, get_llvm_typename, BasicBlock, CgScope, FunctionCg, ModuleCg};
+use zrc_typeck::tast::{
+    expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
+    stmt::{
+        ArgumentDeclaration, ArgumentDeclarationList, LetDeclaration, TypedDeclaration, TypedStmt,
+    },
+    ty::Type,
+};
+use zrc_typeck::typeck::{BlockReturnAbility, BlockReturnActuality, BlockReturnType};
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
 /// instructions. It is passed to [`cg_block`] to allow it to properly handle
@@ -16,12 +24,15 @@ pub struct LoopBreakaway {
 
 /// Declares the variable, creating its allocation and also evaluating the
 /// assignment.
+///
+/// # Errors
+/// Errors if an internal code generation error occurred. This is always a bug.
 pub fn cg_let_declaration<'input>(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
     bb: &BasicBlock,
     scope: &mut CgScope<'input>,
-    declarations: Vec<zrc_typeck::tast::stmt::LetDeclaration<'input>>,
+    declarations: Vec<LetDeclaration<'input>>,
 ) -> anyhow::Result<BasicBlock> {
     let mut bb = *bb;
 
@@ -38,12 +49,12 @@ pub fn cg_let_declaration<'input>(
                 cg,
                 &bb,
                 scope,
-                zrc_typeck::tast::expr::TypedExpr(
+                TypedExpr(
                     let_declaration.ty.clone(),
-                    zrc_typeck::tast::expr::TypedExprKind::Assignment(
-                        Box::new(zrc_typeck::tast::expr::Place(
+                    TypedExprKind::Assignment(
+                        Box::new(Place(
                             let_declaration.ty,
-                            zrc_typeck::tast::expr::PlaceKind::Variable(let_declaration.name),
+                            PlaceKind::Variable(let_declaration.name),
                         )),
                         Box::new(value),
                     ),
@@ -59,18 +70,20 @@ pub fn cg_let_declaration<'input>(
 /// Returns the basic block to continue adding instructions to.
 /// If it is None, a return statement was encountered and no more instructions
 /// should be added.
+///
+/// # Errors
+/// Errors if an internal code generation error occurred. This is always a bug.
+#[allow(clippy::too_many_lines)]
 pub fn cg_block(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
     bb: &BasicBlock,
     parent_scope: &CgScope,
-    block: Vec<zrc_typeck::tast::stmt::TypedStmt>,
+    block: Vec<TypedStmt>,
     // If set to None, break and continue are invalid.
     // If set to Some, break and continue will break to the bbs listed in there.
     breakaway: Option<LoopBreakaway>,
 ) -> anyhow::Result<Option<BasicBlock>> {
-    use zrc_typeck::tast::stmt::*;
-
     let mut scope = parent_scope.clone();
 
     block.into_iter().try_fold(
@@ -175,8 +188,8 @@ pub fn cg_block(
                     }
                 }
 
-                TypedStmt::DeclarationList(d) => {
-                    Some(cg_let_declaration(module, cg, &bb, &mut scope, d)?)
+                TypedStmt::DeclarationList(list) => {
+                    Some(cg_let_declaration(module, cg, &bb, &mut scope, list)?)
                 }
 
                 TypedStmt::ForStmt {
@@ -307,18 +320,16 @@ pub fn cg_block(
     )
 }
 
-pub fn cg_program(
-    program: Vec<zrc_typeck::tast::stmt::TypedDeclaration>,
-) -> anyhow::Result<String> {
+pub fn cg_program(program: Vec<TypedDeclaration>) -> anyhow::Result<String> {
     let mut module = ModuleCg::new();
     let mut global_scope = CgScope::new();
 
     for declaration in program {
         match declaration {
             // Struct declarations don't need code generation as they're all inlined
-            zrc_typeck::tast::stmt::TypedDeclaration::StructDeclaration { .. } => {}
+            TypedDeclaration::StructDeclaration { .. } => {}
 
-            zrc_typeck::tast::stmt::TypedDeclaration::FunctionDeclaration {
+            TypedDeclaration::FunctionDeclaration {
                 name,
                 parameters,
                 return_type,
@@ -331,16 +342,16 @@ pub fn cg_program(
                 let (mut cg, bb, fn_scope) = FunctionCg::new(
                     format!("@{name}"),
                     match return_type {
-                        Some(x) => zrc_typeck::typeck::BlockReturnType::Return(x),
-                        None => zrc_typeck::typeck::BlockReturnType::Void,
+                        Some(x) => BlockReturnType::Return(x),
+                        None => BlockReturnType::Void,
                     },
                     {
-                        let zrc_typeck::tast::stmt::ArgumentDeclarationList::NonVariadic(p) =
+                        let ArgumentDeclarationList::NonVariadic(params) =
                             parameters
                         else {
                             panic!("non-extern function had variadic arguments");
                         };
-                        p
+                        params
                     }
                     .into_iter()
                     .map(|x| (x.name, x.ty))
@@ -353,7 +364,7 @@ pub fn cg_program(
                 module.declarations.push(cg.to_string());
             }
 
-            zrc_typeck::tast::stmt::TypedDeclaration::FunctionDeclaration {
+            TypedDeclaration::FunctionDeclaration {
                 name,
                 parameters,
                 return_type,
@@ -363,33 +374,24 @@ pub fn cg_program(
 
                 module.declarations.push(format!(
                     "declare {} @{}({})",
-                    get_llvm_typename(return_type.unwrap_or(zrc_typeck::tast::ty::Type::Void)),
+                    get_llvm_typename(return_type.unwrap_or(Type::Void)),
                     name,
                     match parameters {
-                        zrc_typeck::tast::stmt::ArgumentDeclarationList::NonVariadic(
-                            parameters,
-                        ) => parameters
+                        ArgumentDeclarationList::NonVariadic(parameters) => parameters
                             .iter()
-                            .map(|zrc_typeck::tast::stmt::ArgumentDeclaration { ty, .. }| {
-                                get_llvm_typename(ty.clone())
-                            })
+                            .map(|ArgumentDeclaration { ty, .. }| { get_llvm_typename(ty.clone()) })
                             .collect::<Vec<_>>()
                             .join(", "),
-                        zrc_typeck::tast::stmt::ArgumentDeclarationList::Variadic(parameters) =>
-                            format!(
-                                "{}, ...",
-                                parameters
-                                    .iter()
-                                    .map(
-                                        |zrc_typeck::tast::stmt::ArgumentDeclaration {
-                                             ty, ..
-                                         }| {
-                                            get_llvm_typename(ty.clone())
-                                        }
-                                    )
-                                    .collect::<Vec<_>>()
-                                    .join(", ")
-                            ),
+                        ArgumentDeclarationList::Variadic(parameters) => format!(
+                            "{}, ...",
+                            parameters
+                                .iter()
+                                .map(|ArgumentDeclaration { ty, .. }| {
+                                    get_llvm_typename(ty.clone())
+                                })
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
                     }
                 ));
             }

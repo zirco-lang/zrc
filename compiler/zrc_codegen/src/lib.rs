@@ -305,6 +305,7 @@ pub struct CgScope<'input> {
     identifiers: HashMap<&'input str, String>,
 }
 impl<'input> CgScope<'input> {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             identifiers: HashMap::new(),
