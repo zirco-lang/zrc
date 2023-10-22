@@ -1,14 +1,17 @@
 use anyhow::bail;
+use zrc_typeck::{
+    tast::{
+        expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
+        stmt::{
+            ArgumentDeclaration, ArgumentDeclarationList, LetDeclaration, TypedDeclaration,
+            TypedStmt,
+        },
+        ty::Type,
+    },
+    typeck::BlockReturnType,
+};
 
 use super::{cg_alloc, cg_expr, get_llvm_typename, BasicBlock, CgScope, FunctionCg, ModuleCg};
-use zrc_typeck::tast::{
-    expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
-    stmt::{
-        ArgumentDeclaration, ArgumentDeclarationList, LetDeclaration, TypedDeclaration, TypedStmt,
-    },
-    ty::Type,
-};
-use zrc_typeck::typeck::BlockReturnType;
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
 /// instructions. It is passed to [`cg_block`] to allow it to properly handle
@@ -345,9 +348,7 @@ pub fn cg_program(program: Vec<TypedDeclaration>) -> anyhow::Result<String> {
                     format!("@{name}"),
                     return_type.map_or_else(|| BlockReturnType::Void, BlockReturnType::Return),
                     {
-                        let ArgumentDeclarationList::NonVariadic(params) =
-                            parameters
-                        else {
+                        let ArgumentDeclarationList::NonVariadic(params) = parameters else {
                             panic!("non-extern function had variadic arguments");
                         };
                         params
