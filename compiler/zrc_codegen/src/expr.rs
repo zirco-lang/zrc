@@ -1,4 +1,3 @@
-use super::CgScope;
 use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
@@ -16,6 +15,7 @@ use zrc_typeck::tast::{
     ty::Type,
 };
 
+use super::CgScope;
 use crate::ty::{llvm_basic_type, llvm_int_type, llvm_type};
 
 pub fn cg_place<'ctx, 'a>(
@@ -335,7 +335,9 @@ pub fn cg_expr<'ctx, 'a>(
 
         TypedExprKind::Call(f, args) => {
             let old_f = f.clone();
-            let (f, bb) = cg_place(ctx, builder, module, function, bb, scope, *f); // always a function pointer
+
+            // will always be a function pointer
+            let (f, bb) = cg_place(ctx, builder, module, function, bb, scope, *f);
 
             let mut bb = bb;
             let old_args = args;
