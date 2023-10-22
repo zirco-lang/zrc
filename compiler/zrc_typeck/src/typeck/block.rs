@@ -383,357 +383,369 @@ pub fn type_block<'input>(
     let input_block_span = input_block.span();
 
     // At first, the block does not return.
-    let (tast_block, return_actualities): (Vec<_>, Vec<_>) = input_block
-        .into_value()
-        .into_iter()
-        .map(
-            |stmt| -> Result<(TypedStmt<'input>, BlockReturnActuality), Diagnostic> {
-                let stmt_span = stmt.0.span();
-                match stmt.0.into_value() {
-                    StmtKind::EmptyStmt => {
-                        Ok((TypedStmt::EmptyStmt, BlockReturnActuality::DoesNotReturn))
-                    }
-                    StmtKind::BreakStmt if can_use_break_continue => {
-                        Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
-                    }
-                    StmtKind::BreakStmt => Err(Diagnostic(
-                        Severity::Error,
-                        stmt_span.containing(DiagnosticKind::CannotUseBreakOutsideOfLoop),
-                    )),
-
-                    StmtKind::ContinueStmt if can_use_break_continue => {
-                        Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
-                    }
-                    StmtKind::ContinueStmt => Err(Diagnostic(
-                        Severity::Error,
-                        stmt_span.containing(DiagnosticKind::CannotUseContinueOutsideOfLoop),
-                    )),
-
-                    StmtKind::DeclarationList(declarations) => Ok((
-                        TypedStmt::DeclarationList(process_let_declaration(
-                            &mut scope,
-                            declarations.clone().into_value(),
-                        )?),
-                        BlockReturnActuality::DoesNotReturn, /* because expressions can't return */
-                    )),
-
-                    StmtKind::IfStmt(cond, then, then_else) => {
-                        // TODO: if `cond` is always true at compile-time, we can prove the if
-                        // branch is always taken (hence if it's WillReturn we can be WillReturn
-                        // instead of MayReturn)
-
-                        let typed_cond = type_expr(&scope, cond.clone())?;
-
-                        if typed_cond.0 != TastType::Bool {
-                            return Err(Diagnostic(
-                                Severity::Error,
-                                cond.0.span().containing(DiagnosticKind::ExpectedGot {
-                                    expected: "bool".to_string(),
-                                    got: typed_cond.0.to_string(),
-                                }),
-                            ));
+    let (tast_block, return_actualities): (Vec<_>, Vec<_>) =
+        input_block
+            .into_value()
+            .into_iter()
+            .map(
+                |stmt| -> Result<(TypedStmt<'input>, BlockReturnActuality), Diagnostic> {
+                    let stmt_span = stmt.0.span();
+                    match stmt.0.into_value() {
+                        StmtKind::EmptyStmt => {
+                            Ok((TypedStmt::EmptyStmt, BlockReturnActuality::DoesNotReturn))
                         }
-
-                        let (typed_then, then_return_actuality) = type_block(
-                            &scope,
-                            coerce_stmt_into_block(*then.clone()),
-                            can_use_break_continue,
-                            // return ability of a sub-block is determined by this match:
-                            match return_ability.clone() {
-                                BlockReturnAbility::MustNotReturn => {
-                                    BlockReturnAbility::MustNotReturn
-                                }
-                                BlockReturnAbility::MustReturn(x)
-                                | BlockReturnAbility::MayReturn(x) => {
-                                    BlockReturnAbility::MayReturn(x)
-                                }
-                            },
-                        )?;
-
-                        let (typed_then_else, then_else_return_actuality) = then_else
-                            .clone()
-                            .map(|then_else| {
-                                type_block(
-                                    &scope,
-                                    coerce_stmt_into_block(*then_else),
-                                    can_use_break_continue,
-                                    // return ability of a sub-block is determined by this match:
-                                    match return_ability.clone() {
-                                        BlockReturnAbility::MustNotReturn => {
-                                            BlockReturnAbility::MustNotReturn
-                                        }
-                                        BlockReturnAbility::MustReturn(x)
-                                        | BlockReturnAbility::MayReturn(x) => {
-                                            BlockReturnAbility::MayReturn(x)
-                                        }
-                                    },
-                                )
-                            })
-                            .transpose()?
-                            .unzip();
-
-                        Ok((
-                            TypedStmt::IfStmt(typed_cond, typed_then, typed_then_else),
-                            match (
-                                then_return_actuality,
-                                then_else_return_actuality
-                                    .unwrap_or(BlockReturnActuality::DoesNotReturn),
-                            ) {
-                                (
-                                    BlockReturnActuality::DoesNotReturn,
-                                    BlockReturnActuality::DoesNotReturn,
-                                ) => BlockReturnActuality::DoesNotReturn,
-                                (
-                                    BlockReturnActuality::DoesNotReturn,
-                                    BlockReturnActuality::WillReturn,
-                                )
-                                | (
-                                    BlockReturnActuality::WillReturn,
-                                    BlockReturnActuality::DoesNotReturn,
-                                )
-                                | (BlockReturnActuality::MightReturn, _)
-                                | (_, BlockReturnActuality::MightReturn) => {
-                                    BlockReturnActuality::MightReturn
-                                }
-                                (
-                                    BlockReturnActuality::WillReturn,
-                                    BlockReturnActuality::WillReturn,
-                                ) => BlockReturnActuality::WillReturn,
-                            },
-                        ))
-                    }
-                    StmtKind::WhileStmt(cond, body) => {
-                        // TODO: we might be able to prove that the body runs at least once or an
-                        // infinite loop making this won't/will return statically
-
-                        let typed_cond = type_expr(&scope, cond.clone())?;
-
-                        if typed_cond.0 != TastType::Bool {
-                            return Err(Diagnostic(
-                                Severity::Error,
-                                cond.0.span().containing(DiagnosticKind::ExpectedGot {
-                                    expected: "bool".to_string(),
-                                    got: typed_cond.0.to_string(),
-                                }),
-                            ));
+                        StmtKind::BreakStmt if can_use_break_continue => {
+                            Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
                         }
+                        StmtKind::BreakStmt => Err(Diagnostic(
+                            Severity::Error,
+                            stmt_span.containing(DiagnosticKind::CannotUseBreakOutsideOfLoop),
+                        )),
 
-                        let (typed_body, body_return_actuality) = type_block(
-                            &scope,
-                            coerce_stmt_into_block(*body.clone()),
-                            true,
-                            // return ability of a sub-block is determined by this match:
-                            match return_ability.clone() {
-                                BlockReturnAbility::MustNotReturn => {
-                                    BlockReturnAbility::MustNotReturn
-                                }
-                                BlockReturnAbility::MustReturn(x)
-                                | BlockReturnAbility::MayReturn(x) => {
-                                    BlockReturnAbility::MayReturn(x)
-                                }
-                            },
-                        )?;
+                        StmtKind::ContinueStmt if can_use_break_continue => {
+                            Ok((TypedStmt::BreakStmt, BlockReturnActuality::DoesNotReturn))
+                        }
+                        StmtKind::ContinueStmt => Err(Diagnostic(
+                            Severity::Error,
+                            stmt_span.containing(DiagnosticKind::CannotUseContinueOutsideOfLoop),
+                        )),
 
-                        Ok((
-                            TypedStmt::WhileStmt(typed_cond, typed_body),
-                            match body_return_actuality {
-                                BlockReturnActuality::DoesNotReturn => {
-                                    BlockReturnActuality::DoesNotReturn
-                                }
+                        StmtKind::DeclarationList(declarations) => Ok((
+                            TypedStmt::DeclarationList(process_let_declaration(
+                                &mut scope,
+                                declarations.clone().into_value(),
+                            )?),
+                            BlockReturnActuality::DoesNotReturn, /* because expressions can't
+                                                                  * return */
+                        )),
 
-                                // in case the loop does not run at all or runs infinitely,
-                                // WillReturn counts too
-                                BlockReturnActuality::MightReturn
-                                | BlockReturnActuality::WillReturn => {
-                                    BlockReturnActuality::MightReturn
-                                }
-                            },
-                        ))
-                    }
-                    StmtKind::ForStmt {
-                        init,
-                        cond,
-                        post,
-                        body,
-                    } => {
-                        // TODO: same logic as the TODO comment on the while loop applies here.
+                        StmtKind::IfStmt(cond, then, then_else) => {
+                            // TODO: if `cond` is always true at compile-time, we can prove the if
+                            // branch is always taken (hence if it's WillReturn we can be WillReturn
+                            // instead of MayReturn)
 
-                        // the declaration made in the for loop's init is scoped to *only* the loop
-                        // so we need to make a subscope for it
-                        let mut loop_scope = scope.clone();
+                            let typed_cond = type_expr(&scope, cond.clone())?;
 
-                        // if present, evaluate the declaration
-                        let typed_init = init
-                            .clone()
-                            .map(|decl| {
-                                process_let_declaration(&mut loop_scope, (*decl).into_value())
-                            })
-                            .transpose()?;
-
-                        let typed_cond = cond
-                            .clone()
-                            .map(|cond| type_expr(&loop_scope, cond))
-                            .transpose()?;
-
-                        if let Some(inner_t_cond) = typed_cond.clone() {
-                            if inner_t_cond.0 != TastType::Bool {
+                            if typed_cond.0 != TastType::Bool {
                                 return Err(Diagnostic(
                                     Severity::Error,
-                                    cond.clone().unwrap().0.span().containing(
-                                        DiagnosticKind::ExpectedGot {
-                                            expected: "bool".to_string(),
-                                            got: inner_t_cond.0.to_string(),
-                                        },
-                                    ),
+                                    cond.0.span().containing(DiagnosticKind::ExpectedGot {
+                                        expected: "bool".to_string(),
+                                        got: typed_cond.0.to_string(),
+                                    }),
                                 ));
                             }
-                        }
 
-                        let typed_post = post
-                            .clone()
-                            .map(|post| type_expr(&loop_scope, post))
-                            .transpose()?;
+                            let (typed_then, then_return_actuality) = type_block(
+                                &scope,
+                                coerce_stmt_into_block(*then.clone()),
+                                can_use_break_continue,
+                                // return ability of a sub-block is determined by this match:
+                                match return_ability.clone() {
+                                    BlockReturnAbility::MustNotReturn => {
+                                        BlockReturnAbility::MustNotReturn
+                                    }
+                                    BlockReturnAbility::MustReturn(x)
+                                    | BlockReturnAbility::MayReturn(x) => {
+                                        BlockReturnAbility::MayReturn(x)
+                                    }
+                                },
+                            )?;
 
-                        let (typed_body, body_return_actuality) = type_block(
-                            &loop_scope,
-                            coerce_stmt_into_block(*body.clone()),
-                            true,
-                            // return ability of a sub-block is determined by this match:
-                            match return_ability.clone() {
-                                BlockReturnAbility::MustNotReturn => {
-                                    BlockReturnAbility::MustNotReturn
-                                }
-                                BlockReturnAbility::MustReturn(x)
-                                | BlockReturnAbility::MayReturn(x) => {
-                                    BlockReturnAbility::MayReturn(x)
-                                }
-                            },
-                        )?;
+                            let (typed_then_else, then_else_return_actuality) = then_else
+                                .clone()
+                                .map(|then_else| {
+                                    type_block(
+                                        &scope,
+                                        coerce_stmt_into_block(*then_else),
+                                        can_use_break_continue,
+                                        // return ability of a sub-block is determined by this
+                                        // match:
+                                        match return_ability.clone() {
+                                            BlockReturnAbility::MustNotReturn => {
+                                                BlockReturnAbility::MustNotReturn
+                                            }
+                                            BlockReturnAbility::MustReturn(x)
+                                            | BlockReturnAbility::MayReturn(x) => {
+                                                BlockReturnAbility::MayReturn(x)
+                                            }
+                                        },
+                                    )
+                                })
+                                .transpose()?
+                                .unzip();
 
-                        Ok((
-                            TypedStmt::ForStmt {
-                                init: typed_init.map(Box::new),
-                                cond: typed_cond,
-                                post: typed_post,
-                                body: typed_body,
-                            },
-                            match body_return_actuality {
-                                BlockReturnActuality::DoesNotReturn => {
-                                    BlockReturnActuality::DoesNotReturn
-                                }
-
-                                // in case the loop does not run at all or runs infinitely,
-                                // WillReturn counts too
-                                BlockReturnActuality::MightReturn
-                                | BlockReturnActuality::WillReturn => {
-                                    BlockReturnActuality::MightReturn
-                                }
-                            },
-                        ))
-                    }
-
-                    StmtKind::BlockStmt(body) => {
-                        let (typed_body, return_actuality) = type_block(
-                            &scope,
-                            body.clone().in_span(stmt_span),
-                            can_use_break_continue,
-                            // return ability of a sub-block is determined by this match:
-                            match return_ability.clone() {
-                                BlockReturnAbility::MustNotReturn => {
-                                    BlockReturnAbility::MustNotReturn
-                                }
-                                BlockReturnAbility::MustReturn(x)
-                                | BlockReturnAbility::MayReturn(x) => {
-                                    BlockReturnAbility::MayReturn(x)
-                                }
-                            },
-                        )?;
-                        Ok((TypedStmt::BlockStmt(typed_body), return_actuality))
-                    }
-
-                    StmtKind::ExprStmt(expr) => Ok((
-                        TypedStmt::ExprStmt(type_expr(&scope, expr)?),
-                        BlockReturnActuality::DoesNotReturn,
-                    )),
-                    StmtKind::ReturnStmt(value) => {
-                        let resolved_value = value
-                            .clone()
-                            .map(|expr| type_expr(&scope, expr))
-                            .transpose()?;
-                        match (resolved_value, return_ability.clone()) {
-                            // expects no return
-                            (_, BlockReturnAbility::MustNotReturn) => Err(Diagnostic(
-                                Severity::Error,
-                                stmt_span.containing(DiagnosticKind::CannotReturnHere),
-                            )),
-
-                            // return; in void fn
-                            (
-                                None,
-                                BlockReturnAbility::MayReturn(BlockReturnType::Void)
-                                | BlockReturnAbility::MustReturn(BlockReturnType::Void),
-                            ) => Ok((
-                                TypedStmt::ReturnStmt(None),
-                                BlockReturnActuality::WillReturn,
-                            )),
-
-                            // return; in fn with required return type
-                            (
-                                None,
-                                BlockReturnAbility::MayReturn(BlockReturnType::Return(return_ty))
-                                | BlockReturnAbility::MustReturn(BlockReturnType::Return(return_ty)),
-                            ) => Err(Diagnostic(
-                                Severity::Error,
-                                stmt_span.containing(DiagnosticKind::ExpectedGot {
-                                    expected: return_ty.to_string(),
-                                    got: "void".to_string(),
-                                }),
-                            )),
-
-                            // return x; in fn expecting to return void
-                            (
-                                Some(TypedExpr(ty, _)),
-                                BlockReturnAbility::MustReturn(BlockReturnType::Void)
-                                | BlockReturnAbility::MayReturn(BlockReturnType::Void),
-                            ) => Err(Diagnostic(
-                                Severity::Error,
-                                stmt_span.containing(DiagnosticKind::ExpectedGot {
-                                    expected: "void".to_string(),
-                                    got: ty.to_string(),
-                                }),
-                            )),
-
-                            // return x; in fn expecting to return x
-                            (
-                                Some(TypedExpr(ty, ex)),
-                                BlockReturnAbility::MustReturn(BlockReturnType::Return(return_ty))
-                                | BlockReturnAbility::MayReturn(BlockReturnType::Return(return_ty)),
-                            ) => {
-                                if ty == return_ty {
-                                    Ok((
-                                        TypedStmt::ReturnStmt(Some(TypedExpr(ty, ex))),
+                            Ok((
+                                TypedStmt::IfStmt(typed_cond, typed_then, typed_then_else),
+                                match (
+                                    then_return_actuality,
+                                    then_else_return_actuality
+                                        .unwrap_or(BlockReturnActuality::DoesNotReturn),
+                                ) {
+                                    (
+                                        BlockReturnActuality::DoesNotReturn,
+                                        BlockReturnActuality::DoesNotReturn,
+                                    ) => BlockReturnActuality::DoesNotReturn,
+                                    (
+                                        BlockReturnActuality::DoesNotReturn,
                                         BlockReturnActuality::WillReturn,
-                                    ))
-                                } else {
-                                    Err(Diagnostic(
+                                    )
+                                    | (
+                                        BlockReturnActuality::WillReturn,
+                                        BlockReturnActuality::DoesNotReturn,
+                                    )
+                                    | (BlockReturnActuality::MightReturn, _)
+                                    | (_, BlockReturnActuality::MightReturn) => {
+                                        BlockReturnActuality::MightReturn
+                                    }
+                                    (
+                                        BlockReturnActuality::WillReturn,
+                                        BlockReturnActuality::WillReturn,
+                                    ) => BlockReturnActuality::WillReturn,
+                                },
+                            ))
+                        }
+                        StmtKind::WhileStmt(cond, body) => {
+                            // TODO: we might be able to prove that the body runs at least once or
+                            // an infinite loop making this won't/will
+                            // return statically
+
+                            let typed_cond = type_expr(&scope, cond.clone())?;
+
+                            if typed_cond.0 != TastType::Bool {
+                                return Err(Diagnostic(
+                                    Severity::Error,
+                                    cond.0.span().containing(DiagnosticKind::ExpectedGot {
+                                        expected: "bool".to_string(),
+                                        got: typed_cond.0.to_string(),
+                                    }),
+                                ));
+                            }
+
+                            let (typed_body, body_return_actuality) = type_block(
+                                &scope,
+                                coerce_stmt_into_block(*body.clone()),
+                                true,
+                                // return ability of a sub-block is determined by this match:
+                                match return_ability.clone() {
+                                    BlockReturnAbility::MustNotReturn => {
+                                        BlockReturnAbility::MustNotReturn
+                                    }
+                                    BlockReturnAbility::MustReturn(x)
+                                    | BlockReturnAbility::MayReturn(x) => {
+                                        BlockReturnAbility::MayReturn(x)
+                                    }
+                                },
+                            )?;
+
+                            Ok((
+                                TypedStmt::WhileStmt(typed_cond, typed_body),
+                                match body_return_actuality {
+                                    BlockReturnActuality::DoesNotReturn => {
+                                        BlockReturnActuality::DoesNotReturn
+                                    }
+
+                                    // in case the loop does not run at all or runs infinitely,
+                                    // WillReturn counts too
+                                    BlockReturnActuality::MightReturn
+                                    | BlockReturnActuality::WillReturn => {
+                                        BlockReturnActuality::MightReturn
+                                    }
+                                },
+                            ))
+                        }
+                        StmtKind::ForStmt {
+                            init,
+                            cond,
+                            post,
+                            body,
+                        } => {
+                            // TODO: same logic as the TODO comment on the while loop applies here.
+
+                            // the declaration made in the for loop's init is scoped to *only* the
+                            // loop so we need to make a subscope for it
+                            let mut loop_scope = scope.clone();
+
+                            // if present, evaluate the declaration
+                            let typed_init = init
+                                .clone()
+                                .map(|decl| {
+                                    process_let_declaration(&mut loop_scope, (*decl).into_value())
+                                })
+                                .transpose()?;
+
+                            let typed_cond = cond
+                                .clone()
+                                .map(|cond| type_expr(&loop_scope, cond))
+                                .transpose()?;
+
+                            if let Some(inner_t_cond) = typed_cond.clone() {
+                                if inner_t_cond.0 != TastType::Bool {
+                                    return Err(Diagnostic(
                                         Severity::Error,
-                                        value.clone().unwrap().0.span().containing(
+                                        cond.clone().unwrap().0.span().containing(
                                             DiagnosticKind::ExpectedGot {
-                                                expected: return_ty.to_string(),
-                                                got: ty.to_string(),
+                                                expected: "bool".to_string(),
+                                                got: inner_t_cond.0.to_string(),
                                             },
                                         ),
+                                    ));
+                                }
+                            }
+
+                            let typed_post = post
+                                .clone()
+                                .map(|post| type_expr(&loop_scope, post))
+                                .transpose()?;
+
+                            let (typed_body, body_return_actuality) = type_block(
+                                &loop_scope,
+                                coerce_stmt_into_block(*body.clone()),
+                                true,
+                                // return ability of a sub-block is determined by this match:
+                                match return_ability.clone() {
+                                    BlockReturnAbility::MustNotReturn => {
+                                        BlockReturnAbility::MustNotReturn
+                                    }
+                                    BlockReturnAbility::MustReturn(x)
+                                    | BlockReturnAbility::MayReturn(x) => {
+                                        BlockReturnAbility::MayReturn(x)
+                                    }
+                                },
+                            )?;
+
+                            Ok((
+                                TypedStmt::ForStmt {
+                                    init: typed_init.map(Box::new),
+                                    cond: typed_cond,
+                                    post: typed_post,
+                                    body: typed_body,
+                                },
+                                match body_return_actuality {
+                                    BlockReturnActuality::DoesNotReturn => {
+                                        BlockReturnActuality::DoesNotReturn
+                                    }
+
+                                    // in case the loop does not run at all or runs infinitely,
+                                    // WillReturn counts too
+                                    BlockReturnActuality::MightReturn
+                                    | BlockReturnActuality::WillReturn => {
+                                        BlockReturnActuality::MightReturn
+                                    }
+                                },
+                            ))
+                        }
+
+                        StmtKind::BlockStmt(body) => {
+                            let (typed_body, return_actuality) = type_block(
+                                &scope,
+                                body.clone().in_span(stmt_span),
+                                can_use_break_continue,
+                                // return ability of a sub-block is determined by this match:
+                                match return_ability.clone() {
+                                    BlockReturnAbility::MustNotReturn => {
+                                        BlockReturnAbility::MustNotReturn
+                                    }
+                                    BlockReturnAbility::MustReturn(x)
+                                    | BlockReturnAbility::MayReturn(x) => {
+                                        BlockReturnAbility::MayReturn(x)
+                                    }
+                                },
+                            )?;
+                            Ok((TypedStmt::BlockStmt(typed_body), return_actuality))
+                        }
+
+                        StmtKind::ExprStmt(expr) => Ok((
+                            TypedStmt::ExprStmt(type_expr(&scope, expr)?),
+                            BlockReturnActuality::DoesNotReturn,
+                        )),
+                        StmtKind::ReturnStmt(value) => {
+                            let resolved_value = value
+                                .clone()
+                                .map(|expr| type_expr(&scope, expr))
+                                .transpose()?;
+                            match (resolved_value, return_ability.clone()) {
+                                // expects no return
+                                (_, BlockReturnAbility::MustNotReturn) => Err(Diagnostic(
+                                    Severity::Error,
+                                    stmt_span.containing(DiagnosticKind::CannotReturnHere),
+                                )),
+
+                                // return; in void fn
+                                (
+                                    None,
+                                    BlockReturnAbility::MayReturn(BlockReturnType::Void)
+                                    | BlockReturnAbility::MustReturn(BlockReturnType::Void),
+                                ) => Ok((
+                                    TypedStmt::ReturnStmt(None),
+                                    BlockReturnActuality::WillReturn,
+                                )),
+
+                                // return; in fn with required return type
+                                (
+                                    None,
+                                    BlockReturnAbility::MayReturn(BlockReturnType::Return(
+                                        return_ty,
                                     ))
+                                    | BlockReturnAbility::MustReturn(BlockReturnType::Return(
+                                        return_ty,
+                                    )),
+                                ) => Err(Diagnostic(
+                                    Severity::Error,
+                                    stmt_span.containing(DiagnosticKind::ExpectedGot {
+                                        expected: return_ty.to_string(),
+                                        got: "void".to_string(),
+                                    }),
+                                )),
+
+                                // return x; in fn expecting to return void
+                                (
+                                    Some(TypedExpr(ty, _)),
+                                    BlockReturnAbility::MustReturn(BlockReturnType::Void)
+                                    | BlockReturnAbility::MayReturn(BlockReturnType::Void),
+                                ) => Err(Diagnostic(
+                                    Severity::Error,
+                                    stmt_span.containing(DiagnosticKind::ExpectedGot {
+                                        expected: "void".to_string(),
+                                        got: ty.to_string(),
+                                    }),
+                                )),
+
+                                // return x; in fn expecting to return x
+                                (
+                                    Some(TypedExpr(ty, ex)),
+                                    BlockReturnAbility::MustReturn(BlockReturnType::Return(
+                                        return_ty,
+                                    ))
+                                    | BlockReturnAbility::MayReturn(BlockReturnType::Return(
+                                        return_ty,
+                                    )),
+                                ) => {
+                                    if ty == return_ty {
+                                        Ok((
+                                            TypedStmt::ReturnStmt(Some(TypedExpr(ty, ex))),
+                                            BlockReturnActuality::WillReturn,
+                                        ))
+                                    } else {
+                                        Err(Diagnostic(
+                                            Severity::Error,
+                                            value.clone().unwrap().0.span().containing(
+                                                DiagnosticKind::ExpectedGot {
+                                                    expected: return_ty.to_string(),
+                                                    got: ty.to_string(),
+                                                },
+                                            ),
+                                        ))
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            },
-        )
-        .collect::<Result<Vec<_>, Diagnostic>>()?
-        .into_iter()
-        .unzip();
+                },
+            )
+            .collect::<Result<Vec<_>, Diagnostic>>()?
+            .into_iter()
+            .unzip();
 
     let might_return = return_actualities.iter().any(|x| {
         matches!(
