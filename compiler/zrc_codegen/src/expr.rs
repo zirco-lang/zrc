@@ -25,7 +25,7 @@ pub fn cg_place(
         PlaceKind::Variable(x) => {
             let reg = scope
                 .get(x)
-                .with_context(|| format!("Identifier {} not found in scope", x))?
+                .with_context(|| format!("Identifier {x} not found in scope"))?
                 .clone();
             (reg, *bb)
         }
@@ -383,7 +383,7 @@ pub fn cg_expr(
         TypedExprKind::Identifier(id) => {
             let reg = scope
                 .get(id)
-                .with_context(|| format!("Identifier {} not found in scope", id))?
+                .with_context(|| format!("Identifier {id} not found in scope"))?
                 .clone();
 
             let value = cg_load(cg, *bb, &get_llvm_typename(expr.0), &reg)?;
