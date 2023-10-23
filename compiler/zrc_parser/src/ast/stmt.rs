@@ -123,14 +123,14 @@ impl<'input> Display for Declaration<'input> {
             Self::FunctionDeclaration {
                 name,
                 parameters,
-                return_type: Some(r),
+                return_type: Some(return_ty),
                 body: Some(body),
             } => write!(
                 f,
                 "fn {}({}) -> {} {{\n{}\n}}",
                 name.value(),
                 parameters.value(),
-                r.0.value(),
+                return_ty.0.value(),
                 body.value()
                     .iter()
                     .map(|stmt| format!("    {stmt}"))
@@ -140,14 +140,14 @@ impl<'input> Display for Declaration<'input> {
             Self::FunctionDeclaration {
                 name,
                 parameters,
-                return_type: Some(r),
+                return_type: Some(return_ty),
                 body: None,
             } => write!(
                 f,
                 "fn {}({}) -> {};",
                 name.value(),
                 parameters.value(),
-                r.0.value()
+                return_ty.0.value()
             ),
             Self::FunctionDeclaration {
                 name,
@@ -194,9 +194,11 @@ impl<'input> Display for Stmt<'input> {
 impl<'input> Display for StmtKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::IfStmt(e, s, None) => write!(f, "if ({e}) {s}"),
-            Self::IfStmt(e, s1, Some(s2)) => write!(f, "if ({e}) {s1} else {s2}"),
-            Self::WhileStmt(e, s) => write!(f, "while ({e}) {s}"),
+            Self::IfStmt(cond, if_true, None) => write!(f, "if ({cond}) {if_true}"),
+            Self::IfStmt(cond, if_true, Some(if_false)) => {
+                write!(f, "if ({cond}) {if_true} else {if_false}")
+            }
+            Self::WhileStmt(cond, body) => write!(f, "while ({cond}) {body}"),
             Self::ForStmt {
                 init,
                 cond,
@@ -219,24 +221,24 @@ impl<'input> Display for StmtKind<'input> {
                 )
             }
 
-            Self::BlockStmt(s) => {
+            Self::BlockStmt(stmts) => {
                 write!(f, "{{")?;
-                for stmt in s {
+                for stmt in stmts {
                     write!(f, "{stmt}")?;
                 }
                 write!(f, "}}")
             }
-            Self::ExprStmt(e) => write!(f, "{e};"),
+            Self::ExprStmt(expr) => write!(f, "{expr};"),
             Self::EmptyStmt => write!(f, ";"),
             Self::ContinueStmt => write!(f, "continue;"),
             Self::BreakStmt => write!(f, "break;"),
-            Self::ReturnStmt(Some(e)) => write!(f, "return {e};",),
+            Self::ReturnStmt(Some(expr)) => write!(f, "return {expr};",),
             Self::ReturnStmt(None) => write!(f, "return;"),
-            Self::DeclarationList(d) => {
+            Self::DeclarationList(list) => {
                 write!(
                     f,
                     "let {};",
-                    d.value()
+                    list.value()
                         .iter()
                         .map(|x| x.value().to_string())
                         .collect::<Vec<_>>()
@@ -264,11 +266,11 @@ impl<'input> Display for LetDeclaration<'input> {
         match &self.ty {
             None => match &self.value {
                 None => write!(f, "{}", self.name.value()),
-                Some(v) => write!(f, "{} = {}", self.name.value(), v),
+                Some(value) => write!(f, "{} = {}", self.name.value(), value),
             },
-            Some(t) => match &self.value {
-                None => write!(f, "{}: {}", self.name.value(), t),
-                Some(v) => write!(f, "{}: {} = {}", self.name.value(), t, v),
+            Some(ty) => match &self.value {
+                None => write!(f, "{}: {}", self.name.value(), ty),
+                Some(value) => write!(f, "{}: {} = {}", self.name.value(), ty, value),
             },
         }
     }

@@ -5,6 +5,7 @@
         "inttoptr",
         "lalrpop",
         "Lvalue",
+        "pointee",
         "ptrtoint",
         "sdiv",
         "Spannable",

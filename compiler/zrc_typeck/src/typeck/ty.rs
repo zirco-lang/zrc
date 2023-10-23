@@ -19,8 +19,8 @@ pub fn resolve_type<'input>(
     let span = ty.0.span();
     Ok(match ty.0.into_value() {
         ParserTypeKind::Identifier(x) => {
-            if let Some(t) = scope.get_type(x) {
-                t.clone()
+            if let Some(ty) = scope.get_type(x) {
+                ty.clone()
             } else {
                 return Err(Diagnostic(
                     zrc_diagnostics::Severity::Error,
@@ -28,7 +28,9 @@ pub fn resolve_type<'input>(
                 ));
             }
         }
-        ParserTypeKind::Ptr(t) => TastType::Ptr(Box::new(resolve_type(scope, *t)?)),
+        ParserTypeKind::Ptr(pointee_ty) => {
+            TastType::Ptr(Box::new(resolve_type(scope, *pointee_ty)?))
+        }
         ParserTypeKind::Struct(members) => TastType::Struct(resolve_struct_keys(
             scope,
             members.map(|x| x.into_iter().collect::<Vec<_>>()),
@@ -49,15 +51,15 @@ pub fn resolve_struct_keys<'input>(
 ) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {
     let mut map: IndexMap<&'input str, TastType> = IndexMap::new();
     for sp in members.into_value() {
-        let (k, v) = sp.value();
-        if map.contains_key(k.value()) {
+        let (key, ast_type) = sp.value();
+        if map.contains_key(key.value()) {
             return Err(Diagnostic(
                 zrc_diagnostics::Severity::Error,
                 sp.as_ref()
                     .map(|x| DiagnosticKind::DuplicateStructMember((*x.0.value()).to_string())),
             ));
         }
-        map.insert(k.value(), resolve_type(scope, v.clone())?);
+        map.insert(key.value(), resolve_type(scope, ast_type.clone())?);
     }
     Ok(map)
 }

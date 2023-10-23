@@ -30,7 +30,7 @@ impl Span {
     /// Panics if `start > end`.
     #[must_use]
     pub fn from_positions(start: usize, end: usize) -> Self {
-        assert!(end >= start);
+        assert!(end >= start, "span must have positive length");
         Self(start, end)
     }
 
@@ -63,13 +63,13 @@ impl Span {
     ///
     /// If this returns [`None`], no intersection exists (they are disjoint).
     #[must_use]
-    pub fn intersect(a: Self, b: Self) -> Option<Self> {
-        if a.start() > b.end() || b.start() > a.end() {
+    pub fn intersect(span_a: Self, span_b: Self) -> Option<Self> {
+        if span_a.start() > span_b.end() || span_b.start() > span_a.end() {
             None
         } else {
             Some(Self::from_positions(
-                std::cmp::max(a.start(), b.start()),
-                std::cmp::min(a.end(), b.end()),
+                std::cmp::max(span_a.start(), span_b.start()),
+                std::cmp::min(span_a.end(), span_b.end()),
             ))
         }
     }
@@ -228,7 +228,8 @@ mod tests {
         }
 
         #[test]
-        #[should_panic]
+        #[allow(clippy::let_underscore_must_use)]
+        #[should_panic(expected = "span must have positive length")]
         fn span_from_invalid_positions_panics() {
             let _ = Span::from_positions(5, 0);
         }

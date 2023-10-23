@@ -1,14 +1,23 @@
 use anyhow::{bail, Context as _};
+use zrc_typeck::tast::{
+    expr::{
+        Arithmetic, BinaryBitwise, Comparison, Equality, Logical, Place, TypedExpr, TypedExprKind,
+    },
+    ty::Type,
+};
 
 use super::{cg_load, get_llvm_typename, BasicBlock, CgScope, FunctionCg, ModuleCg};
 
 /// Returns a pointer to the place referred to along with the basic block
+///
+/// # Errors
+/// Errors on an internal code generation error.
 pub fn cg_place(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
     bb: &BasicBlock,
     scope: &CgScope,
-    place: zrc_typeck::tast::expr::Place,
+    place: Place,
 ) -> anyhow::Result<(String, BasicBlock)> {
     use zrc_typeck::tast::expr::PlaceKind;
 
@@ -16,14 +25,14 @@ pub fn cg_place(
         PlaceKind::Variable(x) => {
             let reg = scope
                 .get(x)
-                .with_context(|| format!("Identifier {} not found in scope", x))?
+                .with_context(|| format!("Identifier {x} not found in scope"))?
                 .clone();
             (reg, *bb)
         }
         PlaceKind::Deref(x) => {
             let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
 
-            let x_reg = cg_load(cg, &bb, &get_llvm_typename(x.0), &x_ptr)?;
+            let x_reg = cg_load(cg, bb, &get_llvm_typename(x.0), &x_ptr)?;
 
             (x_reg, bb)
         }
@@ -33,14 +42,15 @@ pub fn cg_place(
 
             let x_typename = get_llvm_typename(x.clone().0);
 
-            let x_reg = cg_load(cg, &bb, &x_typename, &x_ptr)?;
+            let x_reg = cg_load(cg, bb, &x_typename, &x_ptr)?;
 
             let index_typename = get_llvm_typename(index.0.clone());
 
-            let index_reg = cg_load(cg, &bb, &index_typename, &index_ptr)?;
+            let index_reg = cg_load(cg, bb, &index_typename, &index_ptr)?;
 
+            #[allow(clippy::wildcard_enum_match_arm)]
             let result_typename = match x.0 {
-                zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
+                Type::Ptr(x) => get_llvm_typename(*x),
                 _ => unreachable!(), // per typeck, this is always a pointer
             };
 
@@ -62,12 +72,13 @@ pub fn cg_place(
 
             let result_reg = cg.new_reg();
 
+            #[allow(clippy::wildcard_enum_match_arm)]
             let key_idx = match x.0.clone() {
-                zrc_typeck::tast::ty::Type::Struct(entries) => {
+                Type::Struct(entries) => {
                     entries
                         .into_iter()
                         .enumerate()
-                        .find(|(_, (k, _))| k == &key)
+                        .find(|(_, (found_k, _))| found_k == &key)
                         .with_context(|| format!("Struct {} has no field {}", x.0, key))?
                         .0
                 }
@@ -97,18 +108,20 @@ pub fn cg_place(
 /// 2 + 2 involved allocating space for both constants and the result and
 /// relying on SROA to optimize it away. However, expression results will never
 /// mutate, it's *assignments* / places that are mutated.
+///
+/// # Errors
+/// Errors on an internal code generation error.
+#[allow(clippy::too_many_lines, clippy::module_name_repetitions)]
 pub fn cg_expr(
     module: &mut ModuleCg,
     cg: &mut FunctionCg,
     bb: &BasicBlock,
     scope: &CgScope,
-    expr: zrc_typeck::tast::expr::TypedExpr,
+    expr: TypedExpr,
 ) -> anyhow::Result<(String, BasicBlock)> {
-    use zrc_typeck::tast::expr::TypedExprKind;
-
     Ok(match expr.1 {
         TypedExprKind::NumberLiteral(n) => (n.to_string(), *bb),
-        TypedExprKind::BooleanLiteral(b) => (b.to_string(), *bb),
+        TypedExprKind::BooleanLiteral(value) => (value.to_string(), *bb),
 
         TypedExprKind::Comma(lhs, rhs) => {
             let (_, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
@@ -184,15 +197,13 @@ pub fn cg_expr(
             let result_type = get_llvm_typename(expr.0.clone());
 
             let op = match op {
-                zrc_typeck::tast::expr::BinaryBitwise::And => "and",
-                zrc_typeck::tast::expr::BinaryBitwise::Or => "or",
-                zrc_typeck::tast::expr::BinaryBitwise::Xor => "xor",
-                zrc_typeck::tast::expr::BinaryBitwise::Shl => "shl",
-                zrc_typeck::tast::expr::BinaryBitwise::Shr if expr.0.is_unsigned_integer() => {
-                    "lshr"
-                }
-                zrc_typeck::tast::expr::BinaryBitwise::Shr if expr.0.is_signed_integer() => "ashr",
-                zrc_typeck::tast::expr::BinaryBitwise::Shr => unreachable!(),
+                BinaryBitwise::And => "and",
+                BinaryBitwise::Or => "or",
+                BinaryBitwise::Xor => "xor",
+                BinaryBitwise::Shl => "shl",
+                BinaryBitwise::Shr if expr.0.is_unsigned_integer() => "lshr",
+                BinaryBitwise::Shr if expr.0.is_signed_integer() => "ashr",
+                BinaryBitwise::Shr => unreachable!(),
             };
 
             let result_reg = cg.new_reg();
@@ -211,8 +222,8 @@ pub fn cg_expr(
             let (rhs, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
 
             let op = match op {
-                zrc_typeck::tast::expr::Equality::Eq => "icmp eq",
-                zrc_typeck::tast::expr::Equality::Neq => "icmp ne",
+                Equality::Eq => "icmp eq",
+                Equality::Neq => "icmp ne",
             };
 
             let result_reg = cg.new_reg();
@@ -232,23 +243,15 @@ pub fn cg_expr(
 
             // the operands are integers
             let op = match (op, expr.0.clone()) {
-                (zrc_typeck::tast::expr::Comparison::Lt, ty) if ty.is_signed_integer() => {
-                    "icmp slt"
-                }
-                (zrc_typeck::tast::expr::Comparison::Gt, ty) if ty.is_signed_integer() => {
-                    "icmp sgt"
-                }
-                (zrc_typeck::tast::expr::Comparison::Lte, ty) if ty.is_signed_integer() => {
-                    "icmp sle"
-                }
-                (zrc_typeck::tast::expr::Comparison::Gte, ty) if ty.is_signed_integer() => {
-                    "icmp sge"
-                }
+                (Comparison::Lt, ty) if ty.is_signed_integer() => "icmp slt",
+                (Comparison::Gt, ty) if ty.is_signed_integer() => "icmp sgt",
+                (Comparison::Lte, ty) if ty.is_signed_integer() => "icmp sle",
+                (Comparison::Gte, ty) if ty.is_signed_integer() => "icmp sge",
 
-                (zrc_typeck::tast::expr::Comparison::Lt, _) => "icmp ult",
-                (zrc_typeck::tast::expr::Comparison::Gt, _) => "icmp ugt",
-                (zrc_typeck::tast::expr::Comparison::Lte, _) => "icmp ule",
-                (zrc_typeck::tast::expr::Comparison::Gte, _) => "icmp uge",
+                (Comparison::Lt, _) => "icmp ult",
+                (Comparison::Gt, _) => "icmp ugt",
+                (Comparison::Lte, _) => "icmp ule",
+                (Comparison::Gte, _) => "icmp uge",
             };
 
             let result_reg = cg.new_reg();
@@ -268,21 +271,15 @@ pub fn cg_expr(
             let result_type = get_llvm_typename(expr.0.clone());
 
             let op = match op {
-                zrc_typeck::tast::expr::Arithmetic::Addition => "add",
-                zrc_typeck::tast::expr::Arithmetic::Division if expr.0.is_signed_integer() => {
-                    "sdiv"
-                }
-                zrc_typeck::tast::expr::Arithmetic::Division if expr.0.is_unsigned_integer() => {
-                    "udiv"
-                }
-                zrc_typeck::tast::expr::Arithmetic::Division => unreachable!(),
-                zrc_typeck::tast::expr::Arithmetic::Modulo if expr.0.is_signed_integer() => "srem",
-                zrc_typeck::tast::expr::Arithmetic::Modulo if expr.0.is_unsigned_integer() => {
-                    "urem"
-                }
-                zrc_typeck::tast::expr::Arithmetic::Modulo => unreachable!(),
-                zrc_typeck::tast::expr::Arithmetic::Multiplication => "mul",
-                zrc_typeck::tast::expr::Arithmetic::Subtraction => "sub",
+                Arithmetic::Addition => "add",
+                Arithmetic::Division if expr.0.is_signed_integer() => "sdiv",
+                Arithmetic::Division if expr.0.is_unsigned_integer() => "udiv",
+                Arithmetic::Modulo if expr.0.is_signed_integer() => "srem",
+                Arithmetic::Modulo if expr.0.is_unsigned_integer() => "urem",
+                // should always match one of the above
+                Arithmetic::Modulo | Arithmetic::Division => unreachable!(),
+                Arithmetic::Multiplication => "mul",
+                Arithmetic::Subtraction => "sub",
             };
 
             let result_reg = cg.new_reg();
@@ -303,8 +300,8 @@ pub fn cg_expr(
 
             // "and/or i1" works for bools
             let op = match op {
-                zrc_typeck::tast::expr::Logical::And => "and",
-                zrc_typeck::tast::expr::Logical::Or => "or",
+                Logical::And => "and",
+                Logical::Or => "or",
             };
 
             let result_reg = cg.new_reg();
@@ -378,10 +375,7 @@ pub fn cg_expr(
 
             let value_type = get_llvm_typename((value).clone().0);
 
-            bb.add_instruction(
-                cg,
-                &format!("store {} {}, ptr {}", value_type, new_value, ptr),
-            )?;
+            bb.add_instruction(cg, &format!("store {value_type} {new_value}, ptr {ptr}"))?;
 
             (new_value, bb)
         }
@@ -389,10 +383,10 @@ pub fn cg_expr(
         TypedExprKind::Identifier(id) => {
             let reg = scope
                 .get(id)
-                .with_context(|| format!("Identifier {} not found in scope", id))?
+                .with_context(|| format!("Identifier {id} not found in scope"))?
                 .clone();
 
-            let value = cg_load(cg, bb, &get_llvm_typename(expr.0), &reg)?;
+            let value = cg_load(cg, *bb, &get_llvm_typename(expr.0), &reg)?;
 
             (value, *bb)
         }
@@ -404,8 +398,9 @@ pub fn cg_expr(
 
             let (index_reg, bb) = cg_expr(module, cg, &bb, scope, *index)?;
 
+            #[allow(clippy::wildcard_enum_match_arm)]
             let result_typename = match x.0 {
-                zrc_typeck::tast::ty::Type::Ptr(x) => get_llvm_typename(*x),
+                Type::Ptr(x) => get_llvm_typename(*x),
                 _ => unreachable!(), // per typeck, this is always a pointer
             };
 
@@ -420,7 +415,7 @@ pub fn cg_expr(
                 ),
             )?;
 
-            let value = cg_load(cg, &bb, &result_typename, &result_reg)?;
+            let value = cg_load(cg, bb, &result_typename, &result_reg)?;
 
             (value, bb)
         }
@@ -430,12 +425,13 @@ pub fn cg_expr(
 
             let result_reg = cg.new_reg();
 
+            #[allow(clippy::wildcard_enum_match_arm)]
             let key_idx = match x.0.clone() {
-                zrc_typeck::tast::ty::Type::Struct(entries) => {
+                Type::Struct(entries) => {
                     entries
                         .into_iter()
                         .enumerate()
-                        .find(|(_, (k, _))| k == &prop)
+                        .find(|(_, (got_k, _))| got_k == &prop)
                         .with_context(|| format!("Struct {} has no field {}", x.0, prop))?
                         .0
                 }
@@ -455,7 +451,7 @@ pub fn cg_expr(
                 ),
             )?;
 
-            let value = cg_load(cg, &bb, &get_llvm_typename(expr.0), &result_reg)?;
+            let value = cg_load(cg, bb, &get_llvm_typename(expr.0), &result_reg)?;
 
             (value, bb)
         }
@@ -479,7 +475,7 @@ pub fn cg_expr(
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            if expr.0 == zrc_typeck::tast::ty::Type::Void {
+            if expr.0 == Type::Void {
                 bb.add_instruction(
                     cg,
                     &format!(
@@ -512,11 +508,12 @@ pub fn cg_expr(
             }
         }
 
-        TypedExprKind::Cast(x, t) => {
+        TypedExprKind::Cast(x, ty) => {
+            #[allow(clippy::enum_glob_use)]
             use zrc_typeck::tast::ty::Type::*;
 
             // The legendary Cast Table. Contains the cast opcode used for T -> U
-            let cast_opcode = match (x.0.clone(), t.clone()) {
+            let cast_opcode = match (x.0.clone(), ty.clone()) {
                 (x, y) if x == y => "bitcast",
                 // signed -> signed = sext
                 // signed -> unsigned = sext
@@ -528,39 +525,37 @@ pub fn cg_expr(
                 // ptr -> int = ptrtoint
                 // int -> fn = inttoptr
                 // fn -> int = ptrtoint
-                (Bool, I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "zext",
-                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Bool) => "trunc",
+                (Bool, I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64)
+                | (U8, I16 | U16 | I32 | U32 | I64 | U64)
+                | (U16, I32 | U32 | I64 | U64)
+                | (U32, I64 | U64) => "zext",
+                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Bool)
+                | (I16 | U16 | I32 | U32 | I64 | U64, I8 | U8)
+                | (I64 | U64, I32 | U32)
+                | (I32 | U32 | I64 | U64, I16 | U16) => "trunc",
 
-                (I8, I16 | U16 | I32 | U32 | I64 | U64) => "sext",
-                (U8, I16 | U16 | I32 | U32 | I64 | U64) => "zext",
-                (I16, I32 | U32 | I64 | U64) => "sext",
-                (U16, I32 | U32 | I64 | U64) => "zext",
-                (I32, I64 | U64) => "sext",
-                (U32, I64 | U64) => "zext",
-
-                (I16 | U16 | I32 | U32 | I64 | U64, I8) => "trunc",
-                (I16 | U16 | I32 | U32 | I64 | U64, U8) => "trunc",
-                (I32 | U32 | I64 | U64, I16) => "trunc",
-                (I32 | U32 | I64 | U64, U16) => "trunc",
-                (I64 | U64, I32) => "trunc",
-                (I64 | U64, U32) => "trunc",
+                (I8, I16 | U16 | I32 | U32 | I64 | U64)
+                | (I16, I32 | U32 | I64 | U64)
+                | (I32, I64 | U64) => "sext",
 
                 // also handle things like I32 => U32
                 // is this even the correct way to do it?
-                (I8, U8) | (U8, I8) => "bitcast",
-                (I16, U16) | (U16, I16) => "bitcast",
-                (I32, U32) | (U32, I32) => "bitcast",
-                (I64, U64) | (U64, I64) => "bitcast",
+                (I8, U8)
+                | (U8, I8)
+                | (I16, U16)
+                | (U16, I16)
+                | (I32, U32)
+                | (U32, I32)
+                | (I64, U64)
+                | (U64, I64)
+                | (Ptr(_), Ptr(_)) => "bitcast",
 
                 (Bool, x) if x.is_signed_integer() => "sext",
                 (Bool, x) if x.is_unsigned_integer() => "zext",
 
-                (Ptr(_), Ptr(_)) => "bitcast",
-                (Ptr(_), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
-                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Ptr(_)) => "inttoptr",
-                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Fn(_, _)) => "inttoptr",
-                (Fn(_, _), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
-                _ => bail!("invalid cast from {} to {}", x.0, t),
+                (Ptr(_) | Fn(_, _), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
+                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Ptr(_) | Fn(_, _)) => "inttoptr",
+                _ => bail!("invalid cast from {} to {}", x.0, ty),
             };
             let old_x = x.clone();
 
@@ -576,19 +571,19 @@ pub fn cg_expr(
                     cast_opcode,
                     get_llvm_typename(old_x.0),
                     x,
-                    get_llvm_typename(t),
+                    get_llvm_typename(ty),
                 ),
             )?;
 
             (result_reg, bb)
         }
 
-        TypedExprKind::StringLiteral(s) => {
+        TypedExprKind::StringLiteral(str) => {
             let id = module.global_constant_id.next();
             module.declarations.push(format!(
                 "@.str{id} = private constant [{} x i8] c\"{}\\00\"",
-                s.len() - 1, // subtract both quotes, add the null
-                &s[1..s.len() - 1]
+                str.len() - 1, // subtract both quotes, add the null
+                &str[1..str.len() - 1]
             ));
 
             (format!("@.str{id}"), *bb)

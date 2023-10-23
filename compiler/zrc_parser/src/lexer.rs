@@ -15,9 +15,9 @@
 //! use zrc_utils::{span::{Span, Spanned}, spanned};
 //!
 //! let mut lex = ZircoLexer::new("2 + 2");
-//! assert_eq!(lex.next(), Some(spanned!(0, Ok(Tok::NumberLiteral("2".to_string())), 1)));
+//! assert_eq!(lex.next(), Some(spanned!(0, Ok(Tok::NumberLiteral("2")), 1)));
 //! assert_eq!(lex.next(), Some(spanned!(2, Ok(Tok::Plus), 3)));
-//! assert_eq!(lex.next(), Some(spanned!(4, Ok(Tok::NumberLiteral("2".to_string())), 5)));
+//! assert_eq!(lex.next(), Some(spanned!(4, Ok(Tok::NumberLiteral("2")), 5)));
 //! assert_eq!(lex.next(), None);
 //! ```
 //!
@@ -395,7 +395,7 @@ impl<'input> Display for Tok<'input> {
                 Self::SmallArrow => "->".to_string(),
                 Self::Star => "*".to_string(),
                 Self::StarAssign => "*=".to_string(),
-                Self::StringLiteral(s) => (*s).to_string(),
+                Self::StringLiteral(str) => (*str).to_string(),
                 Self::Struct => "struct".to_string(),
                 Self::True => "true".to_string(),
                 Self::While => "while".to_string(),

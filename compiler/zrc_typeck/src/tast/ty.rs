@@ -56,7 +56,7 @@ impl<'input> Display for Type<'input> {
             Self::I64 => write!(f, "i64"),
             Self::U64 => write!(f, "u64"),
             Self::Bool => write!(f, "bool"),
-            Self::Ptr(t) => write!(f, "*({t})"),
+            Self::Ptr(pointee_ty) => write!(f, "*({pointee_ty})"),
             Self::Void => write!(f, "void"),
             Self::Fn(args, brt) => write!(
                 f,
@@ -72,7 +72,7 @@ impl<'input> Display for Type<'input> {
                 "(struct {{ {} }})",
                 fields
                     .iter()
-                    .map(|(k, v)| format!("{k}: {v}"))
+                    .map(|(key, ty)| format!("{key}: {ty}"))
                     .collect::<Vec<String>>()
                     .join(", ")
             ),

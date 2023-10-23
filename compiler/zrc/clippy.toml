@@ -1,0 +1,2 @@
+absolute-paths-max-segments = 3
+allowed-idents-below-min-chars = [ "..", "f" ]
