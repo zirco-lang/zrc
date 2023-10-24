@@ -619,3 +619,28 @@ pub fn type_expr<'input>(
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zrc_utils::spanned;
+
+    mod desugar_assignment {
+        use super::*;
+
+        #[test]
+        fn standard() {
+            assert_eq!(
+                desugar_assignment(
+                    Assignment::Standard,
+                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
+                    Expr(spanned!(4, ExprKind::Identifier("b"), 5))
+                ),
+                (
+                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
+                    Expr(spanned!(4, ExprKind::Identifier("b"), 5))
+                )
+            );
+        }
+    }
+}
