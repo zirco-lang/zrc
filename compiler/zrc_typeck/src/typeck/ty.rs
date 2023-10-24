@@ -63,3 +63,30 @@ pub fn resolve_struct_keys<'input>(
     }
     Ok(map)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+    use zrc_utils::spanned;
+
+    #[test]
+    fn pointers_and_identifiers_resolve() {
+        assert_eq!(
+            resolve_type(
+                &Scope::from_scopes(HashMap::new(), HashMap::from([("i32", TastType::I32)])),
+                ParserType(spanned!(
+                    0,
+                    ParserTypeKind::Ptr(Box::new(ParserType(spanned!(
+                        1,
+                        ParserTypeKind::Identifier("i32"),
+                        4
+                    )))),
+                    4
+                ))
+            ),
+            Ok(TastType::Ptr(Box::new(TastType::I32)))
+        );
+    }
+}
