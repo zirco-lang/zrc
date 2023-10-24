@@ -145,4 +145,48 @@ mod tests {
             ])))
         );
     }
+
+    #[test]
+    fn duplicate_keys_in_struct_causes_error() {
+        // struct { x: i32, x: i32 }
+        assert_eq!(
+            resolve_type(
+                &Scope::default(),
+                ParserType(spanned!(
+                    0,
+                    ParserTypeKind::Struct(spanned!(
+                        7,
+                        vec![
+                            spanned!(
+                                9,
+                                (
+                                    spanned!(9, "x", 10),
+                                    ParserType(spanned!(12, ParserTypeKind::Identifier("i32"), 15))
+                                ),
+                                15
+                            ),
+                            spanned!(
+                                17,
+                                (
+                                    spanned!(17, "x", 18),
+                                    ParserType(spanned!(20, ParserTypeKind::Identifier("i32"), 23))
+                                ),
+                                23
+                            )
+                        ],
+                        25
+                    )),
+                    25
+                ))
+            ),
+            Err(Diagnostic(
+                Severity::Error,
+                spanned!(
+                    17,
+                    DiagnosticKind::DuplicateStructMember("x".to_string()),
+                    23
+                )
+            ))
+        );
+    }
 }
