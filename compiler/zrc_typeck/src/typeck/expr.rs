@@ -22,6 +22,8 @@ fn desugar_assignment<'input>(
 ) -> (Expr<'input>, Expr<'input>) {
     match mode {
         Assignment::Standard => (lhs, rhs),
+        // This makes the span of the generated 'a + b' in a += b the same span of 'b'. Do we want
+        // this?
         Assignment::Arithmetic(op) => (
             lhs.clone(),
             Expr(
@@ -618,4 +620,81 @@ pub fn type_expr<'input>(
             TypedExpr(TastType::Bool, TypedExprKind::BooleanLiteral(value))
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use zrc_utils::spanned;
+
+    use super::*;
+
+    mod desugar_assignment {
+        use zrc_parser::ast::expr::Arithmetic;
+
+        use super::*;
+
+        #[test]
+        fn standard() {
+            assert_eq!(
+                // a = b
+                desugar_assignment(
+                    Assignment::Standard,
+                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
+                    Expr(spanned!(4, ExprKind::Identifier("b"), 5))
+                ),
+                (
+                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
+                    Expr(spanned!(4, ExprKind::Identifier("b"), 5))
+                )
+            );
+        }
+
+        #[test]
+        fn arithmetic() {
+            assert_eq!(
+                // a += b
+                desugar_assignment(
+                    Assignment::Arithmetic(Arithmetic::Addition),
+                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
+                    Expr(spanned!(5, ExprKind::Identifier("b"), 6))
+                ),
+                (
+                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
+                    Expr(spanned!(
+                        5,
+                        ExprKind::Arithmetic(
+                            Arithmetic::Addition,
+                            Box::new(Expr(spanned!(0, ExprKind::Identifier("a"), 1))),
+                            Box::new(Expr(spanned!(5, ExprKind::Identifier("b"), 6)))
+                        ),
+                        6
+                    ))
+                )
+            );
+        }
+
+        #[test]
+        fn bitwise() {
+            assert_eq!(
+                // a >>= b
+                desugar_assignment(
+                    Assignment::BinaryBitwise(BinaryBitwise::Shr),
+                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
+                    Expr(spanned!(6, ExprKind::Identifier("b"), 7))
+                ),
+                (
+                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
+                    Expr(spanned!(
+                        6,
+                        ExprKind::BinaryBitwise(
+                            BinaryBitwise::Shr,
+                            Box::new(Expr(spanned!(0, ExprKind::Identifier("a"), 1))),
+                            Box::new(Expr(spanned!(6, ExprKind::Identifier("b"), 7)))
+                        ),
+                        7
+                    ))
+                )
+            );
+        }
+    }
 }
