@@ -11,7 +11,8 @@ use crate::tast::ty::Type as TastType;
 /// Resolve an identifier to its corresponding [`tast::ty::Type`].
 ///
 /// # Errors
-/// Errors if the identifier is not found in the type scope or a key is double-defined.
+/// Errors if the identifier is not found in the type scope or a key is
+/// double-defined.
 pub fn resolve_type<'input>(
     scope: &Scope<'input>,
     ty: ParserType<'input>,
@@ -68,8 +69,9 @@ pub fn resolve_struct_keys<'input>(
 mod tests {
     use std::collections::HashMap;
 
-    use super::*;
     use zrc_utils::spanned;
+
+    use super::*;
 
     #[test]
     fn pointers_and_identifiers_resolve_as_expected() {
