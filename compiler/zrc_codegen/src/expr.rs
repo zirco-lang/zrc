@@ -30,11 +30,24 @@ pub fn cg_place(
             (reg, *bb)
         }
         PlaceKind::Deref(x) => {
+            // This is a bit confusing, even for me, but I'm leaving this note here for the
+            // future. `x` in this case is an *expression* yielding type `*T`.
+            // This expression is most likely an identifier, but it could be a
+            // ternary, cast, etc. If it's an identifier, it is stored on the
+            // stack and LLVM sees it as a `T**` (points to the stack). cg_place
+            // is expected to return a *pointer* to the place, so we need to load the
+            // `T*` from the stack or whatever else it represents. `cg_expr` luckily will
+            // handle dereferencing an identifier for us, and will perform the
+            // actual deref. For this reason, we have no need to generate a
+            // `load` instruction here.
+            //
+            // For example, if we're generating the place `*0`, the pointer to this location
+            // is just `0`. We do not need to actually `load` unless we are
+            // pulling from the stack, which cg_expr will do for us.
+
             let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
 
-            let x_reg = cg_load(cg, bb, &get_llvm_typename(x.0), &x_ptr)?;
-
-            (x_reg, bb)
+            (x_ptr, bb)
         }
         PlaceKind::Index(x, index) => {
             let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
@@ -589,4 +602,311 @@ pub fn cg_expr(
             (format!("@.str{id}"), *bb)
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use zrc_typeck::{tast::expr::PlaceKind, typeck::BlockReturnType};
+
+    use super::*;
+    use crate::{BasicBlockData, Counter};
+
+    /// Shorthand for initializing the following function:
+    ///
+    /// ```zr
+    /// fn test() {}
+    /// ```
+    ///
+    /// You are then given all of the values needed for code generation
+    /// within this function.
+    fn init_single_function() -> (ModuleCg, FunctionCg<'static>, BasicBlock, CgScope<'static>) {
+        let module = ModuleCg::new();
+        let mut global_scope = CgScope::new();
+        global_scope.insert("test", "@test".to_string());
+
+        let (cg, bb, fn_scope) = FunctionCg::new(
+            "@test".to_string(),
+            BlockReturnType::Void,
+            vec![],
+            &global_scope,
+        );
+
+        (module, cg, bb, fn_scope)
+    }
+
+    mod cg_place {
+        use super::*;
+
+        /// Ensure the above initialization code works as expected.
+        #[test]
+        fn internal_init_single_function_produces_valid_state() {
+            let (module, cg, bb, scope) = init_single_function();
+
+            assert_eq!(
+                module,
+                ModuleCg {
+                    declarations: vec![],
+                    global_constant_id: Counter::new(0)
+                }
+            );
+            assert_eq!(
+                cg,
+                FunctionCg {
+                    name: "@test".to_string(),
+                    parameters: vec![],
+                    ret: BlockReturnType::Void,
+                    blocks: vec![BasicBlockData {
+                        id: 0,
+                        instructions: vec![]
+                    }],
+                    next_instruction_id: Counter::new(1),
+                    allocations: vec![]
+                }
+            );
+            assert_eq!(bb, BasicBlock { id: 0 });
+            assert_eq!(
+                scope,
+                CgScope {
+                    identifiers: HashMap::from([("test", "@test".to_string())])
+                }
+            );
+        }
+
+        /// The code generator should not need to do any extra work to handle
+        /// identifiers, as they are already represented by a singular register.
+        /// They should just return the pointer as-is.
+        #[test]
+        fn identifier_registers_are_returned_as_is() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            scope.insert("x", "%x".to_string());
+
+            let (reg, bb) = cg_place(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                Place(Type::I32, PlaceKind::Variable("x")),
+            )
+            .unwrap();
+
+            // no basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // no instructions were produced
+            assert_eq!(cg.blocks[0].instructions, Vec::<String>::new());
+
+            // the register was returned as-is
+            assert_eq!(reg, "%x");
+        }
+
+        /// Dereferencing a pointer in place context should generate a single
+        /// load instruction to retrieve the pointer itself off the
+        /// stack.
+        #[test]
+        fn identifier_deref_loads_correctly() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            scope.insert("x", "%x".to_string());
+
+            let (reg, bb) = cg_place(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                Place(
+                    Type::I32,
+                    PlaceKind::Deref(Box::new(TypedExpr(
+                        Type::Ptr(Box::new(Type::I32)),
+                        TypedExprKind::Identifier("x"),
+                    ))),
+                ),
+            )
+            .unwrap();
+
+            // no new basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // the `load` instruction was produced
+            assert_eq!(
+                cg.blocks[0].instructions,
+                vec!["%l1 = load ptr, ptr %x".to_string()]
+            );
+
+            // the register was returned
+            assert_eq!(reg, "%l1");
+        }
+
+        /// Dereferencing a value that is not an identifier should not involve
+        /// any loading, because it is expected to return a pointer
+        /// (e.g. the pointer to the value `*0` is just `0`)
+        #[test]
+        fn other_deref_does_not_load() {
+            let (mut module, mut cg, bb, scope) = init_single_function();
+
+            let (reg, bb) = cg_place(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                // in place context: *(0 as *i32)
+                // should return `0` as an llvm ptr
+                Place(
+                    Type::I32,
+                    PlaceKind::Deref(Box::new(TypedExpr(
+                        Type::Ptr(Box::new(Type::I32)),
+                        TypedExprKind::Cast(
+                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("0"))),
+                            Type::Ptr(Box::new(Type::I32)),
+                        ),
+                    ))),
+                ),
+            )
+            .unwrap();
+
+            // no new basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // an inttoptr instruction is produced and the value is returned
+            assert_eq!(
+                cg.blocks[0].instructions,
+                vec!["%l1 = inttoptr i32 0 to ptr".to_string()]
+            );
+
+            // the register was returned
+            assert_eq!(reg, "%l1");
+        }
+    }
+
+    mod cg_expr {
+        use zrc_typeck::tast::stmt::ArgumentDeclarationList;
+
+        use super::*;
+
+        #[test]
+        fn comma_yields_right_value() {
+            let (mut module, mut cg, bb, scope) = init_single_function();
+
+            let (reg, bb) = cg_expr(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                TypedExpr(
+                    Type::I32,
+                    TypedExprKind::Comma(
+                        // This left-hand-side is to ensure that the left hand operand is still
+                        // evaluated for side effects
+                        Box::new(TypedExpr(
+                            Type::I32,
+                            TypedExprKind::Arithmetic(
+                                Arithmetic::Addition,
+                                Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("1"))),
+                                Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("1"))),
+                            ),
+                        )),
+                        Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("2"))),
+                    ),
+                ),
+            )
+            .unwrap();
+
+            // no new basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // the left hand side gets evaluated
+            assert_eq!(
+                cg.blocks[0].instructions,
+                vec!["%l1 = add i32 1, 1".to_string()]
+            );
+
+            // the right hand side is what was yielded
+            assert_eq!(reg, "2");
+        }
+
+        /// This is a much more complex test. It ensures a ternary operator
+        /// properly resolves the left and right hand side expressions
+        /// and generates the diamond-shaped control flow graph. This
+        /// test is specifically constructed so that one side has side effects
+        /// and cannot be inlined into the `phi` node, and the other can
+        /// be.
+        #[test]
+        fn ternary_generates_proper_cfg() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            // fn get_some_int() -> i32;
+            scope.insert("get_some_int", "@get_some_int".to_string());
+
+            let (reg, bb) = cg_expr(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                TypedExpr(
+                    Type::I32,
+                    TypedExprKind::Ternary(
+                        Box::new(TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true))),
+                        Box::new(TypedExpr(
+                            Type::I32,
+                            TypedExprKind::Call(
+                                Box::new(Place(
+                                    Type::Fn(
+                                        ArgumentDeclarationList::NonVariadic(vec![]),
+                                        Box::new(BlockReturnType::Return(Type::I32)),
+                                    ),
+                                    PlaceKind::Variable("get_some_int"),
+                                )),
+                                vec![],
+                            ),
+                        )),
+                        Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("2"))),
+                    ),
+                ),
+            )
+            .unwrap();
+
+            // We expect the output to look like the following:
+            // bb0:
+            //     br i1 true, label %bb1, label %bb2
+            // bb1: ; if_true
+            //     %l1 = call i32 @get_some_int()
+            //     br label %bb3
+            // bb2: ; if false
+            //     br label %bb3
+            // bb3: ; end
+            //     %l2 = phi i32 [ %l1, %bb1 ], [ 2, %bb2 ]
+            //     ; yields %l2
+
+            assert_eq!(bb, BasicBlock { id: 3 });
+
+            assert_eq!(
+                cg.blocks,
+                vec![
+                    BasicBlockData {
+                        id: 0,
+                        instructions: vec!["br i1 true, label %bb1, label %bb2".to_string()]
+                    },
+                    BasicBlockData {
+                        id: 1,
+                        instructions: vec![
+                            "%l1 = call i32 () @get_some_int()".to_string(),
+                            "br label %bb3".to_string()
+                        ]
+                    },
+                    BasicBlockData {
+                        id: 2,
+                        instructions: vec!["br label %bb3".to_string()]
+                    },
+                    BasicBlockData {
+                        id: 3,
+                        instructions: vec!["%l2 = phi i32 [ %l1, %bb1 ], [ 2, %bb2 ]".to_string()]
+                    },
+                ]
+            );
+
+            assert_eq!(reg, "%l2");
+        }
+    }
 }
