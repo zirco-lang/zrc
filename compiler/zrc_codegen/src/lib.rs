@@ -330,3 +330,73 @@ impl<'input> Default for CgScope<'input> {
         Self::new()
     }
 }
+
+/// Shorthand for initializing the following function:
+///
+/// ```zr
+/// fn test() {}
+/// ```
+///
+/// Only available when the `test` feature is enabled.
+///
+/// You are then given all of the values needed for code generation
+/// within this function.
+#[cfg(test)]
+fn init_single_function() -> (ModuleCg, FunctionCg<'static>, BasicBlock, CgScope<'static>) {
+    use zrc_typeck::typeck::BlockReturnType;
+
+    let module = ModuleCg::new();
+    let mut global_scope = CgScope::new();
+    global_scope.insert("test", "@test".to_string());
+
+    let (cg, bb, fn_scope) = FunctionCg::new(
+        "@test".to_string(),
+        BlockReturnType::Void,
+        vec![],
+        &global_scope,
+    );
+
+    (module, cg, bb, fn_scope)
+}
+
+#[cfg(test)]
+mod tests {
+    use zrc_typeck::typeck::BlockReturnType;
+
+    use super::*;
+
+    /// Ensure the simple initialization code works as expected.
+    #[test]
+    fn internal_init_single_function_produces_valid_state() {
+        let (module, cg, bb, scope) = init_single_function();
+
+        assert_eq!(
+            module,
+            ModuleCg {
+                declarations: vec![],
+                global_constant_id: Counter::new(0)
+            }
+        );
+        assert_eq!(
+            cg,
+            FunctionCg {
+                name: "@test".to_string(),
+                parameters: vec![],
+                ret: BlockReturnType::Void,
+                blocks: vec![BasicBlockData {
+                    id: 0,
+                    instructions: vec![]
+                }],
+                next_instruction_id: Counter::new(1),
+                allocations: vec![]
+            }
+        );
+        assert_eq!(bb, BasicBlock { id: 0 });
+        assert_eq!(
+            scope,
+            CgScope {
+                identifiers: HashMap::from([("test", "@test".to_string())])
+            }
+        );
+    }
+}

@@ -400,3 +400,59 @@ pub fn cg_program(program: Vec<TypedDeclaration>) -> anyhow::Result<String> {
 
     Ok(module.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+
+    use crate::init_single_function;
+
+    /// Ensures [`cg_let_declaration`] properly generates the allocations and assigns a value if needed.
+    #[test]
+    fn let_declarations_are_properly_generated() {
+        let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+        let bb = cg_let_declaration(
+            &mut module,
+            &mut cg,
+            &bb,
+            &mut scope,
+            vec![
+                LetDeclaration {
+                    name: "a",
+                    ty: Type::I32,
+                    value: None,
+                },
+                LetDeclaration {
+                    name: "b",
+                    ty: Type::Bool,
+                    value: Some(TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true))),
+                },
+            ],
+        )
+        .unwrap();
+
+        // no new basic blocks were created
+        assert_eq!(bb, BasicBlock { id: 0 });
+
+        // the two allocations were properly placed at the top of the function
+        assert_eq!(cg.allocations, vec!["%l1 = alloca i32", "%l2 = alloca i1"]);
+
+        // the pointers were properly added to the scope
+        assert_eq!(
+            scope,
+            CgScope {
+                identifiers: HashMap::from([
+                    ("test", "@test".to_string()),
+                    ("a", "%l1".to_string()),
+                    ("b", "%l2".to_string())
+                ])
+            }
+        );
+
+        // the assignment was properly generated
+        assert_eq!(cg.blocks[0].instructions, vec!["store i1 true, ptr %l2"]);
+    }
+}
