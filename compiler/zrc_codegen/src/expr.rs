@@ -688,5 +688,40 @@ mod tests {
             // the register was returned as-is
             assert_eq!(reg, "%x");
         }
+
+        /// Dereferencing a pointer in place context should generate a single load. We store `T*` as a pointer to the stack (`T**`) and we should return the pointer to the value which is a `T*`.
+        #[test]
+        fn pointer_deref_is_loaded() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            scope.insert("x", "%x".to_string());
+
+            let (reg, bb) = cg_place(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                Place(
+                    Type::I32,
+                    PlaceKind::Deref(Box::new(TypedExpr(
+                        Type::Ptr(Box::new(Type::I32)),
+                        TypedExprKind::Identifier("x"),
+                    ))),
+                ),
+            )
+            .unwrap();
+
+            // no new basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // the `load` instruction was produced
+            assert_eq!(
+                cg.blocks[0].instructions,
+                vec!["%l1 = load ptr, ptr %x".to_string()]
+            );
+
+            // the register was returned
+            assert_eq!(reg, "%l1");
+        }
     }
 }
