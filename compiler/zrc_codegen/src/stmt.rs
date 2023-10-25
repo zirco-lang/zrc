@@ -536,5 +536,198 @@ mod tests {
                 ]
             );
         }
+
+        mod loops {
+            use super::*;
+
+            mod while_loops {
+                use super::*;
+
+                #[test]
+                fn generate_as_expected() {
+                    let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+                    scope.insert("do_stuff", "@do_stuff".to_string());
+
+                    let call_do_stuff: TypedStmt = TypedStmt::ExprStmt(TypedExpr(
+                        Type::Void,
+                        TypedExprKind::Call(
+                            Box::new(Place(
+                                Type::Fn(
+                                    ArgumentDeclarationList::NonVariadic(vec![]),
+                                    Box::new(BlockReturnType::Void),
+                                ),
+                                PlaceKind::Variable("do_stuff"),
+                            )),
+                            vec![],
+                        ),
+                    ));
+
+                    let bb = cg_block(
+                        &mut module,
+                        &mut cg,
+                        &bb,
+                        &scope,
+                        // while (true) do_stuff();
+                        vec![TypedStmt::WhileStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![call_do_stuff.clone()],
+                        )],
+                        None,
+                    )
+                    .unwrap()
+                    .expect("code generation is continuable");
+
+                    // The output IR should be as follows:
+                    // bb0:
+                    //     br label %bb1
+                    // bb1: ; header
+                    //     br i1 true, label %bb2, label %bb3
+                    // bb2: ; body
+                    //     call void () @do_stuff()
+                    //     br label %bb1
+                    // bb3: ; exit, yield
+
+                    assert_eq!(bb, BasicBlock { id: 3 });
+
+                    assert_eq!(
+                        cg.blocks,
+                        vec![
+                            BasicBlockData {
+                                id: 0,
+                                instructions: vec!["br label %bb1".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 1,
+                                instructions: vec!["br i1 true, label %bb2, label %bb3".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 2,
+                                instructions: vec![
+                                    "call void () @do_stuff()".to_string(),
+                                    "br label %bb1".to_string()
+                                ]
+                            },
+                            BasicBlockData {
+                                id: 3,
+                                instructions: vec![]
+                            }
+                        ]
+                    );
+                }
+
+                /// `break;` should move to the exit block
+                #[test]
+                fn break_generates_as_expected() {
+                    let (mut module, mut cg, bb, scope) = init_single_function();
+
+                    let bb = cg_block(
+                        &mut module,
+                        &mut cg,
+                        &bb,
+                        &scope,
+                        // while (true) break;
+                        vec![TypedStmt::WhileStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![TypedStmt::BreakStmt],
+                        )],
+                        None,
+                    )
+                    .unwrap()
+                    .expect("code generation is continuable");
+
+                    // The output IR should be as follows:
+                    // bb0:
+                    //     br label %bb1
+                    // bb1: ; header
+                    //     br i1 true, label %bb2, label %bb3
+                    // bb2: ; body
+                    //     br label %bb3 ; break
+                    //     ; THE DEFAULT RETURN-TO-HEADER ISN'T ADDED
+                    //     ; BECAUSE WE BREAK ABOVE
+                    // bb3: ; exit, yield
+
+                    assert_eq!(bb, BasicBlock { id: 3 });
+
+                    assert_eq!(
+                        cg.blocks,
+                        vec![
+                            BasicBlockData {
+                                id: 0,
+                                instructions: vec!["br label %bb1".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 1,
+                                instructions: vec!["br i1 true, label %bb2, label %bb3".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 2,
+                                instructions: vec!["br label %bb3".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 3,
+                                instructions: vec![]
+                            }
+                        ]
+                    );
+                }
+
+                /// `continue;` should move to the exit block
+                #[test]
+                fn continue_generates_as_expected() {
+                    let (mut module, mut cg, bb, scope) = init_single_function();
+
+                    let bb = cg_block(
+                        &mut module,
+                        &mut cg,
+                        &bb,
+                        &scope,
+                        // while (true) break;
+                        vec![TypedStmt::WhileStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![TypedStmt::ContinueStmt],
+                        )],
+                        None,
+                    )
+                    .unwrap()
+                    .expect("code generation is continuable");
+
+                    // The output IR should be as follows:
+                    // bb0:
+                    //     br label %bb1
+                    // bb1: ; header
+                    //     br i1 true, label %bb2, label %bb3
+                    // bb2: ; body
+                    //     br label %bb1 ; continue
+                    //     ; THE DEFAULT RETURN-TO-HEADER ISN'T ADDED
+                    //     ; BECAUSE WE CONTINUE ABOVE
+                    // bb3: ; exit, yield
+
+                    assert_eq!(bb, BasicBlock { id: 3 });
+
+                    assert_eq!(
+                        cg.blocks,
+                        vec![
+                            BasicBlockData {
+                                id: 0,
+                                instructions: vec!["br label %bb1".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 1,
+                                instructions: vec!["br i1 true, label %bb2, label %bb3".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 2,
+                                instructions: vec!["br label %bb1".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 3,
+                                instructions: vec![]
+                            }
+                        ]
+                    );
+                }
+            }
+        }
     }
 }
