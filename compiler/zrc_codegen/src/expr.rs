@@ -610,9 +610,7 @@ mod tests {
     use zrc_typeck::{tast::expr::PlaceKind, typeck::BlockReturnType};
 
     use super::*;
-    use crate::BasicBlockData;
-
-    use crate::init_single_function;
+    use crate::{init_single_function, BasicBlockData};
 
     mod cg_place {
         use super::*;

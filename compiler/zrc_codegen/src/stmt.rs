@@ -406,10 +406,10 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-
     use crate::init_single_function;
 
-    /// Ensures [`cg_let_declaration`] properly generates the allocations and assigns a value if needed.
+    /// Ensures [`cg_let_declaration`] properly generates the allocations and
+    /// assigns a value if needed.
     #[test]
     fn let_declarations_are_properly_generated() {
         let (mut module, mut cg, bb, mut scope) = init_single_function();
