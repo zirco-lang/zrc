@@ -30,11 +30,22 @@ pub fn cg_place(
             (reg, *bb)
         }
         PlaceKind::Deref(x) => {
+            // This is a bit confusing, even for me, but I'm leaving this note here for the future.
+            // `x` in this case is an *expression* yielding type `*T`. This expression is most
+            // likely an identifier, but it could be a ternary, cast, etc. If it's an identifier,
+            // it is stored on the stack and LLVM sees it as a `T**` (points to the stack).
+            // cg_place is expected to return a *pointer* to the place, so we need to load the
+            // `T*` from the stack or whatever else it represents. `cg_expr` luckily will handle
+            // dereferencing an identifier for us, and will perform the actual deref. For this
+            // reason, we have no need to generate a `load` instruction here.
+            //
+            // For example, if we're generating the place `*0`, the pointer to this location is
+            // just `0`. We do not need to actually `load` unless we are pulling from the stack,
+            // which cg_expr will do for us.
+
             let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
 
-            let x_reg = cg_load(cg, bb, &get_llvm_typename(x.0), &x_ptr)?;
-
-            (x_reg, bb)
+            (x_ptr, bb)
         }
         PlaceKind::Index(x, index) => {
             let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
@@ -689,9 +700,10 @@ mod tests {
             assert_eq!(reg, "%x");
         }
 
-        /// Dereferencing a pointer in place context should generate a single load. We store `T*` as a pointer to the stack (`T**`) and we should return the pointer to the value which is a `T*`.
+        /// Dereferencing a pointer in place context should generate a single load instruction to
+        /// retrieve the pointer itself off the stack.
         #[test]
-        fn pointer_deref_is_loaded() {
+        fn identifier_deref_loads_correctly() {
             let (mut module, mut cg, bb, mut scope) = init_single_function();
 
             scope.insert("x", "%x".to_string());
@@ -718,6 +730,45 @@ mod tests {
             assert_eq!(
                 cg.blocks[0].instructions,
                 vec!["%l1 = load ptr, ptr %x".to_string()]
+            );
+
+            // the register was returned
+            assert_eq!(reg, "%l1");
+        }
+
+        /// Dereferencing a value that is not an identifier should not involve any loading, because
+        /// it is expected to return a pointer (e.g. the pointer to the value `*0` is just `0`)
+        #[test]
+        fn other_deref_does_not_load() {
+            let (mut module, mut cg, bb, scope) = init_single_function();
+
+            let (reg, bb) = cg_place(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                // in place context: *(0 as *i32)
+                // should return `0` as an llvm ptr
+                Place(
+                    Type::I32,
+                    PlaceKind::Deref(Box::new(TypedExpr(
+                        Type::Ptr(Box::new(Type::I32)),
+                        TypedExprKind::Cast(
+                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("0"))),
+                            Type::Ptr(Box::new(Type::I32)),
+                        ),
+                    ))),
+                ),
+            )
+            .unwrap();
+
+            // no new basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // an inttoptr instruction is produced and the value is returned
+            assert_eq!(
+                cg.blocks[0].instructions,
+                vec!["%l1 = inttoptr i32 0 to ptr".to_string()]
             );
 
             // the register was returned
