@@ -826,10 +826,12 @@ mod tests {
             assert_eq!(reg, "2");
         }
 
-        /// This is a much more complex test. It ensures a ternary operator properly resolves the
-        /// left and right hand side expressions and generates the diamond-shaped control flow
-        /// graph. This test is specifically constructed so that one side has side effects and
-        /// cannot be inlined into the `phi` node, and the other can be.
+        /// This is a much more complex test. It ensures a ternary operator
+        /// properly resolves the left and right hand side expressions
+        /// and generates the diamond-shaped control flow graph. This
+        /// test is specifically constructed so that one side has side effects
+        /// and cannot be inlined into the `phi` node, and the other can
+        /// be.
         #[test]
         fn ternary_generates_proper_cfg() {
             let (mut module, mut cg, bb, mut scope) = init_single_function();
