@@ -30,18 +30,20 @@ pub fn cg_place(
             (reg, *bb)
         }
         PlaceKind::Deref(x) => {
-            // This is a bit confusing, even for me, but I'm leaving this note here for the future.
-            // `x` in this case is an *expression* yielding type `*T`. This expression is most
-            // likely an identifier, but it could be a ternary, cast, etc. If it's an identifier,
-            // it is stored on the stack and LLVM sees it as a `T**` (points to the stack).
-            // cg_place is expected to return a *pointer* to the place, so we need to load the
-            // `T*` from the stack or whatever else it represents. `cg_expr` luckily will handle
-            // dereferencing an identifier for us, and will perform the actual deref. For this
-            // reason, we have no need to generate a `load` instruction here.
+            // This is a bit confusing, even for me, but I'm leaving this note here for the
+            // future. `x` in this case is an *expression* yielding type `*T`.
+            // This expression is most likely an identifier, but it could be a
+            // ternary, cast, etc. If it's an identifier, it is stored on the
+            // stack and LLVM sees it as a `T**` (points to the stack). cg_place
+            // is expected to return a *pointer* to the place, so we need to load the
+            // `T*` from the stack or whatever else it represents. `cg_expr` luckily will
+            // handle dereferencing an identifier for us, and will perform the
+            // actual deref. For this reason, we have no need to generate a
+            // `load` instruction here.
             //
-            // For example, if we're generating the place `*0`, the pointer to this location is
-            // just `0`. We do not need to actually `load` unless we are pulling from the stack,
-            // which cg_expr will do for us.
+            // For example, if we're generating the place `*0`, the pointer to this location
+            // is just `0`. We do not need to actually `load` unless we are
+            // pulling from the stack, which cg_expr will do for us.
 
             let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
 
@@ -604,38 +606,38 @@ pub fn cg_expr(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use zrc_typeck::{tast::expr::PlaceKind, typeck::BlockReturnType};
+
     use super::*;
+    use crate::{BasicBlockData, Counter};
+
+    /// Shorthand for initializing the following function:
+    ///
+    /// ```zr
+    /// fn test() {}
+    /// ```
+    ///
+    /// You are then given all of the values needed for code generation
+    /// within this function.
+    fn init_single_function() -> (ModuleCg, FunctionCg<'static>, BasicBlock, CgScope<'static>) {
+        let module = ModuleCg::new();
+        let mut global_scope = CgScope::new();
+        global_scope.insert("test", "@test".to_string());
+
+        let (cg, bb, fn_scope) = FunctionCg::new(
+            "@test".to_string(),
+            BlockReturnType::Void,
+            vec![],
+            &global_scope,
+        );
+
+        (module, cg, bb, fn_scope)
+    }
 
     mod cg_place {
-        use std::collections::HashMap;
-
-        use zrc_typeck::{tast::expr::PlaceKind, typeck::BlockReturnType};
-
         use super::*;
-        use crate::{BasicBlockData, Counter};
-
-        /// Shorthand for initializing the following function:
-        ///
-        /// ```zr
-        /// fn test() {}
-        /// ```
-        ///
-        /// You are then given all of the values needed for code generation
-        /// within this function.
-        fn init_single_function() -> (ModuleCg, FunctionCg<'static>, BasicBlock, CgScope<'static>) {
-            let module = ModuleCg::new();
-            let mut global_scope = CgScope::new();
-            global_scope.insert("test", "@test".to_string());
-
-            let (cg, bb, fn_scope) = FunctionCg::new(
-                "@test".to_string(),
-                BlockReturnType::Void,
-                vec![],
-                &global_scope,
-            );
-
-            (module, cg, bb, fn_scope)
-        }
 
         /// Ensure the above initialization code works as expected.
         #[test]
@@ -700,8 +702,9 @@ mod tests {
             assert_eq!(reg, "%x");
         }
 
-        /// Dereferencing a pointer in place context should generate a single load instruction to
-        /// retrieve the pointer itself off the stack.
+        /// Dereferencing a pointer in place context should generate a single
+        /// load instruction to retrieve the pointer itself off the
+        /// stack.
         #[test]
         fn identifier_deref_loads_correctly() {
             let (mut module, mut cg, bb, mut scope) = init_single_function();
@@ -736,8 +739,9 @@ mod tests {
             assert_eq!(reg, "%l1");
         }
 
-        /// Dereferencing a value that is not an identifier should not involve any loading, because
-        /// it is expected to return a pointer (e.g. the pointer to the value `*0` is just `0`)
+        /// Dereferencing a value that is not an identifier should not involve
+        /// any loading, because it is expected to return a pointer
+        /// (e.g. the pointer to the value `*0` is just `0`)
         #[test]
         fn other_deref_does_not_load() {
             let (mut module, mut cg, bb, scope) = init_single_function();
