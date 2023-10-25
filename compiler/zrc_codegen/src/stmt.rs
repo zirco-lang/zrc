@@ -455,4 +455,86 @@ mod tests {
         // the assignment was properly generated
         assert_eq!(cg.blocks[0].instructions, vec!["store i1 true, ptr %l2"]);
     }
+
+    mod cg_block {
+        use super::*;
+        use crate::BasicBlockData;
+
+        #[test]
+        fn if_statements_generate_as_expected() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            scope.insert("do_stuff", "@do_stuff".to_string());
+
+            let call_do_stuff: TypedStmt = TypedStmt::ExprStmt(TypedExpr(
+                Type::Void,
+                TypedExprKind::Call(
+                    Box::new(Place(
+                        Type::Fn(
+                            ArgumentDeclarationList::NonVariadic(vec![]),
+                            Box::new(BlockReturnType::Void),
+                        ),
+                        PlaceKind::Variable("do_stuff"),
+                    )),
+                    vec![],
+                ),
+            ));
+
+            let bb = cg_block(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                vec![TypedStmt::IfStmt(
+                    TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                    vec![call_do_stuff.clone()],
+                    Some(vec![call_do_stuff]),
+                )],
+                None,
+            )
+            .unwrap()
+            .expect("code generation is continuable");
+
+            // The output IR should be as follows:
+            // bb0:
+            //     br i1 true, label %bb1, label %bb2
+            // bb1: ; if true
+            //     call void () @do_stuff()
+            //     br label %bb3
+            // bb2: ; if false
+            //     call void () @do_stuff()
+            //     br label %bb3
+            // bb3: ; yield this bb
+
+            assert_eq!(bb, BasicBlock { id: 3 });
+
+            assert_eq!(
+                cg.blocks,
+                vec![
+                    BasicBlockData {
+                        id: 0,
+                        instructions: vec!["br i1 true, label %bb1, label %bb2".to_string()]
+                    },
+                    BasicBlockData {
+                        id: 1,
+                        instructions: vec![
+                            "call void () @do_stuff()".to_string(),
+                            "br label %bb3".to_string()
+                        ]
+                    },
+                    BasicBlockData {
+                        id: 2,
+                        instructions: vec![
+                            "call void () @do_stuff()".to_string(),
+                            "br label %bb3".to_string()
+                        ]
+                    },
+                    BasicBlockData {
+                        id: 3,
+                        instructions: vec![]
+                    }
+                ]
+            );
+        }
+    }
 }
