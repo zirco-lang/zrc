@@ -71,6 +71,7 @@ impl Counter {
 
 /// A code generator for one module, the unit of compilation in Zirco
 /// corresponding to one source file.
+#[derive(Debug, PartialEq, Clone)]
 pub struct ModuleCg {
     pub declarations: Vec<String>,
     global_constant_id: Counter,

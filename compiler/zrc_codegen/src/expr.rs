@@ -590,3 +590,103 @@ pub fn cg_expr(
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod cg_place {
+        use std::collections::HashMap;
+
+        use zrc_typeck::{tast::expr::PlaceKind, typeck::BlockReturnType};
+
+        use super::*;
+        use crate::{BasicBlockData, Counter};
+
+        /// Shorthand for initializing the following function:
+        ///
+        /// ```zr
+        /// fn test() {}
+        /// ```
+        ///
+        /// You are then given all of the values needed for code generation
+        /// within this function.
+        fn init_single_function() -> (ModuleCg, FunctionCg<'static>, BasicBlock, CgScope<'static>) {
+            let module = ModuleCg::new();
+            let mut global_scope = CgScope::new();
+            global_scope.insert("test", "@test".to_string());
+
+            let (cg, bb, fn_scope) = FunctionCg::new(
+                "@test".to_string(),
+                BlockReturnType::Void,
+                vec![],
+                &global_scope,
+            );
+
+            (module, cg, bb, fn_scope)
+        }
+
+        /// Ensure the above initialization code works as expected.
+        #[test]
+        fn internal_init_single_function_produces_valid_state() {
+            let (module, cg, bb, scope) = init_single_function();
+
+            assert_eq!(
+                module,
+                ModuleCg {
+                    declarations: vec![],
+                    global_constant_id: Counter::new(0)
+                }
+            );
+            assert_eq!(
+                cg,
+                FunctionCg {
+                    name: "@test".to_string(),
+                    parameters: vec![],
+                    ret: BlockReturnType::Void,
+                    blocks: vec![BasicBlockData {
+                        id: 0,
+                        instructions: vec![]
+                    }],
+                    next_instruction_id: Counter::new(1),
+                    allocations: vec![]
+                }
+            );
+            assert_eq!(bb, BasicBlock { id: 0 });
+            assert_eq!(
+                scope,
+                CgScope {
+                    identifiers: HashMap::from([("test", "@test".to_string())])
+                }
+            );
+        }
+
+        /// The code generator should not need to do any extra work to handle
+        /// identifiers, as they are already represented by a singular register.
+        /// They should just return the pointer as-is.
+        #[test]
+        fn identifier_registers_are_returned_as_is() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            scope.insert("x", "%x".to_string());
+
+            let (reg, bb) = cg_place(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                Place(Type::I32, PlaceKind::Variable("x")),
+            )
+            .unwrap();
+
+            // no basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // no instructions were produced
+            assert_eq!(cg.blocks[0].instructions, Vec::<String>::new());
+
+            // the register was returned as-is
+            assert_eq!(reg, "%x");
+        }
+    }
+}
