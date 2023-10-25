@@ -11,7 +11,7 @@ zrc_typeck = { version = "0.1.0", path = "../zrc_typeck" }
 zrc_codegen = { version = "0.1.0", path = "../zrc_codegen" }
 anyhow = "1.0.75"
 zrc_diagnostics = { version = "0.1.0", path = "../zrc_diagnostics" }
-clap = { version = "4.4.6", features = ["derive"] }
+clap = { version = "4.4.7", features = ["derive"] }
 shadow-rs = "0.24.1"
 
 [build-dependencies]
