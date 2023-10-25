@@ -779,4 +779,132 @@ mod tests {
             assert_eq!(reg, "%l1");
         }
     }
+
+    mod cg_expr {
+        use zrc_typeck::tast::stmt::ArgumentDeclarationList;
+
+        use super::*;
+
+        #[test]
+        fn comma_yields_right_value() {
+            let (mut module, mut cg, bb, scope) = init_single_function();
+
+            let (reg, bb) = cg_expr(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                TypedExpr(
+                    Type::I32,
+                    TypedExprKind::Comma(
+                        // This left-hand-side is to ensure that the left hand operand is still
+                        // evaluated for side effects
+                        Box::new(TypedExpr(
+                            Type::I32,
+                            TypedExprKind::Arithmetic(
+                                Arithmetic::Addition,
+                                Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("1"))),
+                                Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("1"))),
+                            ),
+                        )),
+                        Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("2"))),
+                    ),
+                ),
+            )
+            .unwrap();
+
+            // no new basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // the left hand side gets evaluated
+            assert_eq!(
+                cg.blocks[0].instructions,
+                vec!["%l1 = add i32 1, 1".to_string()]
+            );
+
+            // the right hand side is what was yielded
+            assert_eq!(reg, "2");
+        }
+
+        /// This is a much more complex test. It ensures a ternary operator properly resolves the
+        /// left and right hand side expressions and generates the diamond-shaped control flow
+        /// graph. This test is specifically constructed so that one side has side effects and
+        /// cannot be inlined into the `phi` node, and the other can be.
+        #[test]
+        fn ternary_generates_proper_cfg() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            // fn get_some_int() -> i32;
+            scope.insert("get_some_int", "@get_some_int".to_string());
+
+            let (reg, bb) = cg_expr(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                TypedExpr(
+                    Type::I32,
+                    TypedExprKind::Ternary(
+                        Box::new(TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true))),
+                        Box::new(TypedExpr(
+                            Type::I32,
+                            TypedExprKind::Call(
+                                Box::new(Place(
+                                    Type::Fn(
+                                        ArgumentDeclarationList::NonVariadic(vec![]),
+                                        Box::new(BlockReturnType::Return(Type::I32)),
+                                    ),
+                                    PlaceKind::Variable("get_some_int"),
+                                )),
+                                vec![],
+                            ),
+                        )),
+                        Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("2"))),
+                    ),
+                ),
+            )
+            .unwrap();
+
+            // We expect the output to look like the following:
+            // bb0:
+            //     br i1 true, label %bb1, label %bb2
+            // bb1: ; if_true
+            //     %l1 = call i32 @get_some_int()
+            //     br label %bb3
+            // bb2: ; if false
+            //     br label %bb3
+            // bb3: ; end
+            //     %l2 = phi i32 [ %l1, %bb1 ], [ 2, %bb2 ]
+            //     ; yields %l2
+
+            assert_eq!(bb, BasicBlock { id: 3 });
+
+            assert_eq!(
+                cg.blocks,
+                vec![
+                    BasicBlockData {
+                        id: 0,
+                        instructions: vec!["br i1 true, label %bb1, label %bb2".to_string()]
+                    },
+                    BasicBlockData {
+                        id: 1,
+                        instructions: vec![
+                            "%l1 = call i32 () @get_some_int()".to_string(),
+                            "br label %bb3".to_string()
+                        ]
+                    },
+                    BasicBlockData {
+                        id: 2,
+                        instructions: vec!["br label %bb3".to_string()]
+                    },
+                    BasicBlockData {
+                        id: 3,
+                        instructions: vec!["%l2 = phi i32 [ %l1, %bb1 ], [ 2, %bb2 ]".to_string()]
+                    },
+                ]
+            );
+
+            assert_eq!(reg, "%l2");
+        }
+    }
 }
