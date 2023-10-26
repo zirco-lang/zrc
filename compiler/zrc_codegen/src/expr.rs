@@ -50,16 +50,13 @@ pub fn cg_place(
             (x_ptr, bb)
         }
         PlaceKind::Index(x, index) => {
+            let old_index = index.clone();
             let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
-            let (index_ptr, bb) = cg_expr(module, cg, &bb, scope, *index.clone())?;
+            let (index, bb) = cg_expr(module, cg, &bb, scope, *index.clone())?;
 
             let x_typename = get_llvm_typename(x.clone().0);
 
-            let x_reg = cg_load(cg, bb, &x_typename, &x_ptr)?;
-
-            let index_typename = get_llvm_typename(index.0.clone());
-
-            let index_reg = cg_load(cg, bb, &index_typename, &index_ptr)?;
+            let index_typename = get_llvm_typename(old_index.0.clone());
 
             #[allow(clippy::wildcard_enum_match_arm)]
             let result_typename = match x.0 {
@@ -74,7 +71,7 @@ pub fn cg_place(
                 cg,
                 &format!(
                     "{} = getelementptr {}, {} {}, {} {}",
-                    result_reg, result_typename, x_typename, x_reg, index_typename, index_reg
+                    result_reg, result_typename, x_typename, x_ptr, index_typename, index
                 ),
             )?;
 
@@ -647,7 +644,7 @@ mod tests {
         /// load instruction to retrieve the pointer itself off the
         /// stack.
         #[test]
-        fn identifier_deref_loads_correctly() {
+        fn identifier_deref_generates_as_expected() {
             let (mut module, mut cg, bb, mut scope) = init_single_function();
 
             scope.insert("x", "%x".to_string());
@@ -684,7 +681,7 @@ mod tests {
         /// any loading, because it is expected to return a pointer
         /// (e.g. the pointer to the value `*0` is just `0`)
         #[test]
-        fn other_deref_does_not_load() {
+        fn other_deref_generates_as_expected() {
             let (mut module, mut cg, bb, scope) = init_single_function();
 
             let (reg, bb) = cg_place(
@@ -718,6 +715,46 @@ mod tests {
 
             // the register was returned
             assert_eq!(reg, "%l1");
+        }
+
+        #[test]
+        fn pointer_indexing_generates_proper_gep() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            // of type *i32
+            scope.insert("arr", "%arr".to_string());
+
+            let (reg, bb) = cg_place(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                // in place context: arr[4]
+                Place(
+                    Type::I32,
+                    PlaceKind::Index(
+                        Box::new(TypedExpr(
+                            Type::Ptr(Box::new(Type::I32)),
+                            TypedExprKind::Identifier("arr"),
+                        )),
+                        Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("4"))),
+                    ),
+                ),
+            )
+            .unwrap();
+
+            // no new basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // `arr` is loaded from memory, then a gep instruction is produced
+            assert_eq!(
+                cg.blocks[0].instructions,
+                vec![
+                    "%l1 = load ptr, ptr %arr".to_string(),
+                    "%l2 = getelementptr i32, ptr %l1, i32 4".to_string()
+                ]
+            );
+            assert_eq!(reg, "%l2");
         }
     }
 

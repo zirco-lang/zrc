@@ -2,6 +2,7 @@
     "cSpell.words": [
         "alloca",
         "bitcast",
+        "getelementptr",
         "inttoptr",
         "lalrpop",
         "Lvalue",
