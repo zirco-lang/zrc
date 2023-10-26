@@ -2,12 +2,14 @@
 //!
 //! The main thing within this module you will need is the [`Expr`] struct.
 
-use std::fmt::Display;
+use std::{fmt::Display, string::ToString};
 
 use zrc_utils::{
     span::{Span, Spannable, Spanned},
     spanned,
 };
+
+use crate::lexer::StringTok;
 
 /// Arithmetic operators
 ///
@@ -235,7 +237,7 @@ pub enum ExprKind<'input> {
     /// Any numeric literal.
     NumberLiteral(&'input str),
     /// Any string literal.
-    StringLiteral(&'input str),
+    StringLiteral(Vec<StringTok<'input>>),
     /// Any identifier.
     Identifier(&'input str),
     /// Any boolean literal.
@@ -246,7 +248,11 @@ impl<'input> Display for ExprKind<'input> {
         write!(f, "(")?;
         match self {
             Self::NumberLiteral(n) => write!(f, "{n}"),
-            Self::StringLiteral(str) => write!(f, "{str}"),
+            Self::StringLiteral(str) => write!(
+                f,
+                "\"{}\"",
+                str.iter().map(ToString::to_string).collect::<String>()
+            ),
             Self::Identifier(i) => write!(f, "{i}"),
             Self::BooleanLiteral(value) => write!(f, "{value}"),
             Self::Assignment(operator, place, value) => write!(f, "{place} {operator} {value}"),
@@ -523,7 +529,7 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn string(lit: Spanned<&'input str>) -> Self {
+    pub fn string(lit: Spanned<Vec<StringTok<'input>>>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),

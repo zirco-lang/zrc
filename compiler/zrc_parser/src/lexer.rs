@@ -23,7 +23,7 @@
 //!
 //! For more information, read the documentation of [`ZircoLexer`].
 
-use std::fmt::Display;
+use std::{fmt::Display, string::ToString};
 
 use logos::{Lexer, Logos};
 use zrc_utils::span::{Span, Spanned};
@@ -44,6 +44,9 @@ pub enum InternalLexicalError {
     /// A block comment ran to the end of the file. Remind the user that block
     /// comments nest.
     UnterminatedBlockComment,
+    /// An invalid escape sequence was found in a string literal
+    /// The included [`Span`] is the specific span of the invalid sequence
+    UnknownEscapeSequence(Span),
 }
 
 /// An error encountered during lexing. You will usually find this wrapped in a
@@ -60,11 +63,59 @@ pub enum LexicalError<'input> {
     /// A block comment ran to the end of the file. Remind the user that block
     /// comments nest.
     UnterminatedBlockComment,
+    /// Produced from [`InternalLexicalError::NoMatchingRule`]
+    UnknownEscapeSequence,
 }
 
 /// A lexer callback helper to obtain the currently matched token slice.
-fn str_slice<'input>(lex: &Lexer<'input, Tok<'input>>) -> &'input str {
+fn lexer_slice<'input, T: Logos<'input>>(
+    lex: &Lexer<'input, T>,
+) -> &'input <<T as logos::Logos<'input>>::Source as logos::Source>::Slice {
     lex.slice()
+}
+
+/// A lexer callback helper specifically meant for handling `\xFF` to `FF` in
+/// [`StringTok::EscapedHexByte`]
+fn escaped_byte_slice<'input>(lex: &Lexer<'input, StringTok<'input>>) -> &'input str {
+    let slice = lex.slice();
+
+    // \xFF
+    //   ^^ return this
+
+    &slice[2..]
+}
+
+/// A lexer callback header to convert a captured span to a [`Vec`]tor of
+/// [`StringTok`]s.
+fn lex_string_contents<'input>(
+    lex: &Lexer<'input, Tok<'input>>,
+) -> Result<Vec<StringTok<'input>>, InternalLexicalError> {
+    let slice = lex.slice();
+    let start_offset = lex.span().start + 1; // account for the opening quote
+
+    // trim off the quotes at the start and end
+    let contents = &slice[1..slice.len() - 1];
+
+    let mut string_lexer = StringTok::lexer(contents);
+    let mut tokens = Vec::new();
+
+    loop {
+        let Some(token) = string_lexer.next() else {
+            break;
+        };
+        let span = string_lexer.span();
+
+        match token {
+            Ok(token_inner) => tokens.push(token_inner),
+            Err(()) => {
+                return Err(InternalLexicalError::UnknownEscapeSequence(
+                    Span::from_positions(span.start + start_offset, span.end + start_offset),
+                ));
+            }
+        }
+    }
+
+    Ok(tokens)
 }
 
 /// Zirco uses nested block comments -- a regular expression can't match this
@@ -335,19 +386,19 @@ pub enum Tok<'input> {
 
     // === SPECIAL ===
     /// Any string literal
-    #[regex(r#""([^"\\]|\\.)*""#, str_slice)]
+    #[regex(r#""([^"\\]|\\.)*""#, lex_string_contents)]
     #[regex(r#""([^"\\]|\\.)*"#, |_lex| {
         Err(InternalLexicalError::UnterminatedStringLiteral)
     })]
-    StringLiteral(&'input str),
+    StringLiteral(Vec<StringTok<'input>>),
     /// Any number literal
     // FIXME: Do not accept multiple decimal points like "123.456.789"
-    #[regex(r"[0-9][0-9\._]*", str_slice)]
-    #[regex(r"0x[0-9a-fA-F_]+", str_slice)]
-    #[regex(r"0b[01_]+", str_slice)]
+    #[regex(r"[0-9][0-9\._]*", lexer_slice)]
+    #[regex(r"0x[0-9a-fA-F_]+", lexer_slice)]
+    #[regex(r"0b[01_]+", lexer_slice)]
     NumberLiteral(&'input str),
     /// Any identifier
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", str_slice)]
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", lexer_slice)]
     Identifier(&'input str),
 }
 impl<'input> Display for Tok<'input> {
@@ -395,7 +446,10 @@ impl<'input> Display for Tok<'input> {
                 Self::SmallArrow => "->".to_string(),
                 Self::Star => "*".to_string(),
                 Self::StarAssign => "*=".to_string(),
-                Self::StringLiteral(str) => (*str).to_string(),
+                Self::StringLiteral(str) => format!(
+                    "\"{}\"",
+                    str.iter().map(ToString::to_string).collect::<String>()
+                ),
                 Self::Struct => "struct".to_string(),
                 Self::True => "true".to_string(),
                 Self::While => "while".to_string(),
@@ -419,6 +473,46 @@ impl<'input> Display for Tok<'input> {
                 Self::Ellipsis => "...".to_string(),
             }
         )
+    }
+}
+
+/// Enum representing the lexed contents of a string literal
+#[derive(Logos, Debug, Clone, PartialEq, Eq)]
+pub enum StringTok<'input> {
+    /// `\n`
+    #[token("\\n")]
+    EscapedNewline,
+
+    /// `\r`
+    #[token("\\r")]
+    EscapedCr,
+
+    /// `\xXX` with `XX` being a hex literal
+    #[regex(r"\\x[0-9a-fA-F]{2}", escaped_byte_slice)]
+    EscapedHexByte(&'input str),
+
+    /// `\\`
+    #[token("\\\\")]
+    EscapedBackslash,
+
+    /// `\"`
+    #[token("\\\"")]
+    EscapedDoubleQuote,
+
+    /// Any other text fragment
+    #[regex(r"[^\\]+", lexer_slice)]
+    Text(&'input str),
+}
+impl Display for StringTok<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EscapedNewline => write!(f, "\\n"),
+            Self::EscapedCr => write!(f, "\\r"),
+            Self::EscapedBackslash => write!(f, "\\\\"),
+            Self::EscapedHexByte(byte) => write!(f, "\\x{byte}"),
+            Self::EscapedDoubleQuote => write!(f, "\\\""),
+            Self::Text(text) => write!(f, "{text}"),
+        }
     }
 }
 
@@ -457,6 +551,9 @@ impl<'input> Iterator for ZircoLexer<'input> {
             }
             Err(InternalLexicalError::UnterminatedStringLiteral) => {
                 Some(span.containing(Err(LexicalError::UnterminatedStringLiteral)))
+            }
+            Err(InternalLexicalError::UnknownEscapeSequence(span)) => {
+                Some(span.containing(Err(LexicalError::UnknownEscapeSequence)))
             }
             Ok(tok) => Some(span.containing(Ok(tok))),
         }
@@ -562,7 +659,7 @@ mod tests {
             Tok::As,
             Tok::Struct,
             Tok::SmallArrow,
-            Tok::StringLiteral("\"str\""),
+            Tok::StringLiteral(vec![StringTok::Text("str")]),
             Tok::NumberLiteral("7_000"),
             Tok::NumberLiteral("0xF_A"),
             Tok::NumberLiteral("0b1_0"),
