@@ -325,78 +325,495 @@ pub fn cg_block(
 
 /// # Errors
 /// Errors on internal code generation failure.
+fn cg_declaration<'input>(
+    module: &mut ModuleCg,
+    global_scope: &mut CgScope<'input>,
+    declaration: TypedDeclaration<'input>,
+) -> anyhow::Result<()> {
+    match declaration {
+        // Struct declarations don't need code generation as they're all inlined
+        TypedDeclaration::StructDeclaration { .. } => {}
+
+        TypedDeclaration::FunctionDeclaration {
+            name,
+            parameters,
+            return_type,
+            body: Some(body),
+        } => {
+            // Must happen before creating `cg` as FunctionCg::new() clones it and
+            // recursion would be impossible w/o this
+            global_scope.insert(name, format!("@{name}"));
+
+            let (mut cg, bb, fn_scope) = FunctionCg::new(
+                format!("@{name}"),
+                return_type.map_or_else(|| BlockReturnType::Void, BlockReturnType::Return),
+                {
+                    let ArgumentDeclarationList::NonVariadic(params) = parameters else {
+                        panic!("non-extern function had variadic arguments");
+                    };
+                    params
+                }
+                .into_iter()
+                .map(|x| (x.name, x.ty))
+                .collect(),
+                global_scope,
+            );
+
+            cg_block(module, &mut cg, &bb, &fn_scope, body, None)?;
+
+            module.declarations.push(cg.to_string());
+        }
+
+        TypedDeclaration::FunctionDeclaration {
+            name,
+            parameters,
+            return_type,
+            body: None,
+        } => {
+            global_scope.insert(name, format!("@{name}"));
+
+            module.declarations.push(format!(
+                "declare {} @{}({})",
+                get_llvm_typename(return_type.unwrap_or(Type::Void)),
+                name,
+                match parameters {
+                    ArgumentDeclarationList::NonVariadic(parameters) => parameters
+                        .iter()
+                        .map(|ArgumentDeclaration { ty, .. }| { get_llvm_typename(ty.clone()) })
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    ArgumentDeclarationList::Variadic(parameters) => format!(
+                        "{}, ...",
+                        parameters
+                            .iter()
+                            .map(|ArgumentDeclaration { ty, .. }| { get_llvm_typename(ty.clone()) })
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                }
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// # Errors
+/// Errors on internal code generation failure.
 pub fn cg_program(program: Vec<TypedDeclaration>) -> anyhow::Result<String> {
     let mut module = ModuleCg::new();
     let mut global_scope = CgScope::new();
 
     for declaration in program {
-        match declaration {
-            // Struct declarations don't need code generation as they're all inlined
-            TypedDeclaration::StructDeclaration { .. } => {}
+        cg_declaration(&mut module, &mut global_scope, declaration)?;
+    }
 
-            TypedDeclaration::FunctionDeclaration {
-                name,
-                parameters,
-                return_type,
-                body: Some(body),
-            } => {
-                // Must happen before creating `cg` as FunctionCg::new() clones it and
-                // recursion would be impossible w/o this
-                global_scope.insert(name, format!("@{name}"));
+    Ok(module.to_string())
+}
 
-                let (mut cg, bb, fn_scope) = FunctionCg::new(
-                    format!("@{name}"),
-                    return_type.map_or_else(|| BlockReturnType::Void, BlockReturnType::Return),
-                    {
-                        let ArgumentDeclarationList::NonVariadic(params) = parameters else {
-                            panic!("non-extern function had variadic arguments");
-                        };
-                        params
-                    }
-                    .into_iter()
-                    .map(|x| (x.name, x.ty))
-                    .collect(),
-                    &global_scope,
-                );
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
 
-                cg_block(&mut module, &mut cg, &bb, &fn_scope, body, None)?;
+    use super::*;
+    use crate::init_single_function;
 
-                module.declarations.push(cg.to_string());
+    /// Ensures [`cg_let_declaration`] properly generates the allocations and
+    /// assigns a value if needed.
+    #[test]
+    fn let_declarations_are_properly_generated() {
+        let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+        let bb = cg_let_declaration(
+            &mut module,
+            &mut cg,
+            &bb,
+            &mut scope,
+            vec![
+                LetDeclaration {
+                    name: "a",
+                    ty: Type::I32,
+                    value: None,
+                },
+                LetDeclaration {
+                    name: "b",
+                    ty: Type::Bool,
+                    value: Some(TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true))),
+                },
+            ],
+        )
+        .unwrap();
+
+        // no new basic blocks were created
+        assert_eq!(bb, BasicBlock { id: 0 });
+
+        // the two allocations were properly placed at the top of the function
+        assert_eq!(cg.allocations, vec!["%l1 = alloca i32", "%l2 = alloca i1"]);
+
+        // the pointers were properly added to the scope
+        assert_eq!(
+            scope,
+            CgScope {
+                identifiers: HashMap::from([
+                    ("test", "@test".to_string()),
+                    ("a", "%l1".to_string()),
+                    ("b", "%l2".to_string())
+                ])
             }
+        );
 
-            TypedDeclaration::FunctionDeclaration {
-                name,
-                parameters,
-                return_type,
-                body: None,
-            } => {
-                global_scope.insert(name, format!("@{name}"));
+        // the assignment was properly generated
+        assert_eq!(cg.blocks[0].instructions, vec!["store i1 true, ptr %l2"]);
+    }
 
-                module.declarations.push(format!(
-                    "declare {} @{}({})",
-                    get_llvm_typename(return_type.unwrap_or(Type::Void)),
-                    name,
-                    match parameters {
-                        ArgumentDeclarationList::NonVariadic(parameters) => parameters
-                            .iter()
-                            .map(|ArgumentDeclaration { ty, .. }| { get_llvm_typename(ty.clone()) })
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                        ArgumentDeclarationList::Variadic(parameters) => format!(
-                            "{}, ...",
-                            parameters
-                                .iter()
-                                .map(|ArgumentDeclaration { ty, .. }| {
-                                    get_llvm_typename(ty.clone())
-                                })
-                                .collect::<Vec<_>>()
-                                .join(", ")
+    mod cg_block {
+        use super::*;
+        use crate::BasicBlockData;
+
+        #[test]
+        fn if_statements_generate_as_expected() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            scope.insert("do_stuff", "@do_stuff".to_string());
+
+            let call_do_stuff: TypedStmt = TypedStmt::ExprStmt(TypedExpr(
+                Type::Void,
+                TypedExprKind::Call(
+                    Box::new(Place(
+                        Type::Fn(
+                            ArgumentDeclarationList::NonVariadic(vec![]),
+                            Box::new(BlockReturnType::Void),
                         ),
+                        PlaceKind::Variable("do_stuff"),
+                    )),
+                    vec![],
+                ),
+            ));
+
+            let bb = cg_block(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                vec![TypedStmt::IfStmt(
+                    TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                    vec![call_do_stuff.clone()],
+                    Some(vec![call_do_stuff]),
+                )],
+                None,
+            )
+            .unwrap()
+            .expect("code generation is continuable");
+
+            // The output IR should be as follows:
+            // bb0:
+            //     br i1 true, label %bb1, label %bb2
+            // bb1: ; if true
+            //     call void () @do_stuff()
+            //     br label %bb3
+            // bb2: ; if false
+            //     call void () @do_stuff()
+            //     br label %bb3
+            // bb3: ; yield this bb
+
+            assert_eq!(bb, BasicBlock { id: 3 });
+
+            assert_eq!(
+                cg.blocks,
+                vec![
+                    BasicBlockData {
+                        id: 0,
+                        instructions: vec!["br i1 true, label %bb1, label %bb2".to_string()]
+                    },
+                    BasicBlockData {
+                        id: 1,
+                        instructions: vec![
+                            "call void () @do_stuff()".to_string(),
+                            "br label %bb3".to_string()
+                        ]
+                    },
+                    BasicBlockData {
+                        id: 2,
+                        instructions: vec![
+                            "call void () @do_stuff()".to_string(),
+                            "br label %bb3".to_string()
+                        ]
+                    },
+                    BasicBlockData {
+                        id: 3,
+                        instructions: vec![]
                     }
-                ));
+                ]
+            );
+        }
+
+        mod loops {
+            use super::*;
+
+            mod while_loops {
+                use super::*;
+
+                #[test]
+                fn generate_as_expected() {
+                    let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+                    scope.insert("do_stuff", "@do_stuff".to_string());
+
+                    let call_do_stuff: TypedStmt = TypedStmt::ExprStmt(TypedExpr(
+                        Type::Void,
+                        TypedExprKind::Call(
+                            Box::new(Place(
+                                Type::Fn(
+                                    ArgumentDeclarationList::NonVariadic(vec![]),
+                                    Box::new(BlockReturnType::Void),
+                                ),
+                                PlaceKind::Variable("do_stuff"),
+                            )),
+                            vec![],
+                        ),
+                    ));
+
+                    let bb = cg_block(
+                        &mut module,
+                        &mut cg,
+                        &bb,
+                        &scope,
+                        // while (true) do_stuff();
+                        vec![TypedStmt::WhileStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![call_do_stuff.clone()],
+                        )],
+                        None,
+                    )
+                    .unwrap()
+                    .expect("code generation is continuable");
+
+                    // The output IR should be as follows:
+                    // bb0:
+                    //     br label %bb1
+                    // bb1: ; header
+                    //     br i1 true, label %bb2, label %bb3
+                    // bb2: ; body
+                    //     call void () @do_stuff()
+                    //     br label %bb1
+                    // bb3: ; exit, yield
+
+                    assert_eq!(bb, BasicBlock { id: 3 });
+
+                    assert_eq!(
+                        cg.blocks,
+                        vec![
+                            BasicBlockData {
+                                id: 0,
+                                instructions: vec!["br label %bb1".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 1,
+                                instructions: vec!["br i1 true, label %bb2, label %bb3".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 2,
+                                instructions: vec![
+                                    "call void () @do_stuff()".to_string(),
+                                    "br label %bb1".to_string()
+                                ]
+                            },
+                            BasicBlockData {
+                                id: 3,
+                                instructions: vec![]
+                            }
+                        ]
+                    );
+                }
+
+                /// `break;` should move to the exit block
+                #[test]
+                fn break_generates_as_expected() {
+                    let (mut module, mut cg, bb, scope) = init_single_function();
+
+                    let bb = cg_block(
+                        &mut module,
+                        &mut cg,
+                        &bb,
+                        &scope,
+                        // while (true) break;
+                        vec![TypedStmt::WhileStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![TypedStmt::BreakStmt],
+                        )],
+                        None,
+                    )
+                    .unwrap()
+                    .expect("code generation is continuable");
+
+                    // The output IR should be as follows:
+                    // bb0:
+                    //     br label %bb1
+                    // bb1: ; header
+                    //     br i1 true, label %bb2, label %bb3
+                    // bb2: ; body
+                    //     br label %bb3 ; break
+                    //     ; THE DEFAULT RETURN-TO-HEADER ISN'T ADDED
+                    //     ; BECAUSE WE BREAK ABOVE
+                    // bb3: ; exit, yield
+
+                    assert_eq!(bb, BasicBlock { id: 3 });
+
+                    assert_eq!(
+                        cg.blocks,
+                        vec![
+                            BasicBlockData {
+                                id: 0,
+                                instructions: vec!["br label %bb1".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 1,
+                                instructions: vec!["br i1 true, label %bb2, label %bb3".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 2,
+                                instructions: vec!["br label %bb3".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 3,
+                                instructions: vec![]
+                            }
+                        ]
+                    );
+                }
+
+                /// `continue;` should move to the exit block
+                #[test]
+                fn continue_generates_as_expected() {
+                    let (mut module, mut cg, bb, scope) = init_single_function();
+
+                    let bb = cg_block(
+                        &mut module,
+                        &mut cg,
+                        &bb,
+                        &scope,
+                        // while (true) break;
+                        vec![TypedStmt::WhileStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![TypedStmt::ContinueStmt],
+                        )],
+                        None,
+                    )
+                    .unwrap()
+                    .expect("code generation is continuable");
+
+                    // The output IR should be as follows:
+                    // bb0:
+                    //     br label %bb1
+                    // bb1: ; header
+                    //     br i1 true, label %bb2, label %bb3
+                    // bb2: ; body
+                    //     br label %bb1 ; continue
+                    //     ; THE DEFAULT RETURN-TO-HEADER ISN'T ADDED
+                    //     ; BECAUSE WE CONTINUE ABOVE
+                    // bb3: ; exit, yield
+
+                    assert_eq!(bb, BasicBlock { id: 3 });
+
+                    assert_eq!(
+                        cg.blocks,
+                        vec![
+                            BasicBlockData {
+                                id: 0,
+                                instructions: vec!["br label %bb1".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 1,
+                                instructions: vec!["br i1 true, label %bb2, label %bb3".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 2,
+                                instructions: vec!["br label %bb1".to_string()]
+                            },
+                            BasicBlockData {
+                                id: 3,
+                                instructions: vec![]
+                            }
+                        ]
+                    );
+                }
             }
         }
     }
 
-    Ok(module.to_string())
+    mod cg_declaration {
+        use super::*;
+
+        #[test]
+        fn non_variadic_extern_functions_are_properly_generated() {
+            let mut module = ModuleCg::new();
+            let mut global_scope = CgScope::new();
+
+            cg_declaration(
+                &mut module,
+                &mut global_scope,
+                TypedDeclaration::FunctionDeclaration {
+                    name: "add",
+                    parameters: ArgumentDeclarationList::NonVariadic(vec![
+                        ArgumentDeclaration {
+                            name: "a",
+                            ty: Type::I32,
+                        },
+                        ArgumentDeclaration {
+                            name: "b",
+                            ty: Type::I32,
+                        },
+                    ]),
+                    return_type: Some(Type::I32),
+                    body: None,
+                },
+            )
+            .unwrap();
+
+            assert_eq!(
+                global_scope,
+                CgScope {
+                    identifiers: HashMap::from([("add", "@add".to_string())])
+                }
+            );
+
+            assert_eq!(
+                module.declarations,
+                vec!["declare i32 @add(i32, i32)".to_string()]
+            );
+        }
+
+        #[test]
+        fn variadic_extern_functions_are_properly_generated() {
+            let mut module = ModuleCg::new();
+            let mut global_scope = CgScope::new();
+
+            cg_declaration(
+                &mut module,
+                &mut global_scope,
+                TypedDeclaration::FunctionDeclaration {
+                    name: "f",
+                    parameters: ArgumentDeclarationList::Variadic(vec![ArgumentDeclaration {
+                        name: "a",
+                        ty: Type::I32,
+                    }]),
+                    return_type: None,
+                    body: None,
+                },
+            )
+            .unwrap();
+
+            assert_eq!(
+                global_scope,
+                CgScope {
+                    identifiers: HashMap::from([("f", "@f".to_string())])
+                }
+            );
+
+            assert_eq!(
+                module.declarations,
+                vec!["declare void @f(i32, ...)".to_string()]
+            );
+        }
+    }
 }

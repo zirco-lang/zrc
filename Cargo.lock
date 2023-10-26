@@ -1221,6 +1221,7 @@ name = "zrc_codegen"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "indexmap 2.0.2",
  "zrc_typeck",
 ]
 
