@@ -743,5 +743,77 @@ mod tests {
 
     mod cg_declaration {
         use super::*;
+
+        #[test]
+        fn non_variadic_extern_functions_are_properly_generated() {
+            let mut module = ModuleCg::new();
+            let mut global_scope = CgScope::new();
+
+            cg_declaration(
+                &mut module,
+                &mut global_scope,
+                TypedDeclaration::FunctionDeclaration {
+                    name: "add",
+                    parameters: ArgumentDeclarationList::NonVariadic(vec![
+                        ArgumentDeclaration {
+                            name: "a",
+                            ty: Type::I32,
+                        },
+                        ArgumentDeclaration {
+                            name: "b",
+                            ty: Type::I32,
+                        },
+                    ]),
+                    return_type: Some(Type::I32),
+                    body: None,
+                },
+            )
+            .unwrap();
+
+            assert_eq!(
+                global_scope,
+                CgScope {
+                    identifiers: HashMap::from([("add", "@add".to_string())])
+                }
+            );
+
+            assert_eq!(
+                module.declarations,
+                vec!["declare i32 @add(i32, i32)".to_string()]
+            );
+        }
+
+        #[test]
+        fn variadic_extern_functions_are_properly_generated() {
+            let mut module = ModuleCg::new();
+            let mut global_scope = CgScope::new();
+
+            cg_declaration(
+                &mut module,
+                &mut global_scope,
+                TypedDeclaration::FunctionDeclaration {
+                    name: "f",
+                    parameters: ArgumentDeclarationList::Variadic(vec![ArgumentDeclaration {
+                        name: "a",
+                        ty: Type::I32,
+                    }]),
+                    return_type: None,
+                    body: None,
+                },
+            )
+            .unwrap();
+
+            assert_eq!(
+                global_scope,
+                CgScope {
+                    identifiers: HashMap::from([("f", "@f".to_string())])
+                }
+            );
+
+            assert_eq!(
+                module.declarations,
+                vec!["declare void @f(i32, ...)".to_string()]
+            );
+        }
     }
 }
