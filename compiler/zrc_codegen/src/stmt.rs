@@ -325,77 +325,87 @@ pub fn cg_block(
 
 /// # Errors
 /// Errors on internal code generation failure.
+fn cg_declaration<'input>(
+    module: &mut ModuleCg,
+    global_scope: &mut CgScope<'input>,
+    declaration: TypedDeclaration<'input>,
+) -> anyhow::Result<()> {
+    match declaration {
+        // Struct declarations don't need code generation as they're all inlined
+        TypedDeclaration::StructDeclaration { .. } => {}
+
+        TypedDeclaration::FunctionDeclaration {
+            name,
+            parameters,
+            return_type,
+            body: Some(body),
+        } => {
+            // Must happen before creating `cg` as FunctionCg::new() clones it and
+            // recursion would be impossible w/o this
+            global_scope.insert(name, format!("@{name}"));
+
+            let (mut cg, bb, fn_scope) = FunctionCg::new(
+                format!("@{name}"),
+                return_type.map_or_else(|| BlockReturnType::Void, BlockReturnType::Return),
+                {
+                    let ArgumentDeclarationList::NonVariadic(params) = parameters else {
+                        panic!("non-extern function had variadic arguments");
+                    };
+                    params
+                }
+                .into_iter()
+                .map(|x| (x.name, x.ty))
+                .collect(),
+                global_scope,
+            );
+
+            cg_block(module, &mut cg, &bb, &fn_scope, body, None)?;
+
+            module.declarations.push(cg.to_string());
+        }
+
+        TypedDeclaration::FunctionDeclaration {
+            name,
+            parameters,
+            return_type,
+            body: None,
+        } => {
+            global_scope.insert(name, format!("@{name}"));
+
+            module.declarations.push(format!(
+                "declare {} @{}({})",
+                get_llvm_typename(return_type.unwrap_or(Type::Void)),
+                name,
+                match parameters {
+                    ArgumentDeclarationList::NonVariadic(parameters) => parameters
+                        .iter()
+                        .map(|ArgumentDeclaration { ty, .. }| { get_llvm_typename(ty.clone()) })
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    ArgumentDeclarationList::Variadic(parameters) => format!(
+                        "{}, ...",
+                        parameters
+                            .iter()
+                            .map(|ArgumentDeclaration { ty, .. }| { get_llvm_typename(ty.clone()) })
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                }
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// # Errors
+/// Errors on internal code generation failure.
 pub fn cg_program(program: Vec<TypedDeclaration>) -> anyhow::Result<String> {
     let mut module = ModuleCg::new();
     let mut global_scope = CgScope::new();
 
     for declaration in program {
-        match declaration {
-            // Struct declarations don't need code generation as they're all inlined
-            TypedDeclaration::StructDeclaration { .. } => {}
-
-            TypedDeclaration::FunctionDeclaration {
-                name,
-                parameters,
-                return_type,
-                body: Some(body),
-            } => {
-                // Must happen before creating `cg` as FunctionCg::new() clones it and
-                // recursion would be impossible w/o this
-                global_scope.insert(name, format!("@{name}"));
-
-                let (mut cg, bb, fn_scope) = FunctionCg::new(
-                    format!("@{name}"),
-                    return_type.map_or_else(|| BlockReturnType::Void, BlockReturnType::Return),
-                    {
-                        let ArgumentDeclarationList::NonVariadic(params) = parameters else {
-                            panic!("non-extern function had variadic arguments");
-                        };
-                        params
-                    }
-                    .into_iter()
-                    .map(|x| (x.name, x.ty))
-                    .collect(),
-                    &global_scope,
-                );
-
-                cg_block(&mut module, &mut cg, &bb, &fn_scope, body, None)?;
-
-                module.declarations.push(cg.to_string());
-            }
-
-            TypedDeclaration::FunctionDeclaration {
-                name,
-                parameters,
-                return_type,
-                body: None,
-            } => {
-                global_scope.insert(name, format!("@{name}"));
-
-                module.declarations.push(format!(
-                    "declare {} @{}({})",
-                    get_llvm_typename(return_type.unwrap_or(Type::Void)),
-                    name,
-                    match parameters {
-                        ArgumentDeclarationList::NonVariadic(parameters) => parameters
-                            .iter()
-                            .map(|ArgumentDeclaration { ty, .. }| { get_llvm_typename(ty.clone()) })
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                        ArgumentDeclarationList::Variadic(parameters) => format!(
-                            "{}, ...",
-                            parameters
-                                .iter()
-                                .map(|ArgumentDeclaration { ty, .. }| {
-                                    get_llvm_typename(ty.clone())
-                                })
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        ),
-                    }
-                ));
-            }
-        }
+        cg_declaration(&mut module, &mut global_scope, declaration)?;
     }
 
     Ok(module.to_string())
@@ -729,5 +739,9 @@ mod tests {
                 }
             }
         }
+    }
+
+    mod cg_declaration {
+        use super::*;
     }
 }
