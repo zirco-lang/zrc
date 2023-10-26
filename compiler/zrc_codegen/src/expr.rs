@@ -1,7 +1,8 @@
 use anyhow::{bail, Context as _};
 use zrc_typeck::tast::{
     expr::{
-        Arithmetic, BinaryBitwise, Comparison, Equality, Logical, Place, TypedExpr, TypedExprKind,
+        Arithmetic, BinaryBitwise, Comparison, Equality, Logical, Place, PlaceKind, TypedExpr,
+        TypedExprKind,
     },
     ty::Type,
 };
@@ -19,8 +20,6 @@ pub fn cg_place(
     scope: &CgScope,
     place: Place,
 ) -> anyhow::Result<(String, BasicBlock)> {
-    use zrc_typeck::tast::expr::PlaceKind;
-
     Ok(match place.1 {
         PlaceKind::Variable(x) => {
             let reg = scope
@@ -402,66 +401,29 @@ pub fn cg_expr(
         }
 
         TypedExprKind::Index(x, index) => {
-            let (ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
-
-            let index_typename = get_llvm_typename(index.0.clone());
-
-            let (index_reg, bb) = cg_expr(module, cg, &bb, scope, *index)?;
-
-            #[allow(clippy::wildcard_enum_match_arm)]
-            let result_typename = match x.0 {
-                Type::Ptr(x) => get_llvm_typename(*x),
-                _ => unreachable!(), // per typeck, this is always a pointer
-            };
-
-            let result_reg = cg.new_reg();
-
-            #[allow(clippy::uninlined_format_args)] // for line length
-            bb.add_instruction(
+            let (ptr, bb) = cg_place(
+                module,
                 cg,
-                &format!(
-                    "{} = getelementptr {}, {} {}, {} {}",
-                    result_reg, result_typename, result_typename, ptr, index_typename, index_reg
-                ),
+                bb,
+                scope,
+                Place(expr.0.clone(), PlaceKind::Index(x, index)),
             )?;
 
-            let value = cg_load(cg, bb, &result_typename, &result_reg)?;
+            let value = cg_load(cg, bb, &get_llvm_typename(expr.0.clone()), &ptr)?;
 
             (value, bb)
         }
 
         TypedExprKind::Dot(x, prop) => {
-            let (ptr, bb) = cg_place(module, cg, bb, scope, *x.clone())?;
-
-            let result_reg = cg.new_reg();
-
-            #[allow(clippy::wildcard_enum_match_arm)]
-            let key_idx = match x.0.clone() {
-                Type::Struct(entries) => {
-                    entries
-                        .into_iter()
-                        .enumerate()
-                        .find(|(_, (got_k, _))| got_k == &prop)
-                        .with_context(|| format!("Struct {} has no field {}", x.0, prop))?
-                        .0
-                }
-                _ => unreachable!(), // per typeck, this is always a struct
-            };
-
-            #[allow(clippy::uninlined_format_args)] // for line length
-            bb.add_instruction(
+            let (ptr, bb) = cg_place(
+                module,
                 cg,
-                &format!(
-                    "{} = getelementptr {}, ptr {}, i32 0, i32 {}",
-                    result_reg,
-                    get_llvm_typename(x.0.clone()),
-                    // x_typename,
-                    ptr,
-                    key_idx
-                ),
+                bb,
+                scope,
+                Place(expr.0.clone(), PlaceKind::Dot(x, prop)),
             )?;
 
-            let value = cg_load(cg, bb, &get_llvm_typename(expr.0), &result_reg)?;
+            let value = cg_load(cg, bb, &get_llvm_typename(expr.0), &ptr)?;
 
             (value, bb)
         }
@@ -604,13 +566,13 @@ pub fn cg_expr(
 #[cfg(test)]
 mod tests {
 
+    use indexmap::IndexMap;
     use zrc_typeck::{tast::expr::PlaceKind, typeck::BlockReturnType};
 
     use super::*;
     use crate::{init_single_function, BasicBlockData};
 
     mod cg_place {
-        use indexmap::IndexMap;
 
         use super::*;
 
@@ -923,6 +885,88 @@ mod tests {
                 ]
             );
 
+            assert_eq!(reg, "%l2");
+        }
+
+        #[test]
+        fn pointer_indexing_generates_proper_gep_and_load() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            // of type *i32
+            scope.insert("arr", "%arr".to_string());
+
+            let (reg, bb) = cg_expr(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                // arr[4]
+                TypedExpr(
+                    Type::I32,
+                    TypedExprKind::Index(
+                        Box::new(TypedExpr(
+                            Type::Ptr(Box::new(Type::I32)),
+                            TypedExprKind::Identifier("arr"),
+                        )),
+                        Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("4"))),
+                    ),
+                ),
+            )
+            .unwrap();
+
+            // no new basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // `arr` is loaded from memory, a `gep` instruction is produced, then this
+            // pointer is loaded
+            assert_eq!(
+                cg.blocks[0].instructions,
+                vec![
+                    "%l1 = load ptr, ptr %arr".to_string(),
+                    "%l2 = getelementptr i32, ptr %l1, i32 4".to_string(),
+                    "%l3 = load i32, ptr %l2".to_string()
+                ]
+            );
+            assert_eq!(reg, "%l3");
+        }
+
+        #[test]
+        fn struct_property_access_generates_proper_gep_and_load() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            // of type struct { x: i32, y: i32 }
+            scope.insert("x", "%x".to_string());
+
+            let (reg, bb) = cg_expr(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                // x.y
+                TypedExpr(
+                    Type::I32,
+                    TypedExprKind::Dot(
+                        Box::new(Place(
+                            Type::Struct(IndexMap::from([("x", Type::I32), ("y", Type::I32)])),
+                            PlaceKind::Variable("x"),
+                        )),
+                        "y",
+                    ),
+                ),
+            )
+            .unwrap();
+
+            // no new basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // GEP is getting the pointer right off the stack
+            assert_eq!(
+                cg.blocks[0].instructions,
+                vec![
+                    "%l1 = getelementptr { i32, i32 }, ptr %x, i32 0, i32 1".to_string(),
+                    "%l2 = load i32, ptr %l1".to_string()
+                ]
+            );
             assert_eq!(reg, "%l2");
         }
     }
