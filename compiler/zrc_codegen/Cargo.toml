@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
+indexmap = "2.0.2"
 zrc_typeck = { version = "0.1.0", path = "../zrc_typeck" }

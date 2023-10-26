@@ -610,6 +610,8 @@ mod tests {
     use crate::{init_single_function, BasicBlockData};
 
     mod cg_place {
+        use indexmap::IndexMap;
+
         use super::*;
 
         /// The code generator should not need to do any extra work to handle
@@ -755,6 +757,43 @@ mod tests {
                 ]
             );
             assert_eq!(reg, "%l2");
+        }
+
+        #[test]
+        fn struct_property_access_generates_proper_gep() {
+            let (mut module, mut cg, bb, mut scope) = init_single_function();
+
+            // of type struct { x: i32, y: i32 }
+            scope.insert("x", "%x".to_string());
+
+            let (reg, bb) = cg_place(
+                &mut module,
+                &mut cg,
+                &bb,
+                &scope,
+                // in place context: x.y
+                Place(
+                    Type::I32,
+                    PlaceKind::Dot(
+                        Box::new(Place(
+                            Type::Struct(IndexMap::from([("x", Type::I32), ("y", Type::I32)])),
+                            PlaceKind::Variable("x"),
+                        )),
+                        "y",
+                    ),
+                ),
+            )
+            .unwrap();
+
+            // no new basic blocks were produced
+            assert_eq!(bb, BasicBlock { id: 0 });
+
+            // GEP is getting the pointer right off the stack
+            assert_eq!(
+                cg.blocks[0].instructions,
+                vec!["%l1 = getelementptr { i32, i32 }, ptr %x, i32 0, i32 1".to_string()]
+            );
+            assert_eq!(reg, "%l1");
         }
     }
 
