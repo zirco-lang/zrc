@@ -1,6 +1,6 @@
 //! Statement representation for the Zirco [TAST](super)
 
-use std::fmt::Display;
+use std::{fmt::Display, string::ToString};
 
 use indexmap::IndexMap;
 
@@ -21,7 +21,7 @@ pub struct LetDeclaration<'input> {
 impl<'input> Display for LetDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.value {
-            Some(v) => write!(f, "{}: {} = {}", self.name, self.ty, v),
+            Some(value) => write!(f, "{}: {} = {}", self.name, self.ty, value),
             None => write!(f, "{}: {}", self.name, self.ty),
         }
     }
@@ -79,7 +79,7 @@ pub enum TypedDeclaration<'input> {
         /// The name of the function.
         name: &'input str,
         /// The parameters of the function.
-        parameters: Vec<ArgumentDeclaration<'input>>,
+        parameters: ArgumentDeclarationList<'input>,
         /// The return type of the function. If set to [`None`], the function is
         /// void.
         return_type: Option<Type<'input>>,
@@ -96,22 +96,54 @@ pub enum TypedDeclaration<'input> {
     },
 }
 
+/// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]
+///
+/// May be variadic or not. Variadic only exists on extern.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArgumentDeclarationList<'input> {
+    /// `(a, b, ...)`
+    Variadic(Vec<ArgumentDeclaration<'input>>),
+    /// `(a, b)` without `...`
+    NonVariadic(Vec<ArgumentDeclaration<'input>>),
+}
+impl<'input> ArgumentDeclarationList<'input> {
+    /// Create the [`ArgumentDeclarationList`] for just `()`
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self::NonVariadic(vec![])
+    }
+}
+impl<'input> Display for ArgumentDeclarationList<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (Self::Variadic(args) | Self::NonVariadic(args)) = self;
+
+        write!(
+            f,
+            "{}{}",
+            args.iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>()
+                .join(", "),
+            match self {
+                Self::Variadic(_) => ", ...",
+                Self::NonVariadic(_) => "",
+            }
+        )
+    }
+}
+
 impl<'input> Display for TypedDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::FunctionDeclaration {
                 name,
                 parameters,
-                return_type: Some(r),
+                return_type: Some(return_ty),
                 body: Some(body),
             } => write!(
                 f,
-                "fn {name}({}) -> {r} {{\n{}\n}}",
-                parameters
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", "),
+                "fn {name}({}) -> {return_ty} {{\n{}\n}}",
+                parameters,
                 body.iter()
                     .map(|stmt| stmt
                         .to_string()
@@ -125,17 +157,9 @@ impl<'input> Display for TypedDeclaration<'input> {
             Self::FunctionDeclaration {
                 name,
                 parameters,
-                return_type: Some(r),
+                return_type: Some(return_ty),
                 body: None,
-            } => write!(
-                f,
-                "fn {name}({}) -> {r};",
-                parameters
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            } => write!(f, "fn {name}({parameters}) -> {return_ty};"),
             Self::FunctionDeclaration {
                 name,
                 parameters,
@@ -143,12 +167,7 @@ impl<'input> Display for TypedDeclaration<'input> {
                 body: Some(body),
             } => write!(
                 f,
-                "fn {name}({}) {{\n{}\n}}",
-                parameters
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", "),
+                "fn {name}({parameters}) {{\n{}\n}}",
                 body.iter()
                     .map(|stmt| stmt
                         .to_string()
@@ -164,15 +183,7 @@ impl<'input> Display for TypedDeclaration<'input> {
                 parameters,
                 return_type: None,
                 body: None,
-            } => write!(
-                f,
-                "fn {name}({});",
-                parameters
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            } => write!(f, "fn {name}({parameters});"),
             Self::StructDeclaration { name, fields } => write!(
                 f,
                 "struct {name} {{\n{}\n}}",
@@ -190,10 +201,11 @@ impl<'input> Display for TypedStmt<'input> {
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::IfStmt(e, s1, Some(s2)) => write!(
+            Self::IfStmt(cond, if_true, Some(if_false)) => write!(
                 f,
-                "if ({e}) {{\n{}\n}} else {{\n{}\n}}",
-                s1.iter()
+                "if ({cond}) {{\n{}\n}} else {{\n{}\n}}",
+                if_true
+                    .iter()
                     .map(|stmt| stmt
                         .to_string()
                         .split('\n')
@@ -202,7 +214,8 @@ impl<'input> Display for TypedStmt<'input> {
                         .join("\n"))
                     .collect::<Vec<_>>()
                     .join("\n"),
-                s2.iter()
+                if_false
+                    .iter()
                     .map(|stmt| stmt
                         .to_string()
                         .split('\n')
@@ -212,10 +225,11 @@ impl<'input> Display for TypedStmt<'input> {
                     .collect::<Vec<_>>()
                     .join("\n")
             ),
-            Self::IfStmt(e, s1, None) => write!(
+            Self::IfStmt(cond, if_true, None) => write!(
                 f,
-                "if ({e}) {{\n{}\n}}",
-                s1.iter()
+                "if ({cond}) {{\n{}\n}}",
+                if_true
+                    .iter()
                     .map(|stmt| stmt
                         .to_string()
                         .split('\n')
@@ -225,10 +239,10 @@ impl<'input> Display for TypedStmt<'input> {
                     .collect::<Vec<_>>()
                     .join("\n")
             ),
-            Self::WhileStmt(e, s) => write!(
+            Self::WhileStmt(cond, body) => write!(
                 f,
-                "while ({e}) {{\n{}\n}}",
-                s.iter()
+                "while ({cond}) {{\n{}\n}}",
+                body.iter()
                     .map(|stmt| stmt
                         .to_string()
                         .split('\n')
@@ -249,7 +263,7 @@ impl<'input> Display for TypedStmt<'input> {
                 init.clone().map_or(String::new(), |x| format!(
                     "let {};",
                     x.iter()
-                        .map(std::string::ToString::to_string)
+                        .map(ToString::to_string)
                         .collect::<Vec<_>>()
                         .join(", ")
                 )),
@@ -265,10 +279,11 @@ impl<'input> Display for TypedStmt<'input> {
                     .collect::<Vec<_>>()
                     .join("\n")
             ),
-            Self::BlockStmt(s) => write!(
+            Self::BlockStmt(stmts) => write!(
                 f,
                 "{{\n{}\n}}",
-                s.iter()
+                stmts
+                    .iter()
                     .map(|stmt| stmt
                         .to_string()
                         .split('\n')
@@ -278,17 +293,17 @@ impl<'input> Display for TypedStmt<'input> {
                     .collect::<Vec<_>>()
                     .join("\n")
             ),
-            Self::ExprStmt(e) => write!(f, "{e};"),
+            Self::ExprStmt(expr) => write!(f, "{expr};"),
             Self::EmptyStmt => write!(f, ";"),
             Self::ContinueStmt => write!(f, "continue;"),
             Self::BreakStmt => write!(f, "break;"),
-            Self::ReturnStmt(Some(e)) => write!(f, "return {e};",),
+            Self::ReturnStmt(Some(expr)) => write!(f, "return {expr};",),
             Self::ReturnStmt(None) => write!(f, "return;"),
-            Self::DeclarationList(d) => write!(
+            Self::DeclarationList(list) => write!(
                 f,
                 "let {};",
-                d.iter()
-                    .map(std::string::ToString::to_string)
+                list.iter()
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", ")
             ),

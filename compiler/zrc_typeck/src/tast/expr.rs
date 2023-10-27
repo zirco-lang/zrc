@@ -1,8 +1,11 @@
 //! Expression representation for the Zirco [TAST](super)
 
-use std::fmt::Display;
+use std::{fmt::Display, string::ToString};
 
-pub use zrc_parser::ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical};
+pub use zrc_parser::{
+    ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical},
+    lexer::StringTok,
+};
 
 /// An [expression kind](TypedExprKind) with its yielded [result
 /// type](super::ty::Type) attached to it.
@@ -87,7 +90,7 @@ pub enum TypedExprKind<'input> {
     /// Any numeric literal.
     NumberLiteral(&'input str),
     /// Any string literal.bool
-    StringLiteral(&'input str),
+    StringLiteral(Vec<StringTok<'input>>),
     /// Any identifier.
     Identifier(&'input str),
     /// Any boolean literal.
@@ -98,29 +101,33 @@ impl<'input> Display for TypedExprKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NumberLiteral(n) => write!(f, "{n}"),
-            Self::StringLiteral(s) => write!(f, "{s}"),
+            Self::StringLiteral(str) => write!(
+                f,
+                "\"{}\"",
+                str.iter().map(ToString::to_string).collect::<String>()
+            ),
             Self::Identifier(i) => write!(f, "{i}"),
-            Self::BooleanLiteral(b) => write!(f, "{b}"),
-            Self::Assignment(l, r) => write!(f, "{l} = {r}"),
+            Self::BooleanLiteral(value) => write!(f, "{value}"),
+            Self::Assignment(place, value) => write!(f, "{place} = {value}"),
             Self::Equality(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
             Self::Comparison(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
             Self::Arithmetic(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-            Self::BinaryBitwise(op, l, r) => write!(f, "{l} {op} {r}"),
-            Self::Logical(op, l, r) => write!(f, "{l} {op} {r}"),
-            Self::Comma(l, r) => write!(f, "{l}, {r}"),
-            Self::UnaryNot(e) => write!(f, "!{e}"),
-            Self::UnaryBitwiseNot(e) => write!(f, "~{e}"),
-            Self::UnaryMinus(e) => write!(f, "-{e}"),
-            Self::UnaryAddressOf(e) => write!(f, "&{e}"),
-            Self::UnaryDereference(e) => write!(f, "*{e}"),
-            Self::Ternary(l, m, r) => write!(f, "{l} ? {m} : {r}"),
-            Self::Index(a, b) => write!(f, "{a}[{b}]"),
-            Self::Dot(a, b) => write!(f, "{a}.{b}"),
-            Self::Cast(a, t) => write!(f, "{a} as {t}"),
-            Self::Call(a, b) => write!(
+            Self::BinaryBitwise(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
+            Self::Logical(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
+            Self::Comma(lhs, rhs) => write!(f, "{lhs}, {rhs}"),
+            Self::UnaryNot(expr) => write!(f, "!{expr}"),
+            Self::UnaryBitwiseNot(expr) => write!(f, "~{expr}"),
+            Self::UnaryMinus(expr) => write!(f, "-{expr}"),
+            Self::UnaryAddressOf(expr) => write!(f, "&{expr}"),
+            Self::UnaryDereference(expr) => write!(f, "*{expr}"),
+            Self::Ternary(cond, if_true, if_false) => write!(f, "{cond} ? {if_true} : {if_false}"),
+            Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
+            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
+            Self::Cast(expr, ty) => write!(f, "{expr} as {ty}"),
+            Self::Call(expr, args) => write!(
                 f,
-                "{a}({})",
-                b.iter()
+                "{expr}({})",
+                args.iter()
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -131,10 +138,10 @@ impl<'input> Display for TypedExprKind<'input> {
 impl<'input> Display for PlaceKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Deref(e) => write!(f, "*{e}"),
-            Self::Variable(s) => write!(f, "{s}"),
-            Self::Index(a, b) => write!(f, "{a}[{b}]"),
-            Self::Dot(a, b) => write!(f, "{a}.{b}"),
+            Self::Deref(expr) => write!(f, "*{expr}"),
+            Self::Variable(ident) => write!(f, "{ident}"),
+            Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
+            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
         }
     }
 }

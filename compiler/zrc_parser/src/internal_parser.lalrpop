@@ -23,6 +23,7 @@ SpannedStmt<T>: Stmt<'input> = {
     <Spanned<T>> => Stmt(<>),
 }
 
+#[inline]
 CommaSeparated<T>: Vec<T> = {
     <e:T> <mut v:("," <T>)*> ","? => {
         let mut new = vec![e];
@@ -107,19 +108,19 @@ FunctionDeclaration: Declaration<'input> = {
         <s:Spanned<StmtList?>>
     "}" => Declaration::FunctionDeclaration {
         name: i,
-        parameters: a.map(|inner| inner.unwrap_or(Vec::new())),
+        parameters: a.map(|inner| inner.unwrap_or(ArgumentDeclarationList::empty())),
         return_type: r,
         body: Some(s.map(|inner| inner.unwrap_or(Vec::new()))),
     },
     "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?> ";" => Declaration::FunctionDeclaration {
         name: i,
-        parameters: a.map(|inner| inner.unwrap_or(Vec::new())),
+        parameters: a.map(|inner| inner.unwrap_or(ArgumentDeclarationList::empty())),
         return_type: r,
         body: None,
     }
 };
 
-StructDeclaration: Declaration <'input>= {
+StructDeclaration: Declaration<'input>= {
     "struct" <i:Spanned<IDENTIFIER>> "{" <l:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}" => Declaration::StructDeclaration {
         name: i,
         fields: l.map(|inner| {
@@ -129,7 +130,10 @@ StructDeclaration: Declaration <'input>= {
     }
 }
 
-ArgumentDeclarationList = CommaSeparated<Spanned<ArgumentDeclaration>>;
+ArgumentDeclarationList: ArgumentDeclarationList<'input> = {
+    <CommaSeparated<Spanned<ArgumentDeclaration>>> => ArgumentDeclarationList::NonVariadic(<>),
+    <CommaSeparated<Spanned<ArgumentDeclaration>>> "," "..." => ArgumentDeclarationList::Variadic(<>),
+};
 
 ArgumentDeclaration: ArgumentDeclaration<'input> = {
     <i:Spanned<IDENTIFIER>> ":" <t:Type> => ArgumentDeclaration {
@@ -362,7 +366,7 @@ extern {
         "[" => lexer::Tok::LeftBracket,
         "]" => lexer::Tok::RightBracket,
 
-        STRING => lexer::Tok::StringLiteral(<&'input str>),
+        STRING => lexer::Tok::StringLiteral(<Vec<lexer::StringTok<'input>>>),
         NUMBER => lexer::Tok::NumberLiteral(<&'input str>),
         IDENTIFIER => lexer::Tok::Identifier(<&'input str>),
 
@@ -380,5 +384,6 @@ extern {
         "as" => lexer::Tok::As,
         "struct" => lexer::Tok::Struct,
         "->" => lexer::Tok::SmallArrow,
+        "..." => lexer::Tok::Ellipsis,
     }
 }

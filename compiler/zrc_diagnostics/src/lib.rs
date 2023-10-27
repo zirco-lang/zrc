@@ -1,10 +1,43 @@
 #![doc=include_str!("../README.md")]
+#![allow(unknown_lints)] // in case you use non-nightly clippy
 #![warn(
     clippy::cargo,
     clippy::nursery,
     clippy::pedantic,
     clippy::missing_docs_in_private_items,
-    missing_docs
+    missing_docs,
+    clippy::absolute_paths,
+    clippy::as_conversions,
+    clippy::dbg_macro,
+    clippy::decimal_literal_representation,
+    clippy::deref_by_slicing,
+    clippy::disallowed_script_idents,
+    clippy::else_if_without_else,
+    clippy::empty_structs_with_brackets,
+    clippy::format_push_string,
+    clippy::if_then_some_else_none,
+    clippy::let_underscore_must_use,
+    clippy::min_ident_chars,
+    clippy::mixed_read_write_in_expression,
+    clippy::multiple_inherent_impl,
+    clippy::multiple_unsafe_ops_per_block,
+    clippy::non_ascii_literal,
+    clippy::redundant_type_annotations,
+    clippy::rest_pat_in_fully_bound_structs,
+    clippy::same_name_method,
+    clippy::semicolon_inside_block,
+    clippy::unseparated_literal_suffix,
+    clippy::string_to_string,
+    clippy::todo,
+    clippy::undocumented_unsafe_blocks,
+    clippy::unimplemented,
+    clippy::unneeded_field_pattern,
+    clippy::wildcard_enum_match_arm,
+
+    // These should be enabled in any non-user-facing code, like the parser, but not in the
+    // frontend.
+    clippy::print_stderr,
+    clippy::print_stdout
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
@@ -23,14 +56,14 @@ pub enum Severity {
 impl Severity {
     /// Get the display [`Style`] of this severity
     fn style(&self) -> Style {
-        match self {
+        match *self {
             Self::Error => Color::Red.bold(),
         }
     }
 
     /// Get this severity's name
     const fn text(&self) -> &'static str {
-        match self {
+        match *self {
             Self::Error => "error",
         }
     }
@@ -61,6 +94,7 @@ pub enum DiagnosticKind {
     UnknownToken(String),
     UnterminatedStringLiteral,
     UnterminatedBlockComment,
+    UnknownEscapeSequence,
 
     // PARSER ERRORS
     /// Generic parser error
@@ -86,8 +120,8 @@ pub enum DiagnosticKind {
     StructDoesNotHaveMember(String, String),
     StructMemberAccessOnNonStruct(String),
     FunctionArgumentCountMismatch {
-        expected: usize,
-        got: usize,
+        expected: String,
+        got: String,
     },
     FunctionArgumentTypeMismatch {
         n: usize, // counts from 0
@@ -111,13 +145,14 @@ pub enum DiagnosticKind {
     CannotReturnHere,
     ExpectedABlockToReturn,
     DuplicateStructMember(String),
+    VariadicFunctionMustBeExternal,
 }
 
 impl Display for DiagnosticKind {
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnknownToken(c) => write!(f, "unknown token `{c}`"),
+            Self::UnknownToken(token) => write!(f, "unknown token `{token}`"),
             Self::UnterminatedStringLiteral => write!(f, "unterminated string literal"),
             Self::UnterminatedBlockComment => write!(f, "unterminated block comment"),
 
@@ -138,8 +173,8 @@ impl Display for DiagnosticKind {
             }
             Self::ExtraToken(token) => write!(f, "extra token `{token}`"),
 
-            Self::UnableToResolveType(t) => {
-                write!(f, "unable to resolve `{t}` to a type")
+            Self::UnableToResolveType(ty) => {
+                write!(f, "unable to resolve `{ty}` to a type")
             }
             Self::UnableToResolveIdentifier(i) => {
                 write!(f, "unable to resolve identifier `{i}`")
@@ -154,29 +189,29 @@ impl Display for DiagnosticKind {
                 f,
                 "expected `{expected}` on right hand side of assignment, got `{got}`"
             ),
-            Self::UnaryNotExpectedBoolean(t) => {
-                write!(f, "expected boolean type, got `{t}`")
+            Self::UnaryNotExpectedBoolean(ty) => {
+                write!(f, "expected boolean type, got `{ty}`")
             }
-            Self::UnaryBitwiseNotExpectedInteger(t) => {
-                write!(f, "expected integer type, got `{t}`")
+            Self::UnaryBitwiseNotExpectedInteger(ty) => {
+                write!(f, "expected integer type, got `{ty}`")
             }
-            Self::UnaryMinusExpectedSignedInteger(t) => {
-                write!(f, "expected signed integer type, got `{t}`")
+            Self::UnaryMinusExpectedSignedInteger(ty) => {
+                write!(f, "expected signed integer type, got `{ty}`")
             }
-            Self::CannotDereferenceNonPointer(t) => {
-                write!(f, "cannot dereference non-pointer type `{t}`")
+            Self::CannotDereferenceNonPointer(ty) => {
+                write!(f, "cannot dereference non-pointer type `{ty}`")
             }
-            Self::CannotIndexIntoNonPointer(t) => {
-                write!(f, "cannot index into non-pointer type `{t}`")
+            Self::CannotIndexIntoNonPointer(ty) => {
+                write!(f, "cannot index into non-pointer type `{ty}`")
             }
-            Self::IndexOffsetMustBeInteger(t) => {
-                write!(f, "index offset must be integer type, got `{t}`")
+            Self::IndexOffsetMustBeInteger(ty) => {
+                write!(f, "index offset must be integer type, got `{ty}`")
             }
-            Self::StructDoesNotHaveMember(t, member) => {
-                write!(f, "struct `{t}` does not have member `{member}`")
+            Self::StructDoesNotHaveMember(ty, member) => {
+                write!(f, "struct `{ty}` does not have member `{member}`")
             }
-            Self::StructMemberAccessOnNonStruct(t) => {
-                write!(f, "cannot access member of non-struct type `{t}`")
+            Self::StructMemberAccessOnNonStruct(ty) => {
+                write!(f, "cannot access member of non-struct type `{ty}`")
             }
             Self::FunctionArgumentCountMismatch { expected, got } => {
                 write!(f, "expected `{expected}` arguments, got `{got}`",)
@@ -184,34 +219,37 @@ impl Display for DiagnosticKind {
             Self::FunctionArgumentTypeMismatch { n, expected, got } => {
                 write!(f, "expected `{expected}` for argument `{n}`, got `{got}`",)
             }
-            Self::CannotCallNonFunction(t) => {
-                write!(f, "cannot call non-function type `{t}`")
+            Self::CannotCallNonFunction(ty) => {
+                write!(f, "cannot call non-function type `{ty}`")
             }
-            Self::TernaryConditionMustBeBoolean(t) => {
-                write!(f, "ternary condition must be boolean type, got `{t}`")
+            Self::TernaryConditionMustBeBoolean(ty) => {
+                write!(f, "ternary condition must be boolean type, got `{ty}`")
             }
-            Self::TernaryArmsMustHaveSameType(t1, t2) => {
-                write!(f, "ternary arms must have same type, got `{t1}` and `{t2}`")
+            Self::TernaryArmsMustHaveSameType(lhs_ty, rhs_ty) => {
+                write!(
+                    f,
+                    "ternary arms must have same type, got `{lhs_ty}` and `{rhs_ty}`"
+                )
             }
             Self::ExpectedGot { expected, got } => {
                 write!(f, "expected `{expected}`, got `{got}`")
             }
-            Self::ExpectedSameType(t1, t2) => {
+            Self::ExpectedSameType(ty1, ty2) => {
                 write!(
                     f,
-                    "expected both sides to have the same type, got `{t1}` and `{t2}`"
+                    "expected both sides to have the same type, got `{ty1}` and `{ty2}`"
                 )
             }
-            Self::EqualityOperators(t1, t2) => write!(
+            Self::EqualityOperators(ty1, ty2) => write!(
                 f,
                 concat!(
                     "expected both sides to be the same integer,",
                     " boolean or pointer type, got `{}` and `{}`"
                 ),
-                t1, t2
+                ty1, ty2
             ),
             Self::InvalidCast(from, to) => write!(f, "cannot cast `{from}` to `{to}`"),
-            Self::IdentifierAlreadyInUse(i) => write!(f, "identifier `{i}` already in use"),
+            Self::IdentifierAlreadyInUse(id) => write!(f, "identifier `{id}` already in use"),
             Self::NoTypeNoValue => write!(
                 f,
                 "no explicit variable type present and no value to infer from"
@@ -225,6 +263,11 @@ impl Display for DiagnosticKind {
                 write!(f, "expected a block to be guaranteed to return")
             }
             Self::DuplicateStructMember(key) => write!(f, "duplicate struct member `{key}`"),
+            Self::VariadicFunctionMustBeExternal => write!(
+                f,
+                "cannot use variadic arguments (`...`) on a non-external function"
+            ),
+            Self::UnknownEscapeSequence => write!(f, "unknown escape sequence"),
         }
     }
 }

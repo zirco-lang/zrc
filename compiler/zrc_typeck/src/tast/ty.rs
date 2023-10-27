@@ -4,6 +4,7 @@ use std::fmt::Display;
 
 use indexmap::IndexMap;
 
+use super::stmt::ArgumentDeclarationList;
 use crate::typeck::BlockReturnType;
 
 /// The possible Zirco types
@@ -35,7 +36,10 @@ pub enum Type<'input> {
     /// `*T`
     Ptr(Box<Type<'input>>),
     /// `fn(A, B) -> T`
-    Fn(Vec<Type<'input>>, Box<BlockReturnType<'input>>),
+    Fn(
+        ArgumentDeclarationList<'input>,
+        Box<BlockReturnType<'input>>,
+    ),
     /// Struct type literals. Ordered by declaration order.
     Struct(IndexMap<&'input str, Type<'input>>),
 }
@@ -52,15 +56,12 @@ impl<'input> Display for Type<'input> {
             Self::I64 => write!(f, "i64"),
             Self::U64 => write!(f, "u64"),
             Self::Bool => write!(f, "bool"),
-            Self::Ptr(t) => write!(f, "*({t})"),
+            Self::Ptr(pointee_ty) => write!(f, "*({pointee_ty})"),
             Self::Void => write!(f, "void"),
             Self::Fn(args, brt) => write!(
                 f,
                 "(fn({}){})",
-                args.iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", "),
+                args,
                 match *brt {
                     BlockReturnType::Return(ret) => format!(" -> {ret}"),
                     BlockReturnType::Void => String::new(),
@@ -71,7 +72,7 @@ impl<'input> Display for Type<'input> {
                 "(struct {{ {} }})",
                 fields
                     .iter()
-                    .map(|(k, v)| format!("{k}: {v}"))
+                    .map(|(key, ty)| format!("{key}: {ty}"))
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
