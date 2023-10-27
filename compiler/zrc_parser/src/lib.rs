@@ -49,8 +49,7 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
-#[macro_use]
-extern crate lalrpop_util;
+use lalrpop_util::lalrpop_mod;
 
 lalrpop_mod!(
     /// Direct access to the LALRPOP parser. **Do not use this module.** Use the

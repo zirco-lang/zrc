@@ -46,7 +46,7 @@ pub fn resolve_type<'input>(
 /// # Errors
 /// Errors if a key is not unique or is unresolvable.
 #[allow(clippy::type_complexity)]
-pub fn resolve_struct_keys<'input>(
+pub(super) fn resolve_struct_keys<'input>(
     scope: &Scope<'input>,
     members: Spanned<Vec<Spanned<(Spanned<&'input str>, ParserType<'input>)>>>,
 ) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {

@@ -1216,7 +1216,6 @@ dependencies = [
 name = "zrc_parser"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "lalrpop",
  "lalrpop-util",
  "logos",
@@ -1229,7 +1228,6 @@ dependencies = [
 name = "zrc_typeck"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "indexmap",
  "zrc_diagnostics",
  "zrc_parser",
