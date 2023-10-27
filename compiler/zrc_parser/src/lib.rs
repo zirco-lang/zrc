@@ -33,6 +33,14 @@
     clippy::unimplemented,
     clippy::unneeded_field_pattern,
     clippy::wildcard_enum_match_arm,
+    let_underscore_drop,
+    macro_use_extern_crate,
+    missing_debug_implementations,
+    non_exhaustive_omitted_patterns,
+    unreachable_pub,
+    unsafe_op_in_unsafe_fn,
+    unused_crate_dependencies,
+    variant_size_differences,
 
     // These should be enabled in any non-user-facing code, like the parser, but not in the
     // frontend.
@@ -59,7 +67,8 @@ lalrpop_mod!(
         clippy::pedantic,
         missing_docs,
         clippy::missing_docs_in_private_items,
-        clippy::restriction
+        clippy::restriction,
+        unreachable_pub
     )]
     internal_parser
 );

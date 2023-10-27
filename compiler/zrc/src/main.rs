@@ -32,7 +32,15 @@
     clippy::undocumented_unsafe_blocks,
     clippy::unimplemented,
     clippy::unneeded_field_pattern,
-    clippy::wildcard_enum_match_arm
+    clippy::wildcard_enum_match_arm,
+    let_underscore_drop,
+    macro_use_extern_crate,
+    missing_debug_implementations,
+    non_exhaustive_omitted_patterns,
+    unreachable_pub,
+    unsafe_op_in_unsafe_fn,
+    unused_crate_dependencies,
+    variant_size_differences
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
