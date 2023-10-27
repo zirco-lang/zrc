@@ -112,6 +112,21 @@ impl<'input> ArgumentDeclarationList<'input> {
     pub const fn empty() -> Self {
         Self::NonVariadic(vec![])
     }
+
+    /// Get the contained [`Vec`], variadic or not
+    pub fn into_arguments(self) -> Vec<ArgumentDeclaration<'input>> {
+        match self {
+            ArgumentDeclarationList::NonVariadic(x) | Self::Variadic(x) => x,
+        }
+    }
+
+    /// Returns `true` if this is [`ArgumentDeclarationList::Variadic`].
+    pub fn is_variadic(&self) -> bool {
+        match self {
+            ArgumentDeclarationList::Variadic(_) => true,
+            ArgumentDeclarationList::NonVariadic(_) => false,
+        }
+    }
 }
 impl<'input> Display for ArgumentDeclarationList<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

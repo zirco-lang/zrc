@@ -9,8 +9,8 @@ use inkwell::{
 };
 use zrc_typeck::tast::{
     expr::{
-        Arithmetic, BinaryBitwise, Comparison, Equality, Logical, Place, PlaceKind, TypedExpr,
-        TypedExprKind,
+        Arithmetic, BinaryBitwise, Comparison, Equality, Logical, Place, PlaceKind, StringTok,
+        TypedExpr, TypedExprKind,
     },
     ty::Type,
 };
@@ -93,13 +93,33 @@ pub fn cg_expr<'ctx, 'a>(
             *bb,
         ),
 
-        TypedExprKind::StringLiteral(s) => (
-            builder
-                .build_global_string_ptr(s, "str")
-                .unwrap()
-                .as_basic_value_enum(),
-            *bb,
-        ),
+        TypedExprKind::StringLiteral(str) => {
+            let formatted_contents = str
+                .iter()
+                .map(|x| match x {
+                    StringTok::EscapedBackslash => format!("\\"),
+                    StringTok::EscapedCr => format!("\r"),
+                    StringTok::EscapedNewline => format!("\n"),
+                    StringTok::EscapedHexByte(byte) => {
+                        format!(
+                            "{}",
+                            char::from_u32(byte.parse::<u32>().expect("invalid byte"))
+                                .expect("invalid char")
+                        )
+                    }
+                    StringTok::EscapedDoubleQuote => format!("\""),
+                    StringTok::Text(text) => (*text).to_string(),
+                })
+                .collect::<String>();
+
+            (
+                builder
+                    .build_global_string_ptr(&formatted_contents, "str")
+                    .unwrap()
+                    .as_basic_value_enum(),
+                *bb,
+            )
+        }
 
         TypedExprKind::BooleanLiteral(b) => (
             ctx.bool_type()

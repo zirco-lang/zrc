@@ -23,15 +23,16 @@ fn create_ptr(ty: AnyTypeEnum<'_>) -> PointerType<'_> {
 pub fn create_fn<'ctx>(
     ty: AnyTypeEnum<'ctx>,
     args: &[BasicMetadataTypeEnum<'ctx>],
+    is_variadic: bool,
 ) -> FunctionType<'ctx> {
     match ty {
-        AnyTypeEnum::ArrayType(x) => x.fn_type(args, false),
-        AnyTypeEnum::FloatType(x) => x.fn_type(args, false),
-        AnyTypeEnum::IntType(x) => x.fn_type(args, false),
-        AnyTypeEnum::PointerType(x) => x.fn_type(args, false),
-        AnyTypeEnum::StructType(x) => x.fn_type(args, false),
-        AnyTypeEnum::VectorType(x) => x.fn_type(args, false),
-        AnyTypeEnum::VoidType(x) => x.fn_type(args, false),
+        AnyTypeEnum::ArrayType(x) => x.fn_type(args, is_variadic),
+        AnyTypeEnum::FloatType(x) => x.fn_type(args, is_variadic),
+        AnyTypeEnum::IntType(x) => x.fn_type(args, is_variadic),
+        AnyTypeEnum::PointerType(x) => x.fn_type(args, is_variadic),
+        AnyTypeEnum::StructType(x) => x.fn_type(args, is_variadic),
+        AnyTypeEnum::VectorType(x) => x.fn_type(args, is_variadic),
+        AnyTypeEnum::VoidType(x) => x.fn_type(args, is_variadic),
         AnyTypeEnum::FunctionType(_) => panic!("fn is not a valid return type for a function"),
     }
 }
@@ -94,9 +95,12 @@ pub fn llvm_type<'ctx>(ctx: &'ctx Context, ty: Type) -> AnyTypeEnum<'ctx> {
         Type::Fn(args, ret) => create_fn(
             llvm_type(ctx, ret.into_tast_type()),
             &args
+                .clone()
+                .into_arguments()
                 .into_iter()
-                .map(|arg| llvm_basic_type(ctx, arg).into())
+                .map(|arg| llvm_basic_type(ctx, arg.ty).into())
                 .collect::<Vec<_>>(),
+            args.is_variadic(),
         )
         .as_any_type_enum(),
     }

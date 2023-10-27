@@ -1,3 +1,5 @@
+use std::thread::panicking;
+
 use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
@@ -358,6 +360,7 @@ pub fn cg_init_fn<'ctx>(
     name: &str,
     ret: Option<Type>,
     args: Vec<Type>,
+    is_variadic: bool,
 ) -> FunctionValue<'ctx> {
     let ret_type = llvm_type(ctx, ret.unwrap_or(Type::Void));
     let arg_types = args
@@ -365,7 +368,11 @@ pub fn cg_init_fn<'ctx>(
         .map(|t| llvm_basic_type(ctx, t).into())
         .collect::<Vec<_>>();
 
-    let fn_type = create_fn(ret_type.as_any_type_enum(), arg_types.as_slice());
+    let fn_type = create_fn(
+        ret_type.as_any_type_enum(),
+        arg_types.as_slice(),
+        is_variadic,
+    );
     let fn_val = module.add_function(name, fn_type, None);
 
     fn_val
@@ -395,9 +402,12 @@ pub fn cg_program(program: Vec<TypedDeclaration>) -> String {
                     name,
                     return_type,
                     parameters
+                        .clone()
+                        .into_arguments()
                         .iter()
                         .map(|ArgumentDeclaration { ty, .. }| ty.clone())
                         .collect::<Vec<_>>(),
+                    parameters.is_variadic(),
                 );
                 global_scope.insert(name, fn_value.as_global_value().as_pointer_value());
                 // must come after the insert call so that recursion is valid
@@ -407,7 +417,8 @@ pub fn cg_program(program: Vec<TypedDeclaration>) -> String {
                     let entry = ctx.append_basic_block(fn_value, "entry");
                     builder.position_at_end(entry);
 
-                    for (n, ArgumentDeclaration { name, ty }) in parameters.into_iter().enumerate()
+                    for (n, ArgumentDeclaration { name, ty }) in
+                        parameters.into_arguments().into_iter().enumerate()
                     {
                         if entry.get_first_instruction().is_some() {
                             builder.position_before(&entry.get_first_instruction().unwrap());
