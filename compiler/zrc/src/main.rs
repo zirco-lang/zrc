@@ -196,7 +196,19 @@ fn main() -> anyhow::Result<()> {
         eprintln!("error: end internal compiler error. compilation failed.");
     }));
 
-    std::env::set_var("RUST_BACKTRACE", "1");
+    // Force RUST_BACKTRACE=1 if the user did not set RUST_BACKTRACE=full
+    std::env::var("RUST_BACKTRACE").ok().map_or_else(
+        || {
+            // if RUST_BACKTRACE is not set, set it to 1
+            std::env::set_var("RUST_BACKTRACE", "1");
+        },
+        |x| {
+            // if RUST_BACKTRACE is not set to full, set it to 1
+            if x != "full" {
+                std::env::set_var("RUST_BACKTRACE", "1");
+            }
+        },
+    );
 
     let cli = Cli::parse();
 
