@@ -97,9 +97,9 @@ pub fn cg_expr<'ctx, 'a>(
             let formatted_contents = str
                 .iter()
                 .map(|x| match x {
-                    StringTok::EscapedBackslash => format!("\\"),
-                    StringTok::EscapedCr => format!("\r"),
-                    StringTok::EscapedNewline => format!("\n"),
+                    StringTok::EscapedBackslash => "\\".to_string(),
+                    StringTok::EscapedCr => "\r".to_string(),
+                    StringTok::EscapedNewline => "\n".to_string(),
                     StringTok::EscapedHexByte(byte) => {
                         format!(
                             "{}",
@@ -107,7 +107,7 @@ pub fn cg_expr<'ctx, 'a>(
                                 .expect("invalid char")
                         )
                     }
-                    StringTok::EscapedDoubleQuote => format!("\""),
+                    StringTok::EscapedDoubleQuote => "\"".to_string(),
                     StringTok::Text(text) => (*text).to_string(),
                 })
                 .collect::<String>();

@@ -1,5 +1,3 @@
-use std::thread::panicking;
-
 use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
