@@ -94,6 +94,7 @@ pub enum DiagnosticKind {
     UnknownToken(String),
     UnterminatedStringLiteral,
     UnterminatedBlockComment,
+    UnknownEscapeSequence,
 
     // PARSER ERRORS
     /// Generic parser error
@@ -266,6 +267,7 @@ impl Display for DiagnosticKind {
                 f,
                 "cannot use variadic arguments (`...`) on a non-external function"
             ),
+            Self::UnknownEscapeSequence => write!(f, "unknown escape sequence"),
         }
     }
 }

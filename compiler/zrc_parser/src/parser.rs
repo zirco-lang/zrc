@@ -80,6 +80,10 @@ fn parser_error_to_diagnostic(
                     Severity::Error,
                     span.containing(DiagnosticKind::UnterminatedStringLiteral),
                 ),
+                LexicalError::UnknownEscapeSequence => Diagnostic(
+                    Severity::Error,
+                    span.containing(DiagnosticKind::UnknownEscapeSequence),
+                ),
             }
         }
     }
@@ -333,6 +337,7 @@ mod tests {
 
         mod literals {
             use super::*;
+            use crate::lexer::StringTok;
 
             #[test]
             fn number_literals_parse_as_expected() {
@@ -343,7 +348,7 @@ mod tests {
             fn string_literals_parse_as_expected() {
                 assert_eq!(
                     parse_expr("\"x\""),
-                    Ok(Expr::string(spanned!(0, "\"x\"", 3)))
+                    Ok(Expr::string(spanned!(0, vec![StringTok::Text("x")], 3)))
                 );
             }
 

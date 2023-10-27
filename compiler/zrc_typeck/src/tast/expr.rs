@@ -1,8 +1,11 @@
 //! Expression representation for the Zirco [TAST](super)
 
-use std::fmt::Display;
+use std::{fmt::Display, string::ToString};
 
-pub use zrc_parser::ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical};
+pub use zrc_parser::{
+    ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical},
+    lexer::StringTok,
+};
 
 /// An [expression kind](TypedExprKind) with its yielded [result
 /// type](super::ty::Type) attached to it.
@@ -87,7 +90,7 @@ pub enum TypedExprKind<'input> {
     /// Any numeric literal.
     NumberLiteral(&'input str),
     /// Any string literal.bool
-    StringLiteral(&'input str),
+    StringLiteral(Vec<StringTok<'input>>),
     /// Any identifier.
     Identifier(&'input str),
     /// Any boolean literal.
@@ -98,7 +101,11 @@ impl<'input> Display for TypedExprKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NumberLiteral(n) => write!(f, "{n}"),
-            Self::StringLiteral(str) => write!(f, "{str}"),
+            Self::StringLiteral(str) => write!(
+                f,
+                "\"{}\"",
+                str.iter().map(ToString::to_string).collect::<String>()
+            ),
             Self::Identifier(i) => write!(f, "{i}"),
             Self::BooleanLiteral(value) => write!(f, "{value}"),
             Self::Assignment(place, value) => write!(f, "{place} = {value}"),

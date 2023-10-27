@@ -1,8 +1,8 @@
 use anyhow::{bail, Context as _};
 use zrc_typeck::tast::{
     expr::{
-        Arithmetic, BinaryBitwise, Comparison, Equality, Logical, Place, PlaceKind, TypedExpr,
-        TypedExprKind,
+        Arithmetic, BinaryBitwise, Comparison, Equality, Logical, Place, PlaceKind, StringTok,
+        TypedExpr, TypedExprKind,
     },
     ty::Type,
 };
@@ -552,10 +552,34 @@ pub fn cg_expr(
 
         TypedExprKind::StringLiteral(str) => {
             let id = module.global_constant_id.next();
+
+            let formatted_contents = str
+                .iter()
+                .map(|x| match x {
+                    StringTok::EscapedBackslash => format!("\\{:02x}", b'\\'),
+                    StringTok::EscapedCr => format!("\\{:02x}", b'\r'),
+                    StringTok::EscapedNewline => format!("\\{:02x}", b'\n'),
+                    StringTok::EscapedHexByte(byte) => format!("\\{byte}"),
+                    StringTok::EscapedDoubleQuote => format!("\\{:02x}", b'"'),
+                    StringTok::Text(text) => (*text).to_string(),
+                })
+                .collect::<String>();
+
+            let formatted_len: usize = str
+                .iter()
+                .map(|x| match x {
+                    StringTok::Text(text) => text.len(),
+                    StringTok::EscapedBackslash
+                    | StringTok::EscapedCr
+                    | StringTok::EscapedDoubleQuote
+                    | StringTok::EscapedNewline
+                    | StringTok::EscapedHexByte(_) => 1,
+                })
+                .sum();
+
             module.declarations.push(format!(
-                "@.str{id} = private constant [{} x i8] c\"{}\\00\"",
-                str.len() - 1, // subtract both quotes, add the null
-                &str[1..str.len() - 1]
+                "@.str{id} = private constant [{} x i8] c\"{formatted_contents}\\00\"",
+                formatted_len + 1
             ));
 
             (format!("@.str{id}"), *bb)
