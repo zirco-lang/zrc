@@ -1219,7 +1219,6 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "logos",
- "regex",
  "zrc_diagnostics",
  "zrc_utils",
 ]
