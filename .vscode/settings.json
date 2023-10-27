@@ -6,11 +6,8 @@
         "inttoptr",
         "lalrpop",
         "Lvalue",
-<<<<<<< HEAD
         "preheader",
-=======
         "pointee",
->>>>>>> main
         "ptrtoint",
         "sdiv",
         "Spannable",
