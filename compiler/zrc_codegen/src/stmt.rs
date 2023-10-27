@@ -443,5 +443,7 @@ pub fn cg_program(program: Vec<TypedDeclaration>) -> String {
         }
     }
 
+    module.verify().expect("Generated invalid LLVM IR");
+
     module.print_to_string().to_string()
 }
