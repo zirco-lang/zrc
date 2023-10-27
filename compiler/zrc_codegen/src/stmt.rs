@@ -91,12 +91,7 @@ pub fn cg_block<'ctx, 'input, 'a>(
 
     block
         .into_iter()
-        .fold(Some(*bb), |bb, stmt| -> Option<BasicBlock> {
-            let Some(bb) = bb else {
-                // we've hit a return statement / terminator already
-                return None;
-            };
-
+        .try_fold(*bb, |bb, stmt| -> Option<BasicBlock> {
             match stmt {
                 TypedStmt::EmptyStmt => Some(bb),
                 TypedStmt::ExprStmt(expr) => {
