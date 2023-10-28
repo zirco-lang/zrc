@@ -443,6 +443,18 @@ pub fn cg_program(program: Vec<TypedDeclaration>) -> String {
         }
     }
 
+    match module.verify() {
+        Ok(()) => {}
+
+        Err(error_as_llvm_string) => {
+            panic!(
+                "code generation failure:\n{}\nGenerated IR:\n{}",
+                error_as_llvm_string.to_string(),
+                module.print_to_string().to_string()
+            );
+        }
+    }
+
     module.verify().expect("Generated invalid LLVM IR");
 
     module.print_to_string().to_string()

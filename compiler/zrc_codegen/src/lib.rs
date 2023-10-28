@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 #![allow(unknown_lints)] // in case you use non-nightly clippy
 #![warn(
     clippy::cargo,
