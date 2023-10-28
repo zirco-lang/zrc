@@ -108,7 +108,7 @@ fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
 ///
 /// # Errors
 /// Errors with type checker errors.
-pub fn process_let_declaration<'input>(
+fn process_let_declaration<'input>(
     scope: &mut Scope<'input>,
     declarations: Vec<Spanned<AstLetDeclaration<'input>>>,
 ) -> Result<Vec<TastLetDeclaration<'input>>, zrc_diagnostics::Diagnostic> {
