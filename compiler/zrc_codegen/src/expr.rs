@@ -483,3 +483,11 @@ pub fn cg_expr<'ctx, 'a>(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn testy_test() {
+        assert_eq!(true, false);
+    }
+}
