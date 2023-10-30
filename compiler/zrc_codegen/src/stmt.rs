@@ -7,6 +7,7 @@ use inkwell::{
     values::{BasicValueEnum, FunctionValue},
 };
 use zrc_typeck::tast::{
+    expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
     stmt::{ArgumentDeclaration, LetDeclaration, TypedDeclaration, TypedStmt},
     ty::Type,
 };
@@ -20,7 +21,7 @@ use crate::{
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
 /// instructions. It is passed to [`cg_block`] to allow it to properly handle
 /// break and continue.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct LoopBreakaway<'ctx> {
     /// Points to the exit basic block.
     on_break: BasicBlock<'ctx>,
@@ -29,6 +30,11 @@ pub struct LoopBreakaway<'ctx> {
     on_continue: BasicBlock<'ctx>,
 }
 
+/// Generates the `alloca`tion, `store` instruction, and adds a new identifier to the
+/// [`CgScope`].
+///
+/// # Panics
+/// Panics if an internal code generation error is encountered.
 pub fn cg_let_declaration<'ctx, 'input, 'a>(
     ctx: &'ctx Context,
     builder: &'a Builder<'ctx>,
@@ -58,12 +64,12 @@ pub fn cg_let_declaration<'ctx, 'input, 'a>(
                 function,
                 &bb,
                 scope,
-                zrc_typeck::tast::expr::TypedExpr(
+                TypedExpr(
                     let_declaration.ty.clone(),
-                    zrc_typeck::tast::expr::TypedExprKind::Assignment(
-                        Box::new(zrc_typeck::tast::expr::Place(
+                    TypedExprKind::Assignment(
+                        Box::new(Place(
                             let_declaration.ty,
-                            zrc_typeck::tast::expr::PlaceKind::Variable(let_declaration.name),
+                            PlaceKind::Variable(let_declaration.name),
                         )),
                         Box::new(value),
                     ),
@@ -76,7 +82,11 @@ pub fn cg_let_declaration<'ctx, 'input, 'a>(
     bb
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Process a vector of [`TypedStmt`]s (a block) and handle each statement.
+///
+/// # Panics
+/// Panics if an internal code generation error is encountered.
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn cg_block<'ctx, 'input, 'a>(
     ctx: &'ctx Context,
     builder: &'a Builder<'ctx>,
@@ -176,31 +186,29 @@ pub fn cg_block<'ctx, 'input, 'a>(
                 }
 
                 TypedStmt::ContinueStmt => {
-                    if let Some(breakaway) = breakaway.clone() {
-                        builder
-                            .build_unconditional_branch(breakaway.on_continue)
-                            .unwrap();
+                    builder
+                        .build_unconditional_branch(breakaway.as_ref().unwrap().on_continue)
+                        .unwrap();
 
-                        None
-                    } else {
-                        panic!("continue statement outside of loop");
-                    }
+                    None
                 }
 
                 TypedStmt::BreakStmt => {
-                    if let Some(breakaway) = breakaway.clone() {
-                        builder
-                            .build_unconditional_branch(breakaway.on_break)
-                            .unwrap();
+                    builder
+                        .build_unconditional_branch(breakaway.as_ref().unwrap().on_break)
+                        .unwrap();
 
-                        None
-                    } else {
-                        panic!("break statement outside of loop");
-                    }
+                    None
                 }
 
-                TypedStmt::DeclarationList(d) => Some(cg_let_declaration(
-                    ctx, builder, module, function, &bb, &mut scope, d,
+                TypedStmt::DeclarationList(declarations) => Some(cg_let_declaration(
+                    ctx,
+                    builder,
+                    module,
+                    function,
+                    &bb,
+                    &mut scope,
+                    declarations,
                 )),
 
                 TypedStmt::ForStmt {
@@ -223,12 +231,9 @@ pub fn cg_block<'ctx, 'input, 'a>(
 
                     // The block we are currently in will become the preheader. Generate the `init`
                     // code if there is any.
-                    match init {
-                        None => bb,
-                        Some(init) => cg_let_declaration(
-                            ctx, builder, module, function, &bb, &mut scope, *init,
-                        ),
-                    };
+                    if let Some(init) = init {
+                        cg_let_declaration(ctx, builder, module, function, &bb, &mut scope, *init);
+                    }
 
                     let header = ctx.append_basic_block(*function, "header");
                     let body_bb = ctx.append_basic_block(*function, "body");
@@ -284,10 +289,8 @@ pub fn cg_block<'ctx, 'input, 'a>(
                     // Latch runs post and then breaks right back to the header.
                     builder.position_at_end(latch);
                     if let Some(post) = post {
-                        cg_expr(ctx, builder, module, function, &latch, &scope, post).1
-                    } else {
-                        latch
-                    };
+                        cg_expr(ctx, builder, module, function, &latch, &scope, post);
+                    }
 
                     builder.build_unconditional_branch(header).unwrap();
 
@@ -347,6 +350,7 @@ pub fn cg_block<'ctx, 'input, 'a>(
         })
 }
 
+/// Initialize the LLVM [`FunctionValue`] for a given function prototype
 pub fn cg_init_fn<'ctx>(
     ctx: &'ctx Context,
     module: &Module<'ctx>,
@@ -358,7 +362,7 @@ pub fn cg_init_fn<'ctx>(
     let ret_type = llvm_type(ctx, ret.unwrap_or(Type::Void));
     let arg_types = args
         .into_iter()
-        .map(|t| llvm_basic_type(ctx, t).into())
+        .map(|ty| llvm_basic_type(ctx, ty).into())
         .collect::<Vec<_>>();
 
     let fn_type = create_fn(
@@ -371,6 +375,11 @@ pub fn cg_init_fn<'ctx>(
     fn_val
 }
 
+/// Code generate a LLVM program to a string.
+///
+/// # Panics
+/// Panics on internal code generation failure.
+#[must_use]
 pub fn cg_program(program: Vec<TypedDeclaration>) -> String {
     let ctx = Context::create();
     let builder = ctx.create_builder();
@@ -420,7 +429,7 @@ pub fn cg_program(program: Vec<TypedDeclaration>) -> String {
                         }
 
                         let alloc = builder
-                            .build_alloca(llvm_basic_type(&ctx, ty), &format!("arg_{}", name))
+                            .build_alloca(llvm_basic_type(&ctx, ty), &format!("arg_{name}"))
                             .unwrap();
 
                         builder.position_at_end(entry);

@@ -8,6 +8,10 @@ use inkwell::{
 };
 use zrc_typeck::tast::ty::Type;
 
+/// Create a pointer to an [`AnyTypeEnum`] instance.
+///
+/// # Panics
+/// Panics if `ty` is [`AnyTypeEnum::VoidType`].
 fn create_ptr(ty: AnyTypeEnum<'_>) -> PointerType<'_> {
     match ty {
         AnyTypeEnum::ArrayType(x) => x.ptr_type(AddressSpace::default()),
@@ -20,6 +24,11 @@ fn create_ptr(ty: AnyTypeEnum<'_>) -> PointerType<'_> {
         AnyTypeEnum::FunctionType(x) => x.ptr_type(AddressSpace::default()),
     }
 }
+/// Create a function pointer from a prototype.
+///
+/// # Panics
+/// Panics if `ty` is [`AnyTypeEnum::FunctionType`].
+#[must_use]
 pub fn create_fn<'ctx>(
     ty: AnyTypeEnum<'ctx>,
     args: &[BasicMetadataTypeEnum<'ctx>],
@@ -37,6 +46,10 @@ pub fn create_fn<'ctx>(
     }
 }
 
+/// Resolve a [`Type`] to a LLVM [`IntType`]
+///
+/// # Panics
+/// Panics if `ty` is not an integer type
 pub fn llvm_int_type<'ctx>(ctx: &'ctx Context, ty: Type) -> IntType<'ctx> {
     match ty {
         Type::Bool => ctx.bool_type(),
@@ -50,6 +63,10 @@ pub fn llvm_int_type<'ctx>(ctx: &'ctx Context, ty: Type) -> IntType<'ctx> {
     }
 }
 
+/// Resolve a [`Type`] to a LLVM [`BasicTypeEnum`]
+///
+/// # Panics
+/// Panics if `ty` is not a basic type
 pub fn llvm_basic_type<'ctx>(ctx: &'ctx Context, ty: Type) -> BasicTypeEnum<'ctx> {
     match ty {
         Type::Bool
