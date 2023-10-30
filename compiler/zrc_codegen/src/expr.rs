@@ -18,6 +18,7 @@ use zrc_typeck::tast::{
 use super::CgScope;
 use crate::ty::{llvm_basic_type, llvm_int_type, llvm_type};
 
+/// Resolve a place to its pointer
 fn cg_place<'ctx, 'a>(
     ctx: &'ctx Context,
     builder: &'a Builder<'ctx>,
@@ -75,7 +76,8 @@ fn cg_place<'ctx, 'a>(
     }
 }
 
-pub fn cg_expr<'ctx, 'a>(
+#[allow(clippy::redundant_pub_crate)]
+pub(crate) fn cg_expr<'ctx, 'a>(
     ctx: &'ctx Context,
     builder: &'a Builder<'ctx>,
     module: &'a Module<'ctx>,
