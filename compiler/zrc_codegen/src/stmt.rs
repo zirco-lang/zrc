@@ -32,8 +32,8 @@ struct LoopBreakaway<'ctx> {
     on_continue: BasicBlock<'ctx>,
 }
 
-/// Generates the `alloca`tion, `store` instruction, and adds a new identifier to the
-/// [`CgScope`].
+/// Generates the `alloca`tion, `store` instruction, and adds a new identifier
+/// to the [`CgScope`].
 ///
 /// # Panics
 /// Panics if an internal code generation error is encountered.

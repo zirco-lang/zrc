@@ -60,8 +60,8 @@ mod ty;
 
 pub use stmt::cg_program;
 
-/// Represents the code generation scope, or the mapping from identifiers to their LLVM
-/// [`PointerValue`]s.
+/// Represents the code generation scope, or the mapping from identifiers to
+/// their LLVM [`PointerValue`]s.
 #[derive(Debug, Clone)]
 struct CgScope<'input, 'ctx> {
     /// The contained mappings from identifiers to [`PointerValue`]s

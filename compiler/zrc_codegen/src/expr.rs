@@ -513,9 +513,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 mod tests {
     use inkwell::{context::Context, values::InstructionValue};
 
-    use crate::test_utils::{initialize_test_function, BasicBlockExt};
-
     use super::*;
+    use crate::test_utils::{initialize_test_function, BasicBlockExt};
 
     #[test]
     fn boolean_literals_are_yielded_as_is() {
