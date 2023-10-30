@@ -1,3 +1,5 @@
+//! Code generation for statements
+
 use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,

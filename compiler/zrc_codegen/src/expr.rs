@@ -1,3 +1,5 @@
+//! Code generation for expressions
+
 use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
@@ -76,7 +78,12 @@ fn cg_place<'ctx, 'a>(
     }
 }
 
-#[allow(clippy::redundant_pub_crate)]
+/// Generate an expression, yielding its result.
+#[allow(
+    clippy::redundant_pub_crate,
+    clippy::too_many_lines,
+    clippy::match_same_arms
+)]
 pub(crate) fn cg_expr<'ctx, 'a>(
     ctx: &'ctx Context,
     builder: &'a Builder<'ctx>,

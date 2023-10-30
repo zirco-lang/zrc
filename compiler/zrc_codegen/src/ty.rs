@@ -1,3 +1,5 @@
+//! Resolution from [`Type`] instances to LLVM types.
+
 use inkwell::{
     context::Context,
     types::{
