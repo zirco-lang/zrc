@@ -18,7 +18,7 @@ use zrc_typeck::tast::{
 use super::CgScope;
 use crate::ty::{llvm_basic_type, llvm_int_type, llvm_type};
 
-pub fn cg_place<'ctx, 'a>(
+fn cg_place<'ctx, 'a>(
     ctx: &'ctx Context,
     builder: &'a Builder<'ctx>,
     module: &'a Module<'ctx>,

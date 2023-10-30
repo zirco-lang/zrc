@@ -22,7 +22,7 @@ use crate::{
 /// instructions. It is passed to [`cg_block`] to allow it to properly handle
 /// break and continue.
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct LoopBreakaway<'ctx> {
+struct LoopBreakaway<'ctx> {
     /// Points to the exit basic block.
     on_break: BasicBlock<'ctx>,
     /// For `for` loops, points to the latch. For `while` loops, points to the
@@ -35,7 +35,7 @@ pub struct LoopBreakaway<'ctx> {
 ///
 /// # Panics
 /// Panics if an internal code generation error is encountered.
-pub fn cg_let_declaration<'ctx, 'input, 'a>(
+fn cg_let_declaration<'ctx, 'input, 'a>(
     ctx: &'ctx Context,
     builder: &'a Builder<'ctx>,
     module: &'a Module<'ctx>,
@@ -87,7 +87,7 @@ pub fn cg_let_declaration<'ctx, 'input, 'a>(
 /// # Panics
 /// Panics if an internal code generation error is encountered.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
-pub fn cg_block<'ctx, 'input, 'a>(
+fn cg_block<'ctx, 'input, 'a>(
     ctx: &'ctx Context,
     builder: &'a Builder<'ctx>,
     module: &'a Module<'ctx>,
@@ -351,7 +351,7 @@ pub fn cg_block<'ctx, 'input, 'a>(
 }
 
 /// Initialize the LLVM [`FunctionValue`] for a given function prototype
-pub fn cg_init_fn<'ctx>(
+fn cg_init_fn<'ctx>(
     ctx: &'ctx Context,
     module: &Module<'ctx>,
     name: &str,

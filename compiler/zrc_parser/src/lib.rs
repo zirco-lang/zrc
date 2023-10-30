@@ -37,7 +37,6 @@
     macro_use_extern_crate,
     missing_debug_implementations,
     non_exhaustive_omitted_patterns,
-    unreachable_pub,
     unsafe_op_in_unsafe_fn,
     unused_crate_dependencies,
     variant_size_differences,
@@ -66,8 +65,7 @@ lalrpop_mod!(
         clippy::pedantic,
         missing_docs,
         clippy::missing_docs_in_private_items,
-        clippy::restriction,
-        unreachable_pub
+        clippy::restriction
     )]
     internal_parser
 );

@@ -37,7 +37,6 @@
     macro_use_extern_crate,
     missing_debug_implementations,
     non_exhaustive_omitted_patterns,
-    unreachable_pub,
     unsafe_op_in_unsafe_fn,
     unused_crate_dependencies,
     variant_size_differences,
@@ -53,14 +52,14 @@ use std::collections::HashMap;
 
 use inkwell::values::PointerValue;
 
-pub mod expr;
-pub mod stmt;
-pub mod ty;
+mod expr;
+mod stmt;
+mod ty;
 
 pub use stmt::cg_program;
 
 #[derive(Debug, Clone)]
-pub struct CgScope<'input, 'ctx> {
+struct CgScope<'input, 'ctx> {
     identifiers: HashMap<&'input str, PointerValue<'ctx>>,
 }
 impl<'input, 'ctx> CgScope<'input, 'ctx> {
