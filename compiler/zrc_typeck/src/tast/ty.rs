@@ -101,4 +101,24 @@ impl<'input> Type<'input> {
         use Type::{U16, U32, U64, U8};
         matches!(self, U8 | U16 | U32 | U64)
     }
+
+    /// Try to get the value we point at, or None if not a pointer.
+    #[must_use]
+    #[allow(clippy::wildcard_enum_match_arm)]
+    pub fn into_pointee(self) -> Option<Type<'input>> {
+        match self {
+            Type::Ptr(x) => Some(*x),
+            _ => None,
+        }
+    }
+
+    /// Try to access the struct's [`IndexMap`] if we are a struct
+    #[must_use]
+    #[allow(clippy::wildcard_enum_match_arm)]
+    pub fn into_struct_contents(self) -> Option<IndexMap<&'input str, Type<'input>>> {
+        match self {
+            Type::Struct(x) => Some(x),
+            _ => None,
+        }
+    }
 }

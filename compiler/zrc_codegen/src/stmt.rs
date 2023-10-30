@@ -37,6 +37,7 @@ struct LoopBreakaway<'ctx> {
 ///
 /// # Panics
 /// Panics if an internal code generation error is encountered.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn cg_let_declaration<'ctx, 'input, 'a>(
     ctx: &'ctx Context,
     builder: &'a Builder<'ctx>,
@@ -88,7 +89,12 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
 ///
 /// # Panics
 /// Panics if an internal code generation error is encountered.
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    clippy::needless_pass_by_value,
+    clippy::trivially_copy_pass_by_ref
+)]
 fn cg_block<'ctx, 'input, 'a>(
     ctx: &'ctx Context,
     builder: &'a Builder<'ctx>,
@@ -247,15 +253,14 @@ fn cg_block<'ctx, 'input, 'a>(
 
                     // Generate the header.
                     builder.position_at_end(header);
-                    let header = match cond {
-                        None => {
+                    let header = cond.map_or_else(
+                        || {
                             // If there is no condition, we always branch to the body.
                             builder.build_unconditional_branch(body_bb).unwrap();
 
                             header
-                        }
-
-                        Some(cond) => {
+                        },
+                        |cond| {
                             let (cond, header) =
                                 cg_expr(ctx, builder, module, function, &header, &scope, cond);
 
@@ -264,8 +269,8 @@ fn cg_block<'ctx, 'input, 'a>(
                                 .unwrap();
 
                             header
-                        }
-                    };
+                        },
+                    );
 
                     // Generate the body.
                     builder.position_at_end(body_bb);
@@ -439,7 +444,12 @@ pub fn cg_program(program: Vec<TypedDeclaration>) -> String {
                         builder
                             .build_store::<BasicValueEnum>(
                                 alloc,
-                                fn_value.get_nth_param(n as u32).unwrap(),
+                                fn_value
+                                    .get_nth_param(
+                                        n.try_into()
+                                            .expect("over u32::MAX parameters in a function? HOW?"),
+                                    )
+                                    .unwrap(),
                             )
                             .unwrap();
 

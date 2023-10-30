@@ -21,6 +21,7 @@ use super::CgScope;
 use crate::ty::{llvm_basic_type, llvm_int_type, llvm_type};
 
 /// Resolve a place to its pointer
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn cg_place<'ctx, 'a>(
     ctx: &'ctx Context,
     builder: &'a Builder<'ctx>,
@@ -47,6 +48,8 @@ fn cg_place<'ctx, 'a>(
             let (ptr, bb) = cg_expr(ctx, builder, module, function, bb, scope, *ptr);
             let (idx, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *idx);
 
+            // SAFETY: If indices are used incorrectly this may segfault
+            // TODO: Is this actually safely used?
             let reg = unsafe {
                 builder.build_gep(
                     llvm_basic_type(ctx, place.0),
@@ -60,18 +63,25 @@ fn cg_place<'ctx, 'a>(
         }
 
         PlaceKind::Dot(x, prop) => {
-            let prop_idx = match &x.0 {
-                Type::Struct(fields) => fields
-                    .iter()
-                    .position(|(k, _)| *k == prop)
-                    .expect("invalid struct field"),
-                _ => panic!("invalid struct field"),
-            };
+            let prop_idx = x
+                .clone()
+                .0
+                .into_struct_contents()
+                .expect("a struct")
+                .iter()
+                .position(|(got_key, _)| *got_key == prop)
+                .expect("invalid struct field");
 
             let (x, bb) = cg_place(ctx, builder, module, function, bb, scope, *x);
 
-            let reg =
-                builder.build_struct_gep(llvm_basic_type(ctx, place.0), x, prop_idx as u32, "gep");
+            let reg = builder.build_struct_gep(
+                llvm_basic_type(ctx, place.0),
+                x,
+                prop_idx
+                    .try_into()
+                    .expect("got more than u32::MAX as key index? HOW?"),
+                "gep",
+            );
 
             (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
         }
@@ -82,7 +92,8 @@ fn cg_place<'ctx, 'a>(
 #[allow(
     clippy::redundant_pub_crate,
     clippy::too_many_lines,
-    clippy::match_same_arms
+    clippy::match_same_arms,
+    clippy::trivially_copy_pass_by_ref
 )]
 pub(crate) fn cg_expr<'ctx, 'a>(
     ctx: &'ctx Context,
@@ -130,9 +141,9 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             )
         }
 
-        TypedExprKind::BooleanLiteral(b) => (
+        TypedExprKind::BooleanLiteral(value) => (
             ctx.bool_type()
-                .const_int(b as u64, false)
+                .const_int(value.into(), false)
                 .as_basic_value_enum(),
             *bb,
         ),
@@ -329,6 +340,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let (ptr, bb) = cg_expr(ctx, builder, module, function, bb, scope, *ptr);
             let (idx, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *idx);
 
+            // SAFETY: If indices are used incorrectly this may segfault
+            // TODO: Is this actually safely used?
             let reg = unsafe {
                 builder.build_gep(
                     llvm_basic_type(ctx, expr.0),
@@ -342,20 +355,23 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Dot(place, key) => {
-            let key_idx = match &place.0 {
-                Type::Struct(fields) => fields
-                    .iter()
-                    .position(|(k, _)| *k == key)
-                    .expect("invalid struct field"),
-                _ => panic!("invalid struct field"),
-            };
+            let key_idx = place
+                .clone()
+                .0
+                .into_struct_contents()
+                .expect("a struct")
+                .iter()
+                .position(|(got_key, _)| *got_key == key)
+                .expect("invalid struct field");
 
             let (place, bb) = cg_place(ctx, builder, module, function, bb, scope, *place);
 
             let reg = builder.build_struct_gep(
                 llvm_basic_type(ctx, expr.0),
                 place,
-                key_idx as u32,
+                key_idx
+                    .try_into()
+                    .expect("found more than u32::MAX keys in a struct? HOW?"),
                 "gep",
             );
 
@@ -452,7 +468,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             result_reg.add_incoming(&[(&if_true, if_true_bb), (&if_false, if_false_bb)]);
             (result_reg.as_basic_value(), end_bb)
         }
-        TypedExprKind::Cast(x, t) => {
+        TypedExprKind::Cast(x, ty) => {
             // signed -> signed = sext
             // signed -> unsigned = sext
             // unsigned -> signed = zext
@@ -466,24 +482,24 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
 
-            let reg = match (x.get_type().is_pointer_type(), matches!(t, Type::Ptr(_))) {
+            let reg = match (x.get_type().is_pointer_type(), matches!(ty, Type::Ptr(_))) {
                 (true, true) => builder
-                    .build_bitcast(x.into_pointer_value(), llvm_basic_type(ctx, t), "cast")
+                    .build_bitcast(x.into_pointer_value(), llvm_basic_type(ctx, ty), "cast")
                     .unwrap(),
                 (true, false) => builder
-                    .build_ptr_to_int(x.into_pointer_value(), llvm_int_type(ctx, t), "cast")
+                    .build_ptr_to_int(x.into_pointer_value(), llvm_int_type(ctx, ty), "cast")
                     .unwrap()
                     .as_basic_value_enum(),
                 (false, true) => builder
                     .build_int_to_ptr(
                         x.into_int_value(),
-                        llvm_basic_type(ctx, t).into_pointer_type(),
+                        llvm_basic_type(ctx, ty).into_pointer_type(),
                         "cast",
                     )
                     .unwrap()
                     .as_basic_value_enum(),
                 (false, false) => builder
-                    .build_bitcast(x.into_int_value(), llvm_basic_type(ctx, t), "cast")
+                    .build_bitcast(x.into_int_value(), llvm_basic_type(ctx, ty), "cast")
                     .unwrap()
                     .as_basic_value_enum(),
             };

@@ -52,6 +52,7 @@ pub fn create_fn<'ctx>(
 ///
 /// # Panics
 /// Panics if `ty` is not an integer type
+#[allow(clippy::needless_pass_by_value)]
 pub fn llvm_int_type<'ctx>(ctx: &'ctx Context, ty: Type) -> IntType<'ctx> {
     match ty {
         Type::Bool => ctx.bool_type(),
@@ -95,6 +96,7 @@ pub fn llvm_basic_type<'ctx>(ctx: &'ctx Context, ty: Type) -> BasicTypeEnum<'ctx
     }
 }
 
+/// Resolve a [`Type`] to a LLVM [`AnyTypeEnum`]
 pub fn llvm_type<'ctx>(ctx: &'ctx Context, ty: Type) -> AnyTypeEnum<'ctx> {
     match ty {
         Type::Bool
