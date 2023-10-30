@@ -358,7 +358,7 @@ fn cg_block<'ctx, 'input, 'a>(
 }
 
 /// Initialize the LLVM [`FunctionValue`] for a given function prototype
-fn cg_init_fn<'ctx>(
+pub fn cg_init_fn<'ctx>(
     ctx: &'ctx Context,
     module: &Module<'ctx>,
     name: &str,

@@ -54,6 +54,8 @@ use inkwell::values::PointerValue;
 
 mod expr;
 mod stmt;
+#[cfg(test)]
+mod test_utils;
 mod ty;
 
 pub use stmt::cg_program;

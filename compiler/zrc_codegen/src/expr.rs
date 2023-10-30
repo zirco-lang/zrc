@@ -511,8 +511,35 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
 #[cfg(test)]
 mod tests {
+    use inkwell::{context::Context, values::InstructionValue};
+
+    use crate::test_utils::{initialize_test_function, BasicBlockExt};
+
+    use super::*;
+
     #[test]
-    fn testy_test() {
-        assert_eq!(true, false);
+    fn boolean_literals_are_yielded_as_is() {
+        let ctx = Context::create();
+        let (builder, module, fn_value, fn_scope, bb) = initialize_test_function(&ctx);
+
+        let (reg, bb) = cg_expr(
+            &ctx,
+            &builder,
+            &module,
+            &fn_value,
+            &bb,
+            &fn_scope,
+            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+        );
+
+        // No new basic blocks were created
+        assert_eq!(1, fn_value.count_basic_blocks());
+        assert_eq!(bb, fn_value.get_basic_blocks()[0]);
+
+        // No new instructions were created
+        assert_eq!(bb.get_instructions(), Vec::<InstructionValue>::new());
+
+        // The result value is `i1 false`
+        assert_eq!(reg, ctx.bool_type().const_int(1, false));
     }
 }
