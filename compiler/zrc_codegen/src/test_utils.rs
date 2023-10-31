@@ -44,33 +44,11 @@
 //! [`crate::expr::tests::cg_place::identifier_registers_are_returned_as_is`].
 
 use inkwell::{
-    basic_block::BasicBlock,
-    builder::Builder,
-    context::Context,
-    module::Module,
-    values::{FunctionValue, InstructionValue},
+    basic_block::BasicBlock, builder::Builder, context::Context, module::Module,
+    values::FunctionValue,
 };
 
 use crate::{stmt::cg_init_fn, CgScope};
-
-/// Added extension methods to [`BasicBlock`] to help in testing
-pub trait BasicBlockExt<'ctx> {
-    /// Get a list of [`InstructionValue`]s from this [`BasicBlock`]
-    ///
-    /// This is helpful in tests to see what instructions are generated
-    /// within a specific basic block. It is as if you called
-    /// `get_first_instruction()` and then `get_next_instruction()` on each
-    /// instruction until you reach the end of the block.
-    fn get_instructions(&self) -> Vec<InstructionValue<'ctx>>;
-}
-impl<'ctx> BasicBlockExt<'ctx> for BasicBlock<'ctx> {
-    fn get_instructions(&self) -> Vec<InstructionValue<'ctx>> {
-        std::iter::successors(self.get_first_instruction(), |instr| {
-            instr.get_next_instruction()
-        })
-        .collect()
-    }
-}
 
 /// Initialize a new LLVM [`Builder`], [`FunctionValue`], [`CgScope`], and
 /// [`BasicBlock`] within that function. This allows you to generate code within
@@ -101,7 +79,7 @@ pub(crate) fn initialize_test_function(
 
     let mut global_scope = CgScope::new();
 
-    let fn_value = cg_init_fn(ctx, &module, "test", None, vec![], false);
+    let fn_value = cg_init_fn(ctx, &module, "test", None, &[], false);
     global_scope.insert("test", fn_value.as_global_value().as_pointer_value());
     // must come after the insert call so that recursion is valid
     let fn_scope = global_scope.clone();

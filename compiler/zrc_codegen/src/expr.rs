@@ -515,16 +515,21 @@ mod tests {
     // Please read the "Common patterns in tests" section of crate::test_utils for
     // more information on how code generator tests are structured.
 
-    use inkwell::{context::Context, values::InstructionValue};
+    use indexmap::IndexMap;
+    use inkwell::{
+        context::Context,
+        types::{BasicType, FunctionType},
+        values::AnyValue,
+        AddressSpace,
+    };
+    use zrc_typeck::{tast::stmt::ArgumentDeclarationList, typeck::BlockReturnType};
 
     use super::*;
-    use crate::test_utils::{initialize_test_function, BasicBlockExt};
+    use crate::test_utils::initialize_test_function;
 
     // Remember: In all of these tests, cg_place returns a *pointer* to the data in
     // the place.
     mod cg_place {
-        use indexmap::IndexMap;
-        use inkwell::{types::BasicType, values::AnyValue, AddressSpace};
 
         use super::*;
 
@@ -900,33 +905,86 @@ mod tests {
             assert_eq!(actual, expected);
         }
     }
-    // mod cg_expr {
-    //     use super::*;
-    // }
+    mod cg_expr {
+        use super::*;
 
-    #[test]
-    fn boolean_literals_are_yielded_as_is() {
-        let ctx = Context::create();
-        let (builder, module, fn_value, fn_scope, bb) = initialize_test_function(&ctx);
+        /// Ensures all of the side-effects on the left hand side of a comma
+        /// operator are executed and the right hand side is returned.
+        #[test]
+        fn comma_yields_right_value() {
+            fn generate_test_prelude(
+                ctx: &Context,
+            ) -> (
+                Builder,
+                Module,
+                FunctionValue,
+                CgScope<'static, '_>,
+                BasicBlock,
+                FunctionType,
+            ) {
+                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
 
-        let (reg, bb) = cg_expr(
-            &ctx,
-            &builder,
-            &module,
-            &fn_value,
-            &bb,
-            &fn_scope,
-            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
-        );
+                // generate `f: fn() -> void`
+                let f_fn_type = ctx.void_type().fn_type(&[], false);
+                let f_val = module.add_function("f", f_fn_type, None);
+                scope.insert("f", f_val.as_global_value().as_pointer_value());
 
-        // No new basic blocks were created
-        assert_eq!(1, fn_value.count_basic_blocks());
-        assert_eq!(bb, fn_value.get_basic_blocks()[0]);
+                (builder, module, fn_value, scope, bb, f_fn_type)
+            }
 
-        // No new instructions were created
-        assert_eq!(bb.get_instructions(), Vec::<InstructionValue>::new());
+            let ctx = Context::create();
 
-        // The result value is `i1 false`
-        assert_eq!(reg, ctx.bool_type().const_int(1, false));
+            let expected = {
+                let (builder, module, _fn_value, scope, _bb, f_fn_type) =
+                    generate_test_prelude(&ctx);
+
+                // First the function is called, then the number literal is returned
+                builder
+                    .build_indirect_call(f_fn_type, scope.get("f").unwrap(), &[], "call")
+                    .unwrap();
+
+                (
+                    module.print_to_string(),
+                    ctx.i32_type().const_int(3, false).print_to_string(),
+                )
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb, _f_fn_type) =
+                    generate_test_prelude(&ctx);
+
+                let (reg, _bb) = cg_expr(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    TypedExpr(
+                        Type::I32,
+                        TypedExprKind::Comma(
+                            Box::new(TypedExpr(
+                                Type::Void,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Void),
+                                        ),
+                                        PlaceKind::Variable("f"),
+                                    )),
+                                    vec![],
+                                ),
+                            )),
+                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
+                        ),
+                    ),
+                );
+
+                (module.print_to_string(), reg.print_to_string())
+            };
+
+            assert_eq!(actual, expected);
+        }
     }
 }

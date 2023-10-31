@@ -363,13 +363,13 @@ pub fn cg_init_fn<'ctx>(
     module: &Module<'ctx>,
     name: &str,
     ret: Option<Type>,
-    args: Vec<Type>,
+    args: &[Type],
     is_variadic: bool,
 ) -> FunctionValue<'ctx> {
     let ret_type = llvm_type(ctx, ret.unwrap_or(Type::Void));
     let arg_types = args
-        .into_iter()
-        .map(|ty| llvm_basic_type(ctx, ty).into())
+        .iter()
+        .map(|ty| llvm_basic_type(ctx, ty.clone()).into())
         .collect::<Vec<_>>();
 
     let fn_type = create_fn(
@@ -410,7 +410,7 @@ pub fn cg_program(program: Vec<TypedDeclaration>) -> String {
                     &module,
                     name,
                     return_type,
-                    parameters
+                    &parameters
                         .clone()
                         .into_arguments()
                         .iter()
