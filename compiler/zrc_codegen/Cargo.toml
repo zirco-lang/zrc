@@ -10,4 +10,4 @@ anyhow = "1.0.75"
 zrc_typeck = { version = "0.1.0", path = "../zrc_typeck" }
 
 [dev-dependencies]
-indexmap = "2.0.2"
+indexmap = "2.1.0"
