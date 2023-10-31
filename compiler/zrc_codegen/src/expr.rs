@@ -345,17 +345,27 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             // TODO: Is this actually safely used?
             let reg = unsafe {
                 builder.build_gep(
-                    llvm_basic_type(ctx, expr.0),
+                    llvm_basic_type(ctx, expr.0.clone()),
                     ptr.into_pointer_value(),
                     &[idx.into_int_value()],
                     "gep",
                 )
-            };
+            }
+            .unwrap();
 
-            (reg.unwrap().as_basic_value_enum(), bb)
+            let loaded = builder
+                .build_load(
+                    llvm_basic_type(ctx, expr.0),
+                    reg.as_basic_value_enum().into_pointer_value(),
+                    "load",
+                )
+                .unwrap();
+
+            (loaded.as_basic_value_enum(), bb)
         }
 
         TypedExprKind::Dot(place, key) => {
+            let place_ty = place.0.clone();
             let key_idx = place
                 .clone()
                 .0
@@ -367,16 +377,26 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             let (place, bb) = cg_place(ctx, builder, module, function, bb, scope, *place);
 
-            let reg = builder.build_struct_gep(
-                llvm_basic_type(ctx, expr.0),
-                place,
-                key_idx
-                    .try_into()
-                    .expect("found more than u32::MAX keys in a struct? HOW?"),
-                "gep",
-            );
+            let reg = builder
+                .build_struct_gep(
+                    llvm_basic_type(ctx, place_ty),
+                    place,
+                    key_idx
+                        .try_into()
+                        .expect("found more than u32::MAX keys in a struct? HOW?"),
+                    "gep",
+                )
+                .unwrap();
 
-            (reg.unwrap().as_basic_value_enum(), bb)
+            let loaded = builder
+                .build_load(
+                    llvm_basic_type(ctx, expr.0),
+                    reg.as_basic_value_enum().into_pointer_value(),
+                    "load",
+                )
+                .unwrap();
+
+            (loaded.as_basic_value_enum(), bb)
         }
 
         TypedExprKind::Call(f, args) => {
@@ -982,6 +1002,186 @@ mod tests {
                 );
 
                 (module.print_to_string(), reg.print_to_string())
+            };
+
+            assert_eq!(actual, expected);
+        }
+
+        /// This is similar to
+        /// [`super::cg_place::pointer_indexing_generates_proper_gep`] but it
+        /// expects an additional `load` instruction at the end to go from
+        /// resolved pointer to value.
+        #[test]
+        fn pointer_indexing_generates_proper_gep_and_load() {
+            fn generate_test_prelude(
+                ctx: &Context,
+            ) -> (
+                Builder,
+                Module,
+                FunctionValue,
+                CgScope<'static, '_>,
+                BasicBlock,
+            ) {
+                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
+
+                // generate `arr: *i32`
+                let arr_stack_ptr = builder
+                    .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
+                    .unwrap();
+                scope.insert("arr", arr_stack_ptr);
+
+                (builder, module, fn_value, scope, bb)
+            }
+
+            let ctx = Context::create();
+
+            let expected = {
+                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+
+                // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
+                // the pointer to that index in the array
+                let loaded_arr = builder
+                    .build_load(
+                        ctx.i32_type().ptr_type(AddressSpace::default()),
+                        scope.get("arr").unwrap(),
+                        "load",
+                    )
+                    .unwrap();
+
+                // SAFETY: If indices are used incorrectly this may segfault
+                let indexed_ptr = unsafe {
+                    builder.build_gep(
+                        ctx.i32_type(),
+                        loaded_arr.into_pointer_value(),
+                        &[ctx.i32_type().const_int(3, false)],
+                        "gep",
+                    )
+                }
+                .unwrap();
+
+                // Finally this value is loaded.
+                let loaded_value = builder
+                    .build_load(ctx.i32_type(), indexed_ptr, "load")
+                    .unwrap();
+
+                (module.print_to_string(), loaded_value.print_to_string())
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_expr(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    TypedExpr(
+                        Type::I32,
+                        TypedExprKind::Index(
+                            Box::new(TypedExpr(
+                                Type::Ptr(Box::new(Type::I32)),
+                                TypedExprKind::Identifier("arr"),
+                            )),
+                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
+                        ),
+                    ),
+                );
+
+                (module.print_to_string(), ptr.print_to_string())
+            };
+
+            assert_eq!(actual, expected);
+        }
+
+        /// This is similar to
+        /// [`super::cg_place::struct_property_access_generates_proper_gep`] but
+        /// it expects an additional `load` instruction at the end to go
+        /// from resolved pointer to value.
+        #[test]
+        fn struct_property_access_generates_proper_gep_and_load() {
+            fn generate_test_prelude(
+                ctx: &Context,
+            ) -> (
+                Builder,
+                Module,
+                FunctionValue,
+                CgScope<'static, '_>,
+                BasicBlock,
+            ) {
+                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
+
+                // generate: `x: { x: i32, y: i32 }`
+                let x_stack_ptr = builder
+                    .build_alloca(
+                        ctx.struct_type(
+                            &[
+                                ctx.i32_type().as_basic_type_enum(),
+                                ctx.i32_type().as_basic_type_enum(),
+                            ],
+                            false,
+                        ),
+                        "x",
+                    )
+                    .unwrap();
+                scope.insert("x", x_stack_ptr);
+
+                (builder, module, fn_value, scope, bb)
+            }
+
+            let ctx = Context::create();
+
+            let expected = {
+                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+
+                // We do not load the struct yet, we GEP directly into it.
+                let indexed_ptr = builder
+                    .build_struct_gep(
+                        ctx.struct_type(
+                            &[
+                                ctx.i32_type().as_basic_type_enum(),
+                                ctx.i32_type().as_basic_type_enum(),
+                            ],
+                            false,
+                        ),
+                        scope.get("x").unwrap(),
+                        1,
+                        "gep",
+                    )
+                    .unwrap();
+
+                // Now we load the value.
+                let loaded_value = builder
+                    .build_load(ctx.i32_type(), indexed_ptr, "load")
+                    .unwrap();
+
+                (module.print_to_string(), loaded_value.print_to_string())
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_expr(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    TypedExpr(
+                        Type::I32,
+                        TypedExprKind::Dot(
+                            Box::new(Place(
+                                Type::Struct(IndexMap::from([("a", Type::I32), ("b", Type::I32)])),
+                                PlaceKind::Variable("x"),
+                            )),
+                            "b",
+                        ),
+                    ),
+                );
+
+                (module.print_to_string(), ptr.print_to_string())
             };
 
             assert_eq!(actual, expected);
