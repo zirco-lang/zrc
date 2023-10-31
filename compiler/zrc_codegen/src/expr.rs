@@ -587,7 +587,7 @@ mod tests {
                 )
             };
 
-            assert_eq!(expected, actual);
+            assert_eq!(actual, expected);
         }
 
         /// When dereferencing an identifier, the identifier itself represents a
@@ -663,7 +663,7 @@ mod tests {
                 )
             };
 
-            assert_eq!(expected, actual);
+            assert_eq!(actual, expected);
         }
 
         /// When dereferencing a value that's not an identifier in place context
@@ -733,7 +733,86 @@ mod tests {
                 )
             };
 
-            assert_eq!(expected, actual);
+            assert_eq!(actual, expected);
+        }
+
+        #[test]
+        fn pointer_indexing_generates_proper_gep() {
+            fn generate_test_prelude(
+                ctx: &Context,
+            ) -> (
+                Builder,
+                Module,
+                FunctionValue,
+                CgScope<'static, '_>,
+                BasicBlock,
+            ) {
+                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
+
+                // generate `arr: *i32`
+                let arr_stack_ptr = builder
+                    .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
+                    .unwrap();
+                scope.insert("arr", arr_stack_ptr);
+
+                (builder, module, fn_value, scope, bb)
+            }
+
+            let ctx = Context::create();
+
+            let expected = {
+                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+
+                // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
+                // the pointer to that index in the array
+                let loaded_arr = builder
+                    .build_load(
+                        ctx.i32_type().ptr_type(AddressSpace::default()),
+                        scope.get("arr").unwrap(),
+                        "load",
+                    )
+                    .unwrap();
+
+                // SAFETY: If indices are used incorrectly this may segfault
+                let indexed_ptr = unsafe {
+                    builder.build_gep(
+                        ctx.i32_type(),
+                        loaded_arr.into_pointer_value(),
+                        &[ctx.i32_type().const_int(3, false)],
+                        "gep",
+                    )
+                }
+                .unwrap();
+
+                (module.print_to_string(), indexed_ptr.print_to_string())
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_place(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    Place(
+                        Type::I32,
+                        PlaceKind::Index(
+                            Box::new(TypedExpr(
+                                Type::Ptr(Box::new(Type::I32)),
+                                TypedExprKind::Identifier("arr"),
+                            )),
+                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
+                        ),
+                    ),
+                );
+
+                (module.print_to_string(), ptr.print_to_string())
+            };
+
+            assert_eq!(actual, expected);
         }
     }
     // mod cg_expr {
