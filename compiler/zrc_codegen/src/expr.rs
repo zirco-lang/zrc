@@ -511,39 +511,38 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
 #[cfg(test)]
 mod tests {
-    // Please read the "Common patterns in tests" section of crate::test_utils for more information
-    // on how code generator tests are structured.
+    // Please read the "Common patterns in tests" section of crate::test_utils for
+    // more information on how code generator tests are structured.
 
     use inkwell::{context::Context, values::InstructionValue};
 
     use super::*;
     use crate::test_utils::{initialize_test_function, BasicBlockExt};
 
-    // Remember: In all of these tests, cg_place returns a *pointer* to the data in the place.
+    // Remember: In all of these tests, cg_place returns a *pointer* to the data in
+    // the place.
     mod cg_place {
-        use inkwell::{
-            passes::{PassManager, PassManagerBuilder, PassManagerSubType},
-            values::AnyValue,
-            AddressSpace,
-        };
+        use inkwell::{values::AnyValue, AddressSpace};
 
         use super::*;
 
-        /// When generating an identifier, the pointer to their data is stored already within the
-        /// [`CgScope`] instance. There is no need to do any extra work to generate the pointer
-        /// other than return the allocation directly.
+        /// When generating an identifier, the pointer to their data is stored
+        /// already within the [`CgScope`] instance. There is no need to
+        /// do any extra work to generate the pointer other than return
+        /// the allocation directly.
         #[test]
         fn identifier_registers_are_returned_as_is() {
-            /// Initializes the test function and adds any needed IR beforehand. See the
-            /// "Common patterns in tests" section of [`crate::test_utils`] for more information.
-            fn generate_test_prelude<'ctx>(
-                ctx: &'ctx Context,
+            /// Initializes the test function and adds any needed IR beforehand.
+            /// See the "Common patterns in tests" section of
+            /// [`crate::test_utils`] for more information.
+            fn generate_test_prelude(
+                ctx: &Context,
             ) -> (
-                Builder<'ctx>,
-                Module<'ctx>,
-                FunctionValue<'ctx>,
-                CgScope<'static, 'ctx>,
-                BasicBlock<'ctx>,
+                Builder,
+                Module,
+                FunctionValue,
+                CgScope<'static, '_>,
+                BasicBlock,
             ) {
                 let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
 
@@ -557,7 +556,7 @@ mod tests {
             let ctx = Context::create();
 
             let expected = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (_builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
 
                 (
                     module.print_to_string(),
@@ -572,7 +571,7 @@ mod tests {
             let actual = {
                 let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
 
-                let (ptr, bb) = cg_place(
+                let (ptr, _bb) = cg_place(
                     &ctx,
                     &builder,
                     &module,
@@ -591,20 +590,21 @@ mod tests {
             assert_eq!(expected, actual);
         }
 
-        /// When dereferencing an identifier, the identifier itself represents a `*T`, and if we
-        /// consider the fact that the value is stored on the stack, `%x` is of type `T**`. To get
-        /// the underlying pointer to `T` (because cg place returns a pointer) `T*`, we need to `load` the
-        /// identifier only.
+        /// When dereferencing an identifier, the identifier itself represents a
+        /// `*T`, and if we consider the fact that the value is stored
+        /// on the stack, `%x` is of type `T**`. To get the underlying
+        /// pointer to `T` (because cg place returns a pointer) `T*`, we need to
+        /// `load` the identifier only.
         #[test]
         fn identifier_deref_generates_as_expected() {
-            fn generate_test_prelude<'ctx>(
-                ctx: &'ctx Context,
+            fn generate_test_prelude(
+                ctx: &Context,
             ) -> (
-                Builder<'ctx>,
-                Module<'ctx>,
-                FunctionValue<'ctx>,
-                CgScope<'static, 'ctx>,
-                BasicBlock<'ctx>,
+                Builder,
+                Module,
+                FunctionValue,
+                CgScope<'static, '_>,
+                BasicBlock,
             ) {
                 let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
 
@@ -620,7 +620,7 @@ mod tests {
             let ctx = Context::create();
 
             let expected = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
 
                 // Expect a single %yield = load i32*, i32** %x
                 let yield_ptr = builder
@@ -630,8 +630,6 @@ mod tests {
                         "load",
                     )
                     .unwrap();
-
-                dbg!(&yield_ptr);
 
                 (
                     module.print_to_string(),
@@ -643,7 +641,7 @@ mod tests {
             let actual = {
                 let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
 
-                let (ptr, bb) = cg_place(
+                let (ptr, _bb) = cg_place(
                     &ctx,
                     &builder,
                     &module,
@@ -668,9 +666,9 @@ mod tests {
             assert_eq!(expected, actual);
         }
     }
-    mod cg_expr {
-        use super::*;
-    }
+    // mod cg_expr {
+    //     use super::*;
+    // }
 
     #[test]
     fn boolean_literals_are_yielded_as_is() {
