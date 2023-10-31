@@ -665,6 +665,76 @@ mod tests {
 
             assert_eq!(expected, actual);
         }
+
+        /// When dereferencing a value that's not an identifier in place context
+        /// e.g. `*0`, the address to this data is `&*0` which is just
+        /// `0`. In this case, it gets cancelled out. We assert that the
+        /// result is just `0 as *i32` when generating `*(0 as *i32)` in place
+        /// context.
+        #[test]
+        fn other_deref_generates_as_expected() {
+            fn generate_test_prelude(
+                ctx: &Context,
+            ) -> (
+                Builder,
+                Module,
+                FunctionValue,
+                CgScope<'static, '_>,
+                BasicBlock,
+            ) {
+                let (builder, module, fn_value, scope, bb) = initialize_test_function(ctx);
+
+                (builder, module, fn_value, scope, bb)
+            }
+
+            let ctx = Context::create();
+
+            let expected = {
+                let (builder, module, _fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+
+                // Generates `%cast = inttoptr 0 to i32*`
+                let cast = builder
+                    .build_int_to_ptr(
+                        ctx.i32_type().const_zero(),
+                        ctx.i32_type().ptr_type(AddressSpace::default()),
+                        "cast",
+                    )
+                    .unwrap();
+
+                // The yielded value is just %cast -- see the comment at the top
+                (module.print_to_string(), cast.print_to_string())
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_place(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    Place(
+                        Type::I32,
+                        PlaceKind::Deref(Box::new(TypedExpr(
+                            Type::Ptr(Box::new(Type::I32)),
+                            TypedExprKind::Cast(
+                                Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("0"))),
+                                Type::Ptr(Box::new(Type::I32)),
+                            ),
+                        ))),
+                    ),
+                );
+
+                (
+                    module.print_to_string(),
+                    ptr.as_basic_value_enum().print_to_string(),
+                )
+            };
+
+            assert_eq!(expected, actual);
+        }
     }
     // mod cg_expr {
     //     use super::*;
