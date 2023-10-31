@@ -63,6 +63,7 @@ fn cg_place<'ctx, 'a>(
         }
 
         PlaceKind::Dot(x, prop) => {
+            let x_ty = llvm_basic_type(ctx, x.0.clone());
             let prop_idx = x
                 .clone()
                 .0
@@ -72,10 +73,10 @@ fn cg_place<'ctx, 'a>(
                 .position(|(got_key, _)| *got_key == prop)
                 .expect("invalid struct field");
 
-            let (x, bb) = cg_place(ctx, builder, module, function, bb, scope, *x);
+            let (x, bb) = cg_place(ctx, builder, module, function, bb, scope, *x.clone());
 
             let reg = builder.build_struct_gep(
-                llvm_basic_type(ctx, place.0),
+                x_ty,
                 x,
                 prop_idx
                     .try_into()
@@ -522,7 +523,8 @@ mod tests {
     // Remember: In all of these tests, cg_place returns a *pointer* to the data in
     // the place.
     mod cg_place {
-        use inkwell::{values::AnyValue, AddressSpace};
+        use indexmap::IndexMap;
+        use inkwell::{types::BasicType, values::AnyValue, AddressSpace};
 
         use super::*;
 
@@ -805,6 +807,89 @@ mod tests {
                                 TypedExprKind::Identifier("arr"),
                             )),
                             Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
+                        ),
+                    ),
+                );
+
+                (module.print_to_string(), ptr.print_to_string())
+            };
+
+            assert_eq!(actual, expected);
+        }
+
+        #[test]
+        fn struct_property_access_generates_proper_gep() {
+            fn generate_test_prelude(
+                ctx: &Context,
+            ) -> (
+                Builder,
+                Module,
+                FunctionValue,
+                CgScope<'static, '_>,
+                BasicBlock,
+            ) {
+                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
+
+                // generate: `x: { x: i32, y: i32 }`
+                let x_stack_ptr = builder
+                    .build_alloca(
+                        ctx.struct_type(
+                            &[
+                                ctx.i32_type().as_basic_type_enum(),
+                                ctx.i32_type().as_basic_type_enum(),
+                            ],
+                            false,
+                        ),
+                        "x",
+                    )
+                    .unwrap();
+                scope.insert("x", x_stack_ptr);
+
+                (builder, module, fn_value, scope, bb)
+            }
+
+            let ctx = Context::create();
+
+            let expected = {
+                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+
+                // We do not load the struct, we GEP directly into it.
+                let indexed_ptr = builder
+                    .build_struct_gep(
+                        ctx.struct_type(
+                            &[
+                                ctx.i32_type().as_basic_type_enum(),
+                                ctx.i32_type().as_basic_type_enum(),
+                            ],
+                            false,
+                        ),
+                        scope.get("x").unwrap(),
+                        1,
+                        "gep",
+                    )
+                    .unwrap();
+
+                (module.print_to_string(), indexed_ptr.print_to_string())
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_place(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    Place(
+                        Type::I32,
+                        PlaceKind::Dot(
+                            Box::new(Place(
+                                Type::Struct(IndexMap::from([("a", Type::I32), ("b", Type::I32)])),
+                                PlaceKind::Variable("x"),
+                            )),
+                            "b",
                         ),
                     ),
                 );
