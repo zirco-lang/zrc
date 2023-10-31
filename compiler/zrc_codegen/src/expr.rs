@@ -465,21 +465,20 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             let if_true_bb = ctx.append_basic_block(*function, "if_true");
             let if_false_bb = ctx.append_basic_block(*function, "if_false");
+            let end_bb = ctx.append_basic_block(*function, "end");
 
             builder
                 .build_conditional_branch(cond.into_int_value(), if_true_bb, if_false_bb)
                 .unwrap();
 
+            builder.position_at_end(if_true_bb);
             let (if_true, if_true_bb) =
                 cg_expr(ctx, builder, module, function, &if_true_bb, scope, *lhs);
+            builder.build_unconditional_branch(end_bb).unwrap();
+
+            builder.position_at_end(if_false_bb);
             let (if_false, if_false_bb) =
                 cg_expr(ctx, builder, module, function, &if_false_bb, scope, *rhs);
-
-            let end_bb = ctx.append_basic_block(*function, "end");
-
-            builder.position_at_end(if_true_bb);
-            builder.build_unconditional_branch(end_bb).unwrap();
-            builder.position_at_end(if_false_bb);
             builder.build_unconditional_branch(end_bb).unwrap();
 
             builder.position_at_end(end_bb);
@@ -1182,6 +1181,168 @@ mod tests {
                 );
 
                 (module.print_to_string(), ptr.print_to_string())
+            };
+
+            assert_eq!(actual, expected);
+        }
+
+        /// This test is a lot more complicated. It aims to ensure that the
+        /// ternary operator generates as expected. A lot of this can be
+        /// optimized, so we keep the condition as a call to an extern
+        /// fn so that not much can be done about it.
+        ///
+        /// The actual code being tested is basically `get_some_bool() ?
+        /// get_some_int() : 3`.
+        #[test]
+        #[allow(clippy::similar_names, clippy::too_many_lines)]
+        fn ternary_generates_proper_cfg() {
+            fn generate_test_prelude(
+                ctx: &Context,
+            ) -> (
+                Builder,
+                Module,
+                FunctionValue,
+                CgScope<'static, '_>,
+                BasicBlock,
+                FunctionType,
+                FunctionType,
+            ) {
+                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
+
+                // generate `get_some_bool: fn() -> bool`
+                let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
+                let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
+                scope.insert(
+                    "get_some_bool",
+                    gsb_val.as_global_value().as_pointer_value(),
+                );
+
+                // generate `get_some_int: fn() -> i32`
+                let gsi_fn_type = ctx.i32_type().fn_type(&[], false);
+                let gsi_val = module.add_function("get_some_int", gsi_fn_type, None);
+                scope.insert("get_some_int", gsi_val.as_global_value().as_pointer_value());
+
+                (
+                    builder,
+                    module,
+                    fn_value,
+                    scope,
+                    bb,
+                    gsb_fn_type,
+                    gsi_fn_type,
+                )
+            }
+
+            let ctx = Context::create();
+
+            let expected = {
+                let (builder, module, fn_value, scope, _bb, gsb_fn_type, gsi_fn_type) =
+                    generate_test_prelude(&ctx);
+
+                // We will need to generate a couple more complex structures.
+                // First of all, we will call the get_some_bool function and store the result in
+                // a register.
+                let some_bool = builder
+                    .build_indirect_call(
+                        gsb_fn_type,
+                        scope.get("get_some_bool").unwrap(),
+                        &[],
+                        "call",
+                    )
+                    .unwrap();
+
+                // Now, we generate two basic blocks and conditionally jump based on that
+                // boolean.
+                let if_true = ctx.append_basic_block(fn_value, "if_true");
+                let if_false = ctx.append_basic_block(fn_value, "if_false");
+                let end = ctx.append_basic_block(fn_value, "end");
+
+                builder
+                    .build_conditional_branch(
+                        some_bool.as_any_value_enum().into_int_value(),
+                        if_true,
+                        if_false,
+                    )
+                    .unwrap();
+
+                // Generate the call to get_some_int in the if_true block.
+                builder.position_at_end(if_true);
+                let some_int = builder
+                    .build_indirect_call(
+                        gsi_fn_type,
+                        scope.get("get_some_int").unwrap(),
+                        &[],
+                        "call",
+                    )
+                    .unwrap();
+                builder.build_unconditional_branch(end).unwrap();
+
+                // Generate the branch to the end block, we're yielding a constant
+                builder.position_at_end(if_false);
+                let that_constant = ctx.i32_type().const_int(3, false);
+                builder.build_unconditional_branch(end).unwrap();
+
+                // Finally, we generate the phi node in the end block.
+                builder.position_at_end(end);
+                let phi = builder.build_phi(ctx.i32_type(), "yield").unwrap();
+
+                phi.add_incoming(&[
+                    (&some_int.try_as_basic_value().unwrap_left(), if_true),
+                    (&that_constant.as_basic_value_enum(), if_false),
+                ]);
+
+                (
+                    module.print_to_string(),
+                    phi.as_basic_value().print_to_string(),
+                )
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb, _gsb_fn_type, _gsi_fn_type) =
+                    generate_test_prelude(&ctx);
+
+                let (reg, _bb) = cg_expr(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    TypedExpr(
+                        Type::I32,
+                        TypedExprKind::Ternary(
+                            Box::new(TypedExpr(
+                                Type::Bool,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Return(Type::Bool)),
+                                        ),
+                                        PlaceKind::Variable("get_some_bool"),
+                                    )),
+                                    vec![],
+                                ),
+                            )),
+                            Box::new(TypedExpr(
+                                Type::I32,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Return(Type::I32)),
+                                        ),
+                                        PlaceKind::Variable("get_some_int"),
+                                    )),
+                                    vec![],
+                                ),
+                            )),
+                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
+                        ),
+                    ),
+                );
+
+                (module.print_to_string(), reg.print_to_string())
             };
 
             assert_eq!(actual, expected);
