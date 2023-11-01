@@ -103,6 +103,8 @@ pub enum DiagnosticKind {
     UnterminatedStringLiteral,
     UnterminatedBlockComment,
     UnknownEscapeSequence,
+    /// Raised if `===` is found in the input
+    JavascriptUserDetected, 
 
     // PARSER ERRORS
     /// Generic parser error
@@ -276,6 +278,7 @@ impl Display for DiagnosticKind {
                 "cannot use variadic arguments (`...`) on a non-external function"
             ),
             Self::UnknownEscapeSequence => write!(f, "unknown escape sequence"),
+            Self::JavascriptUserDetected => write!(f, "JavaScript user detected -- did you mean `==`?"),
         }
     }
 }

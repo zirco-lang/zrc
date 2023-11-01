@@ -47,6 +47,8 @@ pub enum InternalLexicalError {
     /// An invalid escape sequence was found in a string literal
     /// The included [`Span`] is the specific span of the invalid sequence
     UnknownEscapeSequence(Span),
+    /// `===` was found in the input
+    JavascriptUserDetected,
 }
 
 /// An error encountered during lexing. You will usually find this wrapped in a
@@ -65,6 +67,8 @@ pub enum LexicalError<'input> {
     UnterminatedBlockComment,
     /// Produced from [`InternalLexicalError::NoMatchingRule`]
     UnknownEscapeSequence,
+    /// `===` was found in the input
+    JavascriptUserDetected,
 }
 
 /// A lexer callback helper to obtain the currently matched token slice.
@@ -208,6 +212,8 @@ pub enum Tok<'input> {
     Percent,
 
     // === COMPARISON OPERATORS ===
+    // Silly little error we raise if JavaScript-like equality operators are used
+    #[token("===", |_lex| Err(InternalLexicalError::JavascriptUserDetected))]
     /// The token `==`
     #[token("==")]
     EqEq,
@@ -555,6 +561,9 @@ impl<'input> Iterator for ZircoLexer<'input> {
             }
             Err(InternalLexicalError::UnknownEscapeSequence(span)) => {
                 Some(span.containing(Err(LexicalError::UnknownEscapeSequence)))
+            }
+            Err(InternalLexicalError::JavascriptUserDetected) => {
+                Some(span.containing(Err(LexicalError::JavascriptUserDetected)))
             }
             Ok(tok) => Some(span.containing(Ok(tok))),
         }
