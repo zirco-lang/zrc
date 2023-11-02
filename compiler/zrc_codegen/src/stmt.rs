@@ -401,10 +401,10 @@ pub fn cg_init_fn<'ctx>(
 /// # Panics
 /// Panics on internal code generation failure.
 #[must_use]
-pub fn cg_program(program: Vec<TypedDeclaration>) -> String {
+pub fn cg_program(module_name: &str, program: Vec<TypedDeclaration>) -> String {
     let ctx = Context::create();
     let builder = ctx.create_builder();
-    let module = ctx.create_module("main");
+    let module = ctx.create_module(module_name);
 
     let mut global_scope = CgScope::new();
 
