@@ -101,13 +101,11 @@ pub(crate) fn initialize_test_function(
 /// your provided initialization code with the generated structures, returning
 /// these. Used for test prelude generation.
 ///
-/// You also provide a Data type, which can be used to store any additional data
-/// you need to pass to your test functions that is produced from your closure.
 /// For example, this is used in
 /// [`crate::expr::tests::cg_expr::comma_yields_right_value`]
 #[allow(clippy::redundant_pub_crate)]
 pub(crate) fn make_test_prelude_closure<'ctx>(
-    plugin: impl Fn(
+    prelude_generator: impl Fn(
         &'ctx Context,
         &Builder<'ctx>,
         &Module<'ctx>,
@@ -127,7 +125,7 @@ pub(crate) fn make_test_prelude_closure<'ctx>(
     move |ctx| {
         let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
 
-        let bb = plugin(ctx, &builder, &module, &fn_value, &mut scope, &bb);
+        let bb = prelude_generator(ctx, &builder, &module, &fn_value, &mut scope, &bb);
 
         (builder, module, fn_value, scope, bb)
     }
