@@ -534,22 +534,16 @@ mod tests {
     // Please read the "Common patterns in tests" section of crate::test_utils for
     // more information on how code generator tests are structured.
 
+    use crate::test_utils::make_test_prelude_closure;
     use indexmap::IndexMap;
-    use inkwell::{
-        context::Context,
-        types::{BasicType, FunctionType},
-        values::AnyValue,
-        AddressSpace,
-    };
+    use inkwell::{context::Context, types::BasicType, values::AnyValue, AddressSpace};
     use zrc_typeck::{tast::stmt::ArgumentDeclarationList, typeck::BlockReturnType};
 
     use super::*;
-    use crate::test_utils::initialize_test_function;
 
     // Remember: In all of these tests, cg_place returns a *pointer* to the data in
     // the place.
     mod cg_place {
-
         use super::*;
 
         /// When generating an identifier, the pointer to their data is stored
@@ -558,31 +552,18 @@ mod tests {
         /// the allocation directly.
         #[test]
         fn identifier_registers_are_returned_as_is() {
-            /// Initializes the test function and adds any needed IR beforehand.
-            /// See the "Common patterns in tests" section of
-            /// [`crate::test_utils`] for more information.
-            fn generate_test_prelude(
-                ctx: &Context,
-            ) -> (
-                Builder,
-                Module,
-                FunctionValue,
-                CgScope<'static, '_>,
-                BasicBlock,
-            ) {
-                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
-
-                // generates %x = alloca i32 and scope mapping x -> %x
-                let x_stack_ptr = builder.build_alloca(ctx.i32_type(), "x").unwrap();
-                scope.insert("x", x_stack_ptr);
-
-                (builder, module, fn_value, scope, bb)
-            }
-
             let ctx = Context::create();
 
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    let x_stack_ptr = builder.build_alloca(ctx.i32_type(), "x").unwrap();
+                    scope.insert("x", x_stack_ptr);
+
+                    (*bb, ())
+                });
+
             let expected = {
-                let (_builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (_builder, module, _fn_value, scope, _bb, ()) = generate_test_prelude(&ctx);
 
                 (
                     module.print_to_string(),
@@ -595,7 +576,7 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (builder, module, fn_value, scope, bb, ()) = generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_place(
                     &ctx,
@@ -623,30 +604,21 @@ mod tests {
         /// `load` the identifier only.
         #[test]
         fn identifier_deref_generates_as_expected() {
-            fn generate_test_prelude(
-                ctx: &Context,
-            ) -> (
-                Builder,
-                Module,
-                FunctionValue,
-                CgScope<'static, '_>,
-                BasicBlock,
-            ) {
-                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
-
-                // generates %x = alloca i32* and scope mapping x -> %x
-                let x_stack_ptr = builder
-                    .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "x")
-                    .unwrap();
-                scope.insert("x", x_stack_ptr);
-
-                (builder, module, fn_value, scope, bb)
-            }
-
             let ctx = Context::create();
 
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    // generates %x = alloca i32* and scope mapping x -> %x
+                    let x_stack_ptr = builder
+                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "x")
+                        .unwrap();
+                    scope.insert("x", x_stack_ptr);
+
+                    (*bb, ())
+                });
+
             let expected = {
-                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (builder, module, _fn_value, scope, _bb, ()) = generate_test_prelude(&ctx);
 
                 // Expect a single %yield = load i32*, i32** %x
                 let yield_ptr = builder
@@ -665,7 +637,7 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (builder, module, fn_value, scope, bb, ()) = generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_place(
                     &ctx,
@@ -699,24 +671,15 @@ mod tests {
         /// context.
         #[test]
         fn other_deref_generates_as_expected() {
-            fn generate_test_prelude(
-                ctx: &Context,
-            ) -> (
-                Builder,
-                Module,
-                FunctionValue,
-                CgScope<'static, '_>,
-                BasicBlock,
-            ) {
-                let (builder, module, fn_value, scope, bb) = initialize_test_function(ctx);
-
-                (builder, module, fn_value, scope, bb)
-            }
-
             let ctx = Context::create();
 
+            let generate_test_prelude =
+                make_test_prelude_closure(|_ctx, _builder, _module, _fn_value, _scope, bb| {
+                    (*bb, ())
+                });
+
             let expected = {
-                let (builder, module, _fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+                let (builder, module, _fn_value, _scope, _bb, ()) = generate_test_prelude(&ctx);
 
                 // Generates `%cast = inttoptr 0 to i32*`
                 let cast = builder
@@ -732,7 +695,7 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (builder, module, fn_value, scope, bb, ()) = generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_place(
                     &ctx,
@@ -764,30 +727,21 @@ mod tests {
 
         #[test]
         fn pointer_indexing_generates_proper_gep() {
-            fn generate_test_prelude(
-                ctx: &Context,
-            ) -> (
-                Builder,
-                Module,
-                FunctionValue,
-                CgScope<'static, '_>,
-                BasicBlock,
-            ) {
-                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
-
-                // generate `arr: *i32`
-                let arr_stack_ptr = builder
-                    .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
-                    .unwrap();
-                scope.insert("arr", arr_stack_ptr);
-
-                (builder, module, fn_value, scope, bb)
-            }
-
             let ctx = Context::create();
 
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    // generate `arr: *i32`
+                    let arr_stack_ptr = builder
+                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
+                        .unwrap();
+                    scope.insert("arr", arr_stack_ptr);
+
+                    (*bb, ())
+                });
+
             let expected = {
-                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (builder, module, _fn_value, scope, _bb, ()) = generate_test_prelude(&ctx);
 
                 // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
                 // the pointer to that index in the array
@@ -814,7 +768,7 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (builder, module, fn_value, scope, bb, ()) = generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_place(
                     &ctx,
@@ -843,39 +797,30 @@ mod tests {
 
         #[test]
         fn struct_property_access_generates_proper_gep() {
-            fn generate_test_prelude(
-                ctx: &Context,
-            ) -> (
-                Builder,
-                Module,
-                FunctionValue,
-                CgScope<'static, '_>,
-                BasicBlock,
-            ) {
-                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
-
-                // generate: `x: { x: i32, y: i32 }`
-                let x_stack_ptr = builder
-                    .build_alloca(
-                        ctx.struct_type(
-                            &[
-                                ctx.i32_type().as_basic_type_enum(),
-                                ctx.i32_type().as_basic_type_enum(),
-                            ],
-                            false,
-                        ),
-                        "x",
-                    )
-                    .unwrap();
-                scope.insert("x", x_stack_ptr);
-
-                (builder, module, fn_value, scope, bb)
-            }
-
             let ctx = Context::create();
 
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    // generate: `x: { x: i32, y: i32 }`
+                    let x_stack_ptr = builder
+                        .build_alloca(
+                            ctx.struct_type(
+                                &[
+                                    ctx.i32_type().as_basic_type_enum(),
+                                    ctx.i32_type().as_basic_type_enum(),
+                                ],
+                                false,
+                            ),
+                            "x",
+                        )
+                        .unwrap();
+                    scope.insert("x", x_stack_ptr);
+
+                    (*bb, ())
+                });
+
             let expected = {
-                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (builder, module, _fn_value, scope, _bb, ()) = generate_test_prelude(&ctx);
 
                 // We do not load the struct, we GEP directly into it.
                 let indexed_ptr = builder
@@ -897,7 +842,7 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (builder, module, fn_value, scope, bb, ()) = generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_place(
                     &ctx,
@@ -931,27 +876,19 @@ mod tests {
         /// operator are executed and the right hand side is returned.
         #[test]
         fn comma_yields_right_value() {
-            fn generate_test_prelude(
-                ctx: &Context,
-            ) -> (
-                Builder,
-                Module,
-                FunctionValue,
-                CgScope<'static, '_>,
-                BasicBlock,
-                FunctionType,
-            ) {
-                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
-
-                // generate `f: fn() -> void`
-                let f_fn_type = ctx.void_type().fn_type(&[], false);
-                let f_val = module.add_function("f", f_fn_type, None);
-                scope.insert("f", f_val.as_global_value().as_pointer_value());
-
-                (builder, module, fn_value, scope, bb, f_fn_type)
-            }
-
             let ctx = Context::create();
+
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                    // generate `f: fn() -> void`
+                    let f_fn_type = ctx.void_type().fn_type(&[], false);
+                    let f_val = module.add_function("f", f_fn_type, None);
+                    scope.insert("f", f_val.as_global_value().as_pointer_value());
+
+                    // Having access to the function type of `f` is needed to build the indirect
+                    // call within the expected case.
+                    (*bb, f_fn_type)
+                });
 
             let expected = {
                 let (builder, module, _fn_value, scope, _bb, f_fn_type) =
@@ -1012,30 +949,21 @@ mod tests {
         /// resolved pointer to value.
         #[test]
         fn pointer_indexing_generates_proper_gep_and_load() {
-            fn generate_test_prelude(
-                ctx: &Context,
-            ) -> (
-                Builder,
-                Module,
-                FunctionValue,
-                CgScope<'static, '_>,
-                BasicBlock,
-            ) {
-                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
-
-                // generate `arr: *i32`
-                let arr_stack_ptr = builder
-                    .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
-                    .unwrap();
-                scope.insert("arr", arr_stack_ptr);
-
-                (builder, module, fn_value, scope, bb)
-            }
-
             let ctx = Context::create();
 
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    // generate `arr: *i32`
+                    let arr_stack_ptr = builder
+                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
+                        .unwrap();
+                    scope.insert("arr", arr_stack_ptr);
+
+                    (*bb, ())
+                });
+
             let expected = {
-                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (builder, module, _fn_value, scope, _bb, ()) = generate_test_prelude(&ctx);
 
                 // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
                 // the pointer to that index in the array
@@ -1067,7 +995,7 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (builder, module, fn_value, scope, bb, ()) = generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_expr(
                     &ctx,
@@ -1100,39 +1028,30 @@ mod tests {
         /// from resolved pointer to value.
         #[test]
         fn struct_property_access_generates_proper_gep_and_load() {
-            fn generate_test_prelude(
-                ctx: &Context,
-            ) -> (
-                Builder,
-                Module,
-                FunctionValue,
-                CgScope<'static, '_>,
-                BasicBlock,
-            ) {
-                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
-
-                // generate: `x: { x: i32, y: i32 }`
-                let x_stack_ptr = builder
-                    .build_alloca(
-                        ctx.struct_type(
-                            &[
-                                ctx.i32_type().as_basic_type_enum(),
-                                ctx.i32_type().as_basic_type_enum(),
-                            ],
-                            false,
-                        ),
-                        "x",
-                    )
-                    .unwrap();
-                scope.insert("x", x_stack_ptr);
-
-                (builder, module, fn_value, scope, bb)
-            }
-
             let ctx = Context::create();
 
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    // generate: `x: { x: i32, y: i32 }`
+                    let x_stack_ptr = builder
+                        .build_alloca(
+                            ctx.struct_type(
+                                &[
+                                    ctx.i32_type().as_basic_type_enum(),
+                                    ctx.i32_type().as_basic_type_enum(),
+                                ],
+                                false,
+                            ),
+                            "x",
+                        )
+                        .unwrap();
+                    scope.insert("x", x_stack_ptr);
+
+                    (*bb, ())
+                });
+
             let expected = {
-                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (builder, module, _fn_value, scope, _bb, ()) = generate_test_prelude(&ctx);
 
                 // We do not load the struct yet, we GEP directly into it.
                 let indexed_ptr = builder
@@ -1159,7 +1078,7 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (builder, module, fn_value, scope, bb, ()) = generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_expr(
                     &ctx,
@@ -1196,47 +1115,30 @@ mod tests {
         #[test]
         #[allow(clippy::similar_names, clippy::too_many_lines)]
         fn ternary_generates_proper_cfg() {
-            fn generate_test_prelude(
-                ctx: &Context,
-            ) -> (
-                Builder,
-                Module,
-                FunctionValue,
-                CgScope<'static, '_>,
-                BasicBlock,
-                FunctionType,
-                FunctionType,
-            ) {
-                let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
-
-                // generate `get_some_bool: fn() -> bool`
-                let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
-                let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
-                scope.insert(
-                    "get_some_bool",
-                    gsb_val.as_global_value().as_pointer_value(),
-                );
-
-                // generate `get_some_int: fn() -> i32`
-                let gsi_fn_type = ctx.i32_type().fn_type(&[], false);
-                let gsi_val = module.add_function("get_some_int", gsi_fn_type, None);
-                scope.insert("get_some_int", gsi_val.as_global_value().as_pointer_value());
-
-                (
-                    builder,
-                    module,
-                    fn_value,
-                    scope,
-                    bb,
-                    gsb_fn_type,
-                    gsi_fn_type,
-                )
-            }
-
             let ctx = Context::create();
 
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                    // generate `get_some_bool: fn() -> bool`
+                    let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
+                    let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
+                    scope.insert(
+                        "get_some_bool",
+                        gsb_val.as_global_value().as_pointer_value(),
+                    );
+
+                    // generate `get_some_int: fn() -> i32`
+                    let gsi_fn_type = ctx.i32_type().fn_type(&[], false);
+                    let gsi_val = module.add_function("get_some_int", gsi_fn_type, None);
+                    scope.insert("get_some_int", gsi_val.as_global_value().as_pointer_value());
+
+                    // Access to the function types of get_some_bool/get_some_int is required for
+                    // building the indirect calls in the expected IR.
+                    (*bb, (gsb_fn_type, gsi_fn_type))
+                });
+
             let expected = {
-                let (builder, module, fn_value, scope, _bb, gsb_fn_type, gsi_fn_type) =
+                let (builder, module, fn_value, scope, _bb, (gsb_fn_type, gsi_fn_type)) =
                     generate_test_prelude(&ctx);
 
                 // We will need to generate a couple more complex structures.
@@ -1298,7 +1200,7 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb, _gsb_fn_type, _gsi_fn_type) =
+                let (builder, module, fn_value, scope, bb, (_gsb_fn_type, _gsi_fn_type)) =
                     generate_test_prelude(&ctx);
 
                 let (reg, _bb) = cg_expr(

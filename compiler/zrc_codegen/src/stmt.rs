@@ -486,42 +486,28 @@ mod tests {
     // Please read the "Common patterns in tests" section of crate::test_utils for
     // more information on how code generator tests are structured.
 
-    use inkwell::{
-        basic_block::BasicBlock, builder::Builder, context::Context, module::Module,
-        values::FunctionValue,
-    };
+    use std::collections::HashMap;
+
+    use inkwell::context::Context;
     use zrc_typeck::tast::{
         expr::{TypedExpr, TypedExprKind},
         stmt::LetDeclaration,
         ty::Type,
     };
 
-    use crate::{stmt::cg_let_declaration, test_utils::initialize_test_function, CgScope};
-
-    use std::collections::HashMap;
+    use crate::{stmt::cg_let_declaration, test_utils::make_test_prelude_closure};
 
     /// Ensures [`cg_let_declaration`] properly generates the allocations and
     /// assigns a value if needed.
     #[test]
     fn let_declarations_are_properly_generated() {
-        fn generate_test_prelude(
-            ctx: &Context,
-        ) -> (
-            Builder,
-            Module,
-            FunctionValue,
-            CgScope<'static, '_>,
-            BasicBlock,
-        ) {
-            let (builder, module, fn_value, scope, bb) = initialize_test_function(ctx);
-
-            (builder, module, fn_value, scope, bb)
-        }
-
         let ctx = Context::create();
 
+        let generate_test_prelude =
+            make_test_prelude_closure(|_ctx, _builder, _module, _fn_value, _scope, bb| (*bb, ()));
+
         let expected = {
-            let (builder, module, _fn_value, mut scope, _bb) = generate_test_prelude(&ctx);
+            let (builder, module, _fn_value, mut scope, _bb, ()) = generate_test_prelude(&ctx);
 
             let a_ptr = builder.build_alloca(ctx.i32_type(), "let_a").unwrap();
             let b_ptr = builder.build_alloca(ctx.bool_type(), "let_b").unwrap();
@@ -546,7 +532,7 @@ mod tests {
         };
 
         let actual = {
-            let (builder, module, fn_value, mut scope, bb) = generate_test_prelude(&ctx);
+            let (builder, module, fn_value, mut scope, bb, ()) = generate_test_prelude(&ctx);
 
             let _bb = cg_let_declaration(
                 &ctx,

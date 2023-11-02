@@ -4,42 +4,49 @@
 //!
 //! # Common patterns in tests
 //! Because we use `inkwell` to generate LLVM IR, it is often not possible to
-//! directly compare IRs with each other in tests. For this reason, there are a
-//! few common structures of code generator tests throughout the repository used
-//! to keep our tests clean and structured.
+//! directly compare IRs with each other in tests. For this reason, testing the
+//! code generator can be quite difficult and there are a few common patterns we
+//! use to make these tests simpler and more consistent with each other. If a
+//! test does not follow these paradigms, you will usually find a comment
+//! explaining why.
 //!
-//! First of all, because all LLVM values borrow from the [`Context`] instance,
-//! the rule of thumb is **one test, one context.** Even though tests may
-//! consist of multiple [`Module`]s (one `expected`, one `actual`), there is
-//! only one [`Context`] they are both constructed from. Keep in mind the tests
-//! may only compare stringified IR and IR parts because the internal pointers
-//! would be different.
+//! First of all, because all LLVM structures borrow from the [`Context`]
+//! instance, every function will begin with the initialization of a
+//! [`Context`]. This one context belongs to a single test, and there should
+//! almost never exist two contexts within one test. This one context will
+//! generate two [`Module`]s, both named `test`, which we will explore in more
+//! detail in a few paragraphs.
 //!
-//! Then, there is a concept of the "prelude." The prelude function, often
-//! called `generate_test_prelude()` takes all of the values it needs and will
-//! generate the "prelude" for the test. This may involve a call to
-//! [`initialize_test_function`] to obtain a bare-bones test function, but is
-//! then followed by appending any needed statements onto the IR. For example, a
-//! test that requires a variable in scope may build an `alloca` instruction and
-//! add it to the [`CgScope`] instance. This function then returns all of the IR
-//! components.
+//! Every test also contains a "prelude." The prelude is a closure returned from
+//! [`make_test_prelude_closure`] which takes the [`Context`], calls
+//! [`initialize_test_function`] to obtain the required structures, and then
+//! calls a closure passed to its argument that will allow you to perform any
+//! needed test setup.
 //!
-//! Then you will usually find two block statements that are being bound with
-//! `let`. One of them is `expected` and the other is `actual`. Both of these
-//! will start off with a call to the test's specific `generate_test_prelude`,
-//! and they will both end with the same return statement which returns an extra
-//! value to compare, usually something like the yielded value of `cg_expr`.
+//! This function may be used to generate the state of code generation before
+//! your test, such as any needed allocations. It can also mutate the scope and
+//! do any other needed setup.
 //!
-//! Then, at the end, a `strip` pass is ran on both modules so that we are
-//! comparing the IR, not the names of the values within it. Finally we compare
-//! both result values and the stringified stripped modules.
+//! This will then be followed by two blocks statements bound to `expected` and
+//! `actual`. These will both call the prelude function to obtain the initial
+//! state, and then perform some mutations. These blocks can then return
+//! whatever values are to be compared, usually as a tuple with the first
+//! element being `module.print_to_string()` and the second being something like
+//! the return value of the function we are testing.
+//!
+//! **Keep in mind that the items being compared should NEVER contain LLVM
+//! structures.** They should at the most consist of
+//! [`inkwell::support::LLVMString`]s, because all LLVM structures borrow from
+//! the [`Module`] along with the [`Context`] and will segfault if the
+//! [`Module`] is dropped and then you run a comparison on them. You must print
+//! them to strings.
 //!
 //! It has been decided this test architecture is cleanest for allowing us to
 //! test the equality of IRs.
 //!
-//! tl;dr: `generate_test_prelude` initializes the module and appends some
-//! test-specific IR such as allocations. Then, two IRs are generated (expected
-//! and actual) and stringified, to compare their generated outputs.
+//! tl;dr: Context is created, prelude will initialize both expected/actual IRs,
+//! and then we compare the stringified value of both.
+//!
 //! For a simple test example, read
 //! [`crate::expr::tests::cg_place::identifier_registers_are_returned_as_is`].
 
@@ -88,4 +95,41 @@ pub(crate) fn initialize_test_function(
     builder.position_at_end(bb);
 
     (builder, module, fn_value, fn_scope, bb)
+}
+
+/// Generate a closure that calls [`initialize_test_function`] and then calls
+/// your provided initialization code with the generated structures, returning
+/// these. Used for test prelude generation.
+///
+/// You also provide a Data type, which can be used to store any additional data
+/// you need to pass to your test functions that is produced from your closure.
+/// For example, this is used in
+/// [`crate::expr::tests::cg_expr::comma_yields_right_value`]
+#[allow(clippy::redundant_pub_crate)]
+pub(crate) fn make_test_prelude_closure<'ctx, Data>(
+    plugin: impl Fn(
+        &'ctx Context,
+        &Builder<'ctx>,
+        &Module<'ctx>,
+        &FunctionValue<'ctx>,
+        &mut CgScope<'static, 'ctx>,
+        &BasicBlock<'ctx>,
+    ) -> (BasicBlock<'ctx>, Data),
+) -> impl Fn(
+    &'ctx Context,
+) -> (
+    Builder<'ctx>,
+    Module<'ctx>,
+    FunctionValue<'ctx>,
+    CgScope<'static, 'ctx>,
+    BasicBlock<'ctx>,
+    Data,
+) {
+    move |ctx| {
+        let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
+
+        let (bb, data) = plugin(ctx, &builder, &module, &fn_value, &mut scope, &bb);
+
+        (builder, module, fn_value, scope, bb, data)
+    }
 }
