@@ -311,6 +311,8 @@ fn cg_block<'ctx, 'input, 'a>(
 
                     builder.build_unconditional_branch(header).unwrap();
 
+                    builder.position_at_end(exit);
+
                     Some(exit)
                 }
 
