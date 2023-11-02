@@ -795,8 +795,8 @@ mod tests {
 
             use super::*;
 
-            /// Large test that verifies while loops along with break and continue generate as they
-            /// should.
+            /// Large test that verifies while loops along with break and
+            /// continue generate as they should.
             // TODO: Make test smaller?
             #[test]
             #[allow(clippy::too_many_lines)]
@@ -813,8 +813,8 @@ mod tests {
                             gsb_val.as_global_value().as_pointer_value(),
                         );
 
-                        // Having access to the function type of `get_some_bool` is needed to build the
-                        // indirect call within the expected case.
+                        // Having access to the function type of `get_some_bool` is needed to build
+                        // the indirect call within the expected case.
                         (*bb, gsb_fn_type)
                     });
 
