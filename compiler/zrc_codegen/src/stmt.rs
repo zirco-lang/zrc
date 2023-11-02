@@ -781,6 +781,67 @@ mod tests {
 
                 assert_eq!(actual, expected);
             }
+
+            /// If both blocks of an if/else statement terminate, we must not generate the `end` BB.
+            #[test]
+            fn if_else_statements_where_both_blocks_terminate_do_not_continue_generating() {
+                let ctx = Context::create();
+
+                // if (true) return; else return;
+
+                // expect only 2 basic blocks
+
+                let generate_test_prelude =
+                    make_test_prelude_closure(|_ctx, _builder, _module, _fn_value, _scope, bb| *bb);
+
+                let expected = {
+                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+
+                    let then = ctx.append_basic_block(fn_value, "then");
+                    let then_else = ctx.append_basic_block(fn_value, "then_else");
+
+                    builder
+                        .build_conditional_branch(
+                            ctx.bool_type().const_int(1, false),
+                            then,
+                            then_else,
+                        )
+                        .unwrap();
+
+                    builder.position_at_end(then);
+                    builder.build_return(None).unwrap();
+
+                    builder.position_at_end(then_else);
+                    builder.build_return(None).unwrap();
+
+                    module.print_to_string()
+                };
+
+                let actual = {
+                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                    let bb = cg_block(
+                        &ctx,
+                        &builder,
+                        &module,
+                        &fn_value,
+                        &bb,
+                        &scope,
+                        vec![TypedStmt::IfStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![TypedStmt::ReturnStmt(None)],
+                            Some(vec![TypedStmt::ReturnStmt(None)]),
+                        )],
+                        None,
+                    );
+
+                    assert_eq!(bb, None, "code generation should have terminated");
+
+                    module.print_to_string()
+                };
+
+                assert_eq!(actual, expected);
+            }
         }
 
         mod loops {
