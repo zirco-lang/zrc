@@ -7,3 +7,6 @@ members = [
     "compiler/zrc_typeck",
     "compiler/zrc_codegen",
 ]
+
+[profile.release]
+lto = true
