@@ -62,7 +62,7 @@ pub use stmt::cg_program;
 
 /// Represents the code generation scope, or the mapping from identifiers to
 /// their LLVM [`PointerValue`]s.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct CgScope<'input, 'ctx> {
     /// The contained mappings from identifiers to [`PointerValue`]s
     identifiers: HashMap<&'input str, PointerValue<'ctx>>,

@@ -480,3 +480,107 @@ pub fn cg_program(program: Vec<TypedDeclaration>) -> String {
 
     module.print_to_string().to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    // Please read the "Common patterns in tests" section of crate::test_utils for
+    // more information on how code generator tests are structured.
+
+    use inkwell::{
+        basic_block::BasicBlock, builder::Builder, context::Context, module::Module,
+        values::FunctionValue,
+    };
+    use zrc_typeck::tast::{
+        expr::{TypedExpr, TypedExprKind},
+        stmt::LetDeclaration,
+        ty::Type,
+    };
+
+    use crate::{stmt::cg_let_declaration, test_utils::initialize_test_function, CgScope};
+
+    use std::collections::HashMap;
+
+    /// Ensures [`cg_let_declaration`] properly generates the allocations and
+    /// assigns a value if needed.
+    #[test]
+    fn let_declarations_are_properly_generated() {
+        fn generate_test_prelude(
+            ctx: &Context,
+        ) -> (
+            Builder,
+            Module,
+            FunctionValue,
+            CgScope<'static, '_>,
+            BasicBlock,
+        ) {
+            let (builder, module, fn_value, scope, bb) = initialize_test_function(ctx);
+
+            (builder, module, fn_value, scope, bb)
+        }
+
+        let ctx = Context::create();
+
+        let expected = {
+            let (builder, module, _fn_value, mut scope, _bb) = generate_test_prelude(&ctx);
+
+            let a_ptr = builder.build_alloca(ctx.i32_type(), "let_a").unwrap();
+            let b_ptr = builder.build_alloca(ctx.bool_type(), "let_b").unwrap();
+
+            scope.insert("a", a_ptr);
+            scope.insert("b", b_ptr);
+
+            builder
+                .build_store(b_ptr, ctx.bool_type().const_int(1, false))
+                .unwrap();
+
+            (
+                module.print_to_string(),
+                scope
+                    .identifiers
+                    .into_iter()
+                    .map(|(identifier, pointer)| {
+                        (identifier, pointer.get_name().to_str().unwrap().to_string())
+                    })
+                    .collect::<HashMap<_, _>>(),
+            )
+        };
+
+        let actual = {
+            let (builder, module, fn_value, mut scope, bb) = generate_test_prelude(&ctx);
+
+            let _bb = cg_let_declaration(
+                &ctx,
+                &builder,
+                &module,
+                &fn_value,
+                &bb,
+                &mut scope,
+                vec![
+                    LetDeclaration {
+                        name: "a",
+                        ty: Type::I32,
+                        value: None,
+                    },
+                    LetDeclaration {
+                        name: "b",
+                        ty: Type::Bool,
+                        value: Some(TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true))),
+                    },
+                ],
+            );
+
+            (
+                module.print_to_string(),
+                scope
+                    .identifiers
+                    .into_iter()
+                    .map(|(identifier, pointer)| {
+                        (identifier, pointer.get_name().to_str().unwrap().to_string())
+                    })
+                    .collect::<HashMap<_, _>>(),
+            )
+        };
+
+        assert_eq!(actual, expected);
+    }
+}
