@@ -794,7 +794,8 @@ mod tests {
                 assert_eq!(actual, expected);
             }
 
-            /// If both blocks of an if/else statement terminate, we must not generate the `end` BB.
+            /// If both blocks of an if/else statement terminate, we must not
+            /// generate the `end` BB.
             #[test]
             fn if_else_statements_where_both_blocks_terminate_do_not_continue_generating() {
                 let ctx = Context::create();
