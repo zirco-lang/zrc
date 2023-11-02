@@ -579,196 +579,208 @@ mod tests {
     mod cg_block {
         use super::*;
 
-        #[test]
-        fn if_statements_generate_as_expected() {
-            let ctx = Context::create();
+        mod conditionals {
+            use super::*;
 
-            let generate_test_prelude =
-                make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
-                    // generate `do_stuff: fn() -> void`
-                    let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
-                    let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
-                    scope.insert(
-                        "do_stuff",
-                        do_stuff_val.as_global_value().as_pointer_value(),
-                    );
+            #[test]
+            fn if_statements_generate_as_expected() {
+                let ctx = Context::create();
 
-                    // Having access to the function type of `do_stuff` is needed to build the
-                    // indirect call within the expected case.
-                    *bb
-                });
+                let generate_test_prelude =
+                    make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                        // generate `do_stuff: fn() -> void`
+                        let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
+                        let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
+                        scope.insert(
+                            "do_stuff",
+                            do_stuff_val.as_global_value().as_pointer_value(),
+                        );
 
-            let expected = {
-                let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+                        // Having access to the function type of `do_stuff` is needed to build the
+                        // indirect call within the expected case.
+                        *bb
+                    });
 
-                let then = ctx.append_basic_block(fn_value, "then");
-                let then_else = ctx.append_basic_block(fn_value, "then_else");
-                let end = ctx.append_basic_block(fn_value, "end");
+                let expected = {
+                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
 
-                builder
-                    .build_conditional_branch(ctx.bool_type().const_int(1, false), then, then_else)
-                    .unwrap();
+                    let then = ctx.append_basic_block(fn_value, "then");
+                    let then_else = ctx.append_basic_block(fn_value, "then_else");
+                    let end = ctx.append_basic_block(fn_value, "end");
 
-                builder.position_at_end(then);
-                builder
-                    .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
-                    .unwrap();
-                builder.build_unconditional_branch(end).unwrap();
+                    builder
+                        .build_conditional_branch(
+                            ctx.bool_type().const_int(1, false),
+                            then,
+                            then_else,
+                        )
+                        .unwrap();
 
-                builder.position_at_end(then_else);
-                // because there is no else branch
-                builder.build_unconditional_branch(end).unwrap();
+                    builder.position_at_end(then);
+                    builder
+                        .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
+                        .unwrap();
+                    builder.build_unconditional_branch(end).unwrap();
 
-                builder.position_at_end(end);
+                    builder.position_at_end(then_else);
+                    // because there is no else branch
+                    builder.build_unconditional_branch(end).unwrap();
 
-                (
-                    module.print_to_string(),
-                    end.get_name().to_str().unwrap().to_string(),
-                )
-            };
+                    builder.position_at_end(end);
 
-            let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                    (
+                        module.print_to_string(),
+                        end.get_name().to_str().unwrap().to_string(),
+                    )
+                };
 
-                let bb = cg_block(
-                    &ctx,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    // if (true) do_stuff();
-                    vec![TypedStmt::IfStmt(
-                        TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
-                        vec![TypedStmt::ExprStmt(TypedExpr(
-                            Type::Void,
-                            TypedExprKind::Call(
-                                Box::new(Place(
-                                    Type::Fn(
-                                        ArgumentDeclarationList::NonVariadic(vec![]),
-                                        Box::new(BlockReturnType::Void),
-                                    ),
-                                    PlaceKind::Variable("do_stuff"),
-                                )),
-                                vec![],
-                            ),
-                        ))],
+                let actual = {
+                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                    let bb = cg_block(
+                        &ctx,
+                        &builder,
+                        &module,
+                        &fn_value,
+                        &bb,
+                        &scope,
+                        // if (true) do_stuff();
+                        vec![TypedStmt::IfStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![TypedStmt::ExprStmt(TypedExpr(
+                                Type::Void,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Void),
+                                        ),
+                                        PlaceKind::Variable("do_stuff"),
+                                    )),
+                                    vec![],
+                                ),
+                            ))],
+                            None,
+                        )],
                         None,
-                    )],
-                    None,
-                )
-                .unwrap();
-
-                (
-                    module.print_to_string(),
-                    bb.get_name().to_str().unwrap().to_string(),
-                )
-            };
-
-            assert_eq!(actual, expected);
-        }
-
-        #[test]
-        fn if_else_statements_generate_as_expected() {
-            let ctx = Context::create();
-
-            let generate_test_prelude =
-                make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
-                    // generate `do_stuff: fn() -> void`
-                    let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
-                    let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
-                    scope.insert(
-                        "do_stuff",
-                        do_stuff_val.as_global_value().as_pointer_value(),
-                    );
-
-                    // Having access to the function type of `do_stuff` is needed to build the
-                    // indirect call within the expected case.
-                    *bb
-                });
-
-            let expected = {
-                let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
-
-                let then = ctx.append_basic_block(fn_value, "then");
-                let then_else = ctx.append_basic_block(fn_value, "then_else");
-                let end = ctx.append_basic_block(fn_value, "end");
-
-                builder
-                    .build_conditional_branch(ctx.bool_type().const_int(1, false), then, then_else)
+                    )
                     .unwrap();
 
-                builder.position_at_end(then);
-                builder
-                    .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
+                    (
+                        module.print_to_string(),
+                        bb.get_name().to_str().unwrap().to_string(),
+                    )
+                };
+
+                assert_eq!(actual, expected);
+            }
+
+            #[test]
+            fn if_else_statements_generate_as_expected() {
+                let ctx = Context::create();
+
+                let generate_test_prelude =
+                    make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                        // generate `do_stuff: fn() -> void`
+                        let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
+                        let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
+                        scope.insert(
+                            "do_stuff",
+                            do_stuff_val.as_global_value().as_pointer_value(),
+                        );
+
+                        // Having access to the function type of `do_stuff` is needed to build the
+                        // indirect call within the expected case.
+                        *bb
+                    });
+
+                let expected = {
+                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+
+                    let then = ctx.append_basic_block(fn_value, "then");
+                    let then_else = ctx.append_basic_block(fn_value, "then_else");
+                    let end = ctx.append_basic_block(fn_value, "end");
+
+                    builder
+                        .build_conditional_branch(
+                            ctx.bool_type().const_int(1, false),
+                            then,
+                            then_else,
+                        )
+                        .unwrap();
+
+                    builder.position_at_end(then);
+                    builder
+                        .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
+                        .unwrap();
+                    builder.build_unconditional_branch(end).unwrap();
+
+                    builder.position_at_end(then_else);
+                    builder
+                        .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
+                        .unwrap();
+                    builder.build_unconditional_branch(end).unwrap();
+
+                    builder.position_at_end(end);
+
+                    (
+                        module.print_to_string(),
+                        end.get_name().to_str().unwrap().to_string(),
+                    )
+                };
+
+                let actual = {
+                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                    let bb = cg_block(
+                        &ctx,
+                        &builder,
+                        &module,
+                        &fn_value,
+                        &bb,
+                        &scope,
+                        // if (true) do_stuff();
+                        vec![TypedStmt::IfStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![TypedStmt::ExprStmt(TypedExpr(
+                                Type::Void,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Void),
+                                        ),
+                                        PlaceKind::Variable("do_stuff"),
+                                    )),
+                                    vec![],
+                                ),
+                            ))],
+                            Some(vec![TypedStmt::ExprStmt(TypedExpr(
+                                Type::Void,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Void),
+                                        ),
+                                        PlaceKind::Variable("do_stuff"),
+                                    )),
+                                    vec![],
+                                ),
+                            ))]),
+                        )],
+                        None,
+                    )
                     .unwrap();
-                builder.build_unconditional_branch(end).unwrap();
 
-                builder.position_at_end(then_else);
-                builder
-                    .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
-                    .unwrap();
-                builder.build_unconditional_branch(end).unwrap();
+                    (
+                        module.print_to_string(),
+                        bb.get_name().to_str().unwrap().to_string(),
+                    )
+                };
 
-                builder.position_at_end(end);
-
-                (
-                    module.print_to_string(),
-                    end.get_name().to_str().unwrap().to_string(),
-                )
-            };
-
-            let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
-
-                let bb = cg_block(
-                    &ctx,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    // if (true) do_stuff();
-                    vec![TypedStmt::IfStmt(
-                        TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
-                        vec![TypedStmt::ExprStmt(TypedExpr(
-                            Type::Void,
-                            TypedExprKind::Call(
-                                Box::new(Place(
-                                    Type::Fn(
-                                        ArgumentDeclarationList::NonVariadic(vec![]),
-                                        Box::new(BlockReturnType::Void),
-                                    ),
-                                    PlaceKind::Variable("do_stuff"),
-                                )),
-                                vec![],
-                            ),
-                        ))],
-                        Some(vec![TypedStmt::ExprStmt(TypedExpr(
-                            Type::Void,
-                            TypedExprKind::Call(
-                                Box::new(Place(
-                                    Type::Fn(
-                                        ArgumentDeclarationList::NonVariadic(vec![]),
-                                        Box::new(BlockReturnType::Void),
-                                    ),
-                                    PlaceKind::Variable("do_stuff"),
-                                )),
-                                vec![],
-                            ),
-                        ))]),
-                    )],
-                    None,
-                )
-                .unwrap();
-
-                (
-                    module.print_to_string(),
-                    bb.get_name().to_str().unwrap().to_string(),
-                )
-            };
-
-            assert_eq!(actual, expected);
+                assert_eq!(actual, expected);
+            }
         }
 
         mod loops {
