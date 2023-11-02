@@ -789,5 +789,197 @@ mod tests {
 
             assert_eq!(actual, expected);
         }
+
+        mod loops {
+            use inkwell::values::AnyValue;
+
+            use super::*;
+
+            /// Large test that verifies while loops along with break and continue generate as they
+            /// should.
+            // TODO: Make test smaller?
+            #[test]
+            #[allow(clippy::too_many_lines)]
+            fn while_loops_along_with_break_and_continue_generate_as_expected() {
+                let ctx = Context::create();
+
+                let generate_test_prelude =
+                    make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                        // generate `do_stuff: fn() -> void`
+                        let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
+                        let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
+                        scope.insert(
+                            "get_some_bool",
+                            gsb_val.as_global_value().as_pointer_value(),
+                        );
+
+                        // Having access to the function type of `get_some_bool` is needed to build the
+                        // indirect call within the expected case.
+                        (*bb, gsb_fn_type)
+                    });
+
+                // while (get_some_bool()) {
+                //     if (get_some_bool()) break;
+                //     else {
+                //         if (get_some_bool()) continue;
+                //         else get_some_bool(); // discard result
+                //     }
+                // }
+
+                // IR:
+                // entry:
+                //     br label %header
+                //
+                // header: ; the loop condition
+                //     %call = call i1 @get_some_bool()
+                //     br i1 %call, label %body, label %exit
+                //
+                // exit: ; <<<< YIELDED BASIC BLOCK, CG CONTINUES FROM HERE
+                // body:
+                //     %call1 = call i1 @get_some_bool()
+                //     br i1 %call1, label %then, label %then_else
+                // then:
+                //     br label %exit ; this represents break
+                // then_else:
+                //     %call2 = call i1 @get_some_bool()
+                //     br i1 %call2, %then2, %then_else2
+                // then2:
+                //     br label %header ; this represents continue
+                // then_else2:
+                //     %call3 = call i1 @get_some_bool() ; discarded
+                //     br label %end2
+                // end2: ; end of the inner if chain
+                //     br label %end
+                // end: ; end of the outer if chain
+                //     br label %header ; loop again
+
+                let expected = {
+                    let (builder, module, fn_value, _scope, _bb, _gsb_fn_type) =
+                        generate_test_prelude(&ctx);
+
+                    let header = ctx.append_basic_block(fn_value, "header");
+                    builder.build_unconditional_branch(header).unwrap();
+
+                    builder.position_at_end(header);
+                    let condition = builder
+                        .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
+                        .unwrap();
+                    let body = ctx.append_basic_block(fn_value, "body");
+                    let exit = ctx.append_basic_block(fn_value, "exit");
+                    builder
+                        .build_conditional_branch(
+                            condition.as_any_value_enum().into_int_value(),
+                            body,
+                            exit,
+                        )
+                        .unwrap();
+
+                    builder.position_at_end(body);
+                    let condition2 = builder
+                        .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
+                        .unwrap();
+
+                    let then = ctx.append_basic_block(fn_value, "then");
+                    let then_else = ctx.append_basic_block(fn_value, "then_else");
+                    let end = ctx.append_basic_block(fn_value, "end"); // end of the outer if
+
+                    builder
+                        .build_conditional_branch(
+                            condition2.as_any_value_enum().into_int_value(),
+                            then,
+                            then_else,
+                        )
+                        .unwrap();
+
+                    builder.position_at_end(then);
+                    builder.build_unconditional_branch(exit).unwrap(); // break;
+
+                    builder.position_at_end(then_else);
+                    let condition3 = builder
+                        .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
+                        .unwrap();
+
+                    let then2 = ctx.append_basic_block(fn_value, "then");
+                    let then_else2 = ctx.append_basic_block(fn_value, "then_else");
+                    let end2 = ctx.append_basic_block(fn_value, "end"); // end of the inner if
+
+                    builder
+                        .build_conditional_branch(
+                            condition3.as_any_value_enum().into_int_value(),
+                            then2,
+                            then_else2,
+                        )
+                        .unwrap();
+
+                    builder.position_at_end(then2);
+                    builder.build_unconditional_branch(header).unwrap(); // continue;
+
+                    builder.position_at_end(then_else2);
+                    builder
+                        .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
+                        .unwrap(); // discarded
+
+                    builder.build_unconditional_branch(end2).unwrap();
+                    builder.position_at_end(end2);
+                    builder.build_unconditional_branch(end).unwrap();
+                    builder.position_at_end(end);
+                    builder.build_unconditional_branch(header).unwrap();
+
+                    (
+                        module.print_to_string(),
+                        exit.get_name().to_str().unwrap().to_string(),
+                    )
+                };
+
+                let actual = {
+                    let (builder, module, fn_value, scope, bb, _gsb_fn_type) =
+                        generate_test_prelude(&ctx);
+
+                    let call_gsb = TypedExpr(
+                        Type::Bool,
+                        TypedExprKind::Call(
+                            Box::new(Place(
+                                Type::Fn(
+                                    ArgumentDeclarationList::NonVariadic(vec![]),
+                                    Box::new(BlockReturnType::Return(Type::Bool)),
+                                ),
+                                PlaceKind::Variable("get_some_bool"),
+                            )),
+                            vec![],
+                        ),
+                    );
+
+                    let bb = cg_block(
+                        &ctx,
+                        &builder,
+                        &module,
+                        &fn_value,
+                        &bb,
+                        &scope,
+                        vec![TypedStmt::WhileStmt(
+                            call_gsb.clone(),
+                            vec![TypedStmt::IfStmt(
+                                call_gsb.clone(),
+                                vec![TypedStmt::BreakStmt],
+                                Some(vec![TypedStmt::IfStmt(
+                                    call_gsb.clone(),
+                                    vec![TypedStmt::ContinueStmt],
+                                    Some(vec![TypedStmt::ExprStmt(call_gsb.clone())]),
+                                )]),
+                            )],
+                        )],
+                        None,
+                    )
+                    .unwrap();
+
+                    (
+                        module.print_to_string(),
+                        bb.get_name().to_str().unwrap().to_string(),
+                    )
+                };
+
+                assert_eq!(actual, expected);
+            }
+        }
     }
 }
