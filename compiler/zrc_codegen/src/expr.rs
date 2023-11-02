@@ -534,12 +534,12 @@ mod tests {
     // Please read the "Common patterns in tests" section of crate::test_utils for
     // more information on how code generator tests are structured.
 
-    use crate::test_utils::make_test_prelude_closure;
     use indexmap::IndexMap;
     use inkwell::{context::Context, types::BasicType, values::AnyValue, AddressSpace};
     use zrc_typeck::{tast::stmt::ArgumentDeclarationList, typeck::BlockReturnType};
 
     use super::*;
+    use crate::test_utils::make_test_prelude_closure;
 
     // Remember: In all of these tests, cg_place returns a *pointer* to the data in
     // the place.
