@@ -123,7 +123,6 @@ fn cg_block<'ctx, 'input, 'a>(
 
                     let then_bb = ctx.append_basic_block(*function, "then");
                     let then_else_bb = ctx.append_basic_block(*function, "then_else");
-                    let terminating_bb = ctx.append_basic_block(*function, "end");
 
                     builder
                         .build_conditional_branch(cond.into_int_value(), then_bb, then_else_bb)
@@ -140,9 +139,6 @@ fn cg_block<'ctx, 'input, 'a>(
                         then,
                         breakaway.clone(),
                     );
-                    if maybe_then_bb.is_some() {
-                        builder.build_unconditional_branch(terminating_bb).unwrap();
-                    }
 
                     builder.position_at_end(then_else_bb);
                     let maybe_then_else_bb = cg_block(
@@ -155,16 +151,30 @@ fn cg_block<'ctx, 'input, 'a>(
                         then_else,
                         breakaway.clone(),
                     );
-                    if maybe_then_else_bb.is_some() {
-                        builder.build_unconditional_branch(terminating_bb).unwrap();
-                    }
 
-                    builder.position_at_end(terminating_bb);
+                    match (maybe_then_bb, maybe_then_else_bb) {
+                        (None, None) => None,
+                        (Some(single_bb), None) | (None, Some(single_bb)) => {
+                            let end = ctx.append_basic_block(*function, "end");
 
-                    if maybe_then_bb.is_none() && maybe_then_else_bb.is_none() {
-                        None
-                    } else {
-                        Some(terminating_bb)
+                            builder.position_at_end(single_bb);
+                            builder.build_unconditional_branch(end).unwrap();
+
+                            builder.position_at_end(end);
+                            Some(end)
+                        }
+                        (Some(then_bb), Some(then_else_bb)) => {
+                            let end = ctx.append_basic_block(*function, "end");
+
+                            builder.position_at_end(then_bb);
+                            builder.build_unconditional_branch(end).unwrap();
+
+                            builder.position_at_end(then_else_bb);
+                            builder.build_unconditional_branch(end).unwrap();
+
+                            builder.position_at_end(end);
+                            Some(end)
+                        }
                     }
                 }
 
@@ -932,7 +942,6 @@ mod tests {
 
                     let then = ctx.append_basic_block(fn_value, "then");
                     let then_else = ctx.append_basic_block(fn_value, "then_else");
-                    let end = ctx.append_basic_block(fn_value, "end"); // end of the outer if
 
                     builder
                         .build_conditional_branch(
@@ -952,7 +961,6 @@ mod tests {
 
                     let then2 = ctx.append_basic_block(fn_value, "then");
                     let then_else2 = ctx.append_basic_block(fn_value, "then_else");
-                    let end2 = ctx.append_basic_block(fn_value, "end"); // end of the inner if
 
                     builder
                         .build_conditional_branch(
@@ -970,7 +978,10 @@ mod tests {
                         .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
                         .unwrap(); // discarded
 
+                    let end2 = ctx.append_basic_block(fn_value, "end"); // end of the inner if
                     builder.build_unconditional_branch(end2).unwrap();
+
+                    let end = ctx.append_basic_block(fn_value, "end"); // end of the outer if
                     builder.position_at_end(end2);
                     builder.build_unconditional_branch(end).unwrap();
                     builder.position_at_end(end);
