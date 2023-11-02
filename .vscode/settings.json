@@ -6,6 +6,7 @@
         "inttoptr",
         "lalrpop",
         "Lvalue",
+        "preheader",
         "pointee",
         "ptrtoint",
         "sdiv",

@@ -1,55 +1,70 @@
-use anyhow::bail;
-use zrc_typeck::{
-    tast::{
-        expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
-        stmt::{
-            ArgumentDeclaration, ArgumentDeclarationList, LetDeclaration, TypedDeclaration,
-            TypedStmt,
-        },
-        ty::Type,
-    },
-    typeck::BlockReturnType,
+//! Code generation for statements
+
+use inkwell::{
+    basic_block::BasicBlock,
+    builder::Builder,
+    context::Context,
+    module::Module,
+    types::AnyType,
+    values::{BasicValueEnum, FunctionValue},
+};
+use zrc_typeck::tast::{
+    expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
+    stmt::{ArgumentDeclaration, LetDeclaration, TypedDeclaration, TypedStmt},
+    ty::Type,
 };
 
-use super::{cg_alloc, cg_expr, get_llvm_typename, BasicBlock, CgScope, FunctionCg, ModuleCg};
+use crate::{
+    expr::cg_expr,
+    ty::{create_fn, llvm_basic_type, llvm_type},
+    CgScope,
+};
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
 /// instructions. It is passed to [`cg_block`] to allow it to properly handle
 /// break and continue.
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub struct LoopBreakaway {
+struct LoopBreakaway<'ctx> {
     /// Points to the exit basic block.
-    on_break: BasicBlock,
+    on_break: BasicBlock<'ctx>,
     /// For `for` loops, points to the latch. For `while` loops, points to the
     /// header.
-    on_continue: BasicBlock,
+    on_continue: BasicBlock<'ctx>,
 }
 
-/// Declares the variable, creating its allocation and also evaluating the
-/// assignment.
+/// Generates the `alloca`tion, `store` instruction, and adds a new identifier
+/// to the [`CgScope`].
 ///
-/// # Errors
-/// Errors if an internal code generation error occurred. This is always a bug.
-pub fn cg_let_declaration<'input>(
-    module: &mut ModuleCg,
-    cg: &mut FunctionCg,
-    bb: &BasicBlock,
-    scope: &mut CgScope<'input>,
+/// # Panics
+/// Panics if an internal code generation error is encountered.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn cg_let_declaration<'ctx, 'input, 'a>(
+    ctx: &'ctx Context,
+    builder: &'a Builder<'ctx>,
+    module: &'a Module<'ctx>,
+    function: &'a FunctionValue<'ctx>,
+    bb: &'a BasicBlock<'ctx>,
+    scope: &'a mut CgScope<'input, 'ctx>,
     declarations: Vec<LetDeclaration<'input>>,
-) -> anyhow::Result<BasicBlock> {
+) -> BasicBlock<'ctx> {
     let mut bb = *bb;
 
     for let_declaration in declarations {
-        // allocate space for it
-        let ptr = cg_alloc(cg, bb, &get_llvm_typename(let_declaration.ty.clone()));
+        let ptr = builder
+            .build_alloca(
+                llvm_basic_type(ctx, let_declaration.ty.clone()),
+                &format!("let_{}", let_declaration.name),
+            )
+            .unwrap();
 
-        // store it in scope
         scope.insert(let_declaration.name, ptr);
 
         if let Some(value) = let_declaration.value {
             bb = cg_expr(
+                ctx,
+                builder,
                 module,
-                cg,
+                function,
                 &bb,
                 scope,
                 TypedExpr(
@@ -62,144 +77,163 @@ pub fn cg_let_declaration<'input>(
                         Box::new(value),
                     ),
                 ),
-            )?
+            )
             .1;
         }
     }
 
-    Ok(bb)
+    bb
 }
 
-/// Returns the basic block to continue adding instructions to.
-/// If it is None, a return statement was encountered and no more instructions
-/// should be added.
+/// Process a vector of [`TypedStmt`]s (a block) and handle each statement.
 ///
-/// # Errors
-/// Errors if an internal code generation error occurred. This is always a bug.
-#[allow(clippy::too_many_lines, clippy::needless_pass_by_value)]
-pub fn cg_block(
-    module: &mut ModuleCg,
-    cg: &mut FunctionCg,
-    bb: &BasicBlock,
-    parent_scope: &CgScope,
-    block: Vec<TypedStmt>,
-    // If set to None, break and continue are invalid.
-    // If set to Some, break and continue will break to the bbs listed in there.
-    breakaway: Option<LoopBreakaway>,
-) -> anyhow::Result<Option<BasicBlock>> {
+/// # Panics
+/// Panics if an internal code generation error is encountered.
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    clippy::needless_pass_by_value,
+    clippy::trivially_copy_pass_by_ref
+)]
+fn cg_block<'ctx, 'input, 'a>(
+    ctx: &'ctx Context,
+    builder: &'a Builder<'ctx>,
+    module: &'a Module<'ctx>,
+    function: &'a FunctionValue<'ctx>,
+    bb: &'a BasicBlock<'ctx>,
+    parent_scope: &'a CgScope<'input, 'ctx>,
+    block: Vec<TypedStmt<'input>>,
+    breakaway: Option<LoopBreakaway<'ctx>>,
+) -> Option<BasicBlock<'ctx>> {
     let mut scope = parent_scope.clone();
 
-    block.into_iter().try_fold(
-        Some(*bb),
-        |bb, stmt| -> anyhow::Result<Option<BasicBlock>> {
-            let Some(bb) = bb else {
-                // we hit a return statement already, so we're done
-                return Ok(None);
-            };
-            Ok(match stmt {
+    block
+        .into_iter()
+        .try_fold(*bb, |bb, stmt| -> Option<BasicBlock> {
+            match stmt {
                 TypedStmt::EmptyStmt => Some(bb),
-                TypedStmt::ExprStmt(expr) => Some(cg_expr(module, cg, &bb, &scope, expr)?.1),
-                TypedStmt::IfStmt(cond, then, then_else) => {
-                    let (cond, bb) = cg_expr(module, cg, &bb, &scope, cond)?;
+                TypedStmt::ExprStmt(expr) => {
+                    Some(cg_expr(ctx, builder, module, function, &bb, &scope, expr).1)
+                }
 
+                TypedStmt::IfStmt(cond, then, then_else) => {
                     let then_else = then_else.unwrap_or(vec![]);
 
-                    let then_bb = cg.new_bb();
-                    let then_else_bb = cg.new_bb();
+                    let (cond, _) = cg_expr(ctx, builder, module, function, &bb, &scope, cond);
 
-                    bb.add_instruction(
-                        cg,
-                        &format!("br i1 {cond}, label {then_bb}, label {then_else_bb}",),
-                    )?;
+                    let then_bb = ctx.append_basic_block(*function, "then");
+                    let then_else_bb = ctx.append_basic_block(*function, "then_else");
 
-                    let then_bb = cg_block(module, cg, &then_bb, &scope, then, breakaway.clone())?;
-                    let then_else_bb = cg_block(
+                    builder
+                        .build_conditional_branch(cond.into_int_value(), then_bb, then_else_bb)
+                        .unwrap();
+
+                    builder.position_at_end(then_bb);
+                    let maybe_then_bb = cg_block(
+                        ctx,
+                        builder,
                         module,
-                        cg,
+                        function,
+                        &then_bb,
+                        &scope,
+                        then,
+                        breakaway.clone(),
+                    );
+
+                    builder.position_at_end(then_else_bb);
+                    let maybe_then_else_bb = cg_block(
+                        ctx,
+                        builder,
+                        module,
+                        function,
                         &then_else_bb,
                         &scope,
                         then_else,
                         breakaway.clone(),
-                    )?;
+                    );
 
-                    match (then_bb, then_else_bb) {
-                        (Some(then_bb), Some(then_else_bb)) => {
-                            let terminating_bb = cg.new_bb();
-                            then_bb.add_instruction(cg, &format!("br label {terminating_bb}"))?;
-                            then_else_bb
-                                .add_instruction(cg, &format!("br label {terminating_bb}"))?;
-
-                            Some(terminating_bb)
-                        }
-                        (Some(then_bb), None) => {
-                            let terminating_bb = cg.new_bb();
-                            then_bb.add_instruction(cg, &format!("br label {terminating_bb}"))?;
-                            Some(terminating_bb)
-                        }
-                        (None, Some(then_else_bb)) => {
-                            let terminating_bb = cg.new_bb();
-                            then_else_bb
-                                .add_instruction(cg, &format!("br label {terminating_bb}"))?;
-                            Some(terminating_bb)
-                        }
+                    match (maybe_then_bb, maybe_then_else_bb) {
                         (None, None) => None,
+                        (Some(single_bb), None) | (None, Some(single_bb)) => {
+                            let end = ctx.append_basic_block(*function, "end");
+
+                            builder.position_at_end(single_bb);
+                            builder.build_unconditional_branch(end).unwrap();
+
+                            builder.position_at_end(end);
+                            Some(end)
+                        }
+                        (Some(then_bb), Some(then_else_bb)) => {
+                            let end = ctx.append_basic_block(*function, "end");
+
+                            builder.position_at_end(then_bb);
+                            builder.build_unconditional_branch(end).unwrap();
+
+                            builder.position_at_end(then_else_bb);
+                            builder.build_unconditional_branch(end).unwrap();
+
+                            builder.position_at_end(end);
+                            Some(end)
+                        }
                     }
                 }
 
-                TypedStmt::BlockStmt(body) => {
-                    cg_block(module, cg, &bb, &scope, body, breakaway.clone())?
-                }
+                TypedStmt::BlockStmt(block) => cg_block(
+                    ctx,
+                    builder,
+                    module,
+                    function,
+                    &bb,
+                    &scope,
+                    block,
+                    breakaway.clone(),
+                ),
 
-                TypedStmt::ReturnStmt(Some(ex)) => {
-                    let (ex_reg, bb) = cg_expr(module, cg, &bb, &scope, ex.clone())?;
-                    let ex_type = get_llvm_typename(ex.0);
-                    bb.add_instruction(cg, &format!("ret {ex_type} {ex_reg}"))?;
+                TypedStmt::ReturnStmt(Some(expr)) => {
+                    let (expr, _) = cg_expr(ctx, builder, module, function, &bb, &scope, expr);
+
+                    builder.build_return(Some(&expr)).unwrap();
 
                     None
                 }
+
                 TypedStmt::ReturnStmt(None) => {
-                    bb.add_instruction(cg, "ret void")?;
+                    builder.build_return(None).unwrap();
+
                     None
                 }
 
                 TypedStmt::ContinueStmt => {
-                    // We can jump into whatever the 'continue' target is in `breakaway`
-                    // This is going to be the loop header for `while` loops and the loop latch for
-                    // `for` loops
+                    builder
+                        .build_unconditional_branch(breakaway.as_ref().unwrap().on_continue)
+                        .unwrap();
 
-                    match breakaway.clone() {
-                        Some(LoopBreakaway { on_continue, .. }) => {
-                            bb.add_instruction(cg, &format!("br label {on_continue}"))?;
-                            // make sure to use 'bb' here not 'on_continue' so later statements are
-                            // appended to this block
-                            None
-                        }
-                        None => bail!("continue statement outside of loop"),
-                    }
+                    None
                 }
 
                 TypedStmt::BreakStmt => {
-                    // Jump into the 'break' target in `breakaway`
-                    // This is the exit portion of the loop
+                    builder
+                        .build_unconditional_branch(breakaway.as_ref().unwrap().on_break)
+                        .unwrap();
 
-                    match breakaway.clone() {
-                        Some(LoopBreakaway { on_break, .. }) => {
-                            bb.add_instruction(cg, &format!("br label {on_break}"))?;
-                            None
-                        }
-                        None => bail!("break statement outside of loop"),
-                    }
+                    None
                 }
 
-                TypedStmt::DeclarationList(list) => {
-                    Some(cg_let_declaration(module, cg, &bb, &mut scope, list)?)
-                }
+                TypedStmt::DeclarationList(declarations) => Some(cg_let_declaration(
+                    ctx,
+                    builder,
+                    module,
+                    function,
+                    &bb,
+                    &mut scope,
+                    declarations,
+                )),
 
                 TypedStmt::ForStmt {
                     init,
                     cond,
                     post,
-                    body: body_code,
+                    body,
                 } => {
                     // For loops generate a somewhat more complicated CFG, with a few parts.
                     // The preheader, where `init` runs. Breaks to the header.
@@ -215,68 +249,74 @@ pub fn cg_block(
 
                     // The block we are currently in will become the preheader. Generate the `init`
                     // code if there is any.
-                    let bb = match init {
-                        None => bb,
-                        Some(init) => cg_let_declaration(module, cg, &bb, &mut scope, *init)?,
-                    };
+                    if let Some(init) = init {
+                        cg_let_declaration(ctx, builder, module, function, &bb, &mut scope, *init);
+                    }
 
-                    let header = cg.new_bb();
-                    bb.add_instruction(cg, &format!("br label {header}"))?;
+                    let header = ctx.append_basic_block(*function, "header");
+                    let body_bb = ctx.append_basic_block(*function, "body");
+                    let latch = ctx.append_basic_block(*function, "latch");
+                    let exit = ctx.append_basic_block(*function, "exit");
 
-                    let body = cg.new_bb();
-                    let latch = cg.new_bb();
-                    let exit = cg.new_bb();
+                    // Branch to the header from the preheader.
+                    builder.build_unconditional_branch(header).unwrap();
 
-                    // You are now officially in the loop. Within the header, we check `cond` and
-                    // use that to jump to either the body or the exit condition.
-                    let header = match cond {
-                        None => {
-                            header.add_instruction(cg, &format!("br label {body}"))?;
-                            header
-                        }
-                        Some(cond) => {
-                            let (cond_reg, header) =
-                                cg_expr(module, cg, &header, &scope, cond.clone())?;
-
-                            header.add_instruction(
-                                cg,
-                                &format!("br i1 {cond_reg}, label {body}, label {exit}"),
-                            )?;
+                    // Generate the header.
+                    builder.position_at_end(header);
+                    let header = cond.map_or_else(
+                        || {
+                            // If there is no condition, we always branch to the body.
+                            builder.build_unconditional_branch(body_bb).unwrap();
 
                             header
-                        }
-                    };
+                        },
+                        |cond| {
+                            let (cond, header) =
+                                cg_expr(ctx, builder, module, function, &header, &scope, cond);
 
-                    // Generate the body
-                    let body = cg_block(
+                            builder
+                                .build_conditional_branch(cond.into_int_value(), body_bb, exit)
+                                .unwrap();
+
+                            header
+                        },
+                    );
+
+                    // Generate the body.
+                    builder.position_at_end(body_bb);
+                    let body_bb = cg_block(
+                        ctx,
+                        builder,
                         module,
-                        cg,
-                        &body,
+                        function,
+                        &body_bb,
                         &scope,
-                        body_code,
+                        body,
                         Some(LoopBreakaway {
                             on_break: exit,
                             on_continue: latch,
                         }),
-                    )?;
+                    );
 
                     // The body breaks to latch
-                    if let Some(body) = body {
-                        body.add_instruction(cg, &format!("br label {latch}"))?;
+                    if body_bb.is_some() {
+                        builder.build_unconditional_branch(latch).unwrap();
                     }
 
                     // Latch runs post and then breaks right back to the header.
-                    let latch = if let Some(post) = post {
-                        cg_expr(module, cg, &latch, &scope, post)?.1
-                    } else {
-                        latch
-                    };
+                    builder.position_at_end(latch);
+                    if let Some(post) = post {
+                        cg_expr(ctx, builder, module, function, &latch, &scope, post);
+                    }
 
-                    latch.add_instruction(cg, &format!("br label {header}"))?;
+                    builder.build_unconditional_branch(header).unwrap();
+
+                    builder.position_at_end(exit);
 
                     Some(exit)
                 }
-                TypedStmt::WhileStmt(cond, body_code) => {
+
+                TypedStmt::WhileStmt(cond, body) => {
                     // While loops are similar to for loops but much simpler.
                     // The preheader simply just breaks to the header.
                     // The header checks the condition and breaks to the exit or the body.
@@ -286,534 +326,726 @@ pub fn cg_block(
                     // `break` => exit
                     // `continue` => header
 
-                    let header = cg.new_bb();
-                    bb.add_instruction(cg, &format!("br label {header}"))?;
+                    let header = ctx.append_basic_block(*function, "header");
 
-                    let body = cg.new_bb();
-                    let exit = cg.new_bb();
+                    let body_bb = ctx.append_basic_block(*function, "body");
 
-                    let (cond_reg, header) = cg_expr(module, cg, &header, &scope, cond.clone())?;
+                    let exit = ctx.append_basic_block(*function, "exit");
 
-                    header.add_instruction(
-                        cg,
-                        &format!("br i1 {cond_reg}, label {body}, label {exit}"),
-                    )?;
+                    builder.build_unconditional_branch(header).unwrap();
 
-                    let body = cg_block(
+                    builder.position_at_end(header);
+
+                    let (cond, header) =
+                        cg_expr(ctx, builder, module, function, &header, &scope, cond);
+
+                    builder
+                        .build_conditional_branch(cond.into_int_value(), body_bb, exit)
+                        .unwrap();
+
+                    builder.position_at_end(body_bb);
+
+                    let body_bb = cg_block(
+                        ctx,
+                        builder,
                         module,
-                        cg,
-                        &body,
+                        function,
+                        &body_bb,
                         &scope,
-                        body_code,
+                        body,
                         Some(LoopBreakaway {
                             on_break: exit,
                             on_continue: header,
                         }),
-                    )?;
+                    );
 
-                    // The body breaks to header
-                    if let Some(body) = body {
-                        body.add_instruction(cg, &format!("br label {header}"))?;
+                    if body_bb.is_some() {
+                        builder.build_unconditional_branch(header).unwrap();
                     }
+
+                    builder.position_at_end(exit);
 
                     Some(exit)
                 }
-            })
-        },
-    )
+            }
+        })
 }
 
-/// # Errors
-/// Errors on internal code generation failure.
-fn cg_declaration<'input>(
-    module: &mut ModuleCg,
-    global_scope: &mut CgScope<'input>,
-    declaration: TypedDeclaration<'input>,
-) -> anyhow::Result<()> {
-    match declaration {
-        // Struct declarations don't need code generation as they're all inlined
-        TypedDeclaration::StructDeclaration { .. } => {}
+/// Initialize the LLVM [`FunctionValue`] for a given function prototype
+pub fn cg_init_fn<'ctx>(
+    ctx: &'ctx Context,
+    module: &Module<'ctx>,
+    name: &str,
+    ret: Option<Type>,
+    args: &[Type],
+    is_variadic: bool,
+) -> FunctionValue<'ctx> {
+    let ret_type = llvm_type(ctx, ret.unwrap_or(Type::Void));
+    let arg_types = args
+        .iter()
+        .map(|ty| llvm_basic_type(ctx, ty.clone()).into())
+        .collect::<Vec<_>>();
 
-        TypedDeclaration::FunctionDeclaration {
-            name,
-            parameters,
-            return_type,
-            body: Some(body),
-        } => {
-            // Must happen before creating `cg` as FunctionCg::new() clones it and
-            // recursion would be impossible w/o this
-            global_scope.insert(name, format!("@{name}"));
+    let fn_type = create_fn(
+        ret_type.as_any_type_enum(),
+        arg_types.as_slice(),
+        is_variadic,
+    );
+    let fn_val = module.add_function(name, fn_type, None);
 
-            let (mut cg, bb, fn_scope) = FunctionCg::new(
-                format!("@{name}"),
-                return_type.map_or_else(|| BlockReturnType::Void, BlockReturnType::Return),
-                {
-                    let ArgumentDeclarationList::NonVariadic(params) = parameters else {
-                        panic!("non-extern function had variadic arguments");
-                    };
-                    params
-                }
-                .into_iter()
-                .map(|x| (x.name, x.ty))
-                .collect(),
-                global_scope,
-            );
-
-            cg_block(module, &mut cg, &bb, &fn_scope, body, None)?;
-
-            module.declarations.push(cg.to_string());
-        }
-
-        TypedDeclaration::FunctionDeclaration {
-            name,
-            parameters,
-            return_type,
-            body: None,
-        } => {
-            global_scope.insert(name, format!("@{name}"));
-
-            module.declarations.push(format!(
-                "declare {} @{}({})",
-                get_llvm_typename(return_type.unwrap_or(Type::Void)),
-                name,
-                match parameters {
-                    ArgumentDeclarationList::NonVariadic(parameters) => parameters
-                        .iter()
-                        .map(|ArgumentDeclaration { ty, .. }| { get_llvm_typename(ty.clone()) })
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    ArgumentDeclarationList::Variadic(parameters) => format!(
-                        "{}, ...",
-                        parameters
-                            .iter()
-                            .map(|ArgumentDeclaration { ty, .. }| { get_llvm_typename(ty.clone()) })
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ),
-                }
-            ));
-        }
-    }
-
-    Ok(())
+    fn_val
 }
 
-/// # Errors
-/// Errors on internal code generation failure.
-pub fn cg_program(program: Vec<TypedDeclaration>) -> anyhow::Result<String> {
-    let mut module = ModuleCg::new();
+/// Code generate a LLVM program to a string.
+///
+/// # Panics
+/// Panics on internal code generation failure.
+#[must_use]
+pub fn cg_program(module_name: &str, program: Vec<TypedDeclaration>) -> String {
+    let ctx = Context::create();
+    let builder = ctx.create_builder();
+    let module = ctx.create_module(module_name);
+
     let mut global_scope = CgScope::new();
 
     for declaration in program {
-        cg_declaration(&mut module, &mut global_scope, declaration)?;
+        match declaration {
+            // Struct declarations do not need to be emitted
+            TypedDeclaration::StructDeclaration { .. } => {}
+
+            TypedDeclaration::FunctionDeclaration {
+                name,
+                parameters,
+                return_type,
+                body,
+            } => {
+                let fn_value = cg_init_fn(
+                    &ctx,
+                    &module,
+                    name,
+                    return_type,
+                    &parameters
+                        .clone()
+                        .into_arguments()
+                        .iter()
+                        .map(|ArgumentDeclaration { ty, .. }| ty.clone())
+                        .collect::<Vec<_>>(),
+                    parameters.is_variadic(),
+                );
+                global_scope.insert(name, fn_value.as_global_value().as_pointer_value());
+                // must come after the insert call so that recursion is valid
+                let mut fn_scope = global_scope.clone();
+
+                if let Some(body) = body {
+                    let entry = ctx.append_basic_block(fn_value, "entry");
+                    builder.position_at_end(entry);
+
+                    for (n, ArgumentDeclaration { name, ty }) in
+                        parameters.into_arguments().into_iter().enumerate()
+                    {
+                        if entry.get_first_instruction().is_some() {
+                            builder.position_before(&entry.get_first_instruction().unwrap());
+                        } else {
+                            builder.position_at_end(entry);
+                        }
+
+                        let alloc = builder
+                            .build_alloca(llvm_basic_type(&ctx, ty), &format!("arg_{name}"))
+                            .unwrap();
+
+                        builder.position_at_end(entry);
+
+                        builder
+                            .build_store::<BasicValueEnum>(
+                                alloc,
+                                fn_value
+                                    .get_nth_param(
+                                        n.try_into()
+                                            .expect("over u32::MAX parameters in a function? HOW?"),
+                                    )
+                                    .unwrap(),
+                            )
+                            .unwrap();
+
+                        fn_scope.insert(name, alloc);
+                    }
+
+                    cg_block(
+                        &ctx, &builder, &module, &fn_value, &entry, &fn_scope, body, None,
+                    );
+                }
+            }
+        }
     }
 
-    Ok(module.to_string())
+    match module.verify() {
+        Ok(()) => {}
+
+        Err(error_as_llvm_string) => {
+            panic!(
+                "code generation failure:\n{}\nGenerated IR:\n{}",
+                error_as_llvm_string.to_string(),
+                module.print_to_string().to_string()
+            );
+        }
+    }
+
+    module.verify().expect("Generated invalid LLVM IR");
+
+    module.print_to_string().to_string()
 }
 
 #[cfg(test)]
 mod tests {
+    // Please read the "Common patterns in tests" section of crate::test_utils for
+    // more information on how code generator tests are structured.
+
     use std::collections::HashMap;
 
-    use super::*;
-    use crate::init_single_function;
+    use inkwell::context::Context;
+    use zrc_typeck::{
+        tast::{
+            expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
+            stmt::{ArgumentDeclarationList, LetDeclaration, TypedStmt},
+            ty::Type,
+        },
+        typeck::BlockReturnType,
+    };
+
+    use crate::{
+        stmt::{cg_block, cg_let_declaration},
+        test_utils::make_test_prelude_closure,
+    };
 
     /// Ensures [`cg_let_declaration`] properly generates the allocations and
     /// assigns a value if needed.
     #[test]
     fn let_declarations_are_properly_generated() {
-        let (mut module, mut cg, bb, mut scope) = init_single_function();
+        let ctx = Context::create();
 
-        let bb = cg_let_declaration(
-            &mut module,
-            &mut cg,
-            &bb,
-            &mut scope,
-            vec![
-                LetDeclaration {
-                    name: "a",
-                    ty: Type::I32,
-                    value: None,
-                },
-                LetDeclaration {
-                    name: "b",
-                    ty: Type::Bool,
-                    value: Some(TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true))),
-                },
-            ],
-        )
-        .unwrap();
+        let generate_test_prelude =
+            make_test_prelude_closure(|_ctx, _builder, _module, _fn_value, _scope, bb| *bb);
 
-        // no new basic blocks were created
-        assert_eq!(bb, BasicBlock { id: 0 });
+        let expected = {
+            let (builder, module, _fn_value, mut scope, _bb) = generate_test_prelude(&ctx);
 
-        // the two allocations were properly placed at the top of the function
-        assert_eq!(cg.allocations, vec!["%l1 = alloca i32", "%l2 = alloca i1"]);
+            let a_ptr = builder.build_alloca(ctx.i32_type(), "let_a").unwrap();
+            let b_ptr = builder.build_alloca(ctx.bool_type(), "let_b").unwrap();
 
-        // the pointers were properly added to the scope
-        assert_eq!(
-            scope,
-            CgScope {
-                identifiers: HashMap::from([
-                    ("test", "@test".to_string()),
-                    ("a", "%l1".to_string()),
-                    ("b", "%l2".to_string())
-                ])
-            }
-        );
+            scope.insert("a", a_ptr);
+            scope.insert("b", b_ptr);
 
-        // the assignment was properly generated
-        assert_eq!(cg.blocks[0].instructions, vec!["store i1 true, ptr %l2"]);
+            builder
+                .build_store(b_ptr, ctx.bool_type().const_int(1, false))
+                .unwrap();
+
+            (
+                module.print_to_string(),
+                scope
+                    .identifiers
+                    .into_iter()
+                    .map(|(identifier, pointer)| {
+                        (identifier, pointer.get_name().to_str().unwrap().to_string())
+                    })
+                    .collect::<HashMap<_, _>>(),
+            )
+        };
+
+        let actual = {
+            let (builder, module, fn_value, mut scope, bb) = generate_test_prelude(&ctx);
+
+            let _bb = cg_let_declaration(
+                &ctx,
+                &builder,
+                &module,
+                &fn_value,
+                &bb,
+                &mut scope,
+                vec![
+                    LetDeclaration {
+                        name: "a",
+                        ty: Type::I32,
+                        value: None,
+                    },
+                    LetDeclaration {
+                        name: "b",
+                        ty: Type::Bool,
+                        value: Some(TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true))),
+                    },
+                ],
+            );
+
+            (
+                module.print_to_string(),
+                scope
+                    .identifiers
+                    .into_iter()
+                    .map(|(identifier, pointer)| {
+                        (identifier, pointer.get_name().to_str().unwrap().to_string())
+                    })
+                    .collect::<HashMap<_, _>>(),
+            )
+        };
+
+        assert_eq!(actual, expected);
     }
 
     mod cg_block {
         use super::*;
-        use crate::BasicBlockData;
 
-        #[test]
-        fn if_statements_generate_as_expected() {
-            let (mut module, mut cg, bb, mut scope) = init_single_function();
+        mod conditionals {
+            use super::*;
 
-            scope.insert("do_stuff", "@do_stuff".to_string());
+            #[test]
+            fn if_statements_generate_as_expected() {
+                let ctx = Context::create();
 
-            let call_do_stuff: TypedStmt = TypedStmt::ExprStmt(TypedExpr(
-                Type::Void,
-                TypedExprKind::Call(
-                    Box::new(Place(
-                        Type::Fn(
-                            ArgumentDeclarationList::NonVariadic(vec![]),
-                            Box::new(BlockReturnType::Void),
-                        ),
-                        PlaceKind::Variable("do_stuff"),
-                    )),
-                    vec![],
-                ),
-            ));
+                let generate_test_prelude =
+                    make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                        // generate `do_stuff: fn() -> void`
+                        let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
+                        let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
+                        scope.insert(
+                            "do_stuff",
+                            do_stuff_val.as_global_value().as_pointer_value(),
+                        );
 
-            let bb = cg_block(
-                &mut module,
-                &mut cg,
-                &bb,
-                &scope,
-                vec![TypedStmt::IfStmt(
-                    TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
-                    vec![call_do_stuff.clone()],
-                    Some(vec![call_do_stuff]),
-                )],
-                None,
-            )
-            .unwrap()
-            .expect("code generation is continuable");
+                        // Having access to the function type of `do_stuff` is needed to build the
+                        // indirect call within the expected case.
+                        *bb
+                    });
 
-            // The output IR should be as follows:
-            // bb0:
-            //     br i1 true, label %bb1, label %bb2
-            // bb1: ; if true
-            //     call void () @do_stuff()
-            //     br label %bb3
-            // bb2: ; if false
-            //     call void () @do_stuff()
-            //     br label %bb3
-            // bb3: ; yield this bb
+                let expected = {
+                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
 
-            assert_eq!(bb, BasicBlock { id: 3 });
+                    let then = ctx.append_basic_block(fn_value, "then");
+                    let then_else = ctx.append_basic_block(fn_value, "then_else");
+                    let end = ctx.append_basic_block(fn_value, "end");
 
-            assert_eq!(
-                cg.blocks,
-                vec![
-                    BasicBlockData {
-                        id: 0,
-                        instructions: vec!["br i1 true, label %bb1, label %bb2".to_string()]
-                    },
-                    BasicBlockData {
-                        id: 1,
-                        instructions: vec![
-                            "call void () @do_stuff()".to_string(),
-                            "br label %bb3".to_string()
-                        ]
-                    },
-                    BasicBlockData {
-                        id: 2,
-                        instructions: vec![
-                            "call void () @do_stuff()".to_string(),
-                            "br label %bb3".to_string()
-                        ]
-                    },
-                    BasicBlockData {
-                        id: 3,
-                        instructions: vec![]
-                    }
-                ]
-            );
+                    builder
+                        .build_conditional_branch(
+                            ctx.bool_type().const_int(1, false),
+                            then,
+                            then_else,
+                        )
+                        .unwrap();
+
+                    builder.position_at_end(then);
+                    builder
+                        .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
+                        .unwrap();
+                    builder.build_unconditional_branch(end).unwrap();
+
+                    builder.position_at_end(then_else);
+                    // because there is no else branch
+                    builder.build_unconditional_branch(end).unwrap();
+
+                    builder.position_at_end(end);
+
+                    (
+                        module.print_to_string(),
+                        end.get_name().to_str().unwrap().to_string(),
+                    )
+                };
+
+                let actual = {
+                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                    let bb = cg_block(
+                        &ctx,
+                        &builder,
+                        &module,
+                        &fn_value,
+                        &bb,
+                        &scope,
+                        // if (true) do_stuff();
+                        vec![TypedStmt::IfStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![TypedStmt::ExprStmt(TypedExpr(
+                                Type::Void,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Void),
+                                        ),
+                                        PlaceKind::Variable("do_stuff"),
+                                    )),
+                                    vec![],
+                                ),
+                            ))],
+                            None,
+                        )],
+                        None,
+                    )
+                    .unwrap();
+
+                    (
+                        module.print_to_string(),
+                        bb.get_name().to_str().unwrap().to_string(),
+                    )
+                };
+
+                assert_eq!(actual, expected);
+            }
+
+            #[test]
+            fn if_else_statements_generate_as_expected() {
+                let ctx = Context::create();
+
+                let generate_test_prelude =
+                    make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                        // generate `do_stuff: fn() -> void`
+                        let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
+                        let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
+                        scope.insert(
+                            "do_stuff",
+                            do_stuff_val.as_global_value().as_pointer_value(),
+                        );
+
+                        // Having access to the function type of `do_stuff` is needed to build the
+                        // indirect call within the expected case.
+                        *bb
+                    });
+
+                let expected = {
+                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+
+                    let then = ctx.append_basic_block(fn_value, "then");
+                    let then_else = ctx.append_basic_block(fn_value, "then_else");
+                    let end = ctx.append_basic_block(fn_value, "end");
+
+                    builder
+                        .build_conditional_branch(
+                            ctx.bool_type().const_int(1, false),
+                            then,
+                            then_else,
+                        )
+                        .unwrap();
+
+                    builder.position_at_end(then);
+                    builder
+                        .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
+                        .unwrap();
+                    builder.build_unconditional_branch(end).unwrap();
+
+                    builder.position_at_end(then_else);
+                    builder
+                        .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
+                        .unwrap();
+                    builder.build_unconditional_branch(end).unwrap();
+
+                    builder.position_at_end(end);
+
+                    (
+                        module.print_to_string(),
+                        end.get_name().to_str().unwrap().to_string(),
+                    )
+                };
+
+                let actual = {
+                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                    let bb = cg_block(
+                        &ctx,
+                        &builder,
+                        &module,
+                        &fn_value,
+                        &bb,
+                        &scope,
+                        // if (true) do_stuff();
+                        vec![TypedStmt::IfStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![TypedStmt::ExprStmt(TypedExpr(
+                                Type::Void,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Void),
+                                        ),
+                                        PlaceKind::Variable("do_stuff"),
+                                    )),
+                                    vec![],
+                                ),
+                            ))],
+                            Some(vec![TypedStmt::ExprStmt(TypedExpr(
+                                Type::Void,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Void),
+                                        ),
+                                        PlaceKind::Variable("do_stuff"),
+                                    )),
+                                    vec![],
+                                ),
+                            ))]),
+                        )],
+                        None,
+                    )
+                    .unwrap();
+
+                    (
+                        module.print_to_string(),
+                        bb.get_name().to_str().unwrap().to_string(),
+                    )
+                };
+
+                assert_eq!(actual, expected);
+            }
+
+            /// If both blocks of an if/else statement terminate, we must not
+            /// generate the `end` BB.
+            #[test]
+            fn if_else_statements_where_both_blocks_terminate_do_not_continue_generating() {
+                let ctx = Context::create();
+
+                // if (true) return; else return;
+
+                // expect only 2 basic blocks
+
+                let generate_test_prelude =
+                    make_test_prelude_closure(|_ctx, _builder, _module, _fn_value, _scope, bb| *bb);
+
+                let expected = {
+                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+
+                    let then = ctx.append_basic_block(fn_value, "then");
+                    let then_else = ctx.append_basic_block(fn_value, "then_else");
+
+                    builder
+                        .build_conditional_branch(
+                            ctx.bool_type().const_int(1, false),
+                            then,
+                            then_else,
+                        )
+                        .unwrap();
+
+                    builder.position_at_end(then);
+                    builder.build_return(None).unwrap();
+
+                    builder.position_at_end(then_else);
+                    builder.build_return(None).unwrap();
+
+                    module.print_to_string()
+                };
+
+                let actual = {
+                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                    let bb = cg_block(
+                        &ctx,
+                        &builder,
+                        &module,
+                        &fn_value,
+                        &bb,
+                        &scope,
+                        vec![TypedStmt::IfStmt(
+                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
+                            vec![TypedStmt::ReturnStmt(None)],
+                            Some(vec![TypedStmt::ReturnStmt(None)]),
+                        )],
+                        None,
+                    );
+
+                    assert_eq!(bb, None, "code generation should have terminated");
+
+                    module.print_to_string()
+                };
+
+                assert_eq!(actual, expected);
+            }
         }
 
         mod loops {
+            use inkwell::values::AnyValue;
+
             use super::*;
 
-            mod while_loops {
-                use super::*;
+            /// Large test that verifies while loops along with break and
+            /// continue generate as they should.
+            // TODO: Make test smaller?
+            #[test]
+            #[allow(clippy::too_many_lines)]
+            fn while_loops_along_with_break_and_continue_generate_as_expected() {
+                let ctx = Context::create();
 
-                #[test]
-                fn generate_as_expected() {
-                    let (mut module, mut cg, bb, mut scope) = init_single_function();
+                let generate_test_prelude =
+                    make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                        // generate `do_stuff: fn() -> void`
+                        let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
+                        let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
+                        scope.insert(
+                            "get_some_bool",
+                            gsb_val.as_global_value().as_pointer_value(),
+                        );
 
-                    scope.insert("do_stuff", "@do_stuff".to_string());
+                        *bb
+                    });
 
-                    let call_do_stuff: TypedStmt = TypedStmt::ExprStmt(TypedExpr(
-                        Type::Void,
+                // while (get_some_bool()) {
+                //     if (get_some_bool()) break;
+                //     else {
+                //         if (get_some_bool()) continue;
+                //         else get_some_bool(); // discard result
+                //     }
+                // }
+
+                // IR:
+                // entry:
+                //     br label %header
+                //
+                // header: ; the loop condition
+                //     %call = call i1 @get_some_bool()
+                //     br i1 %call, label %body, label %exit
+                //
+                // exit: ; <<<< YIELDED BASIC BLOCK, CG CONTINUES FROM HERE
+                // body:
+                //     %call1 = call i1 @get_some_bool()
+                //     br i1 %call1, label %then, label %then_else
+                // then:
+                //     br label %exit ; this represents break
+                // then_else:
+                //     %call2 = call i1 @get_some_bool()
+                //     br i1 %call2, %then2, %then_else2
+                // then2:
+                //     br label %header ; this represents continue
+                // then_else2:
+                //     %call3 = call i1 @get_some_bool() ; discarded
+                //     br label %end2
+                // end2: ; end of the inner if chain
+                //     br label %end
+                // end: ; end of the outer if chain
+                //     br label %header ; loop again
+
+                let expected = {
+                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+
+                    let header = ctx.append_basic_block(fn_value, "header");
+                    builder.build_unconditional_branch(header).unwrap();
+
+                    builder.position_at_end(header);
+                    let condition = builder
+                        .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
+                        .unwrap();
+                    let body = ctx.append_basic_block(fn_value, "body");
+                    let exit = ctx.append_basic_block(fn_value, "exit");
+                    builder
+                        .build_conditional_branch(
+                            condition.as_any_value_enum().into_int_value(),
+                            body,
+                            exit,
+                        )
+                        .unwrap();
+
+                    builder.position_at_end(body);
+                    let condition2 = builder
+                        .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
+                        .unwrap();
+
+                    let then = ctx.append_basic_block(fn_value, "then");
+                    let then_else = ctx.append_basic_block(fn_value, "then_else");
+
+                    builder
+                        .build_conditional_branch(
+                            condition2.as_any_value_enum().into_int_value(),
+                            then,
+                            then_else,
+                        )
+                        .unwrap();
+
+                    builder.position_at_end(then);
+                    builder.build_unconditional_branch(exit).unwrap(); // break;
+
+                    builder.position_at_end(then_else);
+                    let condition3 = builder
+                        .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
+                        .unwrap();
+
+                    let then2 = ctx.append_basic_block(fn_value, "then");
+                    let then_else2 = ctx.append_basic_block(fn_value, "then_else");
+
+                    builder
+                        .build_conditional_branch(
+                            condition3.as_any_value_enum().into_int_value(),
+                            then2,
+                            then_else2,
+                        )
+                        .unwrap();
+
+                    builder.position_at_end(then2);
+                    builder.build_unconditional_branch(header).unwrap(); // continue;
+
+                    builder.position_at_end(then_else2);
+                    builder
+                        .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
+                        .unwrap(); // discarded
+
+                    let end2 = ctx.append_basic_block(fn_value, "end"); // end of the inner if
+                    builder.build_unconditional_branch(end2).unwrap();
+
+                    let end = ctx.append_basic_block(fn_value, "end"); // end of the outer if
+                    builder.position_at_end(end2);
+                    builder.build_unconditional_branch(end).unwrap();
+                    builder.position_at_end(end);
+                    builder.build_unconditional_branch(header).unwrap();
+
+                    (
+                        module.print_to_string(),
+                        exit.get_name().to_str().unwrap().to_string(),
+                    )
+                };
+
+                let actual = {
+                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                    let call_gsb = TypedExpr(
+                        Type::Bool,
                         TypedExprKind::Call(
                             Box::new(Place(
                                 Type::Fn(
                                     ArgumentDeclarationList::NonVariadic(vec![]),
-                                    Box::new(BlockReturnType::Void),
+                                    Box::new(BlockReturnType::Return(Type::Bool)),
                                 ),
-                                PlaceKind::Variable("do_stuff"),
+                                PlaceKind::Variable("get_some_bool"),
                             )),
                             vec![],
                         ),
-                    ));
+                    );
 
                     let bb = cg_block(
-                        &mut module,
-                        &mut cg,
+                        &ctx,
+                        &builder,
+                        &module,
+                        &fn_value,
                         &bb,
                         &scope,
-                        // while (true) do_stuff();
                         vec![TypedStmt::WhileStmt(
-                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
-                            vec![call_do_stuff.clone()],
+                            call_gsb.clone(),
+                            vec![TypedStmt::IfStmt(
+                                call_gsb.clone(),
+                                vec![TypedStmt::BreakStmt],
+                                Some(vec![TypedStmt::IfStmt(
+                                    call_gsb.clone(),
+                                    vec![TypedStmt::ContinueStmt],
+                                    Some(vec![TypedStmt::ExprStmt(call_gsb.clone())]),
+                                )]),
+                            )],
                         )],
                         None,
                     )
-                    .unwrap()
-                    .expect("code generation is continuable");
+                    .unwrap();
 
-                    // The output IR should be as follows:
-                    // bb0:
-                    //     br label %bb1
-                    // bb1: ; header
-                    //     br i1 true, label %bb2, label %bb3
-                    // bb2: ; body
-                    //     call void () @do_stuff()
-                    //     br label %bb1
-                    // bb3: ; exit, yield
-
-                    assert_eq!(bb, BasicBlock { id: 3 });
-
-                    assert_eq!(
-                        cg.blocks,
-                        vec![
-                            BasicBlockData {
-                                id: 0,
-                                instructions: vec!["br label %bb1".to_string()]
-                            },
-                            BasicBlockData {
-                                id: 1,
-                                instructions: vec!["br i1 true, label %bb2, label %bb3".to_string()]
-                            },
-                            BasicBlockData {
-                                id: 2,
-                                instructions: vec![
-                                    "call void () @do_stuff()".to_string(),
-                                    "br label %bb1".to_string()
-                                ]
-                            },
-                            BasicBlockData {
-                                id: 3,
-                                instructions: vec![]
-                            }
-                        ]
-                    );
-                }
-
-                /// `break;` should move to the exit block
-                #[test]
-                fn break_generates_as_expected() {
-                    let (mut module, mut cg, bb, scope) = init_single_function();
-
-                    let bb = cg_block(
-                        &mut module,
-                        &mut cg,
-                        &bb,
-                        &scope,
-                        // while (true) break;
-                        vec![TypedStmt::WhileStmt(
-                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
-                            vec![TypedStmt::BreakStmt],
-                        )],
-                        None,
+                    (
+                        module.print_to_string(),
+                        bb.get_name().to_str().unwrap().to_string(),
                     )
-                    .unwrap()
-                    .expect("code generation is continuable");
+                };
 
-                    // The output IR should be as follows:
-                    // bb0:
-                    //     br label %bb1
-                    // bb1: ; header
-                    //     br i1 true, label %bb2, label %bb3
-                    // bb2: ; body
-                    //     br label %bb3 ; break
-                    //     ; THE DEFAULT RETURN-TO-HEADER ISN'T ADDED
-                    //     ; BECAUSE WE BREAK ABOVE
-                    // bb3: ; exit, yield
-
-                    assert_eq!(bb, BasicBlock { id: 3 });
-
-                    assert_eq!(
-                        cg.blocks,
-                        vec![
-                            BasicBlockData {
-                                id: 0,
-                                instructions: vec!["br label %bb1".to_string()]
-                            },
-                            BasicBlockData {
-                                id: 1,
-                                instructions: vec!["br i1 true, label %bb2, label %bb3".to_string()]
-                            },
-                            BasicBlockData {
-                                id: 2,
-                                instructions: vec!["br label %bb3".to_string()]
-                            },
-                            BasicBlockData {
-                                id: 3,
-                                instructions: vec![]
-                            }
-                        ]
-                    );
-                }
-
-                /// `continue;` should move to the exit block
-                #[test]
-                fn continue_generates_as_expected() {
-                    let (mut module, mut cg, bb, scope) = init_single_function();
-
-                    let bb = cg_block(
-                        &mut module,
-                        &mut cg,
-                        &bb,
-                        &scope,
-                        // while (true) break;
-                        vec![TypedStmt::WhileStmt(
-                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
-                            vec![TypedStmt::ContinueStmt],
-                        )],
-                        None,
-                    )
-                    .unwrap()
-                    .expect("code generation is continuable");
-
-                    // The output IR should be as follows:
-                    // bb0:
-                    //     br label %bb1
-                    // bb1: ; header
-                    //     br i1 true, label %bb2, label %bb3
-                    // bb2: ; body
-                    //     br label %bb1 ; continue
-                    //     ; THE DEFAULT RETURN-TO-HEADER ISN'T ADDED
-                    //     ; BECAUSE WE CONTINUE ABOVE
-                    // bb3: ; exit, yield
-
-                    assert_eq!(bb, BasicBlock { id: 3 });
-
-                    assert_eq!(
-                        cg.blocks,
-                        vec![
-                            BasicBlockData {
-                                id: 0,
-                                instructions: vec!["br label %bb1".to_string()]
-                            },
-                            BasicBlockData {
-                                id: 1,
-                                instructions: vec!["br i1 true, label %bb2, label %bb3".to_string()]
-                            },
-                            BasicBlockData {
-                                id: 2,
-                                instructions: vec!["br label %bb1".to_string()]
-                            },
-                            BasicBlockData {
-                                id: 3,
-                                instructions: vec![]
-                            }
-                        ]
-                    );
-                }
+                assert_eq!(actual, expected);
             }
-        }
-    }
-
-    mod cg_declaration {
-        use super::*;
-
-        #[test]
-        fn non_variadic_extern_functions_are_properly_generated() {
-            let mut module = ModuleCg::new();
-            let mut global_scope = CgScope::new();
-
-            cg_declaration(
-                &mut module,
-                &mut global_scope,
-                TypedDeclaration::FunctionDeclaration {
-                    name: "add",
-                    parameters: ArgumentDeclarationList::NonVariadic(vec![
-                        ArgumentDeclaration {
-                            name: "a",
-                            ty: Type::I32,
-                        },
-                        ArgumentDeclaration {
-                            name: "b",
-                            ty: Type::I32,
-                        },
-                    ]),
-                    return_type: Some(Type::I32),
-                    body: None,
-                },
-            )
-            .unwrap();
-
-            assert_eq!(
-                global_scope,
-                CgScope {
-                    identifiers: HashMap::from([("add", "@add".to_string())])
-                }
-            );
-
-            assert_eq!(
-                module.declarations,
-                vec!["declare i32 @add(i32, i32)".to_string()]
-            );
-        }
-
-        #[test]
-        fn variadic_extern_functions_are_properly_generated() {
-            let mut module = ModuleCg::new();
-            let mut global_scope = CgScope::new();
-
-            cg_declaration(
-                &mut module,
-                &mut global_scope,
-                TypedDeclaration::FunctionDeclaration {
-                    name: "f",
-                    parameters: ArgumentDeclarationList::Variadic(vec![ArgumentDeclaration {
-                        name: "a",
-                        ty: Type::I32,
-                    }]),
-                    return_type: None,
-                    body: None,
-                },
-            )
-            .unwrap();
-
-            assert_eq!(
-                global_scope,
-                CgScope {
-                    identifiers: HashMap::from([("f", "@f".to_string())])
-                }
-            );
-
-            assert_eq!(
-                module.declarations,
-                vec!["declare void @f(i32, ...)".to_string()]
-            );
         }
     }
 }

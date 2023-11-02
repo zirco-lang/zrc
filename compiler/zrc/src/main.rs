@@ -37,7 +37,6 @@
     macro_use_extern_crate,
     missing_debug_implementations,
     non_exhaustive_omitted_patterns,
-    unreachable_pub,
     unsafe_op_in_unsafe_fn,
     unused_crate_dependencies,
     variant_size_differences
@@ -243,7 +242,17 @@ fn main() -> anyhow::Result<()> {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
 
-    let result = compile(&cli.emit, &content);
+    let result = compile(
+        &cli.emit,
+        match path.clone().into_os_string().to_str() {
+            Some("-") => "<stdin>",
+            _ => path
+                .as_os_str()
+                .to_str()
+                .expect("Invalid UTF-8 in file name"),
+        },
+        &content,
+    );
     match result {
         Err(diagnostic) => eprintln!("{}", diagnostic.print(&content)),
         Ok(x) => {
@@ -272,12 +281,16 @@ fn main() -> anyhow::Result<()> {
 }
 
 /// Drive the compilation process.
-fn compile(emit: &OutputFormat, content: &str) -> Result<String, zrc_diagnostics::Diagnostic> {
+fn compile(
+    emit: &OutputFormat,
+    module_name: &str,
+    content: &str,
+) -> Result<String, zrc_diagnostics::Diagnostic> {
     match *emit {
-        OutputFormat::Llvm => Ok(zrc_codegen::cg_program(zrc_typeck::typeck::type_program(
-            zrc_parser::parser::parse_program(content)?,
-        )?)
-        .expect("code generation should not fail")),
+        OutputFormat::Llvm => Ok(zrc_codegen::cg_program(
+            module_name,
+            zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
+        )),
 
         OutputFormat::Ast => Ok(zrc_parser::parser::parse_program(content)?
             .into_iter()

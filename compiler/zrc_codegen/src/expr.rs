@@ -1,4 +1,14 @@
-use anyhow::{bail, Context as _};
+//! Code generation for expressions
+
+use inkwell::{
+    basic_block::BasicBlock,
+    builder::Builder,
+    context::Context,
+    module::Module,
+    types::StringRadix,
+    values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
+    IntPredicate,
+};
 use zrc_typeck::tast::{
     expr::{
         Arithmetic, BinaryBitwise, Comparison, Equality, Logical, Place, PlaceKind, StringTok,
@@ -7,138 +17,423 @@ use zrc_typeck::tast::{
     ty::Type,
 };
 
-use super::{cg_load, get_llvm_typename, BasicBlock, CgScope, FunctionCg, ModuleCg};
+use super::CgScope;
+use crate::ty::{llvm_basic_type, llvm_int_type, llvm_type};
 
-/// Returns a pointer to the place referred to along with the basic block
-///
-/// # Errors
-/// Errors on an internal code generation error.
-pub fn cg_place(
-    module: &mut ModuleCg,
-    cg: &mut FunctionCg,
-    bb: &BasicBlock,
-    scope: &CgScope,
+/// Resolve a place to its pointer
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn cg_place<'ctx, 'a>(
+    ctx: &'ctx Context,
+    builder: &'a Builder<'ctx>,
+    module: &'a Module<'ctx>,
+    function: &'a FunctionValue<'ctx>,
+    bb: &'a BasicBlock<'ctx>,
+    scope: &'a CgScope<'_, 'ctx>,
     place: Place,
-) -> anyhow::Result<(String, BasicBlock)> {
-    Ok(match place.1 {
+) -> (PointerValue<'ctx>, BasicBlock<'ctx>) {
+    match place.1 {
         PlaceKind::Variable(x) => {
-            let reg = scope
-                .get(x)
-                .with_context(|| format!("Identifier {x} not found in scope"))?
-                .clone();
+            let reg = scope.get(x).unwrap();
+
             (reg, *bb)
         }
+
         PlaceKind::Deref(x) => {
-            // This is a bit confusing, even for me, but I'm leaving this note here for the
-            // future. `x` in this case is an *expression* yielding type `*T`.
-            // This expression is most likely an identifier, but it could be a
-            // ternary, cast, etc. If it's an identifier, it is stored on the
-            // stack and LLVM sees it as a `T**` (points to the stack). cg_place
-            // is expected to return a *pointer* to the place, so we need to load the
-            // `T*` from the stack or whatever else it represents. `cg_expr` luckily will
-            // handle dereferencing an identifier for us, and will perform the
-            // actual deref. For this reason, we have no need to generate a
-            // `load` instruction here.
-            //
-            // For example, if we're generating the place `*0`, the pointer to this location
-            // is just `0`. We do not need to actually `load` unless we are
-            // pulling from the stack, which cg_expr will do for us.
+            let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
 
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
-
-            (x_ptr, bb)
+            (x.into_pointer_value(), bb)
         }
-        PlaceKind::Index(x, index) => {
-            let old_index = index.clone();
-            let (x_ptr, bb) = cg_expr(module, cg, bb, scope, *x.clone())?;
-            let (index, bb) = cg_expr(module, cg, &bb, scope, *index.clone())?;
 
-            let x_typename = get_llvm_typename(x.clone().0);
+        PlaceKind::Index(ptr, idx) => {
+            let (ptr, bb) = cg_expr(ctx, builder, module, function, bb, scope, *ptr);
+            let (idx, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *idx);
 
-            let index_typename = get_llvm_typename(old_index.0.clone());
-
-            #[allow(clippy::wildcard_enum_match_arm)]
-            let result_typename = match x.0 {
-                Type::Ptr(x) => get_llvm_typename(*x),
-                _ => unreachable!(), // per typeck, this is always a pointer
+            // SAFETY: If indices are used incorrectly this may segfault
+            // TODO: Is this actually safely used?
+            let reg = unsafe {
+                builder.build_gep(
+                    llvm_basic_type(ctx, place.0),
+                    ptr.into_pointer_value(),
+                    &[idx.into_int_value()],
+                    "gep",
+                )
             };
 
-            let result_reg = cg.new_reg();
-
-            #[allow(clippy::uninlined_format_args)] // for line length
-            bb.add_instruction(
-                cg,
-                &format!(
-                    "{} = getelementptr {}, {} {}, {} {}",
-                    result_reg, result_typename, x_typename, x_ptr, index_typename, index
-                ),
-            )?;
-
-            (result_reg, bb)
+            (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
         }
-        PlaceKind::Dot(x, key) => {
-            let (x_ptr, bb) = cg_place(module, cg, bb, scope, *x.clone())?;
 
-            let result_reg = cg.new_reg();
+        PlaceKind::Dot(x, prop) => {
+            let x_ty = llvm_basic_type(ctx, x.0.clone());
+            let prop_idx = x
+                .clone()
+                .0
+                .into_struct_contents()
+                .expect("a struct")
+                .iter()
+                .position(|(got_key, _)| *got_key == prop)
+                .expect("invalid struct field");
 
-            #[allow(clippy::wildcard_enum_match_arm)]
-            let key_idx = match x.0.clone() {
-                Type::Struct(entries) => {
-                    entries
-                        .into_iter()
-                        .enumerate()
-                        .find(|(_, (found_k, _))| found_k == &key)
-                        .with_context(|| format!("Struct {} has no field {}", x.0, key))?
-                        .0
-                }
-                _ => unreachable!(), // per typeck, this is always a struct
-            };
+            let (x, bb) = cg_place(ctx, builder, module, function, bb, scope, *x.clone());
 
-            #[allow(clippy::uninlined_format_args)] // for line length
-            bb.add_instruction(
-                cg,
-                &format!(
-                    "{} = getelementptr {}, ptr {}, i32 0, i32 {}",
-                    result_reg,
-                    get_llvm_typename(x.0.clone()),
-                    // x_typename,
-                    x_ptr,
-                    key_idx
-                ),
-            )?;
+            let reg = builder.build_struct_gep(
+                x_ty,
+                x,
+                prop_idx
+                    .try_into()
+                    .expect("got more than u32::MAX as key index? HOW?"),
+                "gep",
+            );
 
-            (result_reg, bb)
+            (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
         }
-    })
+    }
 }
 
-/// Returns either a literal or a register holding the result of the expression.
-/// The old expression code generator used allocations for every expression, so
-/// 2 + 2 involved allocating space for both constants and the result and
-/// relying on SROA to optimize it away. However, expression results will never
-/// mutate, it's *assignments* / places that are mutated.
-///
-/// # Errors
-/// Errors on an internal code generation error.
-#[allow(clippy::too_many_lines, clippy::module_name_repetitions)]
-pub fn cg_expr(
-    module: &mut ModuleCg,
-    cg: &mut FunctionCg,
-    bb: &BasicBlock,
-    scope: &CgScope,
+/// Generate an expression, yielding its result.
+#[allow(
+    clippy::redundant_pub_crate,
+    clippy::too_many_lines,
+    clippy::match_same_arms,
+    clippy::trivially_copy_pass_by_ref
+)]
+pub(crate) fn cg_expr<'ctx, 'a>(
+    ctx: &'ctx Context,
+    builder: &'a Builder<'ctx>,
+    module: &'a Module<'ctx>,
+    function: &'a FunctionValue<'ctx>,
+    bb: &'a BasicBlock<'ctx>,
+    scope: &'a CgScope<'_, 'ctx>,
     expr: TypedExpr,
-) -> anyhow::Result<(String, BasicBlock)> {
-    Ok(match expr.1 {
-        TypedExprKind::NumberLiteral(n) => (n.to_string(), *bb),
-        TypedExprKind::BooleanLiteral(value) => (value.to_string(), *bb),
+) -> (BasicValueEnum<'ctx>, BasicBlock<'ctx>) {
+    match expr.1 {
+        TypedExprKind::NumberLiteral(n) => (
+            llvm_int_type(ctx, expr.0)
+                .const_int_from_string(n, StringRadix::Decimal)
+                .unwrap()
+                .as_basic_value_enum(),
+            *bb,
+        ),
 
-        TypedExprKind::Comma(lhs, rhs) => {
-            let (_, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
-            cg_expr(module, cg, &bb, scope, *rhs)?
+        TypedExprKind::StringLiteral(str) => {
+            let formatted_contents = str
+                .iter()
+                .map(|x| match x {
+                    StringTok::EscapedBackslash => "\\".to_string(),
+                    StringTok::EscapedCr => "\r".to_string(),
+                    StringTok::EscapedNewline => "\n".to_string(),
+                    StringTok::EscapedHexByte(byte) => {
+                        format!(
+                            "{}",
+                            char::from_u32(byte.parse::<u32>().expect("invalid byte"))
+                                .expect("invalid char")
+                        )
+                    }
+                    StringTok::EscapedDoubleQuote => "\"".to_string(),
+                    StringTok::Text(text) => (*text).to_string(),
+                })
+                .collect::<String>();
+
+            (
+                builder
+                    .build_global_string_ptr(&formatted_contents, "str")
+                    .unwrap()
+                    .as_basic_value_enum(),
+                *bb,
+            )
         }
 
+        TypedExprKind::BooleanLiteral(value) => (
+            ctx.bool_type()
+                .const_int(value.into(), false)
+                .as_basic_value_enum(),
+            *bb,
+        ),
+
+        TypedExprKind::Comma(lhs, rhs) => {
+            let (_, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
+            cg_expr(ctx, builder, module, function, &bb, scope, *rhs)
+        }
+
+        TypedExprKind::Identifier(id) => {
+            let place = cg_place(
+                ctx,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                Place(expr.0.clone(), PlaceKind::Variable(id)),
+            );
+
+            let reg = builder
+                .build_load(llvm_basic_type(ctx, expr.0), place.0, "load")
+                .unwrap();
+
+            (reg.as_basic_value_enum(), place.1)
+        }
+
+        TypedExprKind::Assignment(place, value) => {
+            let (value, bb) = cg_expr(ctx, builder, module, function, bb, scope, *value);
+            let place = cg_place(ctx, builder, module, function, &bb, scope, *place);
+
+            builder.build_store(place.0, value).unwrap();
+
+            (value, bb)
+        }
+
+        TypedExprKind::BinaryBitwise(op, lhs, rhs) => {
+            let (lhs, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
+            let (rhs, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *rhs);
+
+            let reg = match op {
+                BinaryBitwise::And => {
+                    builder.build_and(lhs.into_int_value(), rhs.into_int_value(), "and")
+                }
+                BinaryBitwise::Or => {
+                    builder.build_or(lhs.into_int_value(), rhs.into_int_value(), "or")
+                }
+                BinaryBitwise::Xor => {
+                    builder.build_xor(lhs.into_int_value(), rhs.into_int_value(), "xor")
+                }
+                BinaryBitwise::Shl => {
+                    builder.build_left_shift(lhs.into_int_value(), rhs.into_int_value(), "shl")
+                }
+                BinaryBitwise::Shr => builder.build_right_shift(
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    expr.0.is_signed_integer(),
+                    "shr",
+                ),
+            };
+
+            (reg.unwrap().as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::Equality(op, lhs, rhs) => {
+            let (lhs, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
+            let (rhs, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *rhs);
+
+            let op = match op {
+                Equality::Eq => IntPredicate::EQ,
+                Equality::Neq => IntPredicate::NE,
+            };
+
+            let reg = builder
+                .build_int_compare(op, lhs.into_int_value(), rhs.into_int_value(), "cmp")
+                .unwrap();
+
+            (reg.as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::Comparison(op, lhs, rhs) => {
+            let (lhs, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
+            let (rhs, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *rhs);
+
+            let op = match (op, expr.0.is_signed_integer()) {
+                (Comparison::Lt, true) => IntPredicate::SLT,
+                (Comparison::Lt, false) => IntPredicate::ULT,
+                (Comparison::Gt, true) => IntPredicate::SGT,
+                (Comparison::Gt, false) => IntPredicate::UGT,
+                (Comparison::Lte, true) => IntPredicate::SLE,
+                (Comparison::Lte, false) => IntPredicate::ULE,
+                (Comparison::Gte, true) => IntPredicate::SGE,
+                (Comparison::Gte, false) => IntPredicate::UGE,
+            };
+
+            let reg = builder
+                .build_int_compare(op, lhs.into_int_value(), rhs.into_int_value(), "cmp")
+                .unwrap();
+
+            (reg.as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::Arithmetic(op, lhs, rhs) => {
+            let (lhs, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
+            let (rhs, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *rhs);
+
+            let reg = match (op, expr.0.is_signed_integer()) {
+                (Arithmetic::Addition, _) => {
+                    builder.build_int_add(lhs.into_int_value(), rhs.into_int_value(), "add")
+                }
+                (Arithmetic::Subtraction, _) => {
+                    builder.build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "sub")
+                }
+                (Arithmetic::Multiplication, _) => {
+                    builder.build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "mul")
+                }
+                (Arithmetic::Division, true) => {
+                    builder.build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "div")
+                }
+                (Arithmetic::Division, false) => builder.build_int_unsigned_div(
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "div",
+                ),
+                (Arithmetic::Modulo, true) => {
+                    builder.build_int_signed_rem(lhs.into_int_value(), rhs.into_int_value(), "rem")
+                }
+                (Arithmetic::Modulo, false) => builder.build_int_unsigned_rem(
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "rem",
+                ),
+            };
+
+            (reg.unwrap().as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::Logical(op, lhs, rhs) => {
+            let (lhs, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
+            let (rhs, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *rhs);
+
+            let reg = match op {
+                Logical::And => {
+                    builder.build_and(lhs.into_int_value(), rhs.into_int_value(), "and")
+                }
+                Logical::Or => builder.build_or(lhs.into_int_value(), rhs.into_int_value(), "or"),
+            };
+
+            (reg.unwrap().as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::UnaryNot(x) => {
+            let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
+
+            let reg = builder.build_not(x.into_int_value(), "not");
+
+            (reg.unwrap().as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::UnaryBitwiseNot(x) => {
+            let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
+
+            let reg = builder.build_not(x.into_int_value(), "not");
+
+            (reg.unwrap().as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::UnaryMinus(x) => {
+            let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
+
+            let reg = builder.build_int_neg(x.into_int_value(), "neg");
+
+            (reg.unwrap().as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::UnaryAddressOf(x) => {
+            let (x, bb) = cg_place(ctx, builder, module, function, bb, scope, *x);
+            (x.as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::UnaryDereference(ptr) => {
+            let (ptr, bb) = cg_expr(ctx, builder, module, function, bb, scope, *ptr);
+
+            let reg = builder.build_load(
+                llvm_basic_type(ctx, expr.0),
+                ptr.into_pointer_value(),
+                "load",
+            );
+
+            (reg.unwrap().as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::Index(ptr, idx) => {
+            let (ptr, bb) = cg_expr(ctx, builder, module, function, bb, scope, *ptr);
+            let (idx, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *idx);
+
+            // SAFETY: If indices are used incorrectly this may segfault
+            // TODO: Is this actually safely used?
+            let reg = unsafe {
+                builder.build_gep(
+                    llvm_basic_type(ctx, expr.0.clone()),
+                    ptr.into_pointer_value(),
+                    &[idx.into_int_value()],
+                    "gep",
+                )
+            }
+            .unwrap();
+
+            let loaded = builder
+                .build_load(
+                    llvm_basic_type(ctx, expr.0),
+                    reg.as_basic_value_enum().into_pointer_value(),
+                    "load",
+                )
+                .unwrap();
+
+            (loaded.as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::Dot(place, key) => {
+            let place_ty = place.0.clone();
+            let key_idx = place
+                .clone()
+                .0
+                .into_struct_contents()
+                .expect("a struct")
+                .iter()
+                .position(|(got_key, _)| *got_key == key)
+                .expect("invalid struct field");
+
+            let (place, bb) = cg_place(ctx, builder, module, function, bb, scope, *place);
+
+            let reg = builder
+                .build_struct_gep(
+                    llvm_basic_type(ctx, place_ty),
+                    place,
+                    key_idx
+                        .try_into()
+                        .expect("found more than u32::MAX keys in a struct? HOW?"),
+                    "gep",
+                )
+                .unwrap();
+
+            let loaded = builder
+                .build_load(
+                    llvm_basic_type(ctx, expr.0),
+                    reg.as_basic_value_enum().into_pointer_value(),
+                    "load",
+                )
+                .unwrap();
+
+            (loaded.as_basic_value_enum(), bb)
+        }
+
+        TypedExprKind::Call(f, args) => {
+            let old_f = f.clone();
+
+            // will always be a function pointer
+            let (f, bb) = cg_place(ctx, builder, module, function, bb, scope, *f);
+
+            let mut bb = bb;
+            let old_args = args;
+            let mut args = vec![];
+            for arg in old_args {
+                let (new_arg, new_bb) = cg_expr(ctx, builder, module, function, &bb, scope, arg);
+                bb = new_bb;
+                args.push(new_arg.into());
+            }
+
+            let ret = builder
+                .build_indirect_call(
+                    llvm_type(ctx, old_f.0).into_function_type(),
+                    f,
+                    &args,
+                    "call",
+                )
+                .unwrap();
+
+            (
+                if ret.try_as_basic_value().is_left() {
+                    ret.try_as_basic_value().unwrap_left()
+                } else {
+                    ctx.i8_type().get_undef().as_basic_value_enum()
+                },
+                bb,
+            )
+        }
         TypedExprKind::Ternary(cond, lhs, rhs) => {
-            let (cond, bb) = cg_expr(module, cg, bb, scope, *cond)?;
+            let (cond, _) = cg_expr(ctx, builder, module, function, bb, scope, *cond);
 
             // If lhs and rhs are registers, the code generated will look like:
             //   entry:
@@ -168,830 +463,771 @@ pub fn cg_expr(
             //
             // This is just a weird way to `select` and will be inlined.
 
-            let result_typename = get_llvm_typename(expr.0.clone());
+            let if_true_bb = ctx.append_basic_block(*function, "if_true");
+            let if_false_bb = ctx.append_basic_block(*function, "if_false");
+            let end_bb = ctx.append_basic_block(*function, "end");
 
-            let if_true_bb = cg.new_bb();
-            let if_false_bb = cg.new_bb();
+            builder
+                .build_conditional_branch(cond.into_int_value(), if_true_bb, if_false_bb)
+                .unwrap();
 
-            bb.add_instruction(
-                cg,
-                &format!("br i1 {cond}, label {if_true_bb}, label {if_false_bb}"),
-            )?;
+            builder.position_at_end(if_true_bb);
+            let (if_true, if_true_bb) =
+                cg_expr(ctx, builder, module, function, &if_true_bb, scope, *lhs);
+            builder.build_unconditional_branch(end_bb).unwrap();
 
-            let (if_true, if_true_bb) = cg_expr(module, cg, &if_true_bb, scope, *lhs)?;
-            let (if_false, if_false_bb) = cg_expr(module, cg, &if_false_bb, scope, *rhs)?;
+            builder.position_at_end(if_false_bb);
+            let (if_false, if_false_bb) =
+                cg_expr(ctx, builder, module, function, &if_false_bb, scope, *rhs);
+            builder.build_unconditional_branch(end_bb).unwrap();
 
-            let end_bb = cg.new_bb();
-
-            if_true_bb.add_instruction(cg, &format!("br label {end_bb}"))?;
-            if_false_bb.add_instruction(cg, &format!("br label {end_bb}"))?;
-
-            let result_reg = cg.new_reg();
-            #[allow(clippy::uninlined_format_args)] // for line length
-            end_bb.add_instruction(
-                cg,
-                &format!(
-                    "{} = phi {} [ {}, {} ], [ {}, {} ]",
-                    result_reg, result_typename, if_true, if_true_bb, if_false, if_false_bb
-                ),
-            )?;
-
-            (result_reg, end_bb)
+            builder.position_at_end(end_bb);
+            let result_reg = builder
+                .build_phi(llvm_basic_type(ctx, expr.0), "yield")
+                .unwrap();
+            result_reg.add_incoming(&[(&if_true, if_true_bb), (&if_false, if_false_bb)]);
+            (result_reg.as_basic_value(), end_bb)
         }
-
-        TypedExprKind::BinaryBitwise(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
-            let (rhs, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
-
-            let result_type = get_llvm_typename(expr.0.clone());
-
-            let op = match op {
-                BinaryBitwise::And => "and",
-                BinaryBitwise::Or => "or",
-                BinaryBitwise::Xor => "xor",
-                BinaryBitwise::Shl => "shl",
-                BinaryBitwise::Shr if expr.0.is_unsigned_integer() => "lshr",
-                BinaryBitwise::Shr if expr.0.is_signed_integer() => "ashr",
-                BinaryBitwise::Shr => unreachable!(),
-            };
-
-            let result_reg = cg.new_reg();
-
-            bb.add_instruction(
-                cg,
-                &format!("{result_reg} = {op} {result_type} {lhs}, {rhs}"),
-            )?;
-
-            (result_reg, bb)
-        }
-
-        TypedExprKind::Equality(op, lhs, rhs) => {
-            let operand_typename = get_llvm_typename((*lhs).0.clone());
-            let (lhs, bb) = cg_expr(module, cg, bb, scope, *lhs.clone())?;
-            let (rhs, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
-
-            let op = match op {
-                Equality::Eq => "icmp eq",
-                Equality::Neq => "icmp ne",
-            };
-
-            let result_reg = cg.new_reg();
-
-            bb.add_instruction(
-                cg,
-                &format!("{result_reg} = {op} {operand_typename} {lhs}, {rhs}"),
-            )?;
-
-            (result_reg, bb)
-        }
-
-        TypedExprKind::Comparison(op, lhs, rhs) => {
-            let operand_typename = get_llvm_typename((*lhs).0.clone());
-            let (lhs, bb) = cg_expr(module, cg, bb, scope, *lhs.clone())?;
-            let (rhs, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
-
-            // the operands are integers
-            let op = match (op, expr.0.clone()) {
-                (Comparison::Lt, ty) if ty.is_signed_integer() => "icmp slt",
-                (Comparison::Gt, ty) if ty.is_signed_integer() => "icmp sgt",
-                (Comparison::Lte, ty) if ty.is_signed_integer() => "icmp sle",
-                (Comparison::Gte, ty) if ty.is_signed_integer() => "icmp sge",
-
-                (Comparison::Lt, _) => "icmp ult",
-                (Comparison::Gt, _) => "icmp ugt",
-                (Comparison::Lte, _) => "icmp ule",
-                (Comparison::Gte, _) => "icmp uge",
-            };
-
-            let result_reg = cg.new_reg();
-
-            bb.add_instruction(
-                cg,
-                &format!("{result_reg} = {op} {operand_typename} {lhs}, {rhs}"),
-            )?;
-
-            (result_reg, bb)
-        }
-
-        TypedExprKind::Arithmetic(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
-            let (rhs, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
-
-            let result_type = get_llvm_typename(expr.0.clone());
-
-            let op = match op {
-                Arithmetic::Addition => "add",
-                Arithmetic::Division if expr.0.is_signed_integer() => "sdiv",
-                Arithmetic::Division if expr.0.is_unsigned_integer() => "udiv",
-                Arithmetic::Modulo if expr.0.is_signed_integer() => "srem",
-                Arithmetic::Modulo if expr.0.is_unsigned_integer() => "urem",
-                // should always match one of the above
-                Arithmetic::Modulo | Arithmetic::Division => unreachable!(),
-                Arithmetic::Multiplication => "mul",
-                Arithmetic::Subtraction => "sub",
-            };
-
-            let result_reg = cg.new_reg();
-
-            bb.add_instruction(
-                cg,
-                &format!("{result_reg} = {op} {result_type} {lhs}, {rhs}"),
-            )?;
-
-            (result_reg, bb)
-        }
-
-        TypedExprKind::Logical(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(module, cg, bb, scope, *lhs)?;
-            let (rhs, bb) = cg_expr(module, cg, &bb, scope, *rhs)?;
-
-            let result_type = get_llvm_typename(expr.0.clone());
-
-            // "and/or i1" works for bools
-            let op = match op {
-                Logical::And => "and",
-                Logical::Or => "or",
-            };
-
-            let result_reg = cg.new_reg();
-
-            bb.add_instruction(
-                cg,
-                &format!("{result_reg} = {op} {result_type} {lhs}, {rhs}"),
-            )?;
-
-            (result_reg, bb)
-        }
-
-        TypedExprKind::UnaryBitwiseNot(x) => {
-            let (x, bb) = cg_expr(module, cg, bb, scope, *x)?;
-
-            let result_type = get_llvm_typename(expr.0.clone());
-
-            let result_reg = cg.new_reg();
-
-            bb.add_instruction(cg, &format!("{result_reg} = xor {result_type} {x}, -1"))?;
-
-            (result_reg, bb)
-        }
-
-        TypedExprKind::UnaryNot(x) => {
-            // x is bool
-            let (x, bb) = cg_expr(module, cg, bb, scope, *x)?;
-
-            let result_type = get_llvm_typename(expr.0.clone());
-
-            let result_reg = cg.new_reg();
-
-            bb.add_instruction(cg, &format!("{result_reg} = xor {result_type} {x}, 1"))?;
-
-            (result_reg, bb)
-        }
-
-        TypedExprKind::UnaryMinus(x) => {
-            let (x, bb) = cg_expr(module, cg, bb, scope, *x)?;
-
-            let result_type = get_llvm_typename(expr.0.clone());
-
-            let result_reg = cg.new_reg();
-
-            bb.add_instruction(cg, &format!("{result_reg} = sub {result_type} 0, {x}"))?;
-
-            (result_reg, bb)
-        }
-
-        TypedExprKind::UnaryAddressOf(x) => {
-            let (x, bb) = cg_place(module, cg, bb, scope, *x)?;
-
-            (x, bb)
-        }
-
-        TypedExprKind::UnaryDereference(x) => {
-            let (x, bb) = cg_expr(module, cg, bb, scope, *x)?;
-
-            let result_type = get_llvm_typename(expr.0.clone());
-
-            let result_reg = cg.new_reg();
-
-            bb.add_instruction(cg, &format!("{result_reg} = load {result_type}, {x}"))?;
-
-            (result_reg, bb)
-        }
-
-        TypedExprKind::Assignment(place, value) => {
-            let (new_value, bb) = cg_expr(module, cg, bb, scope, *value.clone())?;
-            let (ptr, bb) = cg_place(module, cg, &bb, scope, *place)?;
-
-            let value_type = get_llvm_typename((value).clone().0);
-
-            bb.add_instruction(cg, &format!("store {value_type} {new_value}, ptr {ptr}"))?;
-
-            (new_value, bb)
-        }
-
-        TypedExprKind::Identifier(id) => {
-            let reg = scope
-                .get(id)
-                .with_context(|| format!("Identifier {id} not found in scope"))?
-                .clone();
-
-            let value = cg_load(cg, *bb, &get_llvm_typename(expr.0), &reg)?;
-
-            (value, *bb)
-        }
-
-        TypedExprKind::Index(x, index) => {
-            let (ptr, bb) = cg_place(
-                module,
-                cg,
-                bb,
-                scope,
-                Place(expr.0.clone(), PlaceKind::Index(x, index)),
-            )?;
-
-            let value = cg_load(cg, bb, &get_llvm_typename(expr.0.clone()), &ptr)?;
-
-            (value, bb)
-        }
-
-        TypedExprKind::Dot(x, prop) => {
-            let (ptr, bb) = cg_place(
-                module,
-                cg,
-                bb,
-                scope,
-                Place(expr.0.clone(), PlaceKind::Dot(x, prop)),
-            )?;
-
-            let value = cg_load(cg, bb, &get_llvm_typename(expr.0), &ptr)?;
-
-            (value, bb)
-        }
-
-        TypedExprKind::Call(f, args) => {
-            let old_f = f.clone();
-            let (f, bb) = cg_place(module, cg, bb, scope, *f)?;
-
-            let mut bb = bb;
-            let old_args = args;
-            let mut args = vec![];
-            for arg in old_args {
-                let (new_arg, new_bb) = cg_expr(module, cg, &bb, scope, arg.clone())?;
-                bb = new_bb;
-                args.push((new_arg, arg.0));
-            }
-
-            let args = args
-                .into_iter()
-                .map(|arg| format!("{} {}", get_llvm_typename(arg.1), arg.0))
-                .collect::<Vec<_>>()
-                .join(", ");
-
-            if expr.0 == Type::Void {
-                bb.add_instruction(
-                    cg,
-                    &format!(
-                        "call {} {}({})",
-                        get_llvm_typename(old_f.0)
-                            .strip_suffix('*')
-                            .expect("fp type didn't end in *, could not trim it"),
-                        f,
-                        args
-                    ),
-                )?;
-
-                ("undef".to_string(), bb)
-            } else {
-                let result_reg = cg.new_reg();
-
-                bb.add_instruction(
-                    cg,
-                    &format!(
-                        "{} = call {} {}({})",
-                        result_reg,
-                        get_llvm_typename(old_f.0)
-                            .strip_suffix('*')
-                            .expect("fp type didn't end in *, could not trim it"),
-                        f,
-                        args
-                    ),
-                )?;
-                (result_reg, bb)
-            }
-        }
-
         TypedExprKind::Cast(x, ty) => {
-            #[allow(clippy::enum_glob_use)]
-            use zrc_typeck::tast::ty::Type::*;
+            // signed -> signed = sext
+            // signed -> unsigned = sext
+            // unsigned -> signed = zext
+            // unsigned -> unsigned = zext
+            // ptr -> ptr = bitcast
+            // T -> T = bitcast
+            // int -> ptr = inttoptr
+            // ptr -> int = ptrtoint
+            // int -> fn = inttoptr
+            // fn -> int = ptrtoint
 
-            // The legendary Cast Table. Contains the cast opcode used for T -> U
-            let cast_opcode = match (x.0.clone(), ty.clone()) {
-                (x, y) if x == y => "bitcast",
-                // signed -> signed = sext
-                // signed -> unsigned = sext
-                // unsigned -> signed = zext
-                // unsigned -> unsigned = zext
-                // ptr -> ptr = bitcast
-                // T -> T = bitcast
-                // int -> ptr = inttoptr
-                // ptr -> int = ptrtoint
-                // int -> fn = inttoptr
-                // fn -> int = ptrtoint
-                (Bool, I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64)
-                | (U8, I16 | U16 | I32 | U32 | I64 | U64)
-                | (U16, I32 | U32 | I64 | U64)
-                | (U32, I64 | U64) => "zext",
-                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Bool)
-                | (I16 | U16 | I32 | U32 | I64 | U64, I8 | U8)
-                | (I64 | U64, I32 | U32)
-                | (I32 | U32 | I64 | U64, I16 | U16) => "trunc",
+            let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
 
-                (I8, I16 | U16 | I32 | U32 | I64 | U64)
-                | (I16, I32 | U32 | I64 | U64)
-                | (I32, I64 | U64) => "sext",
-
-                // also handle things like I32 => U32
-                // is this even the correct way to do it?
-                (I8, U8)
-                | (U8, I8)
-                | (I16, U16)
-                | (U16, I16)
-                | (I32, U32)
-                | (U32, I32)
-                | (I64, U64)
-                | (U64, I64)
-                | (Ptr(_), Ptr(_)) => "bitcast",
-
-                (Bool, x) if x.is_signed_integer() => "sext",
-                (Bool, x) if x.is_unsigned_integer() => "zext",
-
-                (Ptr(_) | Fn(_, _), I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64) => "ptrtoint",
-                (I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64, Ptr(_) | Fn(_, _)) => "inttoptr",
-                _ => bail!("invalid cast from {} to {}", x.0, ty),
+            let reg = match (x.get_type().is_pointer_type(), matches!(ty, Type::Ptr(_))) {
+                (true, true) => builder
+                    .build_bitcast(x.into_pointer_value(), llvm_basic_type(ctx, ty), "cast")
+                    .unwrap(),
+                (true, false) => builder
+                    .build_ptr_to_int(x.into_pointer_value(), llvm_int_type(ctx, ty), "cast")
+                    .unwrap()
+                    .as_basic_value_enum(),
+                (false, true) => builder
+                    .build_int_to_ptr(
+                        x.into_int_value(),
+                        llvm_basic_type(ctx, ty).into_pointer_type(),
+                        "cast",
+                    )
+                    .unwrap()
+                    .as_basic_value_enum(),
+                (false, false) => builder
+                    .build_bitcast(x.into_int_value(), llvm_basic_type(ctx, ty), "cast")
+                    .unwrap()
+                    .as_basic_value_enum(),
             };
-            let old_x = x.clone();
 
-            let (x, bb) = cg_expr(module, cg, bb, scope, *x)?;
-
-            let result_reg = cg.new_reg();
-
-            bb.add_instruction(
-                cg,
-                &format!(
-                    "{} = {} {} {} to {}",
-                    result_reg,
-                    cast_opcode,
-                    get_llvm_typename(old_x.0),
-                    x,
-                    get_llvm_typename(ty),
-                ),
-            )?;
-
-            (result_reg, bb)
+            (reg, bb)
         }
-
-        TypedExprKind::StringLiteral(str) => {
-            let id = module.global_constant_id.next();
-
-            let formatted_contents = str
-                .iter()
-                .map(|x| match x {
-                    StringTok::EscapedBackslash => format!("\\{:02x}", b'\\'),
-                    StringTok::EscapedCr => format!("\\{:02x}", b'\r'),
-                    StringTok::EscapedNewline => format!("\\{:02x}", b'\n'),
-                    StringTok::EscapedHexByte(byte) => format!("\\{byte}"),
-                    StringTok::EscapedDoubleQuote => format!("\\{:02x}", b'"'),
-                    StringTok::Text(text) => (*text).to_string(),
-                })
-                .collect::<String>();
-
-            let formatted_len: usize = str
-                .iter()
-                .map(|x| match x {
-                    StringTok::Text(text) => text.len(),
-                    StringTok::EscapedBackslash
-                    | StringTok::EscapedCr
-                    | StringTok::EscapedDoubleQuote
-                    | StringTok::EscapedNewline
-                    | StringTok::EscapedHexByte(_) => 1,
-                })
-                .sum();
-
-            module.declarations.push(format!(
-                "@.str{id} = private constant [{} x i8] c\"{formatted_contents}\\00\"",
-                formatted_len + 1
-            ));
-
-            (format!("@.str{id}"), *bb)
-        }
-    })
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    // Please read the "Common patterns in tests" section of crate::test_utils for
+    // more information on how code generator tests are structured.
 
     use indexmap::IndexMap;
-    use zrc_typeck::{tast::expr::PlaceKind, typeck::BlockReturnType};
+    use inkwell::{context::Context, types::BasicType, values::AnyValue, AddressSpace};
+    use zrc_typeck::{tast::stmt::ArgumentDeclarationList, typeck::BlockReturnType};
 
     use super::*;
-    use crate::{init_single_function, BasicBlockData};
+    use crate::test_utils::make_test_prelude_closure;
 
+    // Remember: In all of these tests, cg_place returns a *pointer* to the data in
+    // the place.
     mod cg_place {
-
         use super::*;
 
-        /// The code generator should not need to do any extra work to handle
-        /// identifiers, as they are already represented by a singular register.
-        /// They should just return the pointer as-is.
+        /// When generating an identifier, the pointer to their data is stored
+        /// already within the [`CgScope`] instance. There is no need to
+        /// do any extra work to generate the pointer other than return
+        /// the allocation directly.
         #[test]
         fn identifier_registers_are_returned_as_is() {
-            let (mut module, mut cg, bb, mut scope) = init_single_function();
+            let ctx = Context::create();
 
-            scope.insert("x", "%x".to_string());
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    let x_stack_ptr = builder.build_alloca(ctx.i32_type(), "x").unwrap();
+                    scope.insert("x", x_stack_ptr);
 
-            let (reg, bb) = cg_place(
-                &mut module,
-                &mut cg,
-                &bb,
-                &scope,
-                Place(Type::I32, PlaceKind::Variable("x")),
-            )
-            .unwrap();
+                    *bb
+                });
 
-            // no basic blocks were produced
-            assert_eq!(bb, BasicBlock { id: 0 });
+            let expected = {
+                let (_builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
 
-            // no instructions were produced
-            assert_eq!(cg.blocks[0].instructions, Vec::<String>::new());
+                (
+                    module.print_to_string(),
+                    scope
+                        .get("x")
+                        .unwrap()
+                        .as_basic_value_enum()
+                        .print_to_string(),
+                )
+            };
 
-            // the register was returned as-is
-            assert_eq!(reg, "%x");
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_place(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    Place(Type::I32, PlaceKind::Variable("x")),
+                );
+
+                (
+                    module.print_to_string(),
+                    ptr.as_basic_value_enum().print_to_string(),
+                )
+            };
+
+            assert_eq!(actual, expected);
         }
 
-        /// Dereferencing a pointer in place context should generate a single
-        /// load instruction to retrieve the pointer itself off the
-        /// stack.
+        /// When dereferencing an identifier, the identifier itself represents a
+        /// `*T`, and if we consider the fact that the value is stored
+        /// on the stack, `%x` is of type `T**`. To get the underlying
+        /// pointer to `T` (because cg place returns a pointer) `T*`, we need to
+        /// `load` the identifier only.
         #[test]
         fn identifier_deref_generates_as_expected() {
-            let (mut module, mut cg, bb, mut scope) = init_single_function();
+            let ctx = Context::create();
 
-            scope.insert("x", "%x".to_string());
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    // generates %x = alloca i32* and scope mapping x -> %x
+                    let x_stack_ptr = builder
+                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "x")
+                        .unwrap();
+                    scope.insert("x", x_stack_ptr);
 
-            let (reg, bb) = cg_place(
-                &mut module,
-                &mut cg,
-                &bb,
-                &scope,
-                Place(
-                    Type::I32,
-                    PlaceKind::Deref(Box::new(TypedExpr(
-                        Type::Ptr(Box::new(Type::I32)),
-                        TypedExprKind::Identifier("x"),
-                    ))),
-                ),
-            )
-            .unwrap();
+                    *bb
+                });
 
-            // no new basic blocks were produced
-            assert_eq!(bb, BasicBlock { id: 0 });
+            let expected = {
+                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
 
-            // the `load` instruction was produced
-            assert_eq!(
-                cg.blocks[0].instructions,
-                vec!["%l1 = load ptr, ptr %x".to_string()]
-            );
+                // Expect a single %yield = load i32*, i32** %x
+                let yield_ptr = builder
+                    .build_load(
+                        ctx.i32_type().ptr_type(AddressSpace::default()),
+                        scope.get("x").unwrap(),
+                        "load",
+                    )
+                    .unwrap();
 
-            // the register was returned
-            assert_eq!(reg, "%l1");
+                (
+                    module.print_to_string(),
+                    // expected result of cg_place:
+                    yield_ptr.print_to_string(),
+                )
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_place(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    Place(
+                        Type::I32,
+                        PlaceKind::Deref(Box::new(TypedExpr(
+                            Type::Ptr(Box::new(Type::I32)),
+                            TypedExprKind::Identifier("x"),
+                        ))),
+                    ),
+                );
+
+                (
+                    module.print_to_string(),
+                    ptr.as_basic_value_enum().print_to_string(),
+                )
+            };
+
+            assert_eq!(actual, expected);
         }
 
-        /// Dereferencing a value that is not an identifier should not involve
-        /// any loading, because it is expected to return a pointer
-        /// (e.g. the pointer to the value `*0` is just `0`)
+        /// When dereferencing a value that's not an identifier in place context
+        /// e.g. `*0`, the address to this data is `&*0` which is just
+        /// `0`. In this case, it gets cancelled out. We assert that the
+        /// result is just `0 as *i32` when generating `*(0 as *i32)` in place
+        /// context.
         #[test]
         fn other_deref_generates_as_expected() {
-            let (mut module, mut cg, bb, scope) = init_single_function();
+            let ctx = Context::create();
 
-            let (reg, bb) = cg_place(
-                &mut module,
-                &mut cg,
-                &bb,
-                &scope,
-                // in place context: *(0 as *i32)
-                // should return `0` as an llvm ptr
-                Place(
-                    Type::I32,
-                    PlaceKind::Deref(Box::new(TypedExpr(
-                        Type::Ptr(Box::new(Type::I32)),
-                        TypedExprKind::Cast(
-                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("0"))),
+            let generate_test_prelude =
+                make_test_prelude_closure(|_ctx, _builder, _module, _fn_value, _scope, bb| *bb);
+
+            let expected = {
+                let (builder, module, _fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+
+                // Generates `%cast = inttoptr 0 to i32*`
+                let cast = builder
+                    .build_int_to_ptr(
+                        ctx.i32_type().const_zero(),
+                        ctx.i32_type().ptr_type(AddressSpace::default()),
+                        "cast",
+                    )
+                    .unwrap();
+
+                // The yielded value is just %cast -- see the comment at the top
+                (module.print_to_string(), cast.print_to_string())
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_place(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    Place(
+                        Type::I32,
+                        PlaceKind::Deref(Box::new(TypedExpr(
                             Type::Ptr(Box::new(Type::I32)),
-                        ),
-                    ))),
-                ),
-            )
-            .unwrap();
+                            TypedExprKind::Cast(
+                                Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("0"))),
+                                Type::Ptr(Box::new(Type::I32)),
+                            ),
+                        ))),
+                    ),
+                );
 
-            // no new basic blocks were produced
-            assert_eq!(bb, BasicBlock { id: 0 });
+                (
+                    module.print_to_string(),
+                    ptr.as_basic_value_enum().print_to_string(),
+                )
+            };
 
-            // an inttoptr instruction is produced and the value is returned
-            assert_eq!(
-                cg.blocks[0].instructions,
-                vec!["%l1 = inttoptr i32 0 to ptr".to_string()]
-            );
-
-            // the register was returned
-            assert_eq!(reg, "%l1");
+            assert_eq!(actual, expected);
         }
 
         #[test]
         fn pointer_indexing_generates_proper_gep() {
-            let (mut module, mut cg, bb, mut scope) = init_single_function();
+            let ctx = Context::create();
 
-            // of type *i32
-            scope.insert("arr", "%arr".to_string());
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    // generate `arr: *i32`
+                    let arr_stack_ptr = builder
+                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
+                        .unwrap();
+                    scope.insert("arr", arr_stack_ptr);
 
-            let (reg, bb) = cg_place(
-                &mut module,
-                &mut cg,
-                &bb,
-                &scope,
-                // in place context: arr[4]
-                Place(
-                    Type::I32,
-                    PlaceKind::Index(
-                        Box::new(TypedExpr(
-                            Type::Ptr(Box::new(Type::I32)),
-                            TypedExprKind::Identifier("arr"),
-                        )),
-                        Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("4"))),
+                    *bb
+                });
+
+            let expected = {
+                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+
+                // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
+                // the pointer to that index in the array
+                let loaded_arr = builder
+                    .build_load(
+                        ctx.i32_type().ptr_type(AddressSpace::default()),
+                        scope.get("arr").unwrap(),
+                        "load",
+                    )
+                    .unwrap();
+
+                // SAFETY: If indices are used incorrectly this may segfault
+                let indexed_ptr = unsafe {
+                    builder.build_gep(
+                        ctx.i32_type(),
+                        loaded_arr.into_pointer_value(),
+                        &[ctx.i32_type().const_int(3, false)],
+                        "gep",
+                    )
+                }
+                .unwrap();
+
+                (module.print_to_string(), indexed_ptr.print_to_string())
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_place(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    Place(
+                        Type::I32,
+                        PlaceKind::Index(
+                            Box::new(TypedExpr(
+                                Type::Ptr(Box::new(Type::I32)),
+                                TypedExprKind::Identifier("arr"),
+                            )),
+                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
+                        ),
                     ),
-                ),
-            )
-            .unwrap();
+                );
 
-            // no new basic blocks were produced
-            assert_eq!(bb, BasicBlock { id: 0 });
+                (module.print_to_string(), ptr.print_to_string())
+            };
 
-            // `arr` is loaded from memory, then a gep instruction is produced
-            assert_eq!(
-                cg.blocks[0].instructions,
-                vec![
-                    "%l1 = load ptr, ptr %arr".to_string(),
-                    "%l2 = getelementptr i32, ptr %l1, i32 4".to_string()
-                ]
-            );
-            assert_eq!(reg, "%l2");
+            assert_eq!(actual, expected);
         }
 
         #[test]
         fn struct_property_access_generates_proper_gep() {
-            let (mut module, mut cg, bb, mut scope) = init_single_function();
+            let ctx = Context::create();
 
-            // of type struct { x: i32, y: i32 }
-            scope.insert("x", "%x".to_string());
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    // generate: `x: { x: i32, y: i32 }`
+                    let x_stack_ptr = builder
+                        .build_alloca(
+                            ctx.struct_type(
+                                &[
+                                    ctx.i32_type().as_basic_type_enum(),
+                                    ctx.i32_type().as_basic_type_enum(),
+                                ],
+                                false,
+                            ),
+                            "x",
+                        )
+                        .unwrap();
+                    scope.insert("x", x_stack_ptr);
 
-            let (reg, bb) = cg_place(
-                &mut module,
-                &mut cg,
-                &bb,
-                &scope,
-                // in place context: x.y
-                Place(
-                    Type::I32,
-                    PlaceKind::Dot(
-                        Box::new(Place(
-                            Type::Struct(IndexMap::from([("x", Type::I32), ("y", Type::I32)])),
-                            PlaceKind::Variable("x"),
-                        )),
-                        "y",
+                    *bb
+                });
+
+            let expected = {
+                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+
+                // We do not load the struct, we GEP directly into it.
+                let indexed_ptr = builder
+                    .build_struct_gep(
+                        ctx.struct_type(
+                            &[
+                                ctx.i32_type().as_basic_type_enum(),
+                                ctx.i32_type().as_basic_type_enum(),
+                            ],
+                            false,
+                        ),
+                        scope.get("x").unwrap(),
+                        1,
+                        "gep",
+                    )
+                    .unwrap();
+
+                (module.print_to_string(), indexed_ptr.print_to_string())
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_place(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    Place(
+                        Type::I32,
+                        PlaceKind::Dot(
+                            Box::new(Place(
+                                Type::Struct(IndexMap::from([("a", Type::I32), ("b", Type::I32)])),
+                                PlaceKind::Variable("x"),
+                            )),
+                            "b",
+                        ),
                     ),
-                ),
-            )
-            .unwrap();
+                );
 
-            // no new basic blocks were produced
-            assert_eq!(bb, BasicBlock { id: 0 });
+                (module.print_to_string(), ptr.print_to_string())
+            };
 
-            // GEP is getting the pointer right off the stack
-            assert_eq!(
-                cg.blocks[0].instructions,
-                vec!["%l1 = getelementptr { i32, i32 }, ptr %x, i32 0, i32 1".to_string()]
-            );
-            assert_eq!(reg, "%l1");
+            assert_eq!(actual, expected);
         }
     }
-
     mod cg_expr {
-        use zrc_typeck::tast::stmt::ArgumentDeclarationList;
-
         use super::*;
 
+        /// Ensures all of the side-effects on the left hand side of a comma
+        /// operator are executed and the right hand side is returned.
         #[test]
         fn comma_yields_right_value() {
-            let (mut module, mut cg, bb, scope) = init_single_function();
+            let ctx = Context::create();
 
-            let (reg, bb) = cg_expr(
-                &mut module,
-                &mut cg,
-                &bb,
-                &scope,
-                TypedExpr(
-                    Type::I32,
-                    TypedExprKind::Comma(
-                        // This left-hand-side is to ensure that the left hand operand is still
-                        // evaluated for side effects
-                        Box::new(TypedExpr(
-                            Type::I32,
-                            TypedExprKind::Arithmetic(
-                                Arithmetic::Addition,
-                                Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("1"))),
-                                Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("1"))),
-                            ),
-                        )),
-                        Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("2"))),
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                    // generate `f: fn() -> void`
+                    let f_fn_type = ctx.void_type().fn_type(&[], false);
+                    let f_val = module.add_function("f", f_fn_type, None);
+                    scope.insert("f", f_val.as_global_value().as_pointer_value());
+
+                    *bb
+                });
+
+            let expected = {
+                let (builder, module, _fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+
+                // First the function is called, then the number literal is returned
+                builder
+                    .build_call(module.get_function("f").unwrap(), &[], "call")
+                    .unwrap();
+
+                (
+                    module.print_to_string(),
+                    ctx.i32_type().const_int(3, false).print_to_string(),
+                )
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (reg, _bb) = cg_expr(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    TypedExpr(
+                        Type::I32,
+                        TypedExprKind::Comma(
+                            Box::new(TypedExpr(
+                                Type::Void,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Void),
+                                        ),
+                                        PlaceKind::Variable("f"),
+                                    )),
+                                    vec![],
+                                ),
+                            )),
+                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
+                        ),
                     ),
-                ),
-            )
-            .unwrap();
+                );
 
-            // no new basic blocks were produced
-            assert_eq!(bb, BasicBlock { id: 0 });
+                (module.print_to_string(), reg.print_to_string())
+            };
 
-            // the left hand side gets evaluated
-            assert_eq!(
-                cg.blocks[0].instructions,
-                vec!["%l1 = add i32 1, 1".to_string()]
-            );
-
-            // the right hand side is what was yielded
-            assert_eq!(reg, "2");
+            assert_eq!(actual, expected);
         }
 
-        /// This is a much more complex test. It ensures a ternary operator
-        /// properly resolves the left and right hand side expressions
-        /// and generates the diamond-shaped control flow graph. This
-        /// test is specifically constructed so that one side has side effects
-        /// and cannot be inlined into the `phi` node, and the other can
-        /// be.
-        #[test]
-        fn ternary_generates_proper_cfg() {
-            let (mut module, mut cg, bb, mut scope) = init_single_function();
-
-            // fn get_some_int() -> i32;
-            scope.insert("get_some_int", "@get_some_int".to_string());
-
-            let (reg, bb) = cg_expr(
-                &mut module,
-                &mut cg,
-                &bb,
-                &scope,
-                TypedExpr(
-                    Type::I32,
-                    TypedExprKind::Ternary(
-                        Box::new(TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true))),
-                        Box::new(TypedExpr(
-                            Type::I32,
-                            TypedExprKind::Call(
-                                Box::new(Place(
-                                    Type::Fn(
-                                        ArgumentDeclarationList::NonVariadic(vec![]),
-                                        Box::new(BlockReturnType::Return(Type::I32)),
-                                    ),
-                                    PlaceKind::Variable("get_some_int"),
-                                )),
-                                vec![],
-                            ),
-                        )),
-                        Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("2"))),
-                    ),
-                ),
-            )
-            .unwrap();
-
-            // We expect the output to look like the following:
-            // bb0:
-            //     br i1 true, label %bb1, label %bb2
-            // bb1: ; if_true
-            //     %l1 = call i32 @get_some_int()
-            //     br label %bb3
-            // bb2: ; if false
-            //     br label %bb3
-            // bb3: ; end
-            //     %l2 = phi i32 [ %l1, %bb1 ], [ 2, %bb2 ]
-            //     ; yields %l2
-
-            assert_eq!(bb, BasicBlock { id: 3 });
-
-            assert_eq!(
-                cg.blocks,
-                vec![
-                    BasicBlockData {
-                        id: 0,
-                        instructions: vec!["br i1 true, label %bb1, label %bb2".to_string()]
-                    },
-                    BasicBlockData {
-                        id: 1,
-                        instructions: vec![
-                            "%l1 = call i32 () @get_some_int()".to_string(),
-                            "br label %bb3".to_string()
-                        ]
-                    },
-                    BasicBlockData {
-                        id: 2,
-                        instructions: vec!["br label %bb3".to_string()]
-                    },
-                    BasicBlockData {
-                        id: 3,
-                        instructions: vec!["%l2 = phi i32 [ %l1, %bb1 ], [ 2, %bb2 ]".to_string()]
-                    },
-                ]
-            );
-
-            assert_eq!(reg, "%l2");
-        }
-
+        /// This is similar to
+        /// [`super::cg_place::pointer_indexing_generates_proper_gep`] but it
+        /// expects an additional `load` instruction at the end to go from
+        /// resolved pointer to value.
         #[test]
         fn pointer_indexing_generates_proper_gep_and_load() {
-            let (mut module, mut cg, bb, mut scope) = init_single_function();
+            let ctx = Context::create();
 
-            // of type *i32
-            scope.insert("arr", "%arr".to_string());
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    // generate `arr: *i32`
+                    let arr_stack_ptr = builder
+                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
+                        .unwrap();
+                    scope.insert("arr", arr_stack_ptr);
 
-            let (reg, bb) = cg_expr(
-                &mut module,
-                &mut cg,
-                &bb,
-                &scope,
-                // arr[4]
-                TypedExpr(
-                    Type::I32,
-                    TypedExprKind::Index(
-                        Box::new(TypedExpr(
-                            Type::Ptr(Box::new(Type::I32)),
-                            TypedExprKind::Identifier("arr"),
-                        )),
-                        Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("4"))),
+                    *bb
+                });
+
+            let expected = {
+                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+
+                // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
+                // the pointer to that index in the array
+                let loaded_arr = builder
+                    .build_load(
+                        ctx.i32_type().ptr_type(AddressSpace::default()),
+                        scope.get("arr").unwrap(),
+                        "load",
+                    )
+                    .unwrap();
+
+                // SAFETY: If indices are used incorrectly this may segfault
+                let indexed_ptr = unsafe {
+                    builder.build_gep(
+                        ctx.i32_type(),
+                        loaded_arr.into_pointer_value(),
+                        &[ctx.i32_type().const_int(3, false)],
+                        "gep",
+                    )
+                }
+                .unwrap();
+
+                // Finally this value is loaded.
+                let loaded_value = builder
+                    .build_load(ctx.i32_type(), indexed_ptr, "load")
+                    .unwrap();
+
+                (module.print_to_string(), loaded_value.print_to_string())
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_expr(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    TypedExpr(
+                        Type::I32,
+                        TypedExprKind::Index(
+                            Box::new(TypedExpr(
+                                Type::Ptr(Box::new(Type::I32)),
+                                TypedExprKind::Identifier("arr"),
+                            )),
+                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
+                        ),
                     ),
-                ),
-            )
-            .unwrap();
+                );
 
-            // no new basic blocks were produced
-            assert_eq!(bb, BasicBlock { id: 0 });
+                (module.print_to_string(), ptr.print_to_string())
+            };
 
-            // `arr` is loaded from memory, a `gep` instruction is produced, then this
-            // pointer is loaded
-            assert_eq!(
-                cg.blocks[0].instructions,
-                vec![
-                    "%l1 = load ptr, ptr %arr".to_string(),
-                    "%l2 = getelementptr i32, ptr %l1, i32 4".to_string(),
-                    "%l3 = load i32, ptr %l2".to_string()
-                ]
-            );
-            assert_eq!(reg, "%l3");
+            assert_eq!(actual, expected);
         }
 
+        /// This is similar to
+        /// [`super::cg_place::struct_property_access_generates_proper_gep`] but
+        /// it expects an additional `load` instruction at the end to go
+        /// from resolved pointer to value.
         #[test]
         fn struct_property_access_generates_proper_gep_and_load() {
-            let (mut module, mut cg, bb, mut scope) = init_single_function();
+            let ctx = Context::create();
 
-            // of type struct { x: i32, y: i32 }
-            scope.insert("x", "%x".to_string());
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+                    // generate: `x: { x: i32, y: i32 }`
+                    let x_stack_ptr = builder
+                        .build_alloca(
+                            ctx.struct_type(
+                                &[
+                                    ctx.i32_type().as_basic_type_enum(),
+                                    ctx.i32_type().as_basic_type_enum(),
+                                ],
+                                false,
+                            ),
+                            "x",
+                        )
+                        .unwrap();
+                    scope.insert("x", x_stack_ptr);
 
-            let (reg, bb) = cg_expr(
-                &mut module,
-                &mut cg,
-                &bb,
-                &scope,
-                // x.y
-                TypedExpr(
-                    Type::I32,
-                    TypedExprKind::Dot(
-                        Box::new(Place(
-                            Type::Struct(IndexMap::from([("x", Type::I32), ("y", Type::I32)])),
-                            PlaceKind::Variable("x"),
-                        )),
-                        "y",
+                    *bb
+                });
+
+            let expected = {
+                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+
+                // We do not load the struct yet, we GEP directly into it.
+                let indexed_ptr = builder
+                    .build_struct_gep(
+                        ctx.struct_type(
+                            &[
+                                ctx.i32_type().as_basic_type_enum(),
+                                ctx.i32_type().as_basic_type_enum(),
+                            ],
+                            false,
+                        ),
+                        scope.get("x").unwrap(),
+                        1,
+                        "gep",
+                    )
+                    .unwrap();
+
+                // Now we load the value.
+                let loaded_value = builder
+                    .build_load(ctx.i32_type(), indexed_ptr, "load")
+                    .unwrap();
+
+                (module.print_to_string(), loaded_value.print_to_string())
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (ptr, _bb) = cg_expr(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    TypedExpr(
+                        Type::I32,
+                        TypedExprKind::Dot(
+                            Box::new(Place(
+                                Type::Struct(IndexMap::from([("a", Type::I32), ("b", Type::I32)])),
+                                PlaceKind::Variable("x"),
+                            )),
+                            "b",
+                        ),
                     ),
-                ),
-            )
-            .unwrap();
+                );
 
-            // no new basic blocks were produced
-            assert_eq!(bb, BasicBlock { id: 0 });
+                (module.print_to_string(), ptr.print_to_string())
+            };
 
-            // GEP is getting the pointer right off the stack
-            assert_eq!(
-                cg.blocks[0].instructions,
-                vec![
-                    "%l1 = getelementptr { i32, i32 }, ptr %x, i32 0, i32 1".to_string(),
-                    "%l2 = load i32, ptr %l1".to_string()
-                ]
-            );
-            assert_eq!(reg, "%l2");
+            assert_eq!(actual, expected);
+        }
+
+        /// This test is a lot more complicated. It aims to ensure that the
+        /// ternary operator generates as expected. A lot of this can be
+        /// optimized, so we keep the condition as a call to an extern
+        /// fn so that not much can be done about it.
+        ///
+        /// The actual code being tested is basically `get_some_bool() ?
+        /// get_some_int() : 3`.
+        #[test]
+        #[allow(clippy::similar_names, clippy::too_many_lines)]
+        fn ternary_generates_proper_cfg() {
+            let ctx = Context::create();
+
+            let generate_test_prelude =
+                make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                    // generate `get_some_bool: fn() -> bool`
+                    let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
+                    let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
+                    scope.insert(
+                        "get_some_bool",
+                        gsb_val.as_global_value().as_pointer_value(),
+                    );
+
+                    // generate `get_some_int: fn() -> i32`
+                    let gsi_fn_type = ctx.i32_type().fn_type(&[], false);
+                    let gsi_val = module.add_function("get_some_int", gsi_fn_type, None);
+                    scope.insert("get_some_int", gsi_val.as_global_value().as_pointer_value());
+
+                    *bb
+                });
+
+            let expected = {
+                let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+
+                // We will need to generate a couple more complex structures.
+                // First of all, we will call the get_some_bool function and store the result in
+                // a register.
+                let some_bool = builder
+                    .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
+                    .unwrap();
+
+                // Now, we generate two basic blocks and conditionally jump based on that
+                // boolean.
+                let if_true = ctx.append_basic_block(fn_value, "if_true");
+                let if_false = ctx.append_basic_block(fn_value, "if_false");
+                let end = ctx.append_basic_block(fn_value, "end");
+
+                builder
+                    .build_conditional_branch(
+                        some_bool.as_any_value_enum().into_int_value(),
+                        if_true,
+                        if_false,
+                    )
+                    .unwrap();
+
+                // Generate the call to get_some_int in the if_true block.
+                builder.position_at_end(if_true);
+                let some_int = builder
+                    .build_call(module.get_function("get_some_int").unwrap(), &[], "call")
+                    .unwrap();
+                builder.build_unconditional_branch(end).unwrap();
+
+                // Generate the branch to the end block, we're yielding a constant
+                builder.position_at_end(if_false);
+                let that_constant = ctx.i32_type().const_int(3, false);
+                builder.build_unconditional_branch(end).unwrap();
+
+                // Finally, we generate the phi node in the end block.
+                builder.position_at_end(end);
+                let phi = builder.build_phi(ctx.i32_type(), "yield").unwrap();
+
+                phi.add_incoming(&[
+                    (&some_int.try_as_basic_value().unwrap_left(), if_true),
+                    (&that_constant.as_basic_value_enum(), if_false),
+                ]);
+
+                (
+                    module.print_to_string(),
+                    phi.as_basic_value().print_to_string(),
+                )
+            };
+
+            let actual = {
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+
+                let (reg, _bb) = cg_expr(
+                    &ctx,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &scope,
+                    TypedExpr(
+                        Type::I32,
+                        TypedExprKind::Ternary(
+                            Box::new(TypedExpr(
+                                Type::Bool,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Return(Type::Bool)),
+                                        ),
+                                        PlaceKind::Variable("get_some_bool"),
+                                    )),
+                                    vec![],
+                                ),
+                            )),
+                            Box::new(TypedExpr(
+                                Type::I32,
+                                TypedExprKind::Call(
+                                    Box::new(Place(
+                                        Type::Fn(
+                                            ArgumentDeclarationList::NonVariadic(vec![]),
+                                            Box::new(BlockReturnType::Return(Type::I32)),
+                                        ),
+                                        PlaceKind::Variable("get_some_int"),
+                                    )),
+                                    vec![],
+                                ),
+                            )),
+                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
+                        ),
+                    ),
+                );
+
+                (module.print_to_string(), reg.print_to_string())
+            };
+
+            assert_eq!(actual, expected);
         }
     }
 }

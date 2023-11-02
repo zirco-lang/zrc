@@ -37,7 +37,6 @@
     macro_use_extern_crate,
     missing_debug_implementations,
     non_exhaustive_omitted_patterns,
-    unreachable_pub,
     unsafe_op_in_unsafe_fn,
     unused_crate_dependencies,
     variant_size_differences,
