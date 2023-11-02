@@ -106,7 +106,7 @@ pub(crate) fn initialize_test_function(
 /// For example, this is used in
 /// [`crate::expr::tests::cg_expr::comma_yields_right_value`]
 #[allow(clippy::redundant_pub_crate)]
-pub(crate) fn make_test_prelude_closure<'ctx, Data>(
+pub(crate) fn make_test_prelude_closure<'ctx>(
     plugin: impl Fn(
         &'ctx Context,
         &Builder<'ctx>,
@@ -114,7 +114,7 @@ pub(crate) fn make_test_prelude_closure<'ctx, Data>(
         &FunctionValue<'ctx>,
         &mut CgScope<'static, 'ctx>,
         &BasicBlock<'ctx>,
-    ) -> (BasicBlock<'ctx>, Data),
+    ) -> BasicBlock<'ctx>,
 ) -> impl Fn(
     &'ctx Context,
 ) -> (
@@ -123,13 +123,12 @@ pub(crate) fn make_test_prelude_closure<'ctx, Data>(
     FunctionValue<'ctx>,
     CgScope<'static, 'ctx>,
     BasicBlock<'ctx>,
-    Data,
 ) {
     move |ctx| {
         let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
 
-        let (bb, data) = plugin(ctx, &builder, &module, &fn_value, &mut scope, &bb);
+        let bb = plugin(ctx, &builder, &module, &fn_value, &mut scope, &bb);
 
-        (builder, module, fn_value, scope, bb, data)
+        (builder, module, fn_value, scope, bb)
     }
 }

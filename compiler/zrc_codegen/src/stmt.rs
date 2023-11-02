@@ -510,10 +510,10 @@ mod tests {
         let ctx = Context::create();
 
         let generate_test_prelude =
-            make_test_prelude_closure(|_ctx, _builder, _module, _fn_value, _scope, bb| (*bb, ()));
+            make_test_prelude_closure(|_ctx, _builder, _module, _fn_value, _scope, bb| *bb);
 
         let expected = {
-            let (builder, module, _fn_value, mut scope, _bb, ()) = generate_test_prelude(&ctx);
+            let (builder, module, _fn_value, mut scope, _bb) = generate_test_prelude(&ctx);
 
             let a_ptr = builder.build_alloca(ctx.i32_type(), "let_a").unwrap();
             let b_ptr = builder.build_alloca(ctx.bool_type(), "let_b").unwrap();
@@ -538,7 +538,7 @@ mod tests {
         };
 
         let actual = {
-            let (builder, module, fn_value, mut scope, bb, ()) = generate_test_prelude(&ctx);
+            let (builder, module, fn_value, mut scope, bb) = generate_test_prelude(&ctx);
 
             let _bb = cg_let_declaration(
                 &ctx,
@@ -595,12 +595,11 @@ mod tests {
 
                     // Having access to the function type of `do_stuff` is needed to build the
                     // indirect call within the expected case.
-                    (*bb, do_stuff_fn_type)
+                    *bb
                 });
 
             let expected = {
-                let (builder, module, fn_value, scope, _bb, do_stuff_fn_type) =
-                    generate_test_prelude(&ctx);
+                let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
 
                 let then = ctx.append_basic_block(fn_value, "then");
                 let then_else = ctx.append_basic_block(fn_value, "then_else");
@@ -612,12 +611,7 @@ mod tests {
 
                 builder.position_at_end(then);
                 builder
-                    .build_indirect_call(
-                        do_stuff_fn_type,
-                        scope.get("do_stuff").unwrap(),
-                        &[],
-                        "call",
-                    )
+                    .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
                     .unwrap();
                 builder.build_unconditional_branch(end).unwrap();
 
@@ -634,8 +628,7 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb, _do_stuff_fn_type) =
-                    generate_test_prelude(&ctx);
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
 
                 let bb = cg_block(
                     &ctx,
@@ -691,12 +684,11 @@ mod tests {
 
                     // Having access to the function type of `do_stuff` is needed to build the
                     // indirect call within the expected case.
-                    (*bb, do_stuff_fn_type)
+                    *bb
                 });
 
             let expected = {
-                let (builder, module, fn_value, scope, _bb, do_stuff_fn_type) =
-                    generate_test_prelude(&ctx);
+                let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
 
                 let then = ctx.append_basic_block(fn_value, "then");
                 let then_else = ctx.append_basic_block(fn_value, "then_else");
@@ -708,23 +700,13 @@ mod tests {
 
                 builder.position_at_end(then);
                 builder
-                    .build_indirect_call(
-                        do_stuff_fn_type,
-                        scope.get("do_stuff").unwrap(),
-                        &[],
-                        "call",
-                    )
+                    .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
                     .unwrap();
                 builder.build_unconditional_branch(end).unwrap();
 
                 builder.position_at_end(then_else);
                 builder
-                    .build_indirect_call(
-                        do_stuff_fn_type,
-                        scope.get("do_stuff").unwrap(),
-                        &[],
-                        "call",
-                    )
+                    .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
                     .unwrap();
                 builder.build_unconditional_branch(end).unwrap();
 
@@ -737,8 +719,7 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb, _do_stuff_fn_type) =
-                    generate_test_prelude(&ctx);
+                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
 
                 let bb = cg_block(
                     &ctx,
@@ -813,9 +794,7 @@ mod tests {
                             gsb_val.as_global_value().as_pointer_value(),
                         );
 
-                        // Having access to the function type of `get_some_bool` is needed to build
-                        // the indirect call within the expected case.
-                        (*bb, gsb_fn_type)
+                        *bb
                     });
 
                 // while (get_some_bool()) {
@@ -854,8 +833,7 @@ mod tests {
                 //     br label %header ; loop again
 
                 let expected = {
-                    let (builder, module, fn_value, _scope, _bb, _gsb_fn_type) =
-                        generate_test_prelude(&ctx);
+                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
 
                     let header = ctx.append_basic_block(fn_value, "header");
                     builder.build_unconditional_branch(header).unwrap();
@@ -932,8 +910,7 @@ mod tests {
                 };
 
                 let actual = {
-                    let (builder, module, fn_value, scope, bb, _gsb_fn_type) =
-                        generate_test_prelude(&ctx);
+                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
 
                     let call_gsb = TypedExpr(
                         Type::Bool,
