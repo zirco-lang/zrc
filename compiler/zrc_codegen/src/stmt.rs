@@ -4,9 +4,13 @@ use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
     context::Context,
+    memory_buffer::MemoryBuffer,
     module::Module,
+    passes::{PassManager, PassManagerBuilder},
+    targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetTriple},
     types::AnyType,
     values::{BasicValueEnum, FunctionValue},
+    OptimizationLevel,
 };
 use zrc_typeck::tast::{
     expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
@@ -396,13 +400,18 @@ pub fn cg_init_fn<'ctx>(
     fn_val
 }
 
-/// Code generate a LLVM program to a string.
+/// Code generate and verify a program given a [`Context`] and return the final
+/// global [`CgScope`], and [`Module`].
 ///
 /// # Panics
-/// Panics on internal code generation failure.
+/// Panics if code generation fails. This can be caused by an invalid TAST being
+/// passed, so make sure to type check it so invariants are upheld.
 #[must_use]
-pub fn cg_program(module_name: &str, program: Vec<TypedDeclaration>) -> String {
-    let ctx = Context::create();
+fn cg_program<'input, 'ctx>(
+    ctx: &'ctx Context,
+    module_name: &str,
+    program: Vec<TypedDeclaration<'input>>,
+) -> (Module<'ctx>, CgScope<'input, 'ctx>) {
     let builder = ctx.create_builder();
     let module = ctx.create_module(module_name);
 
@@ -420,7 +429,7 @@ pub fn cg_program(module_name: &str, program: Vec<TypedDeclaration>) -> String {
                 body,
             } => {
                 let fn_value = cg_init_fn(
-                    &ctx,
+                    ctx,
                     &module,
                     name,
                     return_type,
@@ -450,7 +459,7 @@ pub fn cg_program(module_name: &str, program: Vec<TypedDeclaration>) -> String {
                         }
 
                         let alloc = builder
-                            .build_alloca(llvm_basic_type(&ctx, ty), &format!("arg_{name}"))
+                            .build_alloca(llvm_basic_type(ctx, ty), &format!("arg_{name}"))
                             .unwrap();
 
                         builder.position_at_end(entry);
@@ -471,7 +480,7 @@ pub fn cg_program(module_name: &str, program: Vec<TypedDeclaration>) -> String {
                     }
 
                     cg_block(
-                        &ctx, &builder, &module, &fn_value, &entry, &fn_scope, body, None,
+                        ctx, &builder, &module, &fn_value, &entry, &fn_scope, body, None,
                     );
                 }
             }
@@ -492,7 +501,58 @@ pub fn cg_program(module_name: &str, program: Vec<TypedDeclaration>) -> String {
 
     module.verify().expect("Generated invalid LLVM IR");
 
+    (module, global_scope)
+}
+
+/// Code generate a LLVM program to a string.
+///
+/// # Panics
+/// Panics on internal code generation failure.
+#[must_use]
+pub fn cg_program_to_string(module_name: &str, program: Vec<TypedDeclaration>) -> String {
+    let ctx = Context::create();
+
+    let (module, _global_scope) = cg_program(&ctx, module_name, program);
+
     module.print_to_string().to_string()
+}
+
+/// Code generate a LLVM program to a [`MemoryBuffer`] based on the given
+/// [`FileType`].
+///
+/// # Panics
+/// Panics on internal code generation failure.
+#[must_use]
+pub fn cg_program_to_buffer(
+    module_name: &str,
+    program: Vec<TypedDeclaration>,
+    file_type: FileType,
+    optimization_level: OptimizationLevel,
+    triple: &TargetTriple,
+    cpu: &str,
+) -> MemoryBuffer {
+    let ctx = Context::create();
+
+    let (module, _global_scope) = cg_program(&ctx, module_name, program);
+
+    Target::initialize_all(&InitializationConfig::default());
+
+    let target = Target::from_triple(triple).unwrap();
+
+    let target_machine = target
+        .create_target_machine(
+            triple,
+            cpu,
+            "",
+            optimization_level,
+            RelocMode::PIC,
+            CodeModel::Default,
+        )
+        .unwrap();
+
+    target_machine
+        .write_to_memory_buffer(&module, file_type)
+        .unwrap()
 }
 
 #[cfg(test)]

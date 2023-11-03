@@ -51,7 +51,7 @@
 
 use std::collections::HashMap;
 
-use inkwell::values::PointerValue;
+use inkwell::{targets::TargetMachine, values::PointerValue};
 
 mod expr;
 mod stmt;
@@ -59,7 +59,17 @@ mod stmt;
 mod test_utils;
 mod ty;
 
-pub use stmt::cg_program;
+pub use inkwell::{
+    targets::{FileType, TargetTriple},
+    OptimizationLevel,
+};
+pub use stmt::{cg_program_to_buffer, cg_program_to_string};
+
+/// Gets the native [`TargetTriple`].
+#[must_use]
+pub fn get_native_triple() -> TargetTriple {
+    TargetMachine::get_default_triple()
+}
 
 /// Represents the code generation scope, or the mapping from identifiers to
 /// their LLVM [`PointerValue`]s.

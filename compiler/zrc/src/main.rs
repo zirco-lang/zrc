@@ -51,6 +51,7 @@ use std::{
 
 use anyhow::bail;
 use clap::Parser;
+use zrc_codegen::OptimizationLevel;
 
 #[doc(hidden)]
 #[allow(
@@ -132,12 +133,60 @@ struct Cli {
     #[arg(long)]
     #[clap(default_value_t = OutputFormat::Llvm)]
     emit: OutputFormat,
+
+    /// Allow emitting raw object code to stdout. This may mess up your
+    /// terminal!
+    #[arg(long)]
+    force: bool,
+
+    /// Set the target triple to generate output for. Defaults to native.
+    #[arg(short, long)]
+    target: Option<String>,
+
+    /// Set the target CPU to generate output for.
+    #[arg(long)]
+    #[clap(default_value = "generic")]
+    cpu: String,
+
+    /// Set the optimization level
+    #[arg(short = 'O', long = "opt-level")]
+    #[clap(default_value = "default")]
+    opt_level: FrontendOptLevel,
+}
+
+/// Configuration for the Zirco optimizer
+#[derive(Clone, clap::ValueEnum, PartialEq)]
+enum FrontendOptLevel {
+    /// Disable as many optimizations as possible.
+    #[value(name = "0", alias("none"))]
+    O0,
+    /// Optimize quickly without destroying debuggability.
+    #[value(name = "1")]
+    O1,
+    /// Optimize for fast execution as much as possible without triggering
+    /// significant incremental compile time or code size growth.
+    #[value(name = "2", alias("default"))]
+    O2,
+    /// Optimize for fast execution as much as possible.
+    // TODO: does this enable LTO?
+    #[value(name = "3", alias("aggressive"))]
+    O3,
+}
+impl From<FrontendOptLevel> for OptimizationLevel {
+    fn from(val: FrontendOptLevel) -> Self {
+        match val {
+            FrontendOptLevel::O0 => Self::None,
+            FrontendOptLevel::O1 => Self::Less,
+            FrontendOptLevel::O2 => Self::Default,
+            FrontendOptLevel::O3 => Self::Aggressive,
+        }
+    }
 }
 
 /// The list of possible outputs `zrc` can emit in
 ///
 /// Usually you will want to use `llvm`.
-#[derive(Clone, clap::ValueEnum)]
+#[derive(Clone, clap::ValueEnum, PartialEq)]
 enum OutputFormat {
     /// LLVM IR
     Llvm,
@@ -155,6 +204,10 @@ enum OutputFormat {
     TastDebugPretty,
     /// The Zirco TAST, stringified to Zirco-like code
     Tast,
+    /// Assembly
+    Asm,
+    /// Object file
+    Object,
 }
 impl Display for OutputFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -166,10 +219,13 @@ impl Display for OutputFormat {
             Self::TastDebug => write!(f, "tast-debug"),
             Self::TastDebugPretty => write!(f, "tast-debug-pretty"),
             Self::Tast => write!(f, "tast"),
+            Self::Asm => write!(f, "asm"),
+            Self::Object => write!(f, "object"),
         }
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() -> anyhow::Result<()> {
     let default_panic_hook = std::panic::take_hook();
 
@@ -243,9 +299,20 @@ fn main() -> anyhow::Result<()> {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
 
+    if cli.emit == OutputFormat::Object
+        && !cli.force
+        && path
+            .as_os_str()
+            .to_str()
+            .expect("Invalid UTF-8 in file name")
+            == "-"
+    {
+        bail!("emitting raw object code to stdout is not allowed. use --force to override this");
+    }
+
     let result = compile(
         &cli.emit,
-        match path.clone().into_os_string().to_str() {
+        match path.as_os_str().to_str() {
             Some("-") => "<stdin>",
             _ => path
                 .as_os_str()
@@ -253,7 +320,14 @@ fn main() -> anyhow::Result<()> {
                 .expect("Invalid UTF-8 in file name"),
         },
         &content,
+        cli.opt_level.into(),
+        &cli.target
+            .map_or_else(zrc_codegen::get_native_triple, |triple| {
+                zrc_codegen::TargetTriple::create(&triple)
+            }),
+        &cli.cpu,
     );
+
     match result {
         Err(diagnostic) => eprintln!("{}", diagnostic.print(&content)),
         Ok(x) => {
@@ -274,7 +348,7 @@ fn main() -> anyhow::Result<()> {
                     }
                 };
 
-            write!(output, "{x}")?;
+            output.write_all(&x).unwrap();
         }
     }
 
@@ -286,23 +360,55 @@ fn compile(
     emit: &OutputFormat,
     module_name: &str,
     content: &str,
-) -> Result<String, zrc_diagnostics::Diagnostic> {
+    optimization_level: OptimizationLevel,
+    triple: &zrc_codegen::TargetTriple,
+    cpu: &str,
+) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
     match *emit {
-        OutputFormat::Llvm => Ok(zrc_codegen::cg_program(
+        OutputFormat::Asm => Ok(zrc_codegen::cg_program_to_buffer(
             module_name,
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
-        )),
+            zrc_codegen::FileType::Assembly,
+            optimization_level,
+            triple,
+            cpu,
+        )
+        .as_slice()
+        .into()),
+        OutputFormat::Object => Ok(zrc_codegen::cg_program_to_buffer(
+            module_name,
+            zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
+            zrc_codegen::FileType::Object,
+            optimization_level,
+            triple,
+            cpu,
+        )
+        .as_slice()
+        .into()),
+
+        OutputFormat::Llvm => Ok(zrc_codegen::cg_program_to_string(
+            module_name,
+            zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
+        )
+        .as_bytes()
+        .into()),
 
         OutputFormat::Ast => Ok(zrc_parser::parser::parse_program(content)?
             .into_iter()
             .map(|x| format!("{}", x.into_value()))
             .collect::<Vec<_>>()
-            .join("\n")),
-        OutputFormat::AstDebug => Ok(format!("{:?}", zrc_parser::parser::parse_program(content)?)),
+            .join("\n")
+            .as_bytes()
+            .into()),
+        OutputFormat::AstDebug => Ok(format!("{:?}", zrc_parser::parser::parse_program(content)?)
+            .as_bytes()
+            .into()),
         OutputFormat::AstDebugPretty => Ok(format!(
             "{:#?}",
             zrc_parser::parser::parse_program(content)?
-        )),
+        )
+        .as_bytes()
+        .into()),
 
         OutputFormat::Tast => Ok(zrc_typeck::typeck::type_program(
             zrc_parser::parser::parse_program(content)?,
@@ -310,14 +416,20 @@ fn compile(
         .into_iter()
         .map(|x| x.to_string())
         .collect::<Vec<_>>()
-        .join("\n")),
+        .join("\n")
+        .as_bytes()
+        .into()),
         OutputFormat::TastDebug => Ok(format!(
             "{:?}",
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?
-        )),
+        )
+        .as_bytes()
+        .into()),
         OutputFormat::TastDebugPretty => Ok(format!(
             "{:#?}",
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?
-        )),
+        )
+        .as_bytes()
+        .into()),
     }
 }
