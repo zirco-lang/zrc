@@ -77,7 +77,7 @@ pub enum Declaration<'input> {
         name: Spanned<&'input str>,
         /// The key-value pairs of the struct. Ordered by declaration order.
         #[allow(clippy::type_complexity)]
-        fields: Spanned<Vec<Spanned<(Spanned<&'input str>, super::ty::Type<'input>)>>>,
+        fields: Spanned<Vec<Spanned<(Spanned<&'input str>, Type<'input>)>>>,
     },
 }
 
