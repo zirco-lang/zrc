@@ -39,7 +39,8 @@
     non_exhaustive_omitted_patterns,
     unsafe_op_in_unsafe_fn,
     unused_crate_dependencies,
-    variant_size_differences
+    variant_size_differences,
+    unused_qualifications
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
