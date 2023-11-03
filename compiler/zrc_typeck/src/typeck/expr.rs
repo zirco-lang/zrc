@@ -44,7 +44,7 @@ fn desugar_assignment<'input>(
 }
 
 /// Validate an expr into a place
-fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, zrc_diagnostics::Diagnostic> {
+fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, Diagnostic> {
     #[allow(clippy::wildcard_enum_match_arm)]
     Ok(match expr.1 {
         TypedExprKind::UnaryDereference(x) => Place(expr.0, PlaceKind::Deref(x)),
@@ -52,8 +52,8 @@ fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, zrc_diagnostics::
         TypedExprKind::Index(x, y) => Place(expr.0, PlaceKind::Index(x, y)),
         TypedExprKind::Dot(x, y) => Place(expr.0, PlaceKind::Dot(x, y)),
         _ => {
-            return Err(zrc_diagnostics::Diagnostic(
-                zrc_diagnostics::Severity::Error,
+            return Err(Diagnostic(
+                Severity::Error,
                 span.containing(DiagnosticKind::NotAnLvalue(expr.to_string())),
             ))
         }
@@ -72,7 +72,7 @@ fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, zrc_diagnostics::
 pub fn type_expr<'input>(
     scope: &Scope<'input>,
     expr: Expr<'input>,
-) -> Result<TypedExpr<'input>, zrc_diagnostics::Diagnostic> {
+) -> Result<TypedExpr<'input>, Diagnostic> {
     let expr_span = expr.0.span();
     Ok(match expr.0.into_value() {
         ExprKind::Comma(lhs, rhs) => {
@@ -91,8 +91,8 @@ pub fn type_expr<'input>(
             let value_t = type_expr(scope, value)?;
 
             if place_t.0 != value_t.0 {
-                return Err(zrc_diagnostics::Diagnostic(
-                    zrc_diagnostics::Severity::Error,
+                return Err(Diagnostic(
+                    Severity::Error,
                     expr_span.containing(DiagnosticKind::InvalidAssignmentRightHandSideType {
                         expected: place_t.0.to_string(),
                         got: value_t.0.to_string(),

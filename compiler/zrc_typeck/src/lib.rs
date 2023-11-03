@@ -44,6 +44,7 @@
     unsafe_op_in_unsafe_fn,
     unused_crate_dependencies,
     variant_size_differences,
+    unused_qualifications,
 
     // These should be enabled in any non-user-facing code, like the parser, but not in the
     // frontend.

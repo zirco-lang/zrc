@@ -74,7 +74,7 @@ pub enum LexicalError<'input> {
 /// A lexer callback helper to obtain the currently matched token slice.
 fn lexer_slice<'input, T: Logos<'input>>(
     lex: &Lexer<'input, T>,
-) -> &'input <<T as logos::Logos<'input>>::Source as logos::Source>::Slice {
+) -> &'input <<T as Logos<'input>>::Source as logos::Source>::Slice {
     lex.slice()
 }
 

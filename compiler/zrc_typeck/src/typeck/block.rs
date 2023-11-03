@@ -111,7 +111,7 @@ fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
 fn process_let_declaration<'input>(
     scope: &mut Scope<'input>,
     declarations: Vec<Spanned<AstLetDeclaration<'input>>>,
-) -> Result<Vec<TastLetDeclaration<'input>>, zrc_diagnostics::Diagnostic> {
+) -> Result<Vec<TastLetDeclaration<'input>>, Diagnostic> {
     declarations
         .into_iter()
         .map(
@@ -213,7 +213,7 @@ fn process_let_declaration<'input>(
 pub fn process_declaration<'input>(
     global_scope: &mut Scope<'input>,
     declaration: AstDeclaration<'input>,
-) -> Result<TypedDeclaration<'input>, zrc_diagnostics::Diagnostic> {
+) -> Result<TypedDeclaration<'input>, Diagnostic> {
     Ok(match declaration {
         AstDeclaration::FunctionDeclaration {
             parameters,
@@ -377,7 +377,7 @@ pub fn type_block<'input>(
     input_block: Spanned<Vec<Stmt<'input>>>,
     can_use_break_continue: bool,
     return_ability: BlockReturnAbility,
-) -> Result<(Vec<TypedStmt<'input>>, BlockReturnActuality), zrc_diagnostics::Diagnostic> {
+) -> Result<(Vec<TypedStmt<'input>>, BlockReturnActuality), Diagnostic> {
     let mut scope: Scope<'input> = parent_scope.clone();
 
     let input_block_span = input_block.span();

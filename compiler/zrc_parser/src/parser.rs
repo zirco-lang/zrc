@@ -32,7 +32,7 @@ use crate::{internal_parser, lexer::LexicalError};
 
 /// Converts from a LALRPOP [`ParseError`] to a corresponding [`Diagnostic`].
 fn parser_error_to_diagnostic(
-    error: ParseError<usize, lexer::Tok, Spanned<lexer::LexicalError>>,
+    error: ParseError<usize, lexer::Tok, Spanned<LexicalError>>,
 ) -> Diagnostic {
     match error {
         ParseError::InvalidToken { location } => Diagnostic(
@@ -97,8 +97,8 @@ fn parser_error_to_diagnostic(
 /// [`Spanned<Result<Tok, LexicalError>>`] to something suitable to pass to
 /// LALRPOP.
 fn zirco_lexer_span_to_lalrpop_span<'input>(
-    spanned: Spanned<Result<lexer::Tok<'input>, lexer::LexicalError<'input>>>,
-) -> Result<(usize, lexer::Tok<'input>, usize), Spanned<lexer::LexicalError<'input>>> {
+    spanned: Spanned<Result<lexer::Tok<'input>, LexicalError<'input>>>,
+) -> Result<(usize, lexer::Tok<'input>, usize), Spanned<LexicalError<'input>>> {
     spanned.transpose().map(|spanned_tok| {
         let span = spanned_tok.span();
         (span.start(), spanned_tok.into_value(), span.end())

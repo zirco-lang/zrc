@@ -92,7 +92,7 @@ pub enum TypedDeclaration<'input> {
         /// The name of the newtype.
         name: &'input str,
         /// The key-value pairs of the struct. Ordered by declaration order.
-        fields: IndexMap<&'input str, super::ty::Type<'input>>,
+        fields: IndexMap<&'input str, Type<'input>>,
     },
 }
 

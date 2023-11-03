@@ -33,6 +33,7 @@
     clippy::unimplemented,
     clippy::unneeded_field_pattern,
     clippy::wildcard_enum_match_arm,
+    unused_qualifications,
 
     // These should be enabled in any non-user-facing code, like the parser, but not in the
     // frontend.
