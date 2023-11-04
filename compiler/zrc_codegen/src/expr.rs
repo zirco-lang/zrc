@@ -501,7 +501,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             // fn -> int = ptrtoint
 
             let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
-
+			
+            // FIXME: Does this actually do sext/zext or just bitcasts?
             let reg = match (x.get_type().is_pointer_type(), matches!(ty, Type::Ptr(_))) {
                 (true, true) => builder
                     .build_bitcast(x.into_pointer_value(), llvm_basic_type(ctx, ty), "cast")
