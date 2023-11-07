@@ -293,7 +293,7 @@ impl<'input> Display for ExprKind<'input> {
 #[allow(clippy::should_implement_trait)]
 impl<'input> Expr<'input> {
     #[must_use]
-    pub fn comma(lhs: Self, rhs: Self) -> Self {
+    pub fn build_comma(lhs: Self, rhs: Self) -> Self {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Comma(Box::new(lhs), Box::new(rhs)),
@@ -301,7 +301,7 @@ impl<'input> Expr<'input> {
         ))
     }
 
-    fn assignment(assignment: Assignment, lhs: Self, rhs: Self) -> Self {
+    fn build_assignment(assignment: Assignment, lhs: Self, rhs: Self) -> Self {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Assignment(assignment, Box::new(lhs), Box::new(rhs)),
@@ -310,36 +310,36 @@ impl<'input> Expr<'input> {
     }
 
     #[must_use]
-    pub fn assign(lhs: Self, rhs: Self) -> Self {
-        Self::assignment(Assignment::Standard, lhs, rhs)
+    pub fn build_assign(lhs: Self, rhs: Self) -> Self {
+        Self::build_assignment(Assignment::Standard, lhs, rhs)
     }
 
-    fn arithmetic_assignment(arithmetic: Arithmetic, lhs: Self, rhs: Self) -> Self {
-        Self::assignment(Assignment::Arithmetic(arithmetic), lhs, rhs)
+    fn build_arithmetic_assignment(arithmetic: Arithmetic, lhs: Self, rhs: Self) -> Self {
+        Self::build_assignment(Assignment::Arithmetic(arithmetic), lhs, rhs)
     }
 
     #[must_use]
-    pub fn add_assign(lhs: Self, rhs: Self) -> Self {
-        Self::arithmetic_assignment(Arithmetic::Addition, lhs, rhs)
+    pub fn build_add_assign(lhs: Self, rhs: Self) -> Self {
+        Self::build_arithmetic_assignment(Arithmetic::Addition, lhs, rhs)
     }
     #[must_use]
-    pub fn sub_assign(lhs: Self, rhs: Self) -> Self {
-        Self::arithmetic_assignment(Arithmetic::Subtraction, lhs, rhs)
+    pub fn build_sub_assign(lhs: Self, rhs: Self) -> Self {
+        Self::build_arithmetic_assignment(Arithmetic::Subtraction, lhs, rhs)
     }
     #[must_use]
-    pub fn mul_assign(lhs: Self, rhs: Self) -> Self {
-        Self::arithmetic_assignment(Arithmetic::Multiplication, lhs, rhs)
+    pub fn build_mul_assign(lhs: Self, rhs: Self) -> Self {
+        Self::build_arithmetic_assignment(Arithmetic::Multiplication, lhs, rhs)
     }
     #[must_use]
-    pub fn div_assign(lhs: Self, rhs: Self) -> Self {
-        Self::arithmetic_assignment(Arithmetic::Division, lhs, rhs)
+    pub fn build_div_assign(lhs: Self, rhs: Self) -> Self {
+        Self::build_arithmetic_assignment(Arithmetic::Division, lhs, rhs)
     }
     #[must_use]
-    pub fn mod_assign(lhs: Self, rhs: Self) -> Self {
-        Self::arithmetic_assignment(Arithmetic::Modulo, lhs, rhs)
+    pub fn build_mod_assign(lhs: Self, rhs: Self) -> Self {
+        Self::build_arithmetic_assignment(Arithmetic::Modulo, lhs, rhs)
     }
 
-    fn binary_bitwise(op: BinaryBitwise, lhs: Self, rhs: Self) -> Self {
+    fn build_binary_bitwise(op: BinaryBitwise, lhs: Self, rhs: Self) -> Self {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::BinaryBitwise(op, Box::new(lhs), Box::new(rhs)),
@@ -347,27 +347,27 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn bit_and(lhs: Self, rhs: Self) -> Self {
-        Self::binary_bitwise(BinaryBitwise::And, lhs, rhs)
+    pub fn build_bit_and(lhs: Self, rhs: Self) -> Self {
+        Self::build_binary_bitwise(BinaryBitwise::And, lhs, rhs)
     }
     #[must_use]
-    pub fn bit_or(lhs: Self, rhs: Self) -> Self {
-        Self::binary_bitwise(BinaryBitwise::Or, lhs, rhs)
+    pub fn build_bit_or(lhs: Self, rhs: Self) -> Self {
+        Self::build_binary_bitwise(BinaryBitwise::Or, lhs, rhs)
     }
     #[must_use]
-    pub fn bit_xor(lhs: Self, rhs: Self) -> Self {
-        Self::binary_bitwise(BinaryBitwise::Xor, lhs, rhs)
+    pub fn build_bit_xor(lhs: Self, rhs: Self) -> Self {
+        Self::build_binary_bitwise(BinaryBitwise::Xor, lhs, rhs)
     }
     #[must_use]
-    pub fn shl(lhs: Self, rhs: Self) -> Self {
-        Self::binary_bitwise(BinaryBitwise::Shl, lhs, rhs)
+    pub fn build_shl(lhs: Self, rhs: Self) -> Self {
+        Self::build_binary_bitwise(BinaryBitwise::Shl, lhs, rhs)
     }
     #[must_use]
-    pub fn shr(lhs: Self, rhs: Self) -> Self {
-        Self::binary_bitwise(BinaryBitwise::Shr, lhs, rhs)
+    pub fn build_shr(lhs: Self, rhs: Self) -> Self {
+        Self::build_binary_bitwise(BinaryBitwise::Shr, lhs, rhs)
     }
 
-    fn logical(op: Logical, lhs: Self, rhs: Self) -> Self {
+    fn build_logical(op: Logical, lhs: Self, rhs: Self) -> Self {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Logical(op, Box::new(lhs), Box::new(rhs)),
@@ -375,15 +375,15 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn logical_and(lhs: Self, rhs: Self) -> Self {
-        Self::logical(Logical::And, lhs, rhs)
+    pub fn build_logical_and(lhs: Self, rhs: Self) -> Self {
+        Self::build_logical(Logical::And, lhs, rhs)
     }
     #[must_use]
-    pub fn logical_or(lhs: Self, rhs: Self) -> Self {
-        Self::logical(Logical::Or, lhs, rhs)
+    pub fn build_logical_or(lhs: Self, rhs: Self) -> Self {
+        Self::build_logical(Logical::Or, lhs, rhs)
     }
 
-    fn equality(op: Equality, lhs: Self, rhs: Self) -> Self {
+    fn build_equality(op: Equality, lhs: Self, rhs: Self) -> Self {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Equality(op, Box::new(lhs), Box::new(rhs)),
@@ -391,16 +391,15 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    #[allow(clippy::same_name_method)]
-    pub fn eq(lhs: Self, rhs: Self) -> Self {
-        Self::equality(Equality::Eq, lhs, rhs)
+    pub fn build_eq(lhs: Self, rhs: Self) -> Self {
+        Self::build_equality(Equality::Eq, lhs, rhs)
     }
     #[must_use]
-    pub fn neq(lhs: Self, rhs: Self) -> Self {
-        Self::equality(Equality::Neq, lhs, rhs)
+    pub fn build_neq(lhs: Self, rhs: Self) -> Self {
+        Self::build_equality(Equality::Neq, lhs, rhs)
     }
 
-    fn comparison(op: Comparison, lhs: Self, rhs: Self) -> Self {
+    fn build_comparison(op: Comparison, lhs: Self, rhs: Self) -> Self {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Comparison(op, Box::new(lhs), Box::new(rhs)),
@@ -408,23 +407,23 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn gt(lhs: Self, rhs: Self) -> Self {
-        Self::comparison(Comparison::Gt, lhs, rhs)
+    pub fn build_gt(lhs: Self, rhs: Self) -> Self {
+        Self::build_comparison(Comparison::Gt, lhs, rhs)
     }
     #[must_use]
-    pub fn gte(lhs: Self, rhs: Self) -> Self {
-        Self::comparison(Comparison::Gte, lhs, rhs)
+    pub fn build_gte(lhs: Self, rhs: Self) -> Self {
+        Self::build_comparison(Comparison::Gte, lhs, rhs)
     }
     #[must_use]
-    pub fn lt(lhs: Self, rhs: Self) -> Self {
-        Self::comparison(Comparison::Lt, lhs, rhs)
+    pub fn build_lt(lhs: Self, rhs: Self) -> Self {
+        Self::build_comparison(Comparison::Lt, lhs, rhs)
     }
     #[must_use]
-    pub fn lte(lhs: Self, rhs: Self) -> Self {
-        Self::comparison(Comparison::Lte, lhs, rhs)
+    pub fn build_lte(lhs: Self, rhs: Self) -> Self {
+        Self::build_comparison(Comparison::Lte, lhs, rhs)
     }
 
-    fn arithmetic(op: Arithmetic, lhs: Self, rhs: Self) -> Self {
+    fn build_arithmetic(op: Arithmetic, lhs: Self, rhs: Self) -> Self {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Arithmetic(op, Box::new(lhs), Box::new(rhs)),
@@ -432,55 +431,55 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn add(lhs: Self, rhs: Self) -> Self {
-        Self::arithmetic(Arithmetic::Addition, lhs, rhs)
+    pub fn build_add(lhs: Self, rhs: Self) -> Self {
+        Self::build_arithmetic(Arithmetic::Addition, lhs, rhs)
     }
     #[must_use]
-    pub fn sub(lhs: Self, rhs: Self) -> Self {
-        Self::arithmetic(Arithmetic::Subtraction, lhs, rhs)
+    pub fn build_sub(lhs: Self, rhs: Self) -> Self {
+        Self::build_arithmetic(Arithmetic::Subtraction, lhs, rhs)
     }
     #[must_use]
-    pub fn mul(lhs: Self, rhs: Self) -> Self {
-        Self::arithmetic(Arithmetic::Multiplication, lhs, rhs)
+    pub fn build_mul(lhs: Self, rhs: Self) -> Self {
+        Self::build_arithmetic(Arithmetic::Multiplication, lhs, rhs)
     }
     #[must_use]
-    pub fn div(lhs: Self, rhs: Self) -> Self {
-        Self::arithmetic(Arithmetic::Division, lhs, rhs)
+    pub fn build_div(lhs: Self, rhs: Self) -> Self {
+        Self::build_arithmetic(Arithmetic::Division, lhs, rhs)
     }
     #[must_use]
-    pub fn modulo(lhs: Self, rhs: Self) -> Self {
-        Self::arithmetic(Arithmetic::Modulo, lhs, rhs)
+    pub fn build_modulo(lhs: Self, rhs: Self) -> Self {
+        Self::build_arithmetic(Arithmetic::Modulo, lhs, rhs)
     }
 
     // Span needed as the unary op may be in a different position than the expr
     #[must_use]
-    pub fn not(sp: Span, expr: Self) -> Self {
+    pub fn build_not(sp: Span, expr: Self) -> Self {
         Self(ExprKind::UnaryNot(Box::new(expr)).in_span(sp))
     }
     #[must_use]
-    pub fn bit_not(sp: Span, expr: Self) -> Self {
+    pub fn build_bit_not(sp: Span, expr: Self) -> Self {
         Self(ExprKind::UnaryBitwiseNot(Box::new(expr)).in_span(sp))
     }
     #[must_use]
-    pub fn neg(sp: Span, expr: Self) -> Self {
+    pub fn build_neg(sp: Span, expr: Self) -> Self {
         Self(ExprKind::UnaryMinus(Box::new(expr)).in_span(sp))
     }
     #[must_use]
-    pub fn address_of(sp: Span, expr: Self) -> Self {
+    pub fn build_address_of(sp: Span, expr: Self) -> Self {
         Self(ExprKind::UnaryAddressOf(Box::new(expr)).in_span(sp))
     }
     #[must_use]
-    pub fn deref(sp: Span, expr: Self) -> Self {
+    pub fn build_deref(sp: Span, expr: Self) -> Self {
         Self(ExprKind::UnaryDereference(Box::new(expr)).in_span(sp))
     }
 
     /// Span is needed for right brace
     #[must_use]
-    pub fn index(sp: Span, lhs: Self, rhs: Self) -> Self {
+    pub fn build_index(sp: Span, lhs: Self, rhs: Self) -> Self {
         Self(ExprKind::Index(Box::new(lhs), Box::new(rhs)).in_span(sp))
     }
     #[must_use]
-    pub fn dot(expr: Self, prop: Spanned<&'input str>) -> Self {
+    pub fn build_dot(expr: Self, prop: Spanned<&'input str>) -> Self {
         Self(spanned!(
             expr.0.start(),
             ExprKind::Dot(Box::new(expr), prop),
@@ -488,21 +487,20 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn arrow(expr: Self, prop: Spanned<&'input str>) -> Self {
+    pub fn build_arrow(expr: Self, prop: Spanned<&'input str>) -> Self {
         Self(spanned!(
             expr.0.start(),
             ExprKind::Arrow(Box::new(expr), prop),
             prop.end()
         ))
     }
-    // The only nonterminal that needs a span because we can't tell when the ) ends.
-    // We also cannot guess the span of params because it may be empty.
+
     #[must_use]
-    pub fn call(span: Span, f: Self, params: Spanned<Vec<Self>>) -> Self {
+    pub fn build_call(span: Span, f: Self, params: Spanned<Vec<Self>>) -> Self {
         Self(ExprKind::Call(Box::new(f), params).in_span(span))
     }
     #[must_use]
-    pub fn ternary(cond: Self, if_true: Self, if_false: Self) -> Self {
+    pub fn build_ternary(cond: Self, if_true: Self, if_false: Self) -> Self {
         Self(spanned!(
             cond.0.start(),
             ExprKind::Ternary(Box::new(cond), Box::new(if_true), Box::new(if_false)),
@@ -510,7 +508,7 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn cast(expr: Self, ty: super::ty::Type<'input>) -> Self {
+    pub fn build_cast(expr: Self, ty: super::ty::Type<'input>) -> Self {
         Self(spanned!(
             expr.0.start(),
             ExprKind::Cast(Box::new(expr), ty),
@@ -520,7 +518,7 @@ impl<'input> Expr<'input> {
 
     // These all need spans because they can't be guessed
     #[must_use]
-    pub fn number(lit: Spanned<&'input str>) -> Self {
+    pub fn build_number(lit: Spanned<&'input str>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),
@@ -529,7 +527,7 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn string(lit: Spanned<Vec<StringTok<'input>>>) -> Self {
+    pub fn build_string(lit: Spanned<Vec<StringTok<'input>>>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),
@@ -538,7 +536,7 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn ident(lit: Spanned<&'input str>) -> Self {
+    pub fn build_ident(lit: Spanned<&'input str>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),
@@ -547,7 +545,7 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn bool(lit: Spanned<bool>) -> Self {
+    pub fn build_bool(lit: Spanned<bool>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),

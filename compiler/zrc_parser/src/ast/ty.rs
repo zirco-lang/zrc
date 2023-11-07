@@ -57,7 +57,7 @@ impl<'input> Display for Type<'input> {
 #[allow(clippy::should_implement_trait)]
 impl<'input> Type<'input> {
     #[must_use]
-    pub fn ident(ident: Spanned<&'input str>) -> Self {
+    pub fn build_ident(ident: Spanned<&'input str>) -> Self {
         let span = ident.span();
         Self(spanned!(
             span.start(),
@@ -68,7 +68,7 @@ impl<'input> Type<'input> {
 
     #[must_use]
     #[allow(clippy::type_complexity)]
-    pub fn struct_direct(
+    pub fn build_struct_from_contents(
         span: Span,
         keys: Spanned<Vec<Spanned<(Spanned<&'input str>, Self)>>>,
     ) -> Self {
@@ -76,7 +76,7 @@ impl<'input> Type<'input> {
     }
 
     #[must_use]
-    pub fn ptr(span: Span, ty: Self) -> Self {
+    pub fn build_ptr(span: Span, ty: Self) -> Self {
         Self(TypeKind::Ptr(Box::new(ty)).in_span(span))
     }
 }

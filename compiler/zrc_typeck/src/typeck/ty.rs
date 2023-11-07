@@ -78,9 +78,9 @@ mod tests {
         assert_eq!(
             resolve_type(
                 &Scope::from_scopes(HashMap::new(), HashMap::from([("i32", TastType::I32)])),
-                ParserType::ptr(
+                ParserType::build_ptr(
                     Span::from_positions(0, 4),
-                    ParserType::ident(spanned!(1, "i32", 4)),
+                    ParserType::build_ident(spanned!(1, "i32", 4)),
                 ),
             ),
             Ok(TastType::Ptr(Box::new(TastType::I32)))
@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn invalid_types_produce_error() {
         assert_eq!(
-            resolve_type(&Scope::new(), ParserType::ident(spanned!(0, "x", 1))),
+            resolve_type(&Scope::new(), ParserType::build_ident(spanned!(0, "x", 1))),
             Err(Diagnostic(
                 Severity::Error,
                 spanned!(0, DiagnosticKind::UnableToResolveType("x".to_string()), 1)
@@ -144,7 +144,7 @@ mod tests {
         assert_eq!(
             resolve_type(
                 &Scope::default(),
-                ParserType::struct_direct(
+                ParserType::build_struct_from_contents(
                     Span::from_positions(0, 25),
                     spanned!(
                         7,
