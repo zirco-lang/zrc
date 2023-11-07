@@ -386,6 +386,8 @@ fn compile(
             module_name,
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             optimization_level,
+            triple,
+            cpu,
         )
         .as_bytes()
         .into()),

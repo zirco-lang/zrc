@@ -91,14 +91,11 @@ fn cg_place<'ctx, 'a>(
             (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
         }
 
-        PlaceKind::Dot(x, prop) => match (*x).0 {
-            Type::Struct(_) => {
+        #[allow(clippy::wildcard_enum_match_arm)]
+        PlaceKind::Dot(x, prop) => match (*x).0.clone() {
+            Type::Struct(contents) => {
                 let x_ty = llvm_basic_type(ctx, target_machine, x.0.clone());
-                let prop_idx = x
-                    .clone()
-                    .0
-                    .into_struct_contents()
-                    .expect("a struct")
+                let prop_idx = contents
                     .iter()
                     .position(|(got_key, _)| *got_key == prop)
                     .expect("invalid struct field");
@@ -125,7 +122,22 @@ fn cg_place<'ctx, 'a>(
 
                 (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
             }
-            // TODO: Add union bitcast/load here
+            Type::Union(_) => {
+                // All we need to do is cast the pointer, but there's no `bitcast` anymore,
+                // so just return it and it'll take on the correct type
+                let (x, bb) = cg_place(
+                    ctx,
+                    target_machine,
+                    builder,
+                    module,
+                    function,
+                    bb,
+                    scope,
+                    *x.clone(),
+                );
+
+                (x, bb)
+            }
             _ => panic!("cannot access property of non-struct"),
         },
     }

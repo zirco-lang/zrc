@@ -98,7 +98,24 @@ pub fn llvm_basic_type<'ctx>(
                 false,
             )
             .as_basic_type_enum(),
-        // TODO: Use target_machine to find the largest bit-sized type
+        Type::Union(fields) => {
+            // Determine which field has the largest size. This is what we will allocate.
+            let largest_field = fields
+                .into_iter()
+                .map(|(_, ty)| {
+                    let ty = llvm_basic_type(ctx, target_machine, ty);
+                    let size = target_machine.get_target_data().get_bit_size(&ty);
+                    (ty, size)
+                })
+                .max_by_key(|(_, size)| *size)
+                .unwrap_or_else(|| {
+                    // this is basically `never`
+                    let ty = ctx.struct_type(&[], false).as_basic_type_enum();
+                    (ty, target_machine.get_target_data().get_bit_size(&ty))
+                });
+
+            largest_field.0
+        }
     }
 }
 
