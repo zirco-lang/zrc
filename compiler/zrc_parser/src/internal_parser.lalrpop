@@ -120,13 +120,16 @@ FunctionDeclaration: Declaration<'input> = {
     }
 };
 
+// The key-type mapping of a struct or union, including the {}
+KeyTypeMapping: KeyTypeMapping<'input> = {
+    "{" <Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}" => 
+        KeyTypeMapping(<>.map(|inner| inner.unwrap_or(Vec::new())))
+}
+
 StructDeclaration: Declaration<'input>= {
-    "struct" <i:Spanned<IDENTIFIER>> "{" <l:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}" => Declaration::StructDeclaration {
+    "struct" <i:Spanned<IDENTIFIER>> <l:KeyTypeMapping> => Declaration::StructDeclaration {
         name: i,
-        fields: l.map(|inner| {
-            inner
-                .unwrap_or(Vec::new())
-        })
+        fields: l,
     }
 }
 
@@ -155,13 +158,10 @@ LetDeclaration: Vec<Spanned<LetDeclaration<'input>>> = {
 Type: Type<'input> = {
     Spanned<IDENTIFIER> => Type(<>.map(|x| TypeKind::Identifier(x))),
     Spanned<("*" <Type>)> => Type(<>.map(|x| TypeKind::Ptr(Box::new(x)))),
-    Spanned<("struct" "{" <Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}")> => 
+    Spanned<("struct" <KeyTypeMapping>)> => 
         Type(
             <>.map(|x| {
-                TypeKind::Struct(x.map(|inner|
-                    inner
-                        .unwrap_or(Vec::new()))
-                )
+                TypeKind::Struct(x)
             })
         ),
 }

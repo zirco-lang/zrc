@@ -14,6 +14,11 @@ use zrc_utils::{
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Type<'input>(pub Spanned<TypeKind<'input>>);
 
+/// The key-value pairs of a struct
+#[derive(PartialEq, Eq, Debug, Clone)]
+#[allow(clippy::type_complexity)]
+pub struct KeyTypeMapping<'input>(pub Spanned<Vec<Spanned<(Spanned<&'input str>, Type<'input>)>>>);
+
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum TypeKind<'input> {
@@ -22,8 +27,7 @@ pub enum TypeKind<'input> {
     /// `*T`
     Ptr(Box<Type<'input>>),
     /// A direct struct type
-    #[allow(clippy::type_complexity)]
-    Struct(Spanned<Vec<Spanned<(Spanned<&'input str>, Type<'input>)>>>),
+    Struct(KeyTypeMapping<'input>),
 }
 
 impl<'input> Display for TypeKind<'input> {
@@ -31,22 +35,24 @@ impl<'input> Display for TypeKind<'input> {
         match self {
             Self::Identifier(i) => write!(f, "{i}"),
             Self::Ptr(pointee_ty) => write!(f, "*{pointee_ty}"),
-            Self::Struct(members) => {
-                write!(f, "struct {{ ")?;
-                for (i, member) in members.value().iter().enumerate() {
-                    write!(f, "{}: {}", member.value().0.value(), member.value().1)?;
-                    if i < members.value().len() - 1 {
-                        write!(f, ", ")?;
-                    }
-                }
-                write!(f, " }}")
-            }
+            Self::Struct(members) => write!(f, "struct {{ {members} }}"),
         }
     }
 }
 impl<'input> Display for Type<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.value().fmt(f)
+    }
+}
+impl Display for KeyTypeMapping<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, member) in self.0.value().iter().enumerate() {
+            write!(f, "{}: {}", member.value().0.value(), member.value().1)?;
+            if i < self.0.value().len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -68,10 +74,7 @@ impl<'input> Type<'input> {
 
     #[must_use]
     #[allow(clippy::type_complexity)]
-    pub fn struct_direct(
-        span: Span,
-        keys: Spanned<Vec<Spanned<(Spanned<&'input str>, Self)>>>,
-    ) -> Self {
+    pub fn struct_direct(span: Span, keys: KeyTypeMapping<'input>) -> Self {
         Self(TypeKind::Struct(keys).in_span(span))
     }
 

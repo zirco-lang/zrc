@@ -2,8 +2,8 @@
 
 use indexmap::IndexMap;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
-use zrc_parser::ast::ty::{Type as ParserType, TypeKind as ParserTypeKind};
-use zrc_utils::span::{Spannable, Spanned};
+use zrc_parser::ast::ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind};
+use zrc_utils::span::Spannable;
 
 use super::Scope;
 use crate::tast::ty::Type as TastType;
@@ -32,10 +32,7 @@ pub fn resolve_type<'input>(
         ParserTypeKind::Ptr(pointee_ty) => {
             TastType::Ptr(Box::new(resolve_type(scope, *pointee_ty)?))
         }
-        ParserTypeKind::Struct(members) => TastType::Struct(resolve_struct_keys(
-            scope,
-            members.map(|x| x.into_iter().collect::<Vec<_>>()),
-        )?),
+        ParserTypeKind::Struct(members) => TastType::Struct(resolve_struct_keys(scope, members)?),
     })
 }
 
@@ -48,10 +45,10 @@ pub fn resolve_type<'input>(
 #[allow(clippy::type_complexity)]
 pub(super) fn resolve_struct_keys<'input>(
     scope: &Scope<'input>,
-    members: Spanned<Vec<Spanned<(Spanned<&'input str>, ParserType<'input>)>>>,
+    members: KeyTypeMapping<'input>,
 ) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {
     let mut map: IndexMap<&'input str, TastType> = IndexMap::new();
-    for sp in members.into_value() {
+    for sp in members.0.into_value() {
         let (key, ast_type) = sp.value();
         if map.contains_key(key.value()) {
             return Err(Diagnostic(
@@ -69,6 +66,7 @@ pub(super) fn resolve_struct_keys<'input>(
 mod tests {
     use std::collections::HashMap;
 
+    use zrc_parser::ast::ty::KeyTypeMapping;
     use zrc_utils::spanned;
 
     use super::*;
@@ -114,7 +112,7 @@ mod tests {
                 &Scope::default(),
                 ParserType(spanned!(
                     0,
-                    ParserTypeKind::Struct(spanned!(
+                    ParserTypeKind::Struct(KeyTypeMapping(spanned!(
                         7,
                         vec![
                             spanned!(
@@ -135,7 +133,7 @@ mod tests {
                             )
                         ],
                         25
-                    )),
+                    ))),
                     25
                 ))
             ),
@@ -154,7 +152,7 @@ mod tests {
                 &Scope::default(),
                 ParserType(spanned!(
                     0,
-                    ParserTypeKind::Struct(spanned!(
+                    ParserTypeKind::Struct(KeyTypeMapping(spanned!(
                         7,
                         vec![
                             spanned!(
@@ -175,7 +173,7 @@ mod tests {
                             )
                         ],
                         25
-                    )),
+                    ))),
                     25
                 ))
             ),

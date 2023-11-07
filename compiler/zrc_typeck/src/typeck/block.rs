@@ -318,10 +318,7 @@ pub fn process_declaration<'input>(
                 ));
             }
 
-            let fields = super::ty::resolve_struct_keys(
-                global_scope,
-                fields.map(|x| x.into_iter().collect::<Vec<_>>()),
-            )?;
+            let fields = super::ty::resolve_struct_keys(global_scope, fields)?;
 
             global_scope.set_type(name.value(), TastType::Struct(fields.clone()));
 

@@ -8,7 +8,10 @@ use std::fmt::Display;
 
 use zrc_utils::span::Spanned;
 
-use super::{expr::Expr, ty::Type};
+use super::{
+    expr::Expr,
+    ty::{KeyTypeMapping, Type},
+};
 
 /// A Zirco statement
 #[derive(PartialEq, Debug, Clone)]
@@ -76,8 +79,7 @@ pub enum Declaration<'input> {
         /// The name of the newtype.
         name: Spanned<&'input str>,
         /// The key-value pairs of the struct. Ordered by declaration order.
-        #[allow(clippy::type_complexity)]
-        fields: Spanned<Vec<Spanned<(Spanned<&'input str>, Type<'input>)>>>,
+        fields: KeyTypeMapping<'input>,
     },
 }
 
@@ -171,17 +173,9 @@ impl<'input> Display for Declaration<'input> {
                 return_type: None,
                 body: None,
             } => write!(f, "fn {}({});", name.value(), parameters.value()),
-            Self::StructDeclaration { name, fields } => write!(
-                f,
-                "struct {} {{\n{}\n}}",
-                name.value(),
-                fields
-                    .value()
-                    .iter()
-                    .map(|sp| format!("    {}: {}", sp.value().0.value(), sp.value().1))
-                    .collect::<Vec<_>>()
-                    .join(",\n")
-            ),
+            Self::StructDeclaration { name, fields } => {
+                write!(f, "struct {} {{ {fields} }}", name.value())
+            }
         }
     }
 }
