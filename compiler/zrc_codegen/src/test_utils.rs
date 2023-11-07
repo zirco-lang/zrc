@@ -51,8 +51,13 @@
 //! [`crate::expr::tests::cg_place::identifier_registers_are_returned_as_is`].
 
 use inkwell::{
-    basic_block::BasicBlock, builder::Builder, context::Context, module::Module,
+    basic_block::BasicBlock,
+    builder::Builder,
+    context::Context,
+    module::Module,
+    targets::{CodeModel, InitializationConfig, RelocMode, Target, TargetMachine},
     values::FunctionValue,
+    OptimizationLevel,
 };
 
 use crate::{stmt::cg_init_fn, CgScope};
@@ -74,19 +79,34 @@ use crate::{stmt::cg_init_fn, CgScope};
 pub(crate) fn initialize_test_function(
     ctx: &Context,
 ) -> (
+    TargetMachine,
     Builder,
     Module,
     FunctionValue,
     CgScope<'static, '_>,
     BasicBlock,
 ) {
+    Target::initialize_all(&InitializationConfig::default());
+    let target = Target::from_triple(&TargetMachine::get_default_triple()).unwrap();
+
+    let target_machine = target
+        .create_target_machine(
+            &TargetMachine::get_default_triple(),
+            "native",
+            "",
+            OptimizationLevel::None,
+            RelocMode::PIC,
+            CodeModel::Default,
+        )
+        .unwrap();
+
     let module = ctx.create_module("test");
 
     let builder = ctx.create_builder();
 
     let mut global_scope = CgScope::new();
 
-    let fn_value = cg_init_fn(ctx, &module, "test", None, &[], false);
+    let fn_value = cg_init_fn(ctx, &module, &target_machine, "test", None, &[], false);
     global_scope.insert("test", fn_value.as_global_value().as_pointer_value());
     // must come after the insert call so that recursion is valid
     let fn_scope = global_scope.clone();
@@ -94,7 +114,7 @@ pub(crate) fn initialize_test_function(
     let bb = ctx.append_basic_block(fn_value, "entry");
     builder.position_at_end(bb);
 
-    (builder, module, fn_value, fn_scope, bb)
+    (target_machine, builder, module, fn_value, fn_scope, bb)
 }
 
 /// Generate a closure that calls [`initialize_test_function`] and then calls
@@ -107,6 +127,7 @@ pub(crate) fn initialize_test_function(
 pub(crate) fn make_test_prelude_closure<'ctx>(
     prelude_generator: impl Fn(
         &'ctx Context,
+        &TargetMachine,
         &Builder<'ctx>,
         &Module<'ctx>,
         &FunctionValue<'ctx>,
@@ -116,6 +137,7 @@ pub(crate) fn make_test_prelude_closure<'ctx>(
 ) -> impl Fn(
     &'ctx Context,
 ) -> (
+    TargetMachine,
     Builder<'ctx>,
     Module<'ctx>,
     FunctionValue<'ctx>,
@@ -123,10 +145,19 @@ pub(crate) fn make_test_prelude_closure<'ctx>(
     BasicBlock<'ctx>,
 ) {
     move |ctx| {
-        let (builder, module, fn_value, mut scope, bb) = initialize_test_function(ctx);
+        let (target_machine, builder, module, fn_value, mut scope, bb) =
+            initialize_test_function(ctx);
 
-        let bb = prelude_generator(ctx, &builder, &module, &fn_value, &mut scope, &bb);
+        let bb = prelude_generator(
+            ctx,
+            &target_machine,
+            &builder,
+            &module,
+            &fn_value,
+            &mut scope,
+            &bb,
+        );
 
-        (builder, module, fn_value, scope, bb)
+        (target_machine, builder, module, fn_value, scope, bb)
     }
 }
