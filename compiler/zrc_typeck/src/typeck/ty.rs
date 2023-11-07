@@ -67,7 +67,7 @@ mod tests {
     use std::collections::HashMap;
 
     use zrc_parser::ast::ty::KeyTypeMapping;
-    use zrc_utils::spanned;
+    use zrc_utils::{span::Span, spanned};
 
     use super::*;
 
@@ -76,15 +76,10 @@ mod tests {
         assert_eq!(
             resolve_type(
                 &Scope::from_scopes(HashMap::new(), HashMap::from([("i32", TastType::I32)])),
-                ParserType(spanned!(
-                    0,
-                    ParserTypeKind::Ptr(Box::new(ParserType(spanned!(
-                        1,
-                        ParserTypeKind::Identifier("i32"),
-                        4
-                    )))),
-                    4
-                ))
+                ParserType::build_ptr(
+                    Span::from_positions(0, 4),
+                    ParserType::build_ident(spanned!(1, "i32", 4)),
+                ),
             ),
             Ok(TastType::Ptr(Box::new(TastType::I32)))
         );
@@ -93,10 +88,7 @@ mod tests {
     #[test]
     fn invalid_types_produce_error() {
         assert_eq!(
-            resolve_type(
-                &Scope::new(),
-                ParserType(spanned!(0, ParserTypeKind::Identifier("x"), 1))
-            ),
+            resolve_type(&Scope::new(), ParserType::build_ident(spanned!(0, "x", 1))),
             Err(Diagnostic(
                 Severity::Error,
                 spanned!(0, DiagnosticKind::UnableToResolveType("x".to_string()), 1)
@@ -150,9 +142,9 @@ mod tests {
         assert_eq!(
             resolve_type(
                 &Scope::default(),
-                ParserType(spanned!(
-                    0,
-                    ParserTypeKind::Struct(KeyTypeMapping(spanned!(
+                ParserType::build_struct_from_contents(
+                    Span::from_positions(0, 25),
+                    spanned!(
                         7,
                         vec![
                             spanned!(
@@ -173,9 +165,8 @@ mod tests {
                             )
                         ],
                         25
-                    ))),
-                    25
-                ))
+                    ),
+                )
             ),
             Err(Diagnostic(
                 Severity::Error,

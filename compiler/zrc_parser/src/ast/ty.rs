@@ -66,7 +66,7 @@ impl Display for KeyTypeMapping<'_> {
 #[allow(clippy::should_implement_trait)]
 impl<'input> Type<'input> {
     #[must_use]
-    pub fn ident(ident: Spanned<&'input str>) -> Self {
+    pub fn build_ident(ident: Spanned<&'input str>) -> Self {
         let span = ident.span();
         Self(spanned!(
             span.start(),
@@ -76,17 +76,17 @@ impl<'input> Type<'input> {
     }
 
     #[must_use]
-    pub fn struct_direct(span: Span, keys: KeyTypeMapping<'input>) -> Self {
+    pub fn build_struct_from_contents(span: Span, keys: KeyTypeMapping<'input>) -> Self {
         Self(TypeKind::Struct(keys).in_span(span))
     }
 
     #[must_use]
-    pub fn union_direct(span: Span, keys: KeyTypeMapping<'input>) -> Self {
-        Self(TypeKind::Struct(keys).in_span(span))
+    pub fn build_union_from_contents(span: Span, keys: KeyTypeMapping<'input>) -> Self {
+        Self(TypeKind::Union(keys).in_span(span))
     }
 
     #[must_use]
-    pub fn ptr(span: Span, ty: Self) -> Self {
+    pub fn build_ptr(span: Span, ty: Self) -> Self {
         Self(TypeKind::Ptr(Box::new(ty)).in_span(span))
     }
 }
