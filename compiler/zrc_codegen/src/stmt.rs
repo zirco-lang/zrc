@@ -43,7 +43,7 @@ struct LoopBreakaway<'ctx> {
 ///
 /// # Panics
 /// Panics if an internal code generation error is encountered.
-#[allow(clippy::trivially_copy_pass_by_ref)]
+#[allow(clippy::trivially_copy_pass_by_ref, clippy::too_many_arguments)]
 fn cg_let_declaration<'ctx, 'input, 'a>(
     ctx: &'ctx Context,
     target_machine: &TargetMachine,
@@ -704,11 +704,11 @@ mod tests {
         let ctx = Context::create();
 
         let generate_test_prelude = make_test_prelude_closure(
-            |_ctx, target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
+            |_ctx, _target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
         );
 
         let expected = {
-            let (target_machine, builder, module, _fn_value, mut scope, _bb) =
+            let (_target_machine, builder, module, _fn_value, mut scope, _bb) =
                 generate_test_prelude(&ctx);
 
             let a_ptr = builder.build_alloca(ctx.i32_type(), "let_a").unwrap();
@@ -785,7 +785,7 @@ mod tests {
                 let ctx = Context::create();
 
                 let generate_test_prelude = make_test_prelude_closure(
-                    |ctx, target_machine, _builder, module, _fn_value, scope, bb| {
+                    |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
                         // generate `do_stuff: fn() -> void`
                         let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
                         let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
@@ -801,7 +801,7 @@ mod tests {
                 );
 
                 let expected = {
-                    let (target_machine, builder, module, fn_value, _scope, _bb) =
+                    let (_target_machine, builder, module, fn_value, _scope, _bb) =
                         generate_test_prelude(&ctx);
 
                     let then = ctx.append_basic_block(fn_value, "then");
@@ -882,7 +882,7 @@ mod tests {
                 let ctx = Context::create();
 
                 let generate_test_prelude = make_test_prelude_closure(
-                    |ctx, target_machine, _builder, module, _fn_value, scope, bb| {
+                    |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
                         // generate `do_stuff: fn() -> void`
                         let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
                         let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
@@ -898,7 +898,7 @@ mod tests {
                 );
 
                 let expected = {
-                    let (target_machine, builder, module, fn_value, _scope, _bb) =
+                    let (_target_machine, builder, module, fn_value, _scope, _bb) =
                         generate_test_prelude(&ctx);
 
                     let then = ctx.append_basic_block(fn_value, "then");
@@ -999,11 +999,11 @@ mod tests {
                 // expect only 2 basic blocks
 
                 let generate_test_prelude = make_test_prelude_closure(
-                    |_ctx, target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
+                    |_ctx, _target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
                 );
 
                 let expected = {
-                    let (target_machine, builder, module, fn_value, _scope, _bb) =
+                    let (_target_machine, builder, module, fn_value, _scope, _bb) =
                         generate_test_prelude(&ctx);
 
                     let then = ctx.append_basic_block(fn_value, "then");
@@ -1069,7 +1069,7 @@ mod tests {
                 let ctx = Context::create();
 
                 let generate_test_prelude = make_test_prelude_closure(
-                    |ctx, target_machine, _builder, module, _fn_value, scope, bb| {
+                    |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
                         // generate `do_stuff: fn() -> void`
                         let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
                         let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
@@ -1118,7 +1118,7 @@ mod tests {
                 //     br label %header ; loop again
 
                 let expected = {
-                    let (target_machine, builder, module, fn_value, _scope, _bb) =
+                    let (_target_machine, builder, module, fn_value, _scope, _bb) =
                         generate_test_prelude(&ctx);
 
                     let header = ctx.append_basic_block(fn_value, "header");

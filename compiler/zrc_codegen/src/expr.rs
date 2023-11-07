@@ -22,7 +22,7 @@ use super::CgScope;
 use crate::ty::{llvm_basic_type, llvm_int_type, llvm_type};
 
 /// Resolve a place to its pointer
-#[allow(clippy::trivially_copy_pass_by_ref)]
+#[allow(clippy::trivially_copy_pass_by_ref, clippy::too_many_arguments)]
 fn cg_place<'ctx, 'a>(
     ctx: &'ctx Context,
     target_machine: &TargetMachine,
@@ -148,7 +148,8 @@ fn cg_place<'ctx, 'a>(
     clippy::redundant_pub_crate,
     clippy::too_many_lines,
     clippy::match_same_arms,
-    clippy::trivially_copy_pass_by_ref
+    clippy::trivially_copy_pass_by_ref,
+    clippy::too_many_arguments
 )]
 pub(crate) fn cg_expr<'ctx, 'a>(
     ctx: &'ctx Context,
@@ -823,7 +824,7 @@ mod tests {
             let ctx = Context::create();
 
             let generate_test_prelude = make_test_prelude_closure(
-                |ctx, target_machine, builder, _module, _fn_value, scope, bb| {
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     let x_stack_ptr = builder.build_alloca(ctx.i32_type(), "x").unwrap();
                     scope.insert("x", x_stack_ptr);
 
@@ -832,7 +833,7 @@ mod tests {
             );
 
             let expected = {
-                let (target_machine, _builder, module, _fn_value, scope, _bb) =
+                let (_target_machine, _builder, module, _fn_value, scope, _bb) =
                     generate_test_prelude(&ctx);
 
                 (
@@ -879,7 +880,7 @@ mod tests {
             let ctx = Context::create();
 
             let generate_test_prelude = make_test_prelude_closure(
-                |ctx, target_machine, builder, _module, _fn_value, scope, bb| {
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     // generates %x = alloca i32* and scope mapping x -> %x
                     let x_stack_ptr = builder
                         .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "x")
@@ -891,7 +892,7 @@ mod tests {
             );
 
             let expected = {
-                let (target_machine, builder, module, _fn_value, scope, _bb) =
+                let (_target_machine, builder, module, _fn_value, scope, _bb) =
                     generate_test_prelude(&ctx);
 
                 // Expect a single %yield = load i32*, i32** %x
@@ -950,11 +951,11 @@ mod tests {
             let ctx = Context::create();
 
             let generate_test_prelude = make_test_prelude_closure(
-                |_ctx, target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
+                |_ctx, _target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
             );
 
             let expected = {
-                let (target_machine, builder, module, _fn_value, _scope, _bb) =
+                let (_target_machine, builder, module, _fn_value, _scope, _bb) =
                     generate_test_prelude(&ctx);
 
                 // Generates `%cast = inttoptr 0 to i32*`
@@ -1008,7 +1009,7 @@ mod tests {
             let ctx = Context::create();
 
             let generate_test_prelude = make_test_prelude_closure(
-                |ctx, target_machine, builder, _module, _fn_value, scope, bb| {
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     // generate `arr: *i32`
                     let arr_stack_ptr = builder
                         .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
@@ -1020,7 +1021,7 @@ mod tests {
             );
 
             let expected = {
-                let (target_machine, builder, module, _fn_value, scope, _bb) =
+                let (_target_machine, builder, module, _fn_value, scope, _bb) =
                     generate_test_prelude(&ctx);
 
                 // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
@@ -1082,7 +1083,7 @@ mod tests {
             let ctx = Context::create();
 
             let generate_test_prelude = make_test_prelude_closure(
-                |ctx, target_machine, builder, _module, _fn_value, scope, bb| {
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     // generate: `x: { x: i32, y: i32 }`
                     let x_stack_ptr = builder
                         .build_alloca(
@@ -1103,7 +1104,7 @@ mod tests {
             );
 
             let expected = {
-                let (target_machine, builder, module, _fn_value, scope, _bb) =
+                let (_target_machine, builder, module, _fn_value, scope, _bb) =
                     generate_test_prelude(&ctx);
 
                 // We do not load the struct, we GEP directly into it.
@@ -1165,7 +1166,7 @@ mod tests {
             let ctx = Context::create();
 
             let generate_test_prelude = make_test_prelude_closure(
-                |ctx, target_machine, _builder, module, _fn_value, scope, bb| {
+                |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
                     // generate `f: fn() -> void`
                     let f_fn_type = ctx.void_type().fn_type(&[], false);
                     let f_val = module.add_function("f", f_fn_type, None);
@@ -1176,7 +1177,7 @@ mod tests {
             );
 
             let expected = {
-                let (target_machine, builder, module, _fn_value, _scope, _bb) =
+                let (_target_machine, builder, module, _fn_value, _scope, _bb) =
                     generate_test_prelude(&ctx);
 
                 // First the function is called, then the number literal is returned
@@ -1238,7 +1239,7 @@ mod tests {
             let ctx = Context::create();
 
             let generate_test_prelude = make_test_prelude_closure(
-                |ctx, target_machine, builder, _module, _fn_value, scope, bb| {
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     // generate `arr: *i32`
                     let arr_stack_ptr = builder
                         .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
@@ -1250,7 +1251,7 @@ mod tests {
             );
 
             let expected = {
-                let (target_machine, builder, module, _fn_value, scope, _bb) =
+                let (_target_machine, builder, module, _fn_value, scope, _bb) =
                     generate_test_prelude(&ctx);
 
                 // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
@@ -1321,7 +1322,7 @@ mod tests {
             let ctx = Context::create();
 
             let generate_test_prelude = make_test_prelude_closure(
-                |ctx, target_machine, builder, _module, _fn_value, scope, bb| {
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     // generate: `x: { x: i32, y: i32 }`
                     let x_stack_ptr = builder
                         .build_alloca(
@@ -1342,7 +1343,7 @@ mod tests {
             );
 
             let expected = {
-                let (target_machine, builder, module, _fn_value, scope, _bb) =
+                let (_target_machine, builder, module, _fn_value, scope, _bb) =
                     generate_test_prelude(&ctx);
 
                 // We do not load the struct yet, we GEP directly into it.
@@ -1412,7 +1413,7 @@ mod tests {
             let ctx = Context::create();
 
             let generate_test_prelude = make_test_prelude_closure(
-                |ctx, target_machine, _builder, module, _fn_value, scope, bb| {
+                |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
                     // generate `get_some_bool: fn() -> bool`
                     let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
                     let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
@@ -1431,7 +1432,7 @@ mod tests {
             );
 
             let expected = {
-                let (target_machine, builder, module, fn_value, _scope, _bb) =
+                let (_target_machine, builder, module, fn_value, _scope, _bb) =
                     generate_test_prelude(&ctx);
 
                 // We will need to generate a couple more complex structures.
