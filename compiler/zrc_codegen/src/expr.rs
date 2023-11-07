@@ -62,30 +62,34 @@ fn cg_place<'ctx, 'a>(
             (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
         }
 
-        PlaceKind::Dot(x, prop) => {
-            let x_ty = llvm_basic_type(ctx, x.0.clone());
-            let prop_idx = x
-                .clone()
-                .0
-                .into_struct_contents()
-                .expect("a struct")
-                .iter()
-                .position(|(got_key, _)| *got_key == prop)
-                .expect("invalid struct field");
+        PlaceKind::Dot(x, prop) => match (*x).0 {
+            Type::Struct(_) => {
+                let x_ty = llvm_basic_type(ctx, x.0.clone());
+                let prop_idx = x
+                    .clone()
+                    .0
+                    .into_struct_contents()
+                    .expect("a struct")
+                    .iter()
+                    .position(|(got_key, _)| *got_key == prop)
+                    .expect("invalid struct field");
 
-            let (x, bb) = cg_place(ctx, builder, module, function, bb, scope, *x.clone());
+                let (x, bb) = cg_place(ctx, builder, module, function, bb, scope, *x.clone());
 
-            let reg = builder.build_struct_gep(
-                x_ty,
-                x,
-                prop_idx
-                    .try_into()
-                    .expect("got more than u32::MAX as key index? HOW?"),
-                "gep",
-            );
+                let reg = builder.build_struct_gep(
+                    x_ty,
+                    x,
+                    prop_idx
+                        .try_into()
+                        .expect("got more than u32::MAX as key index? HOW?"),
+                    "gep",
+                );
 
-            (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
-        }
+                (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
+            }
+            // TODO: Add union bitcast/load here
+            _ => panic!("cannot access property of non-struct"),
+        },
     }
 }
 
