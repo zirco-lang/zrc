@@ -338,62 +338,36 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Index(ptr, idx) => {
-            let (ptr, bb) = cg_expr(ctx, builder, module, function, bb, scope, *ptr);
-            let (idx, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *idx);
-
-            // SAFETY: If indices are used incorrectly this may segfault
-            // TODO: Is this actually safely used?
-            let reg = unsafe {
-                builder.build_gep(
-                    llvm_basic_type(ctx, expr.0.clone()),
-                    ptr.into_pointer_value(),
-                    &[idx.into_int_value()],
-                    "gep",
-                )
-            }
-            .unwrap();
+            let (ptr, bb) = cg_place(
+                ctx,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                Place(expr.0.clone(), PlaceKind::Index(ptr, idx)),
+            );
 
             let loaded = builder
-                .build_load(
-                    llvm_basic_type(ctx, expr.0),
-                    reg.as_basic_value_enum().into_pointer_value(),
-                    "load",
-                )
+                .build_load(llvm_basic_type(ctx, expr.0), ptr, "load")
                 .unwrap();
 
             (loaded.as_basic_value_enum(), bb)
         }
 
         TypedExprKind::Dot(place, key) => {
-            let place_ty = place.0.clone();
-            let key_idx = place
-                .clone()
-                .0
-                .into_struct_contents()
-                .expect("a struct")
-                .iter()
-                .position(|(got_key, _)| *got_key == key)
-                .expect("invalid struct field");
-
-            let (place, bb) = cg_place(ctx, builder, module, function, bb, scope, *place);
-
-            let reg = builder
-                .build_struct_gep(
-                    llvm_basic_type(ctx, place_ty),
-                    place,
-                    key_idx
-                        .try_into()
-                        .expect("found more than u32::MAX keys in a struct? HOW?"),
-                    "gep",
-                )
-                .unwrap();
+            let (ptr, bb) = cg_place(
+                ctx,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                Place(expr.0.clone(), PlaceKind::Dot(place, key)),
+            );
 
             let loaded = builder
-                .build_load(
-                    llvm_basic_type(ctx, expr.0),
-                    reg.as_basic_value_enum().into_pointer_value(),
-                    "load",
-                )
+                .build_load(llvm_basic_type(ctx, expr.0), ptr, "load")
                 .unwrap();
 
             (loaded.as_basic_value_enum(), bb)
