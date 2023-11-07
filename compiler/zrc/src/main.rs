@@ -301,11 +301,7 @@ fn main() -> anyhow::Result<()> {
 
     if cli.emit == OutputFormat::Object
         && !cli.force
-        && path
-            .as_os_str()
-            .to_str()
-            .expect("Invalid UTF-8 in file name")
-            == "-"
+        && cli.out_file.as_os_str().to_str().unwrap_or("-") == "-"
     {
         bail!("emitting raw object code to stdout is not allowed. use --force to override this");
     }
@@ -389,6 +385,7 @@ fn compile(
         OutputFormat::Llvm => Ok(zrc_codegen::cg_program_to_string(
             module_name,
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
+            optimization_level,
         )
         .as_bytes()
         .into()),

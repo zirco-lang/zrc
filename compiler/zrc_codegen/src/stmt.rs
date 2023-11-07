@@ -504,15 +504,31 @@ fn cg_program<'input, 'ctx>(
     (module, global_scope)
 }
 
+/// Run optimizations on the given program.
+fn optimize_module(module: &Module<'_>, optimization_level: OptimizationLevel) {
+    let pmb = PassManagerBuilder::create();
+    pmb.set_optimization_level(optimization_level);
+    let pm = PassManager::<Module>::create(());
+    pmb.populate_module_pass_manager(&pm);
+    pm.run_on(module);
+}
+
 /// Code generate a LLVM program to a string.
 ///
 /// # Panics
 /// Panics on internal code generation failure.
 #[must_use]
-pub fn cg_program_to_string(module_name: &str, program: Vec<TypedDeclaration>) -> String {
+pub fn cg_program_to_string(
+    module_name: &str,
+    program: Vec<TypedDeclaration>,
+    optimization_level: OptimizationLevel,
+) -> String {
     let ctx = Context::create();
 
     let (module, _global_scope) = cg_program(&ctx, module_name, program);
+
+    Target::initialize_all(&InitializationConfig::default());
+    optimize_module(&module, optimization_level);
 
     module.print_to_string().to_string()
 }
@@ -536,6 +552,7 @@ pub fn cg_program_to_buffer(
     let (module, _global_scope) = cg_program(&ctx, module_name, program);
 
     Target::initialize_all(&InitializationConfig::default());
+    optimize_module(&module, optimization_level);
 
     let target = Target::from_triple(triple).unwrap();
 
@@ -544,6 +561,7 @@ pub fn cg_program_to_buffer(
             triple,
             cpu,
             "",
+            // FIXME: Does this potentially run the optimizer twice? That may be inefficient.
             optimization_level,
             RelocMode::PIC,
             CodeModel::Default,
