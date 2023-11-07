@@ -60,7 +60,7 @@ pub fn llvm_int_type<'ctx>(ctx: &'ctx Context, ty: Type) -> IntType<'ctx> {
         Type::I16 | Type::U16 => ctx.i16_type(),
         Type::I32 | Type::U32 => ctx.i32_type(),
         Type::I64 | Type::U64 => ctx.i64_type(),
-        Type::Void | Type::Ptr(_) | Type::Fn(_, _) | Type::Struct(_) => {
+        Type::Void | Type::Ptr(_) | Type::Fn(_, _) | Type::Struct(_) | Type::Union(_) => {
             panic!("not an integer type")
         }
     }
@@ -109,7 +109,8 @@ pub fn llvm_type<'ctx>(ctx: &'ctx Context, ty: Type) -> AnyTypeEnum<'ctx> {
         | Type::I64
         | Type::U64
         | Type::Ptr(_)
-        | Type::Struct(_) => llvm_basic_type(ctx, ty).as_any_type_enum(),
+        | Type::Struct(_)
+        | Type::Union(_) => llvm_basic_type(ctx, ty).as_any_type_enum(),
 
         Type::Void => ctx.void_type().as_any_type_enum(),
 

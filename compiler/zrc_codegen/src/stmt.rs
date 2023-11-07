@@ -419,8 +419,9 @@ fn cg_program<'input, 'ctx>(
 
     for declaration in program {
         match declaration {
-            // Struct declarations do not need to be emitted
-            TypedDeclaration::StructDeclaration { .. } => {}
+            // Struct and union declarations do not need to be emitted
+            TypedDeclaration::StructDeclaration { .. }
+            | TypedDeclaration::UnionDeclaration { .. } => {}
 
             TypedDeclaration::FunctionDeclaration {
                 name,
