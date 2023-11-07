@@ -81,6 +81,13 @@ pub enum Declaration<'input> {
         /// The key-value pairs of the struct. Ordered by declaration order.
         fields: KeyTypeMapping<'input>,
     },
+    /// A named declaration for a `union`.
+    UnionDeclaration {
+        /// The name of the newtype.
+        name: Spanned<&'input str>,
+        /// The key-value pairs of the union. Ordered by declaration order.
+        fields: KeyTypeMapping<'input>,
+    },
 }
 
 /// The list of arguments on a [`Declaration::FunctionDeclaration`]
@@ -173,8 +180,12 @@ impl<'input> Display for Declaration<'input> {
                 return_type: None,
                 body: None,
             } => write!(f, "fn {}({});", name.value(), parameters.value()),
+
             Self::StructDeclaration { name, fields } => {
                 write!(f, "struct {} {{ {fields} }}", name.value())
+            }
+            Self::UnionDeclaration { name, fields } => {
+                write!(f, "union {} {{ {fields} }}", name.value())
             }
         }
     }

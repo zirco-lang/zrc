@@ -28,6 +28,8 @@ pub enum TypeKind<'input> {
     Ptr(Box<Type<'input>>),
     /// A direct struct type
     Struct(KeyTypeMapping<'input>),
+    /// A direct union type
+    Union(KeyTypeMapping<'input>),
 }
 
 impl<'input> Display for TypeKind<'input> {
@@ -36,6 +38,7 @@ impl<'input> Display for TypeKind<'input> {
             Self::Identifier(i) => write!(f, "{i}"),
             Self::Ptr(pointee_ty) => write!(f, "*{pointee_ty}"),
             Self::Struct(members) => write!(f, "struct {{ {members} }}"),
+            Self::Union(members) => write!(f, "union {{ {members} }}"),
         }
     }
 }
@@ -73,8 +76,12 @@ impl<'input> Type<'input> {
     }
 
     #[must_use]
-    #[allow(clippy::type_complexity)]
     pub fn struct_direct(span: Span, keys: KeyTypeMapping<'input>) -> Self {
+        Self(TypeKind::Struct(keys).in_span(span))
+    }
+
+    #[must_use]
+    pub fn union_direct(span: Span, keys: KeyTypeMapping<'input>) -> Self {
         Self(TypeKind::Struct(keys).in_span(span))
     }
 

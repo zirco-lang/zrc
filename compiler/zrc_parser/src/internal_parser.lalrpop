@@ -100,7 +100,7 @@ SimpleStmt: StmtKind<'input> = {
 // For declarations at the global scope
 Declaration: Declaration<'input> = {
     <FunctionDeclaration>,
-    <StructDeclaration>,
+    <StructOrUnionDeclaration>,
 };
 
 FunctionDeclaration: Declaration<'input> = {
@@ -126,11 +126,15 @@ KeyTypeMapping: KeyTypeMapping<'input> = {
         KeyTypeMapping(<>.map(|inner| inner.unwrap_or(Vec::new())))
 }
 
-StructDeclaration: Declaration<'input>= {
+StructOrUnionDeclaration: Declaration<'input>= {
     "struct" <i:Spanned<IDENTIFIER>> <l:KeyTypeMapping> => Declaration::StructDeclaration {
         name: i,
         fields: l,
-    }
+    },
+    "union" <i:Spanned<IDENTIFIER>> <l:KeyTypeMapping> => Declaration::UnionDeclaration {
+        name: i,
+        fields: l,
+    },
 }
 
 ArgumentDeclarationList: ArgumentDeclarationList<'input> = {
@@ -159,11 +163,9 @@ Type: Type<'input> = {
     Spanned<IDENTIFIER> => Type(<>.map(|x| TypeKind::Identifier(x))),
     Spanned<("*" <Type>)> => Type(<>.map(|x| TypeKind::Ptr(Box::new(x)))),
     Spanned<("struct" <KeyTypeMapping>)> => 
-        Type(
-            <>.map(|x| {
-                TypeKind::Struct(x)
-            })
-        ),
+        Type(<>.map(TypeKind::Struct)),
+    Spanned<("union" <KeyTypeMapping>)> =>
+        Type(<>.map(TypeKind::Union)),
 }
 
 FlowStmt: StmtKind<'input> = {
@@ -383,6 +385,7 @@ extern {
         "fn" => lexer::Tok::Fn,
         "as" => lexer::Tok::As,
         "struct" => lexer::Tok::Struct,
+        "union" => lexer::Tok::Union,
         "->" => lexer::Tok::SmallArrow,
         "..." => lexer::Tok::Ellipsis,
     }
