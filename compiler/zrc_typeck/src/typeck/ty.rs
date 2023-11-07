@@ -144,7 +144,7 @@ mod tests {
                 &Scope::default(),
                 ParserType::build_struct_from_contents(
                     Span::from_positions(0, 25),
-                    spanned!(
+                    KeyTypeMapping(spanned!(
                         7,
                         vec![
                             spanned!(
@@ -165,7 +165,7 @@ mod tests {
                             )
                         ],
                         25
-                    ),
+                    )),
                 )
             ),
             Err(Diagnostic(
