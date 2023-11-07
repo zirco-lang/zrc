@@ -639,12 +639,12 @@ mod tests {
                 // a = b
                 desugar_assignment(
                     Assignment::Standard,
-                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
-                    Expr(spanned!(4, ExprKind::Identifier("b"), 5))
+                    Expr::ident(spanned!(0, "a", 1)),
+                    Expr::ident(spanned!(4, "b", 5)),
                 ),
                 (
-                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
-                    Expr(spanned!(4, ExprKind::Identifier("b"), 5))
+                    Expr::ident(spanned!(0, "a", 1)),
+                    Expr::ident(spanned!(4, "b", 5)),
                 )
             );
         }
@@ -655,17 +655,18 @@ mod tests {
                 // a += b
                 desugar_assignment(
                     Assignment::Arithmetic(Arithmetic::Addition),
-                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
-                    Expr(spanned!(5, ExprKind::Identifier("b"), 6))
+                    Expr::ident(spanned!(0, "a", 1)),
+                    Expr::ident(spanned!(5, "b", 6)),
                 ),
                 (
-                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
+                    Expr::ident(spanned!(0, "a", 1)),
+                    // An exception to the normal spanning rules applies here
                     Expr(spanned!(
                         5,
                         ExprKind::Arithmetic(
                             Arithmetic::Addition,
-                            Box::new(Expr(spanned!(0, ExprKind::Identifier("a"), 1))),
-                            Box::new(Expr(spanned!(5, ExprKind::Identifier("b"), 6)))
+                            Box::new(Expr::ident(spanned!(0, "a", 1))),
+                            Box::new(Expr::ident(spanned!(5, "b", 6)))
                         ),
                         6
                     ))
@@ -679,17 +680,18 @@ mod tests {
                 // a >>= b
                 desugar_assignment(
                     Assignment::BinaryBitwise(BinaryBitwise::Shr),
-                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
-                    Expr(spanned!(6, ExprKind::Identifier("b"), 7))
+                    Expr::ident(spanned!(0, "a", 1)),
+                    Expr::ident(spanned!(6, "b", 7)),
                 ),
                 (
-                    Expr(spanned!(0, ExprKind::Identifier("a"), 1)),
+                    Expr::ident(spanned!(0, "a", 1)),
+                    // An exception to the normal spanning rules applies here
                     Expr(spanned!(
                         6,
                         ExprKind::BinaryBitwise(
                             BinaryBitwise::Shr,
-                            Box::new(Expr(spanned!(0, ExprKind::Identifier("a"), 1))),
-                            Box::new(Expr(spanned!(6, ExprKind::Identifier("b"), 7)))
+                            Box::new(Expr::ident(spanned!(0, "a", 1))),
+                            Box::new(Expr::ident(spanned!(6, "b", 7)))
                         ),
                         7
                     ))
