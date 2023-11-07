@@ -42,6 +42,8 @@ pub enum Type<'input> {
     ),
     /// Struct type literals. Ordered by declaration order.
     Struct(IndexMap<&'input str, Type<'input>>),
+    /// Union type literals. Ordered by declaration order.
+    Union(IndexMap<&'input str, Type<'input>>),
 }
 
 impl<'input> Display for Type<'input> {
@@ -70,6 +72,15 @@ impl<'input> Display for Type<'input> {
             Self::Struct(fields) => write!(
                 f,
                 "(struct {{ {} }})",
+                fields
+                    .iter()
+                    .map(|(key, ty)| format!("{key}: {ty}"))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Self::Union(fields) => write!(
+                f,
+                "(union {{ {} }})",
                 fields
                     .iter()
                     .map(|(key, ty)| format!("{key}: {ty}"))
@@ -118,6 +129,16 @@ impl<'input> Type<'input> {
     pub fn into_struct_contents(self) -> Option<IndexMap<&'input str, Type<'input>>> {
         match self {
             Type::Struct(x) => Some(x),
+            _ => None,
+        }
+    }
+
+    /// Try to access the union's [`IndexMap`] if we are a union
+    #[must_use]
+    #[allow(clippy::wildcard_enum_match_arm)]
+    pub fn into_union_contents(self) -> Option<IndexMap<&'input str, Type<'input>>> {
+        match self {
+            Type::Union(x) => Some(x),
             _ => None,
         }
     }

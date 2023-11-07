@@ -32,7 +32,12 @@ pub fn resolve_type<'input>(
         ParserTypeKind::Ptr(pointee_ty) => {
             TastType::Ptr(Box::new(resolve_type(scope, *pointee_ty)?))
         }
-        ParserTypeKind::Struct(members) => TastType::Struct(resolve_struct_keys(scope, members)?),
+        ParserTypeKind::Struct(members) => {
+            TastType::Struct(resolve_key_type_mapping(scope, members)?)
+        }
+        ParserTypeKind::Union(members) => {
+            TastType::Union(resolve_key_type_mapping(scope, members)?)
+        }
     })
 }
 
@@ -43,7 +48,7 @@ pub fn resolve_type<'input>(
 /// # Errors
 /// Errors if a key is not unique or is unresolvable.
 #[allow(clippy::type_complexity)]
-pub(super) fn resolve_struct_keys<'input>(
+pub(super) fn resolve_key_type_mapping<'input>(
     scope: &Scope<'input>,
     members: KeyTypeMapping<'input>,
 ) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {

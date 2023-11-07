@@ -196,7 +196,7 @@ pub fn type_expr<'input>(
         ExprKind::Dot(obj, key) => {
             let obj_t = type_expr(scope, *obj.clone())?;
 
-            if let TastType::Struct(fields) = obj_t.0.clone() {
+            if let TastType::Struct(fields) | TastType::Union(fields) = obj_t.0.clone() {
                 if let Some(ty) = fields.get(key.value()) {
                     TypedExpr(
                         ty.clone(),
@@ -208,7 +208,7 @@ pub fn type_expr<'input>(
                 } else {
                     return Err(Diagnostic(
                         Severity::Error,
-                        expr_span.containing(DiagnosticKind::StructDoesNotHaveMember(
+                        expr_span.containing(DiagnosticKind::StructOrUnionDoesNotHaveMember(
                             obj_t.to_string(),
                             key.into_value().to_string(),
                         )),
