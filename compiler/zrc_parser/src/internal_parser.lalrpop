@@ -134,7 +134,7 @@ KeyTypeMapping: KeyTypeMapping<'input> = {
         KeyTypeMapping(<>.map(|inner| inner.unwrap_or(Vec::new())))
 }
 
-StructOrUnionDeclaration: Declaration<'input>= {
+StructOrUnionDeclaration: Declaration<'input> = {
     "struct" <i:Spanned<IDENTIFIER>> <l:KeyTypeMapping> => Declaration::StructDeclaration {
         name: i,
         fields: l,
@@ -143,7 +143,7 @@ StructOrUnionDeclaration: Declaration<'input>= {
         name: i,
         fields: l,
     },
-}
+};
 
 ArgumentDeclarationList: ArgumentDeclarationList<'input> = {
     <CommaSeparated<Spanned<ArgumentDeclaration>>> => ArgumentDeclarationList::NonVariadic(<>),
