@@ -195,6 +195,16 @@ fn process_let_declaration<'input>(
                         }
                     }
                 };
+
+                if result_decl.ty == TastType::Void {
+                    return Err(Diagnostic(
+                        Severity::Error,
+                        let_declaration
+                            .span()
+                            .containing(DiagnosticKind::CannotDeclareVoid),
+                    ));
+                }
+
                 scope.set_value(result_decl.name, result_decl.ty.clone());
                 Ok(result_decl)
             },

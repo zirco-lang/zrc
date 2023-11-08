@@ -156,6 +156,7 @@ pub enum DiagnosticKind {
     ExpectedABlockToReturn,
     DuplicateStructMember(String),
     VariadicFunctionMustBeExternal,
+    CannotDeclareVoid,
 }
 
 impl Display for DiagnosticKind {
@@ -281,6 +282,10 @@ impl Display for DiagnosticKind {
             Self::JavascriptUserDetected => {
                 write!(f, "JavaScript user detected -- did you mean `==`?")
             }
+            Self::CannotDeclareVoid => write!(
+                f,
+                "cannot declare a variable of type `void` -- just discard the value"
+            ),
         }
     }
 }
