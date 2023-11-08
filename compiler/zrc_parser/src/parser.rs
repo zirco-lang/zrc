@@ -84,9 +84,9 @@ fn parser_error_to_diagnostic(
                     Severity::Error,
                     span.containing(DiagnosticKind::UnknownEscapeSequence),
                 ),
-                LexicalError::JavascriptUserDetected => Diagnostic(
+                LexicalError::JavascriptUserDetected(expected) => Diagnostic(
                     Severity::Error,
-                    span.containing(DiagnosticKind::JavascriptUserDetected),
+                    span.containing(DiagnosticKind::JavascriptUserDetected(expected)),
                 ),
             }
         }

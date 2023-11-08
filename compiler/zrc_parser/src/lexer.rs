@@ -47,8 +47,9 @@ pub enum InternalLexicalError {
     /// An invalid escape sequence was found in a string literal
     /// The included [`Span`] is the specific span of the invalid sequence
     UnknownEscapeSequence(Span),
-    /// `===` was found in the input
-    JavascriptUserDetected,
+    /// `===` or `!==` was found in the input
+    /// Parameter will be `==` or `!=` for what was expected.
+    JavascriptUserDetected(&'static str),
 }
 
 /// An error encountered during lexing. You will usually find this wrapped in a
@@ -67,8 +68,9 @@ pub enum LexicalError<'input> {
     UnterminatedBlockComment,
     /// Produced from [`InternalLexicalError::NoMatchingRule`]
     UnknownEscapeSequence,
-    /// `===` was found in the input
-    JavascriptUserDetected,
+    /// `===` or `!==` was found in the input
+    /// Parameter will be `==` or `!=` for what was expected.
+    JavascriptUserDetected(&'static str),
 }
 
 /// A lexer callback helper to obtain the currently matched token slice.
@@ -213,7 +215,8 @@ pub enum Tok<'input> {
 
     // === COMPARISON OPERATORS ===
     // Silly little error we raise if JavaScript-like equality operators are used
-    #[token("===", |_lex| Err(InternalLexicalError::JavascriptUserDetected))]
+    #[token("===", |_lex| Err(InternalLexicalError::JavascriptUserDetected("==")))]
+    #[token("!==", |_lex| Err(InternalLexicalError::JavascriptUserDetected("!=")))]
     /// The token `==`
     #[token("==")]
     EqEq,
@@ -570,8 +573,8 @@ impl<'input> Iterator for ZircoLexer<'input> {
             Err(InternalLexicalError::UnknownEscapeSequence(span)) => {
                 Some(span.containing(Err(LexicalError::UnknownEscapeSequence)))
             }
-            Err(InternalLexicalError::JavascriptUserDetected) => {
-                Some(span.containing(Err(LexicalError::JavascriptUserDetected)))
+            Err(InternalLexicalError::JavascriptUserDetected(expected)) => {
+                Some(span.containing(Err(LexicalError::JavascriptUserDetected(expected))))
             }
             Ok(tok) => Some(span.containing(Ok(tok))),
         }
