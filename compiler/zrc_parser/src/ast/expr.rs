@@ -9,9 +9,8 @@ use zrc_utils::{
     spanned,
 };
 
-use crate::lexer::StringTok;
-
 use super::ty::Type;
+use crate::lexer::StringTok;
 
 /// Arithmetic operators
 ///
