@@ -107,6 +107,8 @@ pub fn type_program(
 
     program
         .into_iter()
-        .map(|declaration| process_declaration(&mut scope, declaration.into_value()))
+        .filter_map(|declaration| {
+            process_declaration(&mut scope, declaration.into_value()).transpose()
+        })
         .collect()
 }
