@@ -343,7 +343,7 @@ pub enum Tok<'input> {
     #[token("}")]
     RightBrace,
 
-    // === KEYWORDS & BUILTINS ===
+    // === KEYWORDS & BUILT-INS ===
     /// The boolean `true`
     #[token("true")]
     True,
