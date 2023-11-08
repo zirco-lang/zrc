@@ -120,7 +120,6 @@ fn cg_block<'ctx, 'input, 'a>(
         .into_iter()
         .try_fold(*bb, |bb, stmt| -> Option<BasicBlock> {
             match stmt {
-                TypedStmt::EmptyStmt => Some(bb),
                 TypedStmt::ExprStmt(expr) => Some(
                     cg_expr(
                         ctx,
@@ -494,9 +493,6 @@ fn cg_program<'input, 'ctx>(
 
     for declaration in program {
         match declaration {
-            // Struct and union declarations do not need to be emitted
-            TypedDeclaration::TypeAliasDeclaration { .. } => {}
-
             TypedDeclaration::FunctionDeclaration {
                 name,
                 parameters,

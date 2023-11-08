@@ -57,8 +57,6 @@ pub enum TypedStmt<'input> {
     BlockStmt(Vec<TypedStmt<'input>>),
     /// `x;`
     ExprStmt(TypedExpr<'input>),
-    /// `;`
-    EmptyStmt,
     /// `continue;`
     ContinueStmt,
     /// `break;`
@@ -84,13 +82,6 @@ pub enum TypedDeclaration<'input> {
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
         body: Option<Vec<TypedStmt<'input>>>,
-    },
-    /// A named type alias (`type U = T;`)
-    TypeAliasDeclaration {
-        /// The name of the newtype.
-        name: &'input str,
-        /// The type to associate.
-        ty: Type<'input>,
     },
 }
 
@@ -199,7 +190,6 @@ impl<'input> Display for TypedDeclaration<'input> {
                 return_type: None,
                 body: None,
             } => write!(f, "fn {name}({parameters});"),
-            Self::TypeAliasDeclaration { name, ty } => write!(f, "type {name} = {ty};"),
         }
     }
 }
@@ -301,7 +291,6 @@ impl<'input> Display for TypedStmt<'input> {
                     .join("\n")
             ),
             Self::ExprStmt(expr) => write!(f, "{expr};"),
-            Self::EmptyStmt => write!(f, ";"),
             Self::ContinueStmt => write!(f, "continue;"),
             Self::BreakStmt => write!(f, "break;"),
             Self::ReturnStmt(Some(expr)) => write!(f, "return {expr};",),
