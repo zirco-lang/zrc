@@ -88,6 +88,13 @@ pub enum Declaration<'input> {
         /// The key-value pairs of the union. Ordered by declaration order.
         fields: KeyTypeMapping<'input>,
     },
+    /// A named type alias (`type U = T;`)
+    TypeAliasDeclaration {
+        /// The name of the newtype.
+        name: Spanned<&'input str>,
+        /// The type to associate.
+        ty: Type<'input>,
+    },
 }
 
 /// The list of arguments on a [`Declaration::FunctionDeclaration`]
@@ -187,6 +194,7 @@ impl<'input> Display for Declaration<'input> {
             Self::UnionDeclaration { name, fields } => {
                 write!(f, "union {} {{ {fields} }}", name.value())
             }
+            Self::TypeAliasDeclaration { name, ty } => write!(f, "type {name} = {ty};"),
         }
     }
 }
