@@ -396,6 +396,7 @@ extern {
         "struct" => lexer::Tok::Struct,
         "union" => lexer::Tok::Union,
         "sizeof" => lexer::Tok::SizeOf,
+        "type" => lexer::Tok::Type,
         "->" => lexer::Tok::SmallArrow,
         "..." => lexer::Tok::Ellipsis,
     }
