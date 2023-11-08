@@ -6,7 +6,7 @@ use inkwell::{
     context::Context,
     module::Module,
     targets::TargetMachine,
-    types::StringRadix,
+    types::{BasicType, StringRadix},
     values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
     IntPredicate,
 };
@@ -794,6 +794,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             };
 
             (reg, bb)
+        }
+        TypedExprKind::SizeOf(ty) => {
+            let reg = llvm_basic_type(ctx, target_machine, ty)
+                .size_of()
+                .unwrap()
+                .as_basic_value_enum();
+
+            (reg, *bb)
         }
     }
 }
