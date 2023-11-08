@@ -320,40 +320,6 @@ pub fn process_declaration<'input>(
                 },
             }
         }
-        AstDeclaration::StructDeclaration { name, fields } => {
-            if global_scope.get_type(name.value()).is_some() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    name.map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
-                ));
-            }
-
-            let fields = super::ty::resolve_key_type_mapping(global_scope, fields)?;
-
-            global_scope.set_type(name.value(), TastType::Struct(fields.clone()));
-
-            TypedDeclaration::StructDeclaration {
-                name: name.into_value(),
-                fields,
-            }
-        }
-        AstDeclaration::UnionDeclaration { name, fields } => {
-            if global_scope.get_type(name.value()).is_some() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    name.map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
-                ));
-            }
-
-            let fields = super::ty::resolve_key_type_mapping(global_scope, fields)?;
-
-            global_scope.set_type(name.value(), TastType::Union(fields.clone()));
-
-            TypedDeclaration::UnionDeclaration {
-                name: name.into_value(),
-                fields,
-            }
-        }
         AstDeclaration::TypeAliasDeclaration { name, ty } => {
             if global_scope.get_type(name.value()).is_some() {
                 return Err(Diagnostic(

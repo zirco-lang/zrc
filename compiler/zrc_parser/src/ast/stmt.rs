@@ -8,10 +8,7 @@ use std::fmt::Display;
 
 use zrc_utils::span::Spanned;
 
-use super::{
-    expr::Expr,
-    ty::{KeyTypeMapping, Type},
-};
+use super::{expr::Expr, ty::Type};
 
 /// A Zirco statement
 #[derive(PartialEq, Debug, Clone)]
@@ -74,21 +71,8 @@ pub enum Declaration<'input> {
         /// declaration.
         body: Option<Spanned<Vec<Stmt<'input>>>>,
     },
-    /// A named declaration for a `struct`.
-    StructDeclaration {
-        /// The name of the newtype.
-        name: Spanned<&'input str>,
-        /// The key-value pairs of the struct. Ordered by declaration order.
-        fields: KeyTypeMapping<'input>,
-    },
-    /// A named declaration for a `union`.
-    UnionDeclaration {
-        /// The name of the newtype.
-        name: Spanned<&'input str>,
-        /// The key-value pairs of the union. Ordered by declaration order.
-        fields: KeyTypeMapping<'input>,
-    },
     /// A named type alias (`type U = T;`)
+    /// This is also used for structs and unions.
     TypeAliasDeclaration {
         /// The name of the newtype.
         name: Spanned<&'input str>,
@@ -188,12 +172,6 @@ impl<'input> Display for Declaration<'input> {
                 body: None,
             } => write!(f, "fn {}({});", name.value(), parameters.value()),
 
-            Self::StructDeclaration { name, fields } => {
-                write!(f, "struct {} {{ {fields} }}", name.value())
-            }
-            Self::UnionDeclaration { name, fields } => {
-                write!(f, "union {} {{ {fields} }}", name.value())
-            }
             Self::TypeAliasDeclaration { name, ty } => write!(f, "type {} = {ty};", name.value()),
         }
     }

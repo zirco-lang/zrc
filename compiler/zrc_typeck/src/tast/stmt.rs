@@ -2,8 +2,6 @@
 
 use std::{fmt::Display, string::ToString};
 
-use indexmap::IndexMap;
-
 use super::{expr::TypedExpr, ty::Type};
 
 /// A declaration created with `let`.
@@ -86,20 +84,6 @@ pub enum TypedDeclaration<'input> {
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
         body: Option<Vec<TypedStmt<'input>>>,
-    },
-    /// A named declaration for a `struct`.
-    StructDeclaration {
-        /// The name of the newtype.
-        name: &'input str,
-        /// The key-value pairs of the struct. Ordered by declaration order.
-        fields: IndexMap<&'input str, Type<'input>>,
-    },
-    /// A named declaration for a `union`.
-    UnionDeclaration {
-        /// The name of the newtype.
-        name: &'input str,
-        /// The key-value pairs of the union. Ordered by declaration order.
-        fields: IndexMap<&'input str, Type<'input>>,
     },
     /// A named type alias (`type U = T;`)
     TypeAliasDeclaration {
@@ -215,24 +199,6 @@ impl<'input> Display for TypedDeclaration<'input> {
                 return_type: None,
                 body: None,
             } => write!(f, "fn {name}({parameters});"),
-            Self::StructDeclaration { name, fields } => write!(
-                f,
-                "struct {name} {{\n{}\n}}",
-                fields
-                    .iter()
-                    .map(|(name, ty)| format!("    {name}: {ty}"))
-                    .collect::<Vec<_>>()
-                    .join(",\n")
-            ),
-            Self::UnionDeclaration { name, fields } => write!(
-                f,
-                "union {name} {{\n{}\n}}",
-                fields
-                    .iter()
-                    .map(|(name, ty)| format!("    {name}: {ty}"))
-                    .collect::<Vec<_>>()
-                    .join(",\n")
-            ),
             Self::TypeAliasDeclaration { name, ty } => write!(f, "type {name} = {ty};"),
         }
     }
