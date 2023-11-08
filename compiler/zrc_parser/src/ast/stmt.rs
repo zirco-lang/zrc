@@ -194,7 +194,7 @@ impl<'input> Display for Declaration<'input> {
             Self::UnionDeclaration { name, fields } => {
                 write!(f, "union {} {{ {fields} }}", name.value())
             }
-            Self::TypeAliasDeclaration { name, ty } => write!(f, "type {name} = {ty};"),
+            Self::TypeAliasDeclaration { name, ty } => write!(f, "type {} = {ty};", name.value()),
         }
     }
 }

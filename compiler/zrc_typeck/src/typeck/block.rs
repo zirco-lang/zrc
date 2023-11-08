@@ -352,9 +352,9 @@ pub fn process_declaration<'input>(
                 ));
             }
 
-            let resolved_ty = resolve_type(scope, ty)?;
+            let resolved_ty = resolve_type(global_scope, ty)?;
 
-            global_scope.set_type(name.value(), resolved_ty);
+            global_scope.set_type(name.value(), resolved_ty.clone());
 
             TypedDeclaration::TypeAliasDeclaration {
                 name: name.into_value(),

@@ -104,7 +104,7 @@ pub enum TypedDeclaration<'input> {
     /// A named type alias (`type U = T;`)
     TypeAliasDeclaration {
         /// The name of the newtype.
-        name: Spanned<&'input str>,
+        name: &'input str,
         /// The type to associate.
         ty: Type<'input>,
     },
