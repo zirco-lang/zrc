@@ -8,6 +8,7 @@
         "inttoptr",
         "lalrpop",
         "Lvalue",
+        "newtype",
         "pointee",
         "preheader",
         "ptrtoint",

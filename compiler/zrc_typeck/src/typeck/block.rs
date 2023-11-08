@@ -344,6 +344,23 @@ pub fn process_declaration<'input>(
                 fields,
             }
         }
+        AstDeclaration::TypeAliasDeclaration { name, ty } => {
+            if global_scope.get_type(name.value()).is_some() {
+                return Err(Diagnostic(
+                    Severity::Error,
+                    name.map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
+                ));
+            }
+
+            let resolved_ty = resolve_type(scope, ty)?;
+
+            global_scope.set_type(name.value(), resolved_ty);
+
+            TypedDeclaration::TypeAliasDeclaration {
+                name: name.into_value(),
+                ty: resolved_ty,
+            }
+        }
     })
 }
 

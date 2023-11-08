@@ -101,6 +101,7 @@ SimpleStmt: StmtKind<'input> = {
 Declaration: Declaration<'input> = {
     <FunctionDeclaration>,
     <StructOrUnionDeclaration>,
+    <TypeAliasDeclaration>,
 };
 
 FunctionDeclaration: Declaration<'input> = {
@@ -119,6 +120,13 @@ FunctionDeclaration: Declaration<'input> = {
         body: None,
     }
 };
+
+TypeAliasDeclaration: Declaration<'input> = {
+    "type" <i:Spanned<IDENTIFIER>> "=" <t:Type> ";" => Declaration::TypeAliasDeclaration {
+        name: i,
+        ty: t,
+    },
+}
 
 // The key-type mapping of a struct or union, including the {}
 KeyTypeMapping: KeyTypeMapping<'input> = {

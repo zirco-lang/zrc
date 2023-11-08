@@ -101,6 +101,13 @@ pub enum TypedDeclaration<'input> {
         /// The key-value pairs of the union. Ordered by declaration order.
         fields: IndexMap<&'input str, Type<'input>>,
     },
+    /// A named type alias (`type U = T;`)
+    TypeAliasDeclaration {
+        /// The name of the newtype.
+        name: Spanned<&'input str>,
+        /// The type to associate.
+        ty: Type<'input>,
+    },
 }
 
 /// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]
@@ -226,6 +233,7 @@ impl<'input> Display for TypedDeclaration<'input> {
                     .collect::<Vec<_>>()
                     .join(",\n")
             ),
+            Self::TypeAliasDeclaration { name, ty } => write!(f, "type {name} = {ty};"),
         }
     }
 }
