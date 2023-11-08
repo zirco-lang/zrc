@@ -127,7 +127,7 @@ pub enum DiagnosticKind {
     CannotDereferenceNonPointer(String),
     CannotIndexIntoNonPointer(String),
     IndexOffsetMustBeInteger(String),
-    StructDoesNotHaveMember(String, String),
+    StructOrUnionDoesNotHaveMember(String, String),
     StructMemberAccessOnNonStruct(String),
     FunctionArgumentCountMismatch {
         expected: String,
@@ -217,8 +217,8 @@ impl Display for DiagnosticKind {
             Self::IndexOffsetMustBeInteger(ty) => {
                 write!(f, "index offset must be integer type, got `{ty}`")
             }
-            Self::StructDoesNotHaveMember(ty, member) => {
-                write!(f, "struct `{ty}` does not have member `{member}`")
+            Self::StructOrUnionDoesNotHaveMember(ty, member) => {
+                write!(f, "`{ty}` does not have member `{member}`")
             }
             Self::StructMemberAccessOnNonStruct(ty) => {
                 write!(f, "cannot access member of non-struct type `{ty}`")

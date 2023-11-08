@@ -7,7 +7,9 @@ use inkwell::{
     memory_buffer::MemoryBuffer,
     module::Module,
     passes::{PassManager, PassManagerBuilder},
-    targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetTriple},
+    targets::{
+        CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
+    },
     types::AnyType,
     values::{BasicValueEnum, FunctionValue},
     OptimizationLevel,
@@ -41,9 +43,10 @@ struct LoopBreakaway<'ctx> {
 ///
 /// # Panics
 /// Panics if an internal code generation error is encountered.
-#[allow(clippy::trivially_copy_pass_by_ref)]
+#[allow(clippy::trivially_copy_pass_by_ref, clippy::too_many_arguments)]
 fn cg_let_declaration<'ctx, 'input, 'a>(
     ctx: &'ctx Context,
+    target_machine: &TargetMachine,
     builder: &'a Builder<'ctx>,
     module: &'a Module<'ctx>,
     function: &'a FunctionValue<'ctx>,
@@ -56,7 +59,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
     for let_declaration in declarations {
         let ptr = builder
             .build_alloca(
-                llvm_basic_type(ctx, let_declaration.ty.clone()),
+                llvm_basic_type(ctx, target_machine, let_declaration.ty.clone()),
                 &format!("let_{}", let_declaration.name),
             )
             .unwrap();
@@ -66,6 +69,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
         if let Some(value) = let_declaration.value {
             bb = cg_expr(
                 ctx,
+                target_machine,
                 builder,
                 module,
                 function,
@@ -101,6 +105,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
 )]
 fn cg_block<'ctx, 'input, 'a>(
     ctx: &'ctx Context,
+    target_machine: &TargetMachine,
     builder: &'a Builder<'ctx>,
     module: &'a Module<'ctx>,
     function: &'a FunctionValue<'ctx>,
@@ -116,14 +121,33 @@ fn cg_block<'ctx, 'input, 'a>(
         .try_fold(*bb, |bb, stmt| -> Option<BasicBlock> {
             match stmt {
                 TypedStmt::EmptyStmt => Some(bb),
-                TypedStmt::ExprStmt(expr) => {
-                    Some(cg_expr(ctx, builder, module, function, &bb, &scope, expr).1)
-                }
+                TypedStmt::ExprStmt(expr) => Some(
+                    cg_expr(
+                        ctx,
+                        target_machine,
+                        builder,
+                        module,
+                        function,
+                        &bb,
+                        &scope,
+                        expr,
+                    )
+                    .1,
+                ),
 
                 TypedStmt::IfStmt(cond, then, then_else) => {
                     let then_else = then_else.unwrap_or(vec![]);
 
-                    let (cond, _) = cg_expr(ctx, builder, module, function, &bb, &scope, cond);
+                    let (cond, _) = cg_expr(
+                        ctx,
+                        target_machine,
+                        builder,
+                        module,
+                        function,
+                        &bb,
+                        &scope,
+                        cond,
+                    );
 
                     let then_bb = ctx.append_basic_block(*function, "then");
                     let then_else_bb = ctx.append_basic_block(*function, "then_else");
@@ -135,6 +159,7 @@ fn cg_block<'ctx, 'input, 'a>(
                     builder.position_at_end(then_bb);
                     let maybe_then_bb = cg_block(
                         ctx,
+                        target_machine,
                         builder,
                         module,
                         function,
@@ -147,6 +172,7 @@ fn cg_block<'ctx, 'input, 'a>(
                     builder.position_at_end(then_else_bb);
                     let maybe_then_else_bb = cg_block(
                         ctx,
+                        target_machine,
                         builder,
                         module,
                         function,
@@ -184,6 +210,7 @@ fn cg_block<'ctx, 'input, 'a>(
 
                 TypedStmt::BlockStmt(block) => cg_block(
                     ctx,
+                    target_machine,
                     builder,
                     module,
                     function,
@@ -194,7 +221,16 @@ fn cg_block<'ctx, 'input, 'a>(
                 ),
 
                 TypedStmt::ReturnStmt(Some(expr)) => {
-                    let (expr, _) = cg_expr(ctx, builder, module, function, &bb, &scope, expr);
+                    let (expr, _) = cg_expr(
+                        ctx,
+                        target_machine,
+                        builder,
+                        module,
+                        function,
+                        &bb,
+                        &scope,
+                        expr,
+                    );
 
                     builder.build_return(Some(&expr)).unwrap();
 
@@ -225,6 +261,7 @@ fn cg_block<'ctx, 'input, 'a>(
 
                 TypedStmt::DeclarationList(declarations) => Some(cg_let_declaration(
                     ctx,
+                    target_machine,
                     builder,
                     module,
                     function,
@@ -254,7 +291,16 @@ fn cg_block<'ctx, 'input, 'a>(
                     // The block we are currently in will become the preheader. Generate the `init`
                     // code if there is any.
                     if let Some(init) = init {
-                        cg_let_declaration(ctx, builder, module, function, &bb, &mut scope, *init);
+                        cg_let_declaration(
+                            ctx,
+                            target_machine,
+                            builder,
+                            module,
+                            function,
+                            &bb,
+                            &mut scope,
+                            *init,
+                        );
                     }
 
                     let header = ctx.append_basic_block(*function, "header");
@@ -275,8 +321,16 @@ fn cg_block<'ctx, 'input, 'a>(
                             header
                         },
                         |cond| {
-                            let (cond, header) =
-                                cg_expr(ctx, builder, module, function, &header, &scope, cond);
+                            let (cond, header) = cg_expr(
+                                ctx,
+                                target_machine,
+                                builder,
+                                module,
+                                function,
+                                &header,
+                                &scope,
+                                cond,
+                            );
 
                             builder
                                 .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -290,6 +344,7 @@ fn cg_block<'ctx, 'input, 'a>(
                     builder.position_at_end(body_bb);
                     let body_bb = cg_block(
                         ctx,
+                        target_machine,
                         builder,
                         module,
                         function,
@@ -310,7 +365,16 @@ fn cg_block<'ctx, 'input, 'a>(
                     // Latch runs post and then breaks right back to the header.
                     builder.position_at_end(latch);
                     if let Some(post) = post {
-                        cg_expr(ctx, builder, module, function, &latch, &scope, post);
+                        cg_expr(
+                            ctx,
+                            target_machine,
+                            builder,
+                            module,
+                            function,
+                            &latch,
+                            &scope,
+                            post,
+                        );
                     }
 
                     builder.build_unconditional_branch(header).unwrap();
@@ -340,8 +404,16 @@ fn cg_block<'ctx, 'input, 'a>(
 
                     builder.position_at_end(header);
 
-                    let (cond, header) =
-                        cg_expr(ctx, builder, module, function, &header, &scope, cond);
+                    let (cond, header) = cg_expr(
+                        ctx,
+                        target_machine,
+                        builder,
+                        module,
+                        function,
+                        &header,
+                        &scope,
+                        cond,
+                    );
 
                     builder
                         .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -351,6 +423,7 @@ fn cg_block<'ctx, 'input, 'a>(
 
                     let body_bb = cg_block(
                         ctx,
+                        target_machine,
                         builder,
                         module,
                         function,
@@ -379,15 +452,16 @@ fn cg_block<'ctx, 'input, 'a>(
 pub fn cg_init_fn<'ctx>(
     ctx: &'ctx Context,
     module: &Module<'ctx>,
+    target_machine: &TargetMachine,
     name: &str,
     ret: Option<Type>,
     args: &[Type],
     is_variadic: bool,
 ) -> FunctionValue<'ctx> {
-    let ret_type = llvm_type(ctx, ret.unwrap_or(Type::Void));
+    let ret_type = llvm_type(ctx, target_machine, ret.unwrap_or(Type::Void));
     let arg_types = args
         .iter()
-        .map(|ty| llvm_basic_type(ctx, ty.clone()).into())
+        .map(|ty| llvm_basic_type(ctx, target_machine, ty.clone()).into())
         .collect::<Vec<_>>();
 
     let fn_type = create_fn(
@@ -409,6 +483,7 @@ pub fn cg_init_fn<'ctx>(
 #[must_use]
 fn cg_program<'input, 'ctx>(
     ctx: &'ctx Context,
+    target_machine: &TargetMachine,
     module_name: &str,
     program: Vec<TypedDeclaration<'input>>,
 ) -> (Module<'ctx>, CgScope<'input, 'ctx>) {
@@ -419,8 +494,9 @@ fn cg_program<'input, 'ctx>(
 
     for declaration in program {
         match declaration {
-            // Struct declarations do not need to be emitted
-            TypedDeclaration::StructDeclaration { .. } => {}
+            // Struct and union declarations do not need to be emitted
+            TypedDeclaration::StructDeclaration { .. }
+            | TypedDeclaration::UnionDeclaration { .. } => {}
 
             TypedDeclaration::FunctionDeclaration {
                 name,
@@ -431,6 +507,7 @@ fn cg_program<'input, 'ctx>(
                 let fn_value = cg_init_fn(
                     ctx,
                     &module,
+                    target_machine,
                     name,
                     return_type,
                     &parameters
@@ -459,7 +536,10 @@ fn cg_program<'input, 'ctx>(
                         }
 
                         let alloc = builder
-                            .build_alloca(llvm_basic_type(ctx, ty), &format!("arg_{name}"))
+                            .build_alloca(
+                                llvm_basic_type(ctx, target_machine, ty),
+                                &format!("arg_{name}"),
+                            )
                             .unwrap();
 
                         builder.position_at_end(entry);
@@ -480,7 +560,15 @@ fn cg_program<'input, 'ctx>(
                     }
 
                     cg_block(
-                        ctx, &builder, &module, &fn_value, &entry, &fn_scope, body, None,
+                        ctx,
+                        target_machine,
+                        &builder,
+                        &module,
+                        &fn_value,
+                        &entry,
+                        &fn_scope,
+                        body,
+                        None,
                     );
                 }
             }
@@ -522,12 +610,27 @@ pub fn cg_program_to_string(
     module_name: &str,
     program: Vec<TypedDeclaration>,
     optimization_level: OptimizationLevel,
+    triple: &TargetTriple,
+    cpu: &str,
 ) -> String {
     let ctx = Context::create();
 
-    let (module, _global_scope) = cg_program(&ctx, module_name, program);
-
     Target::initialize_all(&InitializationConfig::default());
+    let target = Target::from_triple(triple).unwrap();
+
+    let target_machine = target
+        .create_target_machine(
+            triple,
+            cpu,
+            "",
+            // FIXME: Does this potentially run the optimizer twice? That may be inefficient.
+            optimization_level,
+            RelocMode::PIC,
+            CodeModel::Default,
+        )
+        .unwrap();
+
+    let (module, _global_scope) = cg_program(&ctx, &target_machine, module_name, program);
     optimize_module(&module, optimization_level);
 
     module.print_to_string().to_string()
@@ -549,11 +652,7 @@ pub fn cg_program_to_buffer(
 ) -> MemoryBuffer {
     let ctx = Context::create();
 
-    let (module, _global_scope) = cg_program(&ctx, module_name, program);
-
     Target::initialize_all(&InitializationConfig::default());
-    optimize_module(&module, optimization_level);
-
     let target = Target::from_triple(triple).unwrap();
 
     let target_machine = target
@@ -567,6 +666,9 @@ pub fn cg_program_to_buffer(
             CodeModel::Default,
         )
         .unwrap();
+
+    let (module, _global_scope) = cg_program(&ctx, &target_machine, module_name, program);
+    optimize_module(&module, optimization_level);
 
     target_machine
         .write_to_memory_buffer(&module, file_type)
@@ -601,11 +703,13 @@ mod tests {
     fn let_declarations_are_properly_generated() {
         let ctx = Context::create();
 
-        let generate_test_prelude =
-            make_test_prelude_closure(|_ctx, _builder, _module, _fn_value, _scope, bb| *bb);
+        let generate_test_prelude = make_test_prelude_closure(
+            |_ctx, _target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
+        );
 
         let expected = {
-            let (builder, module, _fn_value, mut scope, _bb) = generate_test_prelude(&ctx);
+            let (_target_machine, builder, module, _fn_value, mut scope, _bb) =
+                generate_test_prelude(&ctx);
 
             let a_ptr = builder.build_alloca(ctx.i32_type(), "let_a").unwrap();
             let b_ptr = builder.build_alloca(ctx.bool_type(), "let_b").unwrap();
@@ -630,10 +734,12 @@ mod tests {
         };
 
         let actual = {
-            let (builder, module, fn_value, mut scope, bb) = generate_test_prelude(&ctx);
+            let (target_machine, builder, module, fn_value, mut scope, bb) =
+                generate_test_prelude(&ctx);
 
             let _bb = cg_let_declaration(
                 &ctx,
+                &target_machine,
                 &builder,
                 &module,
                 &fn_value,
@@ -678,8 +784,8 @@ mod tests {
             fn if_statements_generate_as_expected() {
                 let ctx = Context::create();
 
-                let generate_test_prelude =
-                    make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                let generate_test_prelude = make_test_prelude_closure(
+                    |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
                         // generate `do_stuff: fn() -> void`
                         let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
                         let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
@@ -691,10 +797,12 @@ mod tests {
                         // Having access to the function type of `do_stuff` is needed to build the
                         // indirect call within the expected case.
                         *bb
-                    });
+                    },
+                );
 
                 let expected = {
-                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+                    let (_target_machine, builder, module, fn_value, _scope, _bb) =
+                        generate_test_prelude(&ctx);
 
                     let then = ctx.append_basic_block(fn_value, "then");
                     let then_else = ctx.append_basic_block(fn_value, "then_else");
@@ -727,10 +835,12 @@ mod tests {
                 };
 
                 let actual = {
-                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                    let (target_machine, builder, module, fn_value, scope, bb) =
+                        generate_test_prelude(&ctx);
 
                     let bb = cg_block(
                         &ctx,
+                        &target_machine,
                         &builder,
                         &module,
                         &fn_value,
@@ -771,8 +881,8 @@ mod tests {
             fn if_else_statements_generate_as_expected() {
                 let ctx = Context::create();
 
-                let generate_test_prelude =
-                    make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                let generate_test_prelude = make_test_prelude_closure(
+                    |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
                         // generate `do_stuff: fn() -> void`
                         let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
                         let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
@@ -784,10 +894,12 @@ mod tests {
                         // Having access to the function type of `do_stuff` is needed to build the
                         // indirect call within the expected case.
                         *bb
-                    });
+                    },
+                );
 
                 let expected = {
-                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+                    let (_target_machine, builder, module, fn_value, _scope, _bb) =
+                        generate_test_prelude(&ctx);
 
                     let then = ctx.append_basic_block(fn_value, "then");
                     let then_else = ctx.append_basic_block(fn_value, "then_else");
@@ -822,10 +934,12 @@ mod tests {
                 };
 
                 let actual = {
-                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                    let (target_machine, builder, module, fn_value, scope, bb) =
+                        generate_test_prelude(&ctx);
 
                     let bb = cg_block(
                         &ctx,
+                        &target_machine,
                         &builder,
                         &module,
                         &fn_value,
@@ -884,11 +998,13 @@ mod tests {
 
                 // expect only 2 basic blocks
 
-                let generate_test_prelude =
-                    make_test_prelude_closure(|_ctx, _builder, _module, _fn_value, _scope, bb| *bb);
+                let generate_test_prelude = make_test_prelude_closure(
+                    |_ctx, _target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
+                );
 
                 let expected = {
-                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+                    let (_target_machine, builder, module, fn_value, _scope, _bb) =
+                        generate_test_prelude(&ctx);
 
                     let then = ctx.append_basic_block(fn_value, "then");
                     let then_else = ctx.append_basic_block(fn_value, "then_else");
@@ -911,10 +1027,12 @@ mod tests {
                 };
 
                 let actual = {
-                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                    let (target_machine, builder, module, fn_value, scope, bb) =
+                        generate_test_prelude(&ctx);
 
                     let bb = cg_block(
                         &ctx,
+                        &target_machine,
                         &builder,
                         &module,
                         &fn_value,
@@ -938,7 +1056,7 @@ mod tests {
         }
 
         mod loops {
-            use inkwell::values::AnyValue;
+            use inkwell::values::AnyValue as _;
 
             use super::*;
 
@@ -950,8 +1068,8 @@ mod tests {
             fn while_loops_along_with_break_and_continue_generate_as_expected() {
                 let ctx = Context::create();
 
-                let generate_test_prelude =
-                    make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+                let generate_test_prelude = make_test_prelude_closure(
+                    |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
                         // generate `do_stuff: fn() -> void`
                         let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
                         let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
@@ -961,7 +1079,8 @@ mod tests {
                         );
 
                         *bb
-                    });
+                    },
+                );
 
                 // while (get_some_bool()) {
                 //     if (get_some_bool()) break;
@@ -999,7 +1118,8 @@ mod tests {
                 //     br label %header ; loop again
 
                 let expected = {
-                    let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+                    let (_target_machine, builder, module, fn_value, _scope, _bb) =
+                        generate_test_prelude(&ctx);
 
                     let header = ctx.append_basic_block(fn_value, "header");
                     builder.build_unconditional_branch(header).unwrap();
@@ -1077,7 +1197,8 @@ mod tests {
                 };
 
                 let actual = {
-                    let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                    let (target_machine, builder, module, fn_value, scope, bb) =
+                        generate_test_prelude(&ctx);
 
                     let call_gsb = TypedExpr(
                         Type::Bool,
@@ -1095,6 +1216,7 @@ mod tests {
 
                     let bb = cg_block(
                         &ctx,
+                        &target_machine,
                         &builder,
                         &module,
                         &fn_value,

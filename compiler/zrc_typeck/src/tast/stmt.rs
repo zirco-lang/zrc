@@ -94,6 +94,13 @@ pub enum TypedDeclaration<'input> {
         /// The key-value pairs of the struct. Ordered by declaration order.
         fields: IndexMap<&'input str, Type<'input>>,
     },
+    /// A named declaration for a `union`.
+    UnionDeclaration {
+        /// The name of the newtype.
+        name: &'input str,
+        /// The key-value pairs of the union. Ordered by declaration order.
+        fields: IndexMap<&'input str, Type<'input>>,
+    },
 }
 
 /// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]
@@ -204,6 +211,15 @@ impl<'input> Display for TypedDeclaration<'input> {
             Self::StructDeclaration { name, fields } => write!(
                 f,
                 "struct {name} {{\n{}\n}}",
+                fields
+                    .iter()
+                    .map(|(name, ty)| format!("    {name}: {ty}"))
+                    .collect::<Vec<_>>()
+                    .join(",\n")
+            ),
+            Self::UnionDeclaration { name, fields } => write!(
+                f,
+                "union {name} {{\n{}\n}}",
                 fields
                     .iter()
                     .map(|(name, ty)| format!("    {name}: {ty}"))

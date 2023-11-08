@@ -2,6 +2,7 @@
 
 use inkwell::{
     context::Context,
+    targets::TargetMachine,
     types::{
         AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType,
         IntType, PointerType,
@@ -60,7 +61,7 @@ pub fn llvm_int_type<'ctx>(ctx: &'ctx Context, ty: Type) -> IntType<'ctx> {
         Type::I16 | Type::U16 => ctx.i16_type(),
         Type::I32 | Type::U32 => ctx.i32_type(),
         Type::I64 | Type::U64 => ctx.i64_type(),
-        Type::Void | Type::Ptr(_) | Type::Fn(_, _) | Type::Struct(_) => {
+        Type::Void | Type::Ptr(_) | Type::Fn(_, _) | Type::Struct(_) | Type::Union(_) => {
             panic!("not an integer type")
         }
     }
@@ -70,7 +71,11 @@ pub fn llvm_int_type<'ctx>(ctx: &'ctx Context, ty: Type) -> IntType<'ctx> {
 ///
 /// # Panics
 /// Panics if `ty` is not a basic type
-pub fn llvm_basic_type<'ctx>(ctx: &'ctx Context, ty: Type) -> BasicTypeEnum<'ctx> {
+pub fn llvm_basic_type<'ctx>(
+    ctx: &'ctx Context,
+    target_machine: &TargetMachine,
+    ty: Type,
+) -> BasicTypeEnum<'ctx> {
     match ty {
         Type::Bool
         | Type::I8
@@ -82,22 +87,44 @@ pub fn llvm_basic_type<'ctx>(ctx: &'ctx Context, ty: Type) -> BasicTypeEnum<'ctx
         | Type::I64
         | Type::U64 => llvm_int_type(ctx, ty).as_basic_type_enum(),
         Type::Void => panic!("void is not a basic type"),
-        Type::Ptr(x) => create_ptr(llvm_type(ctx, *x)).as_basic_type_enum(),
+        Type::Ptr(x) => create_ptr(llvm_type(ctx, target_machine, *x)).as_basic_type_enum(),
         Type::Fn(_, _) => panic!("function is not a basic type"),
         Type::Struct(fields) => ctx
             .struct_type(
                 &fields
                     .into_iter()
-                    .map(|(_, key_ty)| llvm_basic_type(ctx, key_ty))
+                    .map(|(_, key_ty)| llvm_basic_type(ctx, target_machine, key_ty))
                     .collect::<Vec<_>>(),
                 false,
             )
             .as_basic_type_enum(),
+        Type::Union(fields) => {
+            // Determine which field has the largest size. This is what we will allocate.
+            let largest_field = fields
+                .into_iter()
+                .map(|(_, ty)| {
+                    let ty = llvm_basic_type(ctx, target_machine, ty);
+                    let size = target_machine.get_target_data().get_bit_size(&ty);
+                    (ty, size)
+                })
+                .max_by_key(|(_, size)| *size)
+                .unwrap_or_else(|| {
+                    // this is basically `never`
+                    let ty = ctx.struct_type(&[], false).as_basic_type_enum();
+                    (ty, target_machine.get_target_data().get_bit_size(&ty))
+                });
+
+            largest_field.0
+        }
     }
 }
 
 /// Resolve a [`Type`] to a LLVM [`AnyTypeEnum`]
-pub fn llvm_type<'ctx>(ctx: &'ctx Context, ty: Type) -> AnyTypeEnum<'ctx> {
+pub fn llvm_type<'ctx>(
+    ctx: &'ctx Context,
+    target_machine: &TargetMachine,
+    ty: Type,
+) -> AnyTypeEnum<'ctx> {
     match ty {
         Type::Bool
         | Type::I8
@@ -109,17 +136,18 @@ pub fn llvm_type<'ctx>(ctx: &'ctx Context, ty: Type) -> AnyTypeEnum<'ctx> {
         | Type::I64
         | Type::U64
         | Type::Ptr(_)
-        | Type::Struct(_) => llvm_basic_type(ctx, ty).as_any_type_enum(),
+        | Type::Struct(_)
+        | Type::Union(_) => llvm_basic_type(ctx, target_machine, ty).as_any_type_enum(),
 
         Type::Void => ctx.void_type().as_any_type_enum(),
 
         Type::Fn(args, ret) => create_fn(
-            llvm_type(ctx, ret.into_tast_type()),
+            llvm_type(ctx, target_machine, ret.into_tast_type()),
             &args
                 .clone()
                 .into_arguments()
                 .into_iter()
-                .map(|arg| llvm_basic_type(ctx, arg.ty).into())
+                .map(|arg| llvm_basic_type(ctx, target_machine, arg.ty).into())
                 .collect::<Vec<_>>(),
             args.is_variadic(),
         )

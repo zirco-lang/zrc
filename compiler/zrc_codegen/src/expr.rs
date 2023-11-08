@@ -5,6 +5,7 @@ use inkwell::{
     builder::Builder,
     context::Context,
     module::Module,
+    targets::TargetMachine,
     types::StringRadix,
     values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
     IntPredicate,
@@ -21,9 +22,10 @@ use super::CgScope;
 use crate::ty::{llvm_basic_type, llvm_int_type, llvm_type};
 
 /// Resolve a place to its pointer
-#[allow(clippy::trivially_copy_pass_by_ref)]
+#[allow(clippy::trivially_copy_pass_by_ref, clippy::too_many_arguments)]
 fn cg_place<'ctx, 'a>(
     ctx: &'ctx Context,
+    target_machine: &TargetMachine,
     builder: &'a Builder<'ctx>,
     module: &'a Module<'ctx>,
     function: &'a FunctionValue<'ctx>,
@@ -39,20 +41,47 @@ fn cg_place<'ctx, 'a>(
         }
 
         PlaceKind::Deref(x) => {
-            let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
+            let (x, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *x,
+            );
 
             (x.into_pointer_value(), bb)
         }
 
         PlaceKind::Index(ptr, idx) => {
-            let (ptr, bb) = cg_expr(ctx, builder, module, function, bb, scope, *ptr);
-            let (idx, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *idx);
+            let (ptr, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *ptr,
+            );
+            let (idx, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                &bb,
+                scope,
+                *idx,
+            );
 
             // SAFETY: If indices are used incorrectly this may segfault
             // TODO: Is this actually safely used?
             let reg = unsafe {
                 builder.build_gep(
-                    llvm_basic_type(ctx, place.0),
+                    llvm_basic_type(ctx, target_machine, place.0),
                     ptr.into_pointer_value(),
                     &[idx.into_int_value()],
                     "gep",
@@ -62,30 +91,55 @@ fn cg_place<'ctx, 'a>(
             (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
         }
 
-        PlaceKind::Dot(x, prop) => {
-            let x_ty = llvm_basic_type(ctx, x.0.clone());
-            let prop_idx = x
-                .clone()
-                .0
-                .into_struct_contents()
-                .expect("a struct")
-                .iter()
-                .position(|(got_key, _)| *got_key == prop)
-                .expect("invalid struct field");
+        #[allow(clippy::wildcard_enum_match_arm)]
+        PlaceKind::Dot(x, prop) => match (*x).0.clone() {
+            Type::Struct(contents) => {
+                let x_ty = llvm_basic_type(ctx, target_machine, x.0.clone());
+                let prop_idx = contents
+                    .iter()
+                    .position(|(got_key, _)| *got_key == prop)
+                    .expect("invalid struct field");
 
-            let (x, bb) = cg_place(ctx, builder, module, function, bb, scope, *x.clone());
+                let (x, bb) = cg_place(
+                    ctx,
+                    target_machine,
+                    builder,
+                    module,
+                    function,
+                    bb,
+                    scope,
+                    *x.clone(),
+                );
 
-            let reg = builder.build_struct_gep(
-                x_ty,
-                x,
-                prop_idx
-                    .try_into()
-                    .expect("got more than u32::MAX as key index? HOW?"),
-                "gep",
-            );
+                let reg = builder.build_struct_gep(
+                    x_ty,
+                    x,
+                    prop_idx
+                        .try_into()
+                        .expect("got more than u32::MAX as key index? HOW?"),
+                    "gep",
+                );
 
-            (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
-        }
+                (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
+            }
+            Type::Union(_) => {
+                // All we need to do is cast the pointer, but there's no `bitcast` anymore,
+                // so just return it and it'll take on the correct type
+                let (x, bb) = cg_place(
+                    ctx,
+                    target_machine,
+                    builder,
+                    module,
+                    function,
+                    bb,
+                    scope,
+                    *x.clone(),
+                );
+
+                (x, bb)
+            }
+            _ => panic!("cannot access property of non-struct"),
+        },
     }
 }
 
@@ -94,10 +148,12 @@ fn cg_place<'ctx, 'a>(
     clippy::redundant_pub_crate,
     clippy::too_many_lines,
     clippy::match_same_arms,
-    clippy::trivially_copy_pass_by_ref
+    clippy::trivially_copy_pass_by_ref,
+    clippy::too_many_arguments
 )]
 pub(crate) fn cg_expr<'ctx, 'a>(
     ctx: &'ctx Context,
+    target_machine: &TargetMachine,
     builder: &'a Builder<'ctx>,
     module: &'a Module<'ctx>,
     function: &'a FunctionValue<'ctx>,
@@ -150,13 +206,32 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         ),
 
         TypedExprKind::Comma(lhs, rhs) => {
-            let (_, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
-            cg_expr(ctx, builder, module, function, &bb, scope, *rhs)
+            let (_, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *lhs,
+            );
+            cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                &bb,
+                scope,
+                *rhs,
+            )
         }
 
         TypedExprKind::Identifier(id) => {
             let place = cg_place(
                 ctx,
+                target_machine,
                 builder,
                 module,
                 function,
@@ -166,15 +241,37 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             );
 
             let reg = builder
-                .build_load(llvm_basic_type(ctx, expr.0), place.0, "load")
+                .build_load(
+                    llvm_basic_type(ctx, target_machine, expr.0),
+                    place.0,
+                    "load",
+                )
                 .unwrap();
 
             (reg.as_basic_value_enum(), place.1)
         }
 
         TypedExprKind::Assignment(place, value) => {
-            let (value, bb) = cg_expr(ctx, builder, module, function, bb, scope, *value);
-            let place = cg_place(ctx, builder, module, function, &bb, scope, *place);
+            let (value, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *value,
+            );
+            let place = cg_place(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                &bb,
+                scope,
+                *place,
+            );
 
             builder.build_store(place.0, value).unwrap();
 
@@ -182,8 +279,26 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::BinaryBitwise(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
-            let (rhs, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *rhs);
+            let (lhs, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *lhs,
+            );
+            let (rhs, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                &bb,
+                scope,
+                *rhs,
+            );
 
             let reg = match op {
                 BinaryBitwise::And => {
@@ -210,8 +325,26 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Equality(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
-            let (rhs, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *rhs);
+            let (lhs, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *lhs,
+            );
+            let (rhs, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                &bb,
+                scope,
+                *rhs,
+            );
 
             let op = match op {
                 Equality::Eq => IntPredicate::EQ,
@@ -226,8 +359,26 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Comparison(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
-            let (rhs, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *rhs);
+            let (lhs, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *lhs,
+            );
+            let (rhs, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                &bb,
+                scope,
+                *rhs,
+            );
 
             let op = match (op, expr.0.is_signed_integer()) {
                 (Comparison::Lt, true) => IntPredicate::SLT,
@@ -248,8 +399,26 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Arithmetic(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
-            let (rhs, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *rhs);
+            let (lhs, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *lhs,
+            );
+            let (rhs, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                &bb,
+                scope,
+                *rhs,
+            );
 
             let reg = match (op, expr.0.is_signed_integer()) {
                 (Arithmetic::Addition, _) => {
@@ -283,8 +452,26 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Logical(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(ctx, builder, module, function, bb, scope, *lhs);
-            let (rhs, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *rhs);
+            let (lhs, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *lhs,
+            );
+            let (rhs, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                &bb,
+                scope,
+                *rhs,
+            );
 
             let reg = match op {
                 Logical::And => {
@@ -297,7 +484,16 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryNot(x) => {
-            let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
+            let (x, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *x,
+            );
 
             let reg = builder.build_not(x.into_int_value(), "not");
 
@@ -305,7 +501,16 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryBitwiseNot(x) => {
-            let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
+            let (x, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *x,
+            );
 
             let reg = builder.build_not(x.into_int_value(), "not");
 
@@ -313,7 +518,16 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryMinus(x) => {
-            let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
+            let (x, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *x,
+            );
 
             let reg = builder.build_int_neg(x.into_int_value(), "neg");
 
@@ -321,15 +535,33 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryAddressOf(x) => {
-            let (x, bb) = cg_place(ctx, builder, module, function, bb, scope, *x);
+            let (x, bb) = cg_place(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *x,
+            );
             (x.as_basic_value_enum(), bb)
         }
 
         TypedExprKind::UnaryDereference(ptr) => {
-            let (ptr, bb) = cg_expr(ctx, builder, module, function, bb, scope, *ptr);
+            let (ptr, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *ptr,
+            );
 
             let reg = builder.build_load(
-                llvm_basic_type(ctx, expr.0),
+                llvm_basic_type(ctx, target_machine, expr.0),
                 ptr.into_pointer_value(),
                 "load",
             );
@@ -338,62 +570,38 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Index(ptr, idx) => {
-            let (ptr, bb) = cg_expr(ctx, builder, module, function, bb, scope, *ptr);
-            let (idx, bb) = cg_expr(ctx, builder, module, function, &bb, scope, *idx);
-
-            // SAFETY: If indices are used incorrectly this may segfault
-            // TODO: Is this actually safely used?
-            let reg = unsafe {
-                builder.build_gep(
-                    llvm_basic_type(ctx, expr.0.clone()),
-                    ptr.into_pointer_value(),
-                    &[idx.into_int_value()],
-                    "gep",
-                )
-            }
-            .unwrap();
+            let (ptr, bb) = cg_place(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                Place(expr.0.clone(), PlaceKind::Index(ptr, idx)),
+            );
 
             let loaded = builder
-                .build_load(
-                    llvm_basic_type(ctx, expr.0),
-                    reg.as_basic_value_enum().into_pointer_value(),
-                    "load",
-                )
+                .build_load(llvm_basic_type(ctx, target_machine, expr.0), ptr, "load")
                 .unwrap();
 
             (loaded.as_basic_value_enum(), bb)
         }
 
         TypedExprKind::Dot(place, key) => {
-            let place_ty = place.0.clone();
-            let key_idx = place
-                .clone()
-                .0
-                .into_struct_contents()
-                .expect("a struct")
-                .iter()
-                .position(|(got_key, _)| *got_key == key)
-                .expect("invalid struct field");
-
-            let (place, bb) = cg_place(ctx, builder, module, function, bb, scope, *place);
-
-            let reg = builder
-                .build_struct_gep(
-                    llvm_basic_type(ctx, place_ty),
-                    place,
-                    key_idx
-                        .try_into()
-                        .expect("found more than u32::MAX keys in a struct? HOW?"),
-                    "gep",
-                )
-                .unwrap();
+            let (ptr, bb) = cg_place(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                Place(expr.0.clone(), PlaceKind::Dot(place, key)),
+            );
 
             let loaded = builder
-                .build_load(
-                    llvm_basic_type(ctx, expr.0),
-                    reg.as_basic_value_enum().into_pointer_value(),
-                    "load",
-                )
+                .build_load(llvm_basic_type(ctx, target_machine, expr.0), ptr, "load")
                 .unwrap();
 
             (loaded.as_basic_value_enum(), bb)
@@ -403,20 +611,38 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let old_f = f.clone();
 
             // will always be a function pointer
-            let (f, bb) = cg_place(ctx, builder, module, function, bb, scope, *f);
+            let (f, bb) = cg_place(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *f,
+            );
 
             let mut bb = bb;
             let old_args = args;
             let mut args = vec![];
             for arg in old_args {
-                let (new_arg, new_bb) = cg_expr(ctx, builder, module, function, &bb, scope, arg);
+                let (new_arg, new_bb) = cg_expr(
+                    ctx,
+                    target_machine,
+                    builder,
+                    module,
+                    function,
+                    &bb,
+                    scope,
+                    arg,
+                );
                 bb = new_bb;
                 args.push(new_arg.into());
             }
 
             let ret = builder
                 .build_indirect_call(
-                    llvm_type(ctx, old_f.0).into_function_type(),
+                    llvm_type(ctx, target_machine, old_f.0).into_function_type(),
                     f,
                     &args,
                     "call",
@@ -433,7 +659,16 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             )
         }
         TypedExprKind::Ternary(cond, lhs, rhs) => {
-            let (cond, _) = cg_expr(ctx, builder, module, function, bb, scope, *cond);
+            let (cond, _) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *cond,
+            );
 
             // If lhs and rhs are registers, the code generated will look like:
             //   entry:
@@ -472,18 +707,34 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 .unwrap();
 
             builder.position_at_end(if_true_bb);
-            let (if_true, if_true_bb) =
-                cg_expr(ctx, builder, module, function, &if_true_bb, scope, *lhs);
+            let (if_true, if_true_bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                &if_true_bb,
+                scope,
+                *lhs,
+            );
             builder.build_unconditional_branch(end_bb).unwrap();
 
             builder.position_at_end(if_false_bb);
-            let (if_false, if_false_bb) =
-                cg_expr(ctx, builder, module, function, &if_false_bb, scope, *rhs);
+            let (if_false, if_false_bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                &if_false_bb,
+                scope,
+                *rhs,
+            );
             builder.build_unconditional_branch(end_bb).unwrap();
 
             builder.position_at_end(end_bb);
             let result_reg = builder
-                .build_phi(llvm_basic_type(ctx, expr.0), "yield")
+                .build_phi(llvm_basic_type(ctx, target_machine, expr.0), "yield")
                 .unwrap();
             result_reg.add_incoming(&[(&if_true, if_true_bb), (&if_false, if_false_bb)]);
             (result_reg.as_basic_value(), end_bb)
@@ -500,12 +751,25 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             // int -> fn = inttoptr
             // fn -> int = ptrtoint
 
-            let (x, bb) = cg_expr(ctx, builder, module, function, bb, scope, *x);
+            let (x, bb) = cg_expr(
+                ctx,
+                target_machine,
+                builder,
+                module,
+                function,
+                bb,
+                scope,
+                *x,
+            );
 
             // FIXME: Does this actually do sext/zext or just bitcasts?
             let reg = match (x.get_type().is_pointer_type(), matches!(ty, Type::Ptr(_))) {
                 (true, true) => builder
-                    .build_bitcast(x.into_pointer_value(), llvm_basic_type(ctx, ty), "cast")
+                    .build_bitcast(
+                        x.into_pointer_value(),
+                        llvm_basic_type(ctx, target_machine, ty),
+                        "cast",
+                    )
                     .unwrap(),
                 (true, false) => builder
                     .build_ptr_to_int(x.into_pointer_value(), llvm_int_type(ctx, ty), "cast")
@@ -514,13 +778,17 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 (false, true) => builder
                     .build_int_to_ptr(
                         x.into_int_value(),
-                        llvm_basic_type(ctx, ty).into_pointer_type(),
+                        llvm_basic_type(ctx, target_machine, ty).into_pointer_type(),
                         "cast",
                     )
                     .unwrap()
                     .as_basic_value_enum(),
                 (false, false) => builder
-                    .build_bitcast(x.into_int_value(), llvm_basic_type(ctx, ty), "cast")
+                    .build_bitcast(
+                        x.into_int_value(),
+                        llvm_basic_type(ctx, target_machine, ty),
+                        "cast",
+                    )
                     .unwrap()
                     .as_basic_value_enum(),
             };
@@ -555,16 +823,18 @@ mod tests {
         fn identifier_registers_are_returned_as_is() {
             let ctx = Context::create();
 
-            let generate_test_prelude =
-                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+            let generate_test_prelude = make_test_prelude_closure(
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     let x_stack_ptr = builder.build_alloca(ctx.i32_type(), "x").unwrap();
                     scope.insert("x", x_stack_ptr);
 
                     *bb
-                });
+                },
+            );
 
             let expected = {
-                let (_builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (_target_machine, _builder, module, _fn_value, scope, _bb) =
+                    generate_test_prelude(&ctx);
 
                 (
                     module.print_to_string(),
@@ -577,10 +847,12 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (target_machine, builder, module, fn_value, scope, bb) =
+                    generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_place(
                     &ctx,
+                    &target_machine,
                     &builder,
                     &module,
                     &fn_value,
@@ -607,8 +879,8 @@ mod tests {
         fn identifier_deref_generates_as_expected() {
             let ctx = Context::create();
 
-            let generate_test_prelude =
-                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+            let generate_test_prelude = make_test_prelude_closure(
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     // generates %x = alloca i32* and scope mapping x -> %x
                     let x_stack_ptr = builder
                         .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "x")
@@ -616,10 +888,12 @@ mod tests {
                     scope.insert("x", x_stack_ptr);
 
                     *bb
-                });
+                },
+            );
 
             let expected = {
-                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (_target_machine, builder, module, _fn_value, scope, _bb) =
+                    generate_test_prelude(&ctx);
 
                 // Expect a single %yield = load i32*, i32** %x
                 let yield_ptr = builder
@@ -638,10 +912,12 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (target_machine, builder, module, fn_value, scope, bb) =
+                    generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_place(
                     &ctx,
+                    &target_machine,
                     &builder,
                     &module,
                     &fn_value,
@@ -674,11 +950,13 @@ mod tests {
         fn other_deref_generates_as_expected() {
             let ctx = Context::create();
 
-            let generate_test_prelude =
-                make_test_prelude_closure(|_ctx, _builder, _module, _fn_value, _scope, bb| *bb);
+            let generate_test_prelude = make_test_prelude_closure(
+                |_ctx, _target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
+            );
 
             let expected = {
-                let (builder, module, _fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+                let (_target_machine, builder, module, _fn_value, _scope, _bb) =
+                    generate_test_prelude(&ctx);
 
                 // Generates `%cast = inttoptr 0 to i32*`
                 let cast = builder
@@ -694,10 +972,12 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (target_machine, builder, module, fn_value, scope, bb) =
+                    generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_place(
                     &ctx,
+                    &target_machine,
                     &builder,
                     &module,
                     &fn_value,
@@ -728,8 +1008,8 @@ mod tests {
         fn pointer_indexing_generates_proper_gep() {
             let ctx = Context::create();
 
-            let generate_test_prelude =
-                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+            let generate_test_prelude = make_test_prelude_closure(
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     // generate `arr: *i32`
                     let arr_stack_ptr = builder
                         .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
@@ -737,10 +1017,12 @@ mod tests {
                     scope.insert("arr", arr_stack_ptr);
 
                     *bb
-                });
+                },
+            );
 
             let expected = {
-                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (_target_machine, builder, module, _fn_value, scope, _bb) =
+                    generate_test_prelude(&ctx);
 
                 // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
                 // the pointer to that index in the array
@@ -767,10 +1049,12 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (target_machine, builder, module, fn_value, scope, bb) =
+                    generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_place(
                     &ctx,
+                    &target_machine,
                     &builder,
                     &module,
                     &fn_value,
@@ -798,8 +1082,8 @@ mod tests {
         fn struct_property_access_generates_proper_gep() {
             let ctx = Context::create();
 
-            let generate_test_prelude =
-                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+            let generate_test_prelude = make_test_prelude_closure(
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     // generate: `x: { x: i32, y: i32 }`
                     let x_stack_ptr = builder
                         .build_alloca(
@@ -816,10 +1100,12 @@ mod tests {
                     scope.insert("x", x_stack_ptr);
 
                     *bb
-                });
+                },
+            );
 
             let expected = {
-                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (_target_machine, builder, module, _fn_value, scope, _bb) =
+                    generate_test_prelude(&ctx);
 
                 // We do not load the struct, we GEP directly into it.
                 let indexed_ptr = builder
@@ -841,10 +1127,12 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (target_machine, builder, module, fn_value, scope, bb) =
+                    generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_place(
                     &ctx,
+                    &target_machine,
                     &builder,
                     &module,
                     &fn_value,
@@ -877,18 +1165,20 @@ mod tests {
         fn comma_yields_right_value() {
             let ctx = Context::create();
 
-            let generate_test_prelude =
-                make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+            let generate_test_prelude = make_test_prelude_closure(
+                |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
                     // generate `f: fn() -> void`
                     let f_fn_type = ctx.void_type().fn_type(&[], false);
                     let f_val = module.add_function("f", f_fn_type, None);
                     scope.insert("f", f_val.as_global_value().as_pointer_value());
 
                     *bb
-                });
+                },
+            );
 
             let expected = {
-                let (builder, module, _fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+                let (_target_machine, builder, module, _fn_value, _scope, _bb) =
+                    generate_test_prelude(&ctx);
 
                 // First the function is called, then the number literal is returned
                 builder
@@ -902,10 +1192,12 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (target_machine, builder, module, fn_value, scope, bb) =
+                    generate_test_prelude(&ctx);
 
                 let (reg, _bb) = cg_expr(
                     &ctx,
+                    &target_machine,
                     &builder,
                     &module,
                     &fn_value,
@@ -946,8 +1238,8 @@ mod tests {
         fn pointer_indexing_generates_proper_gep_and_load() {
             let ctx = Context::create();
 
-            let generate_test_prelude =
-                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+            let generate_test_prelude = make_test_prelude_closure(
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     // generate `arr: *i32`
                     let arr_stack_ptr = builder
                         .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
@@ -955,10 +1247,12 @@ mod tests {
                     scope.insert("arr", arr_stack_ptr);
 
                     *bb
-                });
+                },
+            );
 
             let expected = {
-                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (_target_machine, builder, module, _fn_value, scope, _bb) =
+                    generate_test_prelude(&ctx);
 
                 // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
                 // the pointer to that index in the array
@@ -990,10 +1284,12 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (target_machine, builder, module, fn_value, scope, bb) =
+                    generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_expr(
                     &ctx,
+                    &target_machine,
                     &builder,
                     &module,
                     &fn_value,
@@ -1025,8 +1321,8 @@ mod tests {
         fn struct_property_access_generates_proper_gep_and_load() {
             let ctx = Context::create();
 
-            let generate_test_prelude =
-                make_test_prelude_closure(|ctx, builder, _module, _fn_value, scope, bb| {
+            let generate_test_prelude = make_test_prelude_closure(
+                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
                     // generate: `x: { x: i32, y: i32 }`
                     let x_stack_ptr = builder
                         .build_alloca(
@@ -1043,10 +1339,12 @@ mod tests {
                     scope.insert("x", x_stack_ptr);
 
                     *bb
-                });
+                },
+            );
 
             let expected = {
-                let (builder, module, _fn_value, scope, _bb) = generate_test_prelude(&ctx);
+                let (_target_machine, builder, module, _fn_value, scope, _bb) =
+                    generate_test_prelude(&ctx);
 
                 // We do not load the struct yet, we GEP directly into it.
                 let indexed_ptr = builder
@@ -1073,10 +1371,12 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (target_machine, builder, module, fn_value, scope, bb) =
+                    generate_test_prelude(&ctx);
 
                 let (ptr, _bb) = cg_expr(
                     &ctx,
+                    &target_machine,
                     &builder,
                     &module,
                     &fn_value,
@@ -1112,8 +1412,8 @@ mod tests {
         fn ternary_generates_proper_cfg() {
             let ctx = Context::create();
 
-            let generate_test_prelude =
-                make_test_prelude_closure(|ctx, _builder, module, _fn_value, scope, bb| {
+            let generate_test_prelude = make_test_prelude_closure(
+                |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
                     // generate `get_some_bool: fn() -> bool`
                     let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
                     let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
@@ -1128,10 +1428,12 @@ mod tests {
                     scope.insert("get_some_int", gsi_val.as_global_value().as_pointer_value());
 
                     *bb
-                });
+                },
+            );
 
             let expected = {
-                let (builder, module, fn_value, _scope, _bb) = generate_test_prelude(&ctx);
+                let (_target_machine, builder, module, fn_value, _scope, _bb) =
+                    generate_test_prelude(&ctx);
 
                 // We will need to generate a couple more complex structures.
                 // First of all, we will call the get_some_bool function and store the result in
@@ -1182,10 +1484,12 @@ mod tests {
             };
 
             let actual = {
-                let (builder, module, fn_value, scope, bb) = generate_test_prelude(&ctx);
+                let (target_machine, builder, module, fn_value, scope, bb) =
+                    generate_test_prelude(&ctx);
 
                 let (reg, _bb) = cg_expr(
                     &ctx,
+                    &target_machine,
                     &builder,
                     &module,
                     &fn_value,
