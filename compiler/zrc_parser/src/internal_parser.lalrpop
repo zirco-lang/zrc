@@ -135,13 +135,13 @@ KeyTypeMapping: KeyTypeMapping<'input> = {
 }
 
 StructOrUnionDeclaration: Declaration<'input> = {
-    "struct" <i:Spanned<IDENTIFIER>> <l:KeyTypeMapping> => Declaration::StructDeclaration {
-        name: i,
-        fields: l,
+    Spanned<("struct" <Spanned<IDENTIFIER>> <KeyTypeMapping>)> => Declaration::TypeAliasDeclaration {
+        name: <>.value().0,
+        ty: Type(<>.map(|(_, values)| TypeKind::Struct(values))),
     },
-    "union" <i:Spanned<IDENTIFIER>> <l:KeyTypeMapping> => Declaration::UnionDeclaration {
-        name: i,
-        fields: l,
+    Spanned<("union" <Spanned<IDENTIFIER>> <KeyTypeMapping>)> => Declaration::TypeAliasDeclaration {
+        name: <>.value().0,
+        ty: Type(<>.map(|(_, values)| TypeKind::Union(values))),
     },
 };
 
