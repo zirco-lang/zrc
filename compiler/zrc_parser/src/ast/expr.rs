@@ -9,6 +9,7 @@ use zrc_utils::{
     spanned,
 };
 
+use super::ty::Type;
 use crate::lexer::StringTok;
 
 /// Arithmetic operators
@@ -232,7 +233,9 @@ pub enum ExprKind<'input> {
     Ternary(Box<Expr<'input>>, Box<Expr<'input>>, Box<Expr<'input>>),
 
     /// `x as T`
-    Cast(Box<Expr<'input>>, super::ty::Type<'input>),
+    Cast(Box<Expr<'input>>, Type<'input>),
+    /// `sizeof(T)`
+    SizeOf(Type<'input>),
 
     /// Any numeric literal.
     NumberLiteral(&'input str),
@@ -269,6 +272,7 @@ impl<'input> Display for ExprKind<'input> {
             Self::UnaryDereference(expr) => write!(f, "*{expr}"),
             Self::Ternary(cond, if_true, if_false) => write!(f, "{cond} ? {if_true} : {if_false}"),
             Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
+            Self::SizeOf(ty) => write!(f, "sizeof({ty})"),
             Self::Dot(expr, key) => write!(f, "{expr}.{}", key.value()),
             Self::Arrow(ptr, key) => write!(f, "{ptr}->{}", key.value()),
             Self::Cast(expr, ty) => write!(f, "{expr} as {ty}"),
@@ -508,12 +512,16 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn build_cast(expr: Self, ty: super::ty::Type<'input>) -> Self {
+    pub fn build_cast(expr: Self, ty: Type<'input>) -> Self {
         Self(spanned!(
             expr.0.start(),
             ExprKind::Cast(Box::new(expr), ty),
             ty.0.end()
         ))
+    }
+    #[must_use]
+    pub fn build_sizeof(span: Span, ty: Type<'input>) -> Self {
+        Self(ExprKind::SizeOf(ty).in_span(span))
     }
 
     // These all need spans because they can't be guessed

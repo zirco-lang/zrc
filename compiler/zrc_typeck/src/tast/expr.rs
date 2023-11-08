@@ -7,15 +7,17 @@ pub use zrc_parser::{
     lexer::StringTok,
 };
 
+use super::ty::Type;
+
 /// An [expression kind](TypedExprKind) with its yielded [result
 /// type](super::ty::Type) attached to it.
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
-pub struct TypedExpr<'input>(pub super::ty::Type<'input>, pub TypedExprKind<'input>);
+pub struct TypedExpr<'input>(pub Type<'input>, pub TypedExprKind<'input>);
 
 /// The left hand side of an assignment.
 #[derive(PartialEq, Debug, Clone)]
-pub struct Place<'input>(pub super::ty::Type<'input>, pub PlaceKind<'input>);
+pub struct Place<'input>(pub Type<'input>, pub PlaceKind<'input>);
 /// The valid left-hand-side of a [`TypedExprKind::Assignment`].
 ///
 /// Places may be:
@@ -85,7 +87,9 @@ pub enum TypedExprKind<'input> {
     ),
 
     /// `x as T`
-    Cast(Box<TypedExpr<'input>>, super::ty::Type<'input>),
+    Cast(Box<TypedExpr<'input>>, Type<'input>),
+    /// `sizeof(T)`
+    SizeOf(Type<'input>),
 
     /// Any numeric literal.
     NumberLiteral(&'input str),
@@ -124,6 +128,7 @@ impl<'input> Display for TypedExprKind<'input> {
             Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
             Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
             Self::Cast(expr, ty) => write!(f, "{expr} as {ty}"),
+            Self::SizeOf(ty) => write!(f, "sizeof({ty})"),
             Self::Call(expr, args) => write!(
                 f,
                 "{expr}({})",

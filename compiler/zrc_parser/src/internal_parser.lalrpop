@@ -311,6 +311,7 @@ Primary: Expr<'input> = {
     Spanned<IDENTIFIER> => Expr(<>.map(|i| ExprKind::Identifier(i))),
     Spanned<"true"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(true))),
     Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
+    Spanned<("sizeof" "(" <Type> ")")> => Expr(<>.map(|t| ExprKind::SizeOf(t))),
     "(" <Expr> ")" => <>,
 };
 
@@ -386,6 +387,7 @@ extern {
         "as" => lexer::Tok::As,
         "struct" => lexer::Tok::Struct,
         "union" => lexer::Tok::Union,
+        "sizeof" => lexer::Tok::SizeOf,
         "->" => lexer::Tok::SmallArrow,
         "..." => lexer::Tok::Ellipsis,
     }

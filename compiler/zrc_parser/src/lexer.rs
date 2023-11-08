@@ -386,6 +386,9 @@ pub enum Tok<'input> {
     /// The keyword `union`
     #[token("union")]
     Union,
+    /// The keyword `sizeof`
+    #[token("sizeof")]
+    SizeOf,
     /// The operator `->`
     #[token("->")]
     SmallArrow,
@@ -461,6 +464,7 @@ impl<'input> Display for Tok<'input> {
                 ),
                 Self::Struct => "struct".to_string(),
                 Self::Union => "union".to_string(),
+                Self::SizeOf => "sizeof".to_string(),
                 Self::True => "true".to_string(),
                 Self::While => "while".to_string(),
                 Self::BitwiseAnd => "&".to_string(),
@@ -613,7 +617,7 @@ mod tests {
         let input = concat!(
             "+ - * / % == != > >= < <= && || ! & | ^ ~ << >> = += -= *= /= %= &= |= ^= <<= >>= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while for break continue return let fn as",
-            r#" struct union -> "str" 7_000 0xF_A 0b1_0 abc"#
+            r#" struct union sizeof -> "str" 7_000 0xF_A 0b1_0 abc"#
         );
         let tokens: Vec<Tok> = vec![
             Tok::Plus,
@@ -673,6 +677,7 @@ mod tests {
             Tok::As,
             Tok::Struct,
             Tok::Union,
+            Tok::SizeOf,
             Tok::SmallArrow,
             Tok::StringLiteral(vec![StringTok::Text("str")]),
             Tok::NumberLiteral("7_000"),

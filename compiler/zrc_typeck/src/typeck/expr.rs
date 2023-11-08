@@ -602,6 +602,11 @@ pub fn type_expr<'input>(
             }
         }
 
+        ExprKind::SizeOf(ty) => {
+            let resolved_ty = resolve_type(scope, ty)?;
+            TypedExpr(TastType::U64, TypedExprKind::SizeOf(resolved_ty))
+        }
+
         ExprKind::NumberLiteral(n) => TypedExpr(TastType::I32, TypedExprKind::NumberLiteral(n)),
         ExprKind::StringLiteral(str) => TypedExpr(
             TastType::Ptr(Box::new(TastType::U8)),
