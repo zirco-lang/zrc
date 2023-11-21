@@ -1,3 +1,9 @@
+<div align="center">
+
+![Zirco banner](https://github.com/zirco-lang/assets/blob/main/png/wide-light.png)
+
+</div>
+
 # The Zirco Programming Language
 
 This is the main source code repository for `zrc`, the compiler of the Zirco programming language.
