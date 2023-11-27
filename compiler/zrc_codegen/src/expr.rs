@@ -751,6 +751,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             // int -> fn = inttoptr
             // fn -> int = ptrtoint
 
+            let x_ty = (*x).0.clone();
             let (x, bb) = cg_expr(
                 ctx,
                 target_machine,
@@ -762,7 +763,6 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 *x,
             );
 
-            // FIXME: Does this actually do sext/zext or just bitcasts?
             let reg = match (x.get_type().is_pointer_type(), matches!(ty, Type::Ptr(_))) {
                 (true, true) => builder
                     .build_bitcast(
@@ -783,14 +783,41 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     )
                     .unwrap()
                     .as_basic_value_enum(),
-                (false, false) => builder
-                    .build_bitcast(
-                        x.into_int_value(),
-                        llvm_basic_type(ctx, target_machine, ty),
-                        "cast",
-                    )
-                    .unwrap()
-                    .as_basic_value_enum(),
+                (false, false) if x.get_type().is_int_type() && ty.is_integer() => {
+                    // Cast between two integers
+                    match (x_ty.is_signed_integer(), ty.is_signed_integer()) {
+                        // (x is signed, target is signed or unsigned)
+                        (true, _) => builder
+                            .build_int_s_extend(
+                                x.into_int_value(),
+                                llvm_basic_type(ctx, target_machine, ty).into_int_type(),
+                                "cast",
+                            )
+                            .unwrap()
+                            .as_basic_value_enum(),
+
+                        // (x is signed, target is signed or unsigned)
+                        (false, _) => builder
+                            .build_int_z_extend(
+                                x.into_int_value(),
+                                llvm_basic_type(ctx, target_machine, ty).into_int_type(),
+                                "cast",
+                            )
+                            .unwrap()
+                            .as_basic_value_enum(),
+                    }
+                }
+                (false, false) => {
+                    // Other casts are just bitcasts
+                    builder
+                        .build_bitcast(
+                            x.into_int_value(),
+                            llvm_basic_type(ctx, target_machine, ty),
+                            "cast",
+                        )
+                        .unwrap()
+                        .as_basic_value_enum()
+                }
             };
 
             (reg, bb)
