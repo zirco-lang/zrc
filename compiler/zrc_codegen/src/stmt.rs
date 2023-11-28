@@ -16,9 +16,10 @@ use inkwell::{
 };
 use zrc_typeck::tast::{
     expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
-    stmt::{ArgumentDeclaration, LetDeclaration, TypedDeclaration, TypedStmt},
+    stmt::{ArgumentDeclaration, LetDeclaration, TypedDeclaration, TypedStmt, TypedStmtKind},
     ty::Type,
 };
+use zrc_utils::span::Spannable;
 
 use crate::{
     expr::cg_expr,
@@ -60,11 +61,11 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
         let ptr = builder
             .build_alloca(
                 llvm_basic_type(ctx, target_machine, let_declaration.ty.clone()),
-                &format!("let_{}", let_declaration.name),
+                &format!("let_{}", let_declaration.name.value()),
             )
             .unwrap();
 
-        scope.insert(let_declaration.name, ptr);
+        scope.insert(let_declaration.name.value(), ptr);
 
         if let Some(value) = let_declaration.value {
             bb = cg_expr(
@@ -80,10 +81,12 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
                     TypedExprKind::Assignment(
                         Box::new(Place(
                             let_declaration.ty,
-                            PlaceKind::Variable(let_declaration.name),
+                            PlaceKind::Variable(let_declaration.name.value())
+                                .in_span(let_declaration.name.span()),
                         )),
-                        Box::new(value),
-                    ),
+                        Box::new(value.clone()),
+                    )
+                    .in_span(value.1.span()),
                 ),
             )
             .1;
@@ -119,8 +122,8 @@ fn cg_block<'ctx, 'input, 'a>(
     block
         .into_iter()
         .try_fold(*bb, |bb, stmt| -> Option<BasicBlock> {
-            match stmt {
-                TypedStmt::ExprStmt(expr) => Some(
+            match stmt.0.into_value() {
+                TypedStmtKind::ExprStmt(expr) => Some(
                     cg_expr(
                         ctx,
                         target_machine,
@@ -134,7 +137,7 @@ fn cg_block<'ctx, 'input, 'a>(
                     .1,
                 ),
 
-                TypedStmt::IfStmt(cond, then, then_else) => {
+                TypedStmtKind::IfStmt(cond, then, then_else) => {
                     let then_else = then_else.unwrap_or(vec![]);
 
                     let (cond, _) = cg_expr(
@@ -207,7 +210,7 @@ fn cg_block<'ctx, 'input, 'a>(
                     }
                 }
 
-                TypedStmt::BlockStmt(block) => cg_block(
+                TypedStmtKind::BlockStmt(block) => cg_block(
                     ctx,
                     target_machine,
                     builder,
@@ -219,7 +222,7 @@ fn cg_block<'ctx, 'input, 'a>(
                     breakaway.clone(),
                 ),
 
-                TypedStmt::ReturnStmt(Some(expr)) => {
+                TypedStmtKind::ReturnStmt(Some(expr)) => {
                     let (expr, _) = cg_expr(
                         ctx,
                         target_machine,
@@ -236,13 +239,13 @@ fn cg_block<'ctx, 'input, 'a>(
                     None
                 }
 
-                TypedStmt::ReturnStmt(None) => {
+                TypedStmtKind::ReturnStmt(None) => {
                     builder.build_return(None).unwrap();
 
                     None
                 }
 
-                TypedStmt::ContinueStmt => {
+                TypedStmtKind::ContinueStmt => {
                     builder
                         .build_unconditional_branch(breakaway.as_ref().unwrap().on_continue)
                         .unwrap();
@@ -250,7 +253,7 @@ fn cg_block<'ctx, 'input, 'a>(
                     None
                 }
 
-                TypedStmt::BreakStmt => {
+                TypedStmtKind::BreakStmt => {
                     builder
                         .build_unconditional_branch(breakaway.as_ref().unwrap().on_break)
                         .unwrap();
@@ -258,7 +261,7 @@ fn cg_block<'ctx, 'input, 'a>(
                     None
                 }
 
-                TypedStmt::DeclarationList(declarations) => Some(cg_let_declaration(
+                TypedStmtKind::DeclarationList(declarations) => Some(cg_let_declaration(
                     ctx,
                     target_machine,
                     builder,
@@ -269,7 +272,7 @@ fn cg_block<'ctx, 'input, 'a>(
                     declarations,
                 )),
 
-                TypedStmt::ForStmt {
+                TypedStmtKind::ForStmt {
                     init,
                     cond,
                     post,
@@ -383,7 +386,7 @@ fn cg_block<'ctx, 'input, 'a>(
                     Some(exit)
                 }
 
-                TypedStmt::WhileStmt(cond, body) => {
+                TypedStmtKind::WhileStmt(cond, body) => {
                     // While loops are similar to for loops but much simpler.
                     // The preheader simply just breaks to the header.
                     // The header checks the condition and breaks to the exit or the body.

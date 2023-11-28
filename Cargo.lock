@@ -1249,6 +1249,7 @@ dependencies = [
  "indexmap",
  "inkwell",
  "zrc_typeck",
+ "zrc_utils",
 ]
 
 [[package]]

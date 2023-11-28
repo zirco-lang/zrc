@@ -17,6 +17,7 @@ use zrc_typeck::tast::{
     },
     ty::Type,
 };
+use zrc_utils::span::Spannable;
 
 use super::CgScope;
 use crate::ty::{llvm_basic_type, llvm_int_type, llvm_type};
@@ -33,7 +34,7 @@ fn cg_place<'ctx, 'a>(
     scope: &'a CgScope<'_, 'ctx>,
     place: Place,
 ) -> (PointerValue<'ctx>, BasicBlock<'ctx>) {
-    match place.1 {
+    match place.1.into_value() {
         PlaceKind::Variable(x) => {
             let reg = scope.get(x).unwrap();
 
@@ -97,7 +98,7 @@ fn cg_place<'ctx, 'a>(
                 let x_ty = llvm_basic_type(ctx, target_machine, x.0.clone());
                 let prop_idx = contents
                     .iter()
-                    .position(|(got_key, _)| *got_key == prop)
+                    .position(|(got_key, _)| got_key == prop.value())
                     .expect("invalid struct field");
 
                 let (x, bb) = cg_place(
@@ -161,7 +162,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
     scope: &'a CgScope<'_, 'ctx>,
     expr: TypedExpr,
 ) -> (BasicValueEnum<'ctx>, BasicBlock<'ctx>) {
-    match expr.1 {
+    let expr_span = expr.1.span();
+    match expr.1.into_value() {
         TypedExprKind::NumberLiteral(n) => (
             llvm_int_type(ctx, expr.0)
                 .const_int_from_string(n, StringRadix::Decimal)
@@ -237,7 +239,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 function,
                 bb,
                 scope,
-                Place(expr.0.clone(), PlaceKind::Variable(id)),
+                Place(expr.0.clone(), PlaceKind::Variable(id).in_span(expr_span)),
             );
 
             let reg = builder
@@ -578,7 +580,10 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 function,
                 bb,
                 scope,
-                Place(expr.0.clone(), PlaceKind::Index(ptr, idx)),
+                Place(
+                    expr.0.clone(),
+                    PlaceKind::Index(ptr.clone(), idx).in_span((*ptr).1.span()),
+                ),
             );
 
             let loaded = builder
@@ -597,7 +602,10 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 function,
                 bb,
                 scope,
-                Place(expr.0.clone(), PlaceKind::Dot(place, key)),
+                Place(
+                    expr.0.clone(),
+                    PlaceKind::Dot(place, key).in_span(expr_span),
+                ),
             );
 
             let loaded = builder
@@ -625,7 +633,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let mut bb = bb;
             let old_args = args;
             let mut args = vec![];
-            for arg in old_args {
+            for arg in old_args.into_value() {
                 let (new_arg, new_bb) = cg_expr(
                     ctx,
                     target_machine,
