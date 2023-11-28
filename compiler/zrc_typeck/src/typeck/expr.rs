@@ -612,6 +612,7 @@ pub fn type_expr<'input>(
             TastType::Ptr(Box::new(TastType::U8)),
             TypedExprKind::StringLiteral(str),
         ),
+        ExprKind::CharLiteral(ch) => TypedExpr(TastType::U8, TypedExprKind::CharLiteral(ch)),
         ExprKind::Identifier(i) => {
             let ty = scope.get_value(i).ok_or_else(|| {
                 Diagnostic(

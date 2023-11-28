@@ -316,6 +316,7 @@ ArgumentList: Vec<Expr<'input>> = CommaSeparated<Assignment>;
 Primary: Expr<'input> = {
     Spanned<NUMBER> => Expr(<>.map(|n| ExprKind::NumberLiteral(n))),
     Spanned<STRING> => Expr(<>.map(|s| ExprKind::StringLiteral(s))),
+    Spanned<CHAR> => Expr(<>.map(|c| ExprKind::CharLiteral(c))),
     Spanned<IDENTIFIER> => Expr(<>.map(|i| ExprKind::Identifier(i))),
     Spanned<"true"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(true))),
     Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
@@ -378,6 +379,7 @@ extern {
         "]" => lexer::Tok::RightBracket,
 
         STRING => lexer::Tok::StringLiteral(<Vec<lexer::StringTok<'input>>>),
+        CHAR => lexer::Tok::CharLiteral(<Vec<lexer::StringTok<'input>>>),
         NUMBER => lexer::Tok::NumberLiteral(<&'input str>),
         IDENTIFIER => lexer::Tok::Identifier(<&'input str>),
 

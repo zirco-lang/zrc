@@ -403,6 +403,12 @@ pub enum Tok<'input> {
     Ellipsis,
 
     // === SPECIAL ===
+    /// Any character literal
+    #[regex(r"'([^'\\]|\\.)*'", lex_string_contents)]
+    #[regex(r"'([^'\\]|\\.)*", |_lex| {
+        Err(InternalLexicalError::UnterminatedStringLiteral)
+    })]
+    CharLiteral(Vec<StringTok<'input>>),
     /// Any string literal
     #[regex(r#""([^"\\]|\\.)*""#, lex_string_contents)]
     #[regex(r#""([^"\\]|\\.)*"#, |_lex| {
@@ -467,6 +473,10 @@ impl<'input> Display for Tok<'input> {
                 Self::StringLiteral(str) => format!(
                     "\"{}\"",
                     str.iter().map(ToString::to_string).collect::<String>()
+                ),
+                Self::CharLiteral(ch) => format!(
+                    "'{}'",
+                    ch.iter().map(ToString::to_string).collect::<String>()
                 ),
                 Self::Struct => "struct".to_string(),
                 Self::Union => "union".to_string(),

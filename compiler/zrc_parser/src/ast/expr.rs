@@ -241,6 +241,8 @@ pub enum ExprKind<'input> {
     NumberLiteral(&'input str),
     /// Any string literal.
     StringLiteral(Vec<StringTok<'input>>),
+    /// Any char literal
+    CharLiteral(Vec<StringTok<'input>>),
     /// Any identifier.
     Identifier(&'input str),
     /// Any boolean literal.
@@ -254,6 +256,11 @@ impl<'input> Display for ExprKind<'input> {
             Self::StringLiteral(str) => write!(
                 f,
                 "\"{}\"",
+                str.iter().map(ToString::to_string).collect::<String>()
+            ),
+            Self::CharLiteral(str) => write!(
+                f,
+                "'{}'",
                 str.iter().map(ToString::to_string).collect::<String>()
             ),
             Self::Identifier(i) => write!(f, "{i}"),
@@ -540,6 +547,15 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             span.start(),
             ExprKind::StringLiteral(lit.into_value()),
+            span.end()
+        ))
+    }
+    #[must_use]
+    pub fn build_char(lit: Spanned<Vec<StringTok<'input>>>) -> Self {
+        let span = lit.span();
+        Self(spanned!(
+            span.start(),
+            ExprKind::CharLiteral(lit.into_value()),
             span.end()
         ))
     }

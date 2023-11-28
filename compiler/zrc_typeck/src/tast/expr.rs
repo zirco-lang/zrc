@@ -95,6 +95,8 @@ pub enum TypedExprKind<'input> {
     NumberLiteral(&'input str),
     /// Any string literal.bool
     StringLiteral(Vec<StringTok<'input>>),
+    /// Any char literal
+    CharLiteral(Vec<StringTok<'input>>),
     /// Any identifier.
     Identifier(&'input str),
     /// Any boolean literal.
@@ -108,6 +110,11 @@ impl<'input> Display for TypedExprKind<'input> {
             Self::StringLiteral(str) => write!(
                 f,
                 "\"{}\"",
+                str.iter().map(ToString::to_string).collect::<String>()
+            ),
+            Self::CharLiteral(str) => write!(
+                f,
+                "\'{}\'",
                 str.iter().map(ToString::to_string).collect::<String>()
             ),
             Self::Identifier(i) => write!(f, "{i}"),
