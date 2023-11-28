@@ -6,6 +6,7 @@ pub use zrc_parser::{
     ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical},
     lexer::StringTok,
 };
+use zrc_utils::span::Spanned;
 
 use super::ty::Type;
 
@@ -13,11 +14,11 @@ use super::ty::Type;
 /// type](super::ty::Type) attached to it.
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
-pub struct TypedExpr<'input>(pub Type<'input>, pub TypedExprKind<'input>);
+pub struct TypedExpr<'input>(pub Type<'input>, pub Spanned<TypedExprKind<'input>>);
 
 /// The left hand side of an assignment.
 #[derive(PartialEq, Debug, Clone)]
-pub struct Place<'input>(pub Type<'input>, pub PlaceKind<'input>);
+pub struct Place<'input>(pub Type<'input>, pub Spanned<PlaceKind<'input>>);
 /// The valid left-hand-side of a [`TypedExprKind::Assignment`].
 ///
 /// Places may be:
@@ -32,7 +33,7 @@ pub enum PlaceKind<'input> {
     /// `x[y]`
     Index(Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
     /// `x.y`
-    Dot(Box<Place<'input>>, &'input str),
+    Dot(Box<Place<'input>>, Spanned<&'input str>),
 }
 
 /// The kind of a [`TypedExpr`]
@@ -75,9 +76,9 @@ pub enum TypedExprKind<'input> {
     /// `a[b]`
     Index(Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
     /// `a.b`
-    Dot(Box<Place<'input>>, &'input str),
+    Dot(Box<Place<'input>>, Spanned<&'input str>),
     /// `a(b, c, d, ...)`
-    Call(Box<Place<'input>>, Vec<TypedExpr<'input>>),
+    Call(Box<Place<'input>>, Spanned<Vec<TypedExpr<'input>>>),
 
     /// `a ? b : c`
     Ternary(
@@ -126,13 +127,14 @@ impl<'input> Display for TypedExprKind<'input> {
             Self::UnaryDereference(expr) => write!(f, "*{expr}"),
             Self::Ternary(cond, if_true, if_false) => write!(f, "{cond} ? {if_true} : {if_false}"),
             Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
-            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
+            Self::Dot(expr, key) => write!(f, "{expr}.{}", key.value()),
             Self::Cast(expr, ty) => write!(f, "{expr} as {ty}"),
             Self::SizeOf(ty) => write!(f, "sizeof({ty})"),
             Self::Call(expr, args) => write!(
                 f,
                 "{expr}({})",
-                args.iter()
+                args.value()
+                    .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", ")
@@ -146,18 +148,18 @@ impl<'input> Display for PlaceKind<'input> {
             Self::Deref(expr) => write!(f, "*{expr}"),
             Self::Variable(ident) => write!(f, "{ident}"),
             Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
-            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
+            Self::Dot(expr, key) => write!(f, "{expr}.{}", key.value()),
         }
     }
 }
 impl<'input> Display for Place<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}) as ({})", self.1, self.0)
+        write!(f, "({}) as ({})", self.1.value(), self.0)
     }
 }
 
 impl<'input> Display for TypedExpr<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "(({}) as ({}))", self.1, self.0)
+        write!(f, "(({}) as ({}))", self.1.value(), self.0)
     }
 }

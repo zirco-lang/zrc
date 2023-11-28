@@ -2,13 +2,15 @@
 
 use std::{fmt::Display, string::ToString};
 
+use zrc_utils::span::Spanned;
+
 use super::{expr::TypedExpr, ty::Type};
 
 /// A declaration created with `let`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LetDeclaration<'input> {
     /// The name of the identifier.
-    pub name: &'input str,
+    pub name: Spanned<&'input str>,
     /// The type of the new symbol. If set to [`None`], the type will be
     /// inferred.
     pub ty: Type<'input>, // types are definite after inference
@@ -19,17 +21,22 @@ pub struct LetDeclaration<'input> {
 impl<'input> Display for LetDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.value {
-            Some(value) => write!(f, "{}: {} = {}", self.name, self.ty, value),
-            None => write!(f, "{}: {}", self.name, self.ty),
+            Some(value) => write!(f, "{}: {} = {}", self.name.value(), self.ty, value),
+            None => write!(f, "{}: {}", self.name.value(), self.ty),
         }
     }
 }
+
+/// A typed statement with a span
+#[derive(PartialEq, Debug, Clone)]
+#[allow(clippy::module_name_repetitions)]
+pub struct TypedStmt<'input>(pub Spanned<TypedStmtKind<'input>>);
 
 /// The enum representing all of the different kinds of statements in Zirco
 /// after type checking
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::module_name_repetitions)]
-pub enum TypedStmt<'input> {
+pub enum TypedStmtKind<'input> {
     // all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here
     // (basically if (x) y has become if (x) {y})
     /// `if (x) y` or `if (x) y else z`
@@ -152,6 +159,8 @@ impl<'input> Display for TypedDeclaration<'input> {
                 parameters,
                 body.iter()
                     .map(|stmt| stmt
+                        .0
+                        .value()
                         .to_string()
                         .split('\n')
                         .map(|x| format!("    {x}"))
@@ -176,6 +185,8 @@ impl<'input> Display for TypedDeclaration<'input> {
                 "fn {name}({parameters}) {{\n{}\n}}",
                 body.iter()
                     .map(|stmt| stmt
+                        .0
+                        .value()
                         .to_string()
                         .split('\n')
                         .map(|x| format!("    {x}"))
@@ -194,7 +205,7 @@ impl<'input> Display for TypedDeclaration<'input> {
     }
 }
 
-impl<'input> Display for TypedStmt<'input> {
+impl<'input> Display for TypedStmtKind<'input> {
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -204,6 +215,8 @@ impl<'input> Display for TypedStmt<'input> {
                 if_true
                     .iter()
                     .map(|stmt| stmt
+                        .0
+                        .value()
                         .to_string()
                         .split('\n')
                         .map(|x| format!("    {x}"))
@@ -214,6 +227,8 @@ impl<'input> Display for TypedStmt<'input> {
                 if_false
                     .iter()
                     .map(|stmt| stmt
+                        .0
+                        .value()
                         .to_string()
                         .split('\n')
                         .map(|x| format!("    {x}"))
@@ -228,6 +243,8 @@ impl<'input> Display for TypedStmt<'input> {
                 if_true
                     .iter()
                     .map(|stmt| stmt
+                        .0
+                        .value()
                         .to_string()
                         .split('\n')
                         .map(|x| format!("    {x}"))
@@ -241,6 +258,8 @@ impl<'input> Display for TypedStmt<'input> {
                 "while ({cond}) {{\n{}\n}}",
                 body.iter()
                     .map(|stmt| stmt
+                        .0
+                        .value()
                         .to_string()
                         .split('\n')
                         .map(|x| format!("    {x}"))
@@ -268,6 +287,8 @@ impl<'input> Display for TypedStmt<'input> {
                 post.clone().map_or(String::new(), |x| x.to_string()),
                 body.iter()
                     .map(|stmt| stmt
+                        .0
+                        .value()
                         .to_string()
                         .split('\n')
                         .map(|x| format!("    {x}"))
@@ -282,6 +303,8 @@ impl<'input> Display for TypedStmt<'input> {
                 stmts
                     .iter()
                     .map(|stmt| stmt
+                        .0
+                        .value()
                         .to_string()
                         .split('\n')
                         .map(|x| format!("    {x}"))
