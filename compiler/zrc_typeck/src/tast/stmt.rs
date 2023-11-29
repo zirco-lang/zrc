@@ -257,15 +257,15 @@ impl<'input> Display for TypedStmt<'input> {
             } => write!(
                 f,
                 "for ({} {}; {}) {{\n{}\n}}",
-                init.clone().map_or(String::new(), |x| format!(
+                init.as_ref().map_or(String::new(), |x| format!(
                     "let {};",
                     x.iter()
                         .map(ToString::to_string)
                         .collect::<Vec<_>>()
                         .join(", ")
                 )),
-                cond.clone().map_or(String::new(), |x| x.to_string()),
-                post.clone().map_or(String::new(), |x| x.to_string()),
+                cond.as_ref().map_or(String::new(), |x| x.to_string()),
+                post.as_ref().map_or(String::new(), |x| x.to_string()),
                 body.iter()
                     .map(|stmt| stmt
                         .to_string()

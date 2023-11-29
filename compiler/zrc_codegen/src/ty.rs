@@ -141,16 +141,18 @@ pub fn llvm_type<'ctx>(
 
         Type::Void => ctx.void_type().as_any_type_enum(),
 
-        Type::Fn(args, ret) => create_fn(
-            llvm_type(ctx, target_machine, ret.into_tast_type()),
-            &args
-                .clone()
-                .into_arguments()
-                .into_iter()
-                .map(|arg| llvm_basic_type(ctx, target_machine, arg.ty).into())
-                .collect::<Vec<_>>(),
-            args.is_variadic(),
-        )
-        .as_any_type_enum(),
+        Type::Fn(args, ret) => {
+            let is_variadic = args.is_variadic();
+            create_fn(
+                llvm_type(ctx, target_machine, ret.into_tast_type()),
+                &args
+                    .into_arguments()
+                    .into_iter()
+                    .map(|arg| llvm_basic_type(ctx, target_machine, arg.ty).into())
+                    .collect::<Vec<_>>(),
+                is_variadic,
+            )
+            .as_any_type_enum()
+        }
     }
 }

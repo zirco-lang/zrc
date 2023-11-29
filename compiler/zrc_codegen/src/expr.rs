@@ -108,7 +108,7 @@ fn cg_place<'ctx, 'a>(
                     function,
                     bb,
                     scope,
-                    *x.clone(),
+                    *x,
                 );
 
                 let reg = builder.build_struct_gep(

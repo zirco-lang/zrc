@@ -199,7 +199,7 @@ impl<'input> Display for StmtKind<'input> {
                 write!(
                     f,
                     "for ({} {}; {}) {body}",
-                    init.clone().map_or(";".to_string(), |x| format!(
+                    init.as_ref().map_or(";".to_string(), |x| format!(
                         "let {};",
                         x.value()
                             .iter()
@@ -207,8 +207,8 @@ impl<'input> Display for StmtKind<'input> {
                             .collect::<Vec<_>>()
                             .join(", ")
                     )),
-                    cond.clone().map_or(String::new(), |x| x.to_string()),
-                    post.clone().map_or(String::new(), |x| x.to_string()),
+                    cond.as_ref().map_or(String::new(), |x| x.to_string()),
+                    post.as_ref().map_or(String::new(), |x| x.to_string()),
                 )
             }
 

@@ -95,10 +95,12 @@ pub enum BlockReturnActuality {
 /// }` without converting `{ x; }` to `{ { x; } }`. This is preferred instead of
 /// `vec![x]` as it prevents extra nesting layers.
 fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
+    let span = stmt.0.span();
+
     #[allow(clippy::wildcard_enum_match_arm)]
-    stmt.0.clone().map(|value| match value {
+    stmt.0.map(|value| match value {
         StmtKind::BlockStmt(stmts) => stmts,
-        _ => vec![stmt],
+        stmt_kind => vec![Stmt(stmt_kind.in_span(span))],
     })
 }
 
@@ -136,6 +138,7 @@ fn process_let_declaration<'input>(
                     .clone()
                     .map(|expr| type_expr(scope, expr))
                     .transpose()?;
+
                 let resolved_ty = let_declaration
                     .value()
                     .ty
@@ -613,7 +616,7 @@ pub fn type_block<'input>(
 
                                 let (typed_body, body_return_actuality) = type_block(
                                     &loop_scope,
-                                    coerce_stmt_into_block(*body.clone()),
+                                    coerce_stmt_into_block(*body),
                                     true,
                                     // return ability of a sub-block is determined by this match:
                                     match return_ability.clone() {

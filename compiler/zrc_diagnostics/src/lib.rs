@@ -372,7 +372,7 @@ impl Diagnostic {
             "{}: {}\n{}",
             self.0,
             Color::White.bold().paint(self.1.value().to_string()),
-            display_source_window(&self.0.clone(), self.1.span(), source)
+            display_source_window(&self.0, self.1.span(), source)
         )
     }
 }
