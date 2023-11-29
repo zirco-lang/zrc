@@ -81,7 +81,7 @@ fn cg_place<'ctx, 'a>(
             // TODO: Is this actually safely used?
             let reg = unsafe {
                 builder.build_gep(
-                    llvm_basic_type(ctx, target_machine, place.0),
+                    llvm_basic_type(ctx, target_machine, &place.0),
                     ptr.into_pointer_value(),
                     &[idx.into_int_value()],
                     "gep",
@@ -92,9 +92,9 @@ fn cg_place<'ctx, 'a>(
         }
 
         #[allow(clippy::wildcard_enum_match_arm)]
-        PlaceKind::Dot(x, prop) => match (*x).0.clone() {
+        PlaceKind::Dot(x, prop) => match &(*x).0 {
             Type::Struct(contents) => {
-                let x_ty = llvm_basic_type(ctx, target_machine, x.0.clone());
+                let x_ty = llvm_basic_type(ctx, target_machine, &x.0);
                 let prop_idx = contents
                     .iter()
                     .position(|(got_key, _)| *got_key == prop)
@@ -133,7 +133,7 @@ fn cg_place<'ctx, 'a>(
                     function,
                     bb,
                     scope,
-                    *x.clone(),
+                    *x,
                 );
 
                 (x, bb)
@@ -163,7 +163,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 ) -> (BasicValueEnum<'ctx>, BasicBlock<'ctx>) {
     match expr.1 {
         TypedExprKind::NumberLiteral(n) => (
-            llvm_int_type(ctx, expr.0)
+            llvm_int_type(ctx, &expr.0)
                 .const_int_from_string(n, StringRadix::Decimal)
                 .unwrap()
                 .as_basic_value_enum(),
@@ -242,7 +242,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             let reg = builder
                 .build_load(
-                    llvm_basic_type(ctx, target_machine, expr.0),
+                    llvm_basic_type(ctx, target_machine, &expr.0),
                     place.0,
                     "load",
                 )
@@ -561,7 +561,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             );
 
             let reg = builder.build_load(
-                llvm_basic_type(ctx, target_machine, expr.0),
+                llvm_basic_type(ctx, target_machine, &expr.0),
                 ptr.into_pointer_value(),
                 "load",
             );
@@ -582,7 +582,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             );
 
             let loaded = builder
-                .build_load(llvm_basic_type(ctx, target_machine, expr.0), ptr, "load")
+                .build_load(llvm_basic_type(ctx, target_machine, &expr.0), ptr, "load")
                 .unwrap();
 
             (loaded.as_basic_value_enum(), bb)
@@ -601,17 +601,17 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             );
 
             let loaded = builder
-                .build_load(llvm_basic_type(ctx, target_machine, expr.0), ptr, "load")
+                .build_load(llvm_basic_type(ctx, target_machine, &expr.0), ptr, "load")
                 .unwrap();
 
             (loaded.as_basic_value_enum(), bb)
         }
 
         TypedExprKind::Call(f, args) => {
-            let old_f = f.clone();
+            let llvm_f_type = llvm_type(ctx, target_machine, &f.0).into_function_type();
 
             // will always be a function pointer
-            let (f, bb) = cg_place(
+            let (f_ptr, bb) = cg_place(
                 ctx,
                 target_machine,
                 builder,
@@ -641,12 +641,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             }
 
             let ret = builder
-                .build_indirect_call(
-                    llvm_type(ctx, target_machine, old_f.0).into_function_type(),
-                    f,
-                    &args,
-                    "call",
-                )
+                .build_indirect_call(llvm_f_type, f_ptr, &args, "call")
                 .unwrap();
 
             (
@@ -734,7 +729,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             builder.position_at_end(end_bb);
             let result_reg = builder
-                .build_phi(llvm_basic_type(ctx, target_machine, expr.0), "yield")
+                .build_phi(llvm_basic_type(ctx, target_machine, &expr.0), "yield")
                 .unwrap();
             result_reg.add_incoming(&[(&if_true, if_true_bb), (&if_false, if_false_bb)]);
             (result_reg.as_basic_value(), end_bb)
@@ -751,7 +746,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             // int -> fn = inttoptr
             // fn -> int = ptrtoint
 
-            let x_ty = (*x).0.clone();
+            let x_ty_is_signed_integer = (*x).0.is_signed_integer();
+
             let (x, bb) = cg_expr(
                 ctx,
                 target_machine,
@@ -767,30 +763,30 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 (true, true) => builder
                     .build_bitcast(
                         x.into_pointer_value(),
-                        llvm_basic_type(ctx, target_machine, ty),
+                        llvm_basic_type(ctx, target_machine, &ty),
                         "cast",
                     )
                     .unwrap(),
                 (true, false) => builder
-                    .build_ptr_to_int(x.into_pointer_value(), llvm_int_type(ctx, ty), "cast")
+                    .build_ptr_to_int(x.into_pointer_value(), llvm_int_type(ctx, &ty), "cast")
                     .unwrap()
                     .as_basic_value_enum(),
                 (false, true) => builder
                     .build_int_to_ptr(
                         x.into_int_value(),
-                        llvm_basic_type(ctx, target_machine, ty).into_pointer_type(),
+                        llvm_basic_type(ctx, target_machine, &ty).into_pointer_type(),
                         "cast",
                     )
                     .unwrap()
                     .as_basic_value_enum(),
                 (false, false) if x.get_type().is_int_type() && ty.is_integer() => {
                     // Cast between two integers
-                    match (x_ty.is_signed_integer(), ty.is_signed_integer()) {
+                    match (x_ty_is_signed_integer, ty.is_signed_integer()) {
                         // (x is signed, target is signed or unsigned)
                         (true, _) => builder
                             .build_int_s_extend(
                                 x.into_int_value(),
-                                llvm_basic_type(ctx, target_machine, ty).into_int_type(),
+                                llvm_basic_type(ctx, target_machine, &ty).into_int_type(),
                                 "cast",
                             )
                             .unwrap()
@@ -800,7 +796,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                         (false, _) => builder
                             .build_int_z_extend(
                                 x.into_int_value(),
-                                llvm_basic_type(ctx, target_machine, ty).into_int_type(),
+                                llvm_basic_type(ctx, target_machine, &ty).into_int_type(),
                                 "cast",
                             )
                             .unwrap()
@@ -812,7 +808,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     builder
                         .build_bitcast(
                             x.into_int_value(),
-                            llvm_basic_type(ctx, target_machine, ty),
+                            llvm_basic_type(ctx, target_machine, &ty),
                             "cast",
                         )
                         .unwrap()
@@ -823,7 +819,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             (reg, bb)
         }
         TypedExprKind::SizeOf(ty) => {
-            let reg = llvm_basic_type(ctx, target_machine, ty)
+            let reg = llvm_basic_type(ctx, target_machine, &ty)
                 .size_of()
                 .unwrap()
                 .as_basic_value_enum();

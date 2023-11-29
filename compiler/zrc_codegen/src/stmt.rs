@@ -59,7 +59,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
     for let_declaration in declarations {
         let ptr = builder
             .build_alloca(
-                llvm_basic_type(ctx, target_machine, let_declaration.ty.clone()),
+                llvm_basic_type(ctx, target_machine, &let_declaration.ty),
                 &format!("let_{}", let_declaration.name),
             )
             .unwrap();
@@ -112,7 +112,7 @@ fn cg_block<'ctx, 'input, 'a>(
     bb: &'a BasicBlock<'ctx>,
     parent_scope: &'a CgScope<'input, 'ctx>,
     block: Vec<TypedStmt<'input>>,
-    breakaway: Option<LoopBreakaway<'ctx>>,
+    breakaway: &Option<LoopBreakaway<'ctx>>,
 ) -> Option<BasicBlock<'ctx>> {
     let mut scope = parent_scope.clone();
 
@@ -165,7 +165,7 @@ fn cg_block<'ctx, 'input, 'a>(
                         &then_bb,
                         &scope,
                         then,
-                        breakaway.clone(),
+                        breakaway,
                     );
 
                     builder.position_at_end(then_else_bb);
@@ -178,7 +178,7 @@ fn cg_block<'ctx, 'input, 'a>(
                         &then_else_bb,
                         &scope,
                         then_else,
-                        breakaway.clone(),
+                        breakaway,
                     );
 
                     match (maybe_then_bb, maybe_then_else_bb) {
@@ -216,7 +216,7 @@ fn cg_block<'ctx, 'input, 'a>(
                     &bb,
                     &scope,
                     block,
-                    breakaway.clone(),
+                    breakaway,
                 ),
 
                 TypedStmt::ReturnStmt(Some(expr)) => {
@@ -350,7 +350,7 @@ fn cg_block<'ctx, 'input, 'a>(
                         &body_bb,
                         &scope,
                         body,
-                        Some(LoopBreakaway {
+                        &Some(LoopBreakaway {
                             on_break: exit,
                             on_continue: latch,
                         }),
@@ -429,7 +429,7 @@ fn cg_block<'ctx, 'input, 'a>(
                         &body_bb,
                         &scope,
                         body,
-                        Some(LoopBreakaway {
+                        &Some(LoopBreakaway {
                             on_break: exit,
                             on_continue: header,
                         }),
@@ -454,13 +454,13 @@ pub fn cg_init_fn<'ctx>(
     target_machine: &TargetMachine,
     name: &str,
     ret: Option<Type>,
-    args: &[Type],
+    args: &[&Type],
     is_variadic: bool,
 ) -> FunctionValue<'ctx> {
-    let ret_type = llvm_type(ctx, target_machine, ret.unwrap_or(Type::Void));
+    let ret_type = llvm_type(ctx, target_machine, &ret.unwrap_or(Type::Void));
     let arg_types = args
         .iter()
-        .map(|ty| llvm_basic_type(ctx, target_machine, ty.clone()).into())
+        .map(|ty| llvm_basic_type(ctx, target_machine, ty).into())
         .collect::<Vec<_>>();
 
     let fn_type = create_fn(
@@ -506,10 +506,9 @@ fn cg_program<'input, 'ctx>(
                     name,
                     return_type,
                     &parameters
-                        .clone()
-                        .into_arguments()
+                        .as_arguments()
                         .iter()
-                        .map(|ArgumentDeclaration { ty, .. }| ty.clone())
+                        .map(|ArgumentDeclaration { ty, .. }| ty)
                         .collect::<Vec<_>>(),
                     parameters.is_variadic(),
                 );
@@ -532,7 +531,7 @@ fn cg_program<'input, 'ctx>(
 
                         let alloc = builder
                             .build_alloca(
-                                llvm_basic_type(ctx, target_machine, ty),
+                                llvm_basic_type(ctx, target_machine, &ty),
                                 &format!("arg_{name}"),
                             )
                             .unwrap();
@@ -563,7 +562,7 @@ fn cg_program<'input, 'ctx>(
                         &entry,
                         &fn_scope,
                         body,
-                        None,
+                        &None,
                     );
                 }
             }
@@ -859,7 +858,7 @@ mod tests {
                             ))],
                             None,
                         )],
-                        None,
+                        &None,
                     )
                     .unwrap();
 
@@ -970,7 +969,7 @@ mod tests {
                                 ),
                             ))]),
                         )],
-                        None,
+                        &None,
                     )
                     .unwrap();
 
@@ -1038,7 +1037,7 @@ mod tests {
                             vec![TypedStmt::ReturnStmt(None)],
                             Some(vec![TypedStmt::ReturnStmt(None)]),
                         )],
-                        None,
+                        &None,
                     );
 
                     assert_eq!(bb, None, "code generation should have terminated");
@@ -1229,7 +1228,7 @@ mod tests {
                                 )]),
                             )],
                         )],
-                        None,
+                        &None,
                     )
                     .unwrap();
 

@@ -110,6 +110,14 @@ impl<'input> ArgumentDeclarationList<'input> {
         }
     }
 
+    /// Get the contained [`Vec`], variadic or not
+    #[must_use]
+    pub fn as_arguments(&self) -> &Vec<ArgumentDeclaration<'input>> {
+        match self {
+            ArgumentDeclarationList::NonVariadic(x) | Self::Variadic(x) => x,
+        }
+    }
+
     /// Returns `true` if this is [`ArgumentDeclarationList::Variadic`].
     #[must_use]
     pub const fn is_variadic(&self) -> bool {
