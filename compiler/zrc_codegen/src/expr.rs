@@ -197,6 +197,38 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 *bb,
             )
         }
+        TypedExprKind::CharLiteral(str) => {
+            let [ch] = str.as_slice() else {
+                panic!("Char literal must be exactly one character")
+            };
+
+            #[allow(clippy::as_conversions)]
+            (
+                ctx.i8_type()
+                    .const_int(
+                        match ch {
+                            StringTok::EscapedBackslash => '\\',
+                            StringTok::EscapedCr => '\r',
+                            StringTok::EscapedNewline => '\n',
+                            StringTok::EscapedHexByte(byte) => {
+                                char::from_u32(byte.parse::<u32>().expect("invalid byte"))
+                                    .expect("invalid char")
+                            }
+                            StringTok::EscapedDoubleQuote => '"',
+                            StringTok::Text(text) => {
+                                assert!(
+                                    text.len() == 1,
+                                    "Char literal must be exactly one character"
+                                );
+                                text.chars().next().unwrap()
+                            }
+                        } as u64,
+                        false,
+                    )
+                    .as_basic_value_enum(),
+                *bb,
+            )
+        }
 
         TypedExprKind::BooleanLiteral(value) => (
             ctx.bool_type()
