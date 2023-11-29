@@ -95,10 +95,12 @@ pub enum BlockReturnActuality {
 /// }` without converting `{ x; }` to `{ { x; } }`. This is preferred instead of
 /// `vec![x]` as it prevents extra nesting layers.
 fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
+    let span = stmt.0.span();
+
     #[allow(clippy::wildcard_enum_match_arm)]
-    stmt.0.clone().map(|value| match value {
+    stmt.0.map(|value| match value {
         StmtKind::BlockStmt(stmts) => stmts,
-        _ => vec![stmt],
+        stmt_kind => vec![Stmt(stmt_kind.in_span(span))],
     })
 }
 
@@ -116,30 +118,26 @@ fn process_let_declaration<'input>(
         .into_iter()
         .map(
             |let_declaration| -> Result<TastLetDeclaration, Diagnostic> {
-                if scope
-                    .get_value(let_declaration.value().name.value())
-                    .is_some()
-                {
+                let let_decl_span = let_declaration.span();
+                let let_declaration = let_declaration.into_value();
+
+                if scope.get_value(let_declaration.name.value()).is_some() {
                     // TODO: In the future we may allow shadowing but currently no
                     return Err(Diagnostic(
                         Severity::Error,
                         let_declaration
-                            .value()
                             .name
                             .map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
                     ));
                 }
 
                 let typed_expr = let_declaration
-                    .value()
                     .value
-                    .clone()
                     .map(|expr| type_expr(scope, expr))
                     .transpose()?;
+
                 let resolved_ty = let_declaration
-                    .value()
                     .ty
-                    .clone()
                     .map(|ty| resolve_type(scope, ty))
                     .transpose()?;
 
@@ -147,22 +145,20 @@ fn process_let_declaration<'input>(
                     (None, None) => {
                         return Err(Diagnostic(
                             Severity::Error,
-                            let_declaration
-                                .span()
-                                .containing(DiagnosticKind::NoTypeNoValue),
+                            let_decl_span.containing(DiagnosticKind::NoTypeNoValue),
                         ));
                     }
 
                     // Explicitly typed with no value
                     (None, Some(ty)) => TastLetDeclaration {
-                        name: let_declaration.value().name.into_value(),
+                        name: let_declaration.name.into_value(),
                         ty,
                         value: None,
                     },
 
                     // Infer type from value
                     (Some(TypedExpr(ty, ex)), None) => TastLetDeclaration {
-                        name: let_declaration.value().name.into_value(),
+                        name: let_declaration.name.into_value(),
                         ty: ty.clone(),
                         value: Some(TypedExpr(ty, ex)),
                     },
@@ -171,26 +167,19 @@ fn process_let_declaration<'input>(
                     (Some(TypedExpr(ty, ex)), Some(resolved_ty)) => {
                         if ty == resolved_ty {
                             TastLetDeclaration {
-                                name: let_declaration.value().name.into_value(),
+                                name: let_declaration.name.into_value(),
                                 ty: ty.clone(),
                                 value: Some(TypedExpr(ty, ex)),
                             }
                         } else {
                             return Err(Diagnostic(
                                 Severity::Error,
-                                let_declaration
-                                    .value()
-                                    .value
-                                    .clone()
-                                    .unwrap()
-                                    .0
-                                    .span()
-                                    .containing(
-                                        DiagnosticKind::InvalidAssignmentRightHandSideType {
-                                            expected: resolved_ty.to_string(),
-                                            got: ty.to_string(),
-                                        },
-                                    ),
+                                let_decl_span.containing(
+                                    DiagnosticKind::InvalidAssignmentRightHandSideType {
+                                        expected: resolved_ty.to_string(),
+                                        got: ty.to_string(),
+                                    },
+                                ),
                             ));
                         }
                     }
@@ -199,9 +188,7 @@ fn process_let_declaration<'input>(
                 if result_decl.ty == TastType::Void {
                     return Err(Diagnostic(
                         Severity::Error,
-                        let_declaration
-                            .span()
-                            .containing(DiagnosticKind::CannotDeclareVoid),
+                        let_decl_span.containing(DiagnosticKind::CannotDeclareVoid),
                     ));
                 }
 
@@ -432,12 +419,14 @@ pub fn type_block<'input>(
                                 // if it's WillReturn we can be WillReturn
                                 // instead of MayReturn)
 
-                                let typed_cond = type_expr(&scope, cond.clone())?;
+                                let cond_span = cond.0.span();
+
+                                let typed_cond = type_expr(&scope, cond)?;
 
                                 if typed_cond.0 != TastType::Bool {
                                     return Err(Diagnostic(
                                         Severity::Error,
-                                        cond.0.span().containing(DiagnosticKind::ExpectedGot {
+                                        cond_span.containing(DiagnosticKind::ExpectedGot {
                                             expected: "bool".to_string(),
                                             got: typed_cond.0.to_string(),
                                         }),
@@ -446,7 +435,7 @@ pub fn type_block<'input>(
 
                                 let (typed_then, then_return_actuality) = type_block(
                                     &scope,
-                                    coerce_stmt_into_block(*then.clone()),
+                                    coerce_stmt_into_block(*then),
                                     can_use_break_continue,
                                     // return ability of a sub-block is determined by this match:
                                     match return_ability.clone() {
@@ -518,12 +507,13 @@ pub fn type_block<'input>(
                                 // or an infinite loop making this
                                 // won't/will return statically
 
-                                let typed_cond = type_expr(&scope, cond.clone())?;
+                                let cond_span = cond.0.span();
+                                let typed_cond = type_expr(&scope, cond)?;
 
                                 if typed_cond.0 != TastType::Bool {
                                     return Err(Diagnostic(
                                         Severity::Error,
-                                        cond.0.span().containing(DiagnosticKind::ExpectedGot {
+                                        cond_span.containing(DiagnosticKind::ExpectedGot {
                                             expected: "bool".to_string(),
                                             got: typed_cond.0.to_string(),
                                         }),
@@ -532,7 +522,7 @@ pub fn type_block<'input>(
 
                                 let (typed_body, body_return_actuality) = type_block(
                                     &scope,
-                                    coerce_stmt_into_block(*body.clone()),
+                                    coerce_stmt_into_block(*body),
                                     true,
                                     // return ability of a sub-block is determined by this match:
                                     match return_ability.clone() {
@@ -578,7 +568,6 @@ pub fn type_block<'input>(
 
                                 // if present, evaluate the declaration
                                 let typed_init = init
-                                    .clone()
                                     .map(|decl| {
                                         process_let_declaration(
                                             &mut loop_scope,
@@ -587,16 +576,15 @@ pub fn type_block<'input>(
                                     })
                                     .transpose()?;
 
-                                let typed_cond = cond
-                                    .clone()
-                                    .map(|cond| type_expr(&loop_scope, cond))
-                                    .transpose()?;
+                                let cond_span = cond.as_ref().map(|inner| inner.0.span());
+                                let typed_cond =
+                                    cond.map(|cond| type_expr(&loop_scope, cond)).transpose()?;
 
                                 if let Some(inner_t_cond) = typed_cond.clone() {
                                     if inner_t_cond.0 != TastType::Bool {
                                         return Err(Diagnostic(
                                             Severity::Error,
-                                            cond.clone().unwrap().0.span().containing(
+                                            cond_span.unwrap().containing(
                                                 DiagnosticKind::ExpectedGot {
                                                     expected: "bool".to_string(),
                                                     got: inner_t_cond.0.to_string(),
@@ -606,14 +594,12 @@ pub fn type_block<'input>(
                                     }
                                 }
 
-                                let typed_post = post
-                                    .clone()
-                                    .map(|post| type_expr(&loop_scope, post))
-                                    .transpose()?;
+                                let typed_post =
+                                    post.map(|post| type_expr(&loop_scope, post)).transpose()?;
 
                                 let (typed_body, body_return_actuality) = type_block(
                                     &loop_scope,
-                                    coerce_stmt_into_block(*body.clone()),
+                                    coerce_stmt_into_block(*body),
                                     true,
                                     // return ability of a sub-block is determined by this match:
                                     match return_ability.clone() {
@@ -652,7 +638,7 @@ pub fn type_block<'input>(
                             StmtKind::BlockStmt(body) => {
                                 let (typed_body, return_actuality) = type_block(
                                     &scope,
-                                    body.clone().in_span(stmt_span),
+                                    body.in_span(stmt_span),
                                     can_use_break_continue,
                                     // return ability of a sub-block is determined by this match:
                                     match return_ability.clone() {
@@ -673,10 +659,9 @@ pub fn type_block<'input>(
                                 BlockReturnActuality::DoesNotReturn,
                             ))),
                             StmtKind::ReturnStmt(value) => {
-                                let resolved_value = value
-                                    .clone()
-                                    .map(|expr| type_expr(&scope, expr))
-                                    .transpose()?;
+                                let value_span = value.as_ref().map(|inner| inner.0.span());
+                                let resolved_value =
+                                    value.map(|expr| type_expr(&scope, expr)).transpose()?;
                                 match (resolved_value, return_ability.clone()) {
                                     // expects no return
                                     (_, BlockReturnAbility::MustNotReturn) => Err(Diagnostic(
@@ -742,7 +727,7 @@ pub fn type_block<'input>(
                                         } else {
                                             Err(Diagnostic(
                                                 Severity::Error,
-                                                value.clone().unwrap().0.span().containing(
+                                                value_span.unwrap().containing(
                                                     DiagnosticKind::ExpectedGot {
                                                         expected: return_ty.to_string(),
                                                         got: ty.to_string(),

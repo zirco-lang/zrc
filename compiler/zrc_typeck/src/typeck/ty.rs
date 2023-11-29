@@ -53,16 +53,17 @@ pub(super) fn resolve_key_type_mapping<'input>(
     members: KeyTypeMapping<'input>,
 ) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {
     let mut map: IndexMap<&'input str, TastType> = IndexMap::new();
-    for sp in members.0.into_value() {
-        let (key, ast_type) = sp.value();
+    for member in members.0.into_value() {
+        let span = member.span();
+        let (key, ast_type) = member.into_value();
+
         if map.contains_key(key.value()) {
             return Err(Diagnostic(
                 zrc_diagnostics::Severity::Error,
-                sp.as_ref()
-                    .map(|x| DiagnosticKind::DuplicateStructMember((*x.0.value()).to_string())),
+                DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).in_span(span),
             ));
         }
-        map.insert(key.value(), resolve_type(scope, ast_type.clone())?);
+        map.insert(key.value(), resolve_type(scope, ast_type)?);
     }
     Ok(map)
 }

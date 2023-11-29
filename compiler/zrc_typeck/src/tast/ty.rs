@@ -48,7 +48,7 @@ pub enum Type<'input> {
 
 impl<'input> Display for Type<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.clone() {
+        match self {
             Self::I8 => write!(f, "i8"),
             Self::U8 => write!(f, "u8"),
             Self::I16 => write!(f, "i16"),
@@ -64,7 +64,7 @@ impl<'input> Display for Type<'input> {
                 f,
                 "(fn({}){})",
                 args,
-                match *brt {
+                match &**brt {
                     BlockReturnType::Return(ret) => format!(" -> {ret}"),
                     BlockReturnType::Void => String::new(),
                 }

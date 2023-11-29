@@ -79,7 +79,7 @@ pub fn type_expr<'input>(
             let at = type_expr(scope, *lhs)?;
             let bt = type_expr(scope, *rhs)?;
             TypedExpr(
-                bt.clone().0,
+                bt.0.clone(),
                 TypedExprKind::Comma(Box::new(at), Box::new(bt)),
             )
         }
@@ -101,7 +101,7 @@ pub fn type_expr<'input>(
             }
 
             TypedExpr(
-                place_t.clone().0,
+                place_t.0.clone(),
                 TypedExprKind::Assignment(Box::new(place_t), Box::new(value_t)),
             )
         }
@@ -153,7 +153,7 @@ pub fn type_expr<'input>(
         }
         ExprKind::UnaryDereference(x) => {
             let x_ty = type_expr(scope, *x)?;
-            if let TastType::Ptr(tt) = x_ty.clone().0 {
+            if let TastType::Ptr(tt) = x_ty.0.clone() {
                 TypedExpr(*tt, TypedExprKind::UnaryDereference(Box::new(x_ty)))
             } else {
                 return Err(Diagnostic(
@@ -194,16 +194,14 @@ pub fn type_expr<'input>(
         }
 
         ExprKind::Dot(obj, key) => {
-            let obj_t = type_expr(scope, *obj.clone())?;
+            let obj_span = obj.0.span();
+            let obj_t = type_expr(scope, *obj)?;
 
             if let TastType::Struct(fields) | TastType::Union(fields) = obj_t.0.clone() {
                 if let Some(ty) = fields.get(key.value()) {
                     TypedExpr(
                         ty.clone(),
-                        TypedExprKind::Dot(
-                            Box::new(expr_to_place(obj.0.span(), obj_t)?),
-                            key.value(),
-                        ),
+                        TypedExprKind::Dot(Box::new(expr_to_place(obj_span, obj_t)?), key.value()),
                     )
                 } else {
                     return Err(Diagnostic(
@@ -249,7 +247,8 @@ pub fn type_expr<'input>(
             }
         }
         ExprKind::Call(f, args) => {
-            let ft = type_expr(scope, *f.clone())?;
+            let f_span = (*f).0.span();
+            let ft = type_expr(scope, *f)?;
             let args_t = args
                 .value()
                 .iter()
@@ -286,7 +285,7 @@ pub fn type_expr<'input>(
 
                     TypedExpr(
                         ret_type.into_option().unwrap_or(TastType::Void),
-                        TypedExprKind::Call(Box::new(expr_to_place((*f).0.span(), ft)?), args_t),
+                        TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_t),
                     )
                 }
                 TastType::Fn(ArgumentDeclarationList::Variadic(beginning_arg_types), ret_type) => {
@@ -320,7 +319,7 @@ pub fn type_expr<'input>(
                     // the rest may be any, so we don't need to check them
                     TypedExpr(
                         ret_type.into_option().unwrap_or(TastType::Void),
-                        TypedExprKind::Call(Box::new(expr_to_place((*f).0.span(), ft)?), args_t),
+                        TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_t),
                     )
                 }
                 _ => {
@@ -365,13 +364,15 @@ pub fn type_expr<'input>(
         }
 
         ExprKind::Logical(op, lhs, rhs) => {
-            let lhs_t = type_expr(scope, *lhs.clone())?;
-            let rhs_t = type_expr(scope, *rhs.clone())?;
+            let lhs_span = lhs.0.span();
+            let lhs_t = type_expr(scope, *lhs)?;
+            let rhs_span = rhs.0.span();
+            let rhs_t = type_expr(scope, *rhs)?;
 
             if lhs_t.0 != TastType::Bool {
                 return Err(Diagnostic(
                     Severity::Error,
-                    lhs.0.span().containing(DiagnosticKind::ExpectedGot {
+                    lhs_span.containing(DiagnosticKind::ExpectedGot {
                         expected: "bool".to_string(),
                         got: lhs_t.0.to_string(),
                     }),
@@ -381,7 +382,7 @@ pub fn type_expr<'input>(
             if rhs_t.0 != TastType::Bool {
                 return Err(Diagnostic(
                     Severity::Error,
-                    rhs.0.span().containing(DiagnosticKind::ExpectedGot {
+                    rhs_span.containing(DiagnosticKind::ExpectedGot {
                         expected: "bool".to_string(),
                         got: rhs_t.0.to_string(),
                     }),
@@ -399,8 +400,7 @@ pub fn type_expr<'input>(
 
             if lhs_t.0.is_integer() && rhs_t.0.is_integer() && lhs_t.0 == rhs_t.0 {
                 // int == int is valid
-            } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (lhs_t.0.clone(), rhs_t.0.clone())
-            {
+            } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (&lhs_t.0, &rhs_t.0) {
                 // *T == *U is valid
             } else if lhs_t.0 == TastType::Bool && rhs_t.0 == TastType::Bool {
                 // bool == bool is valid
@@ -420,13 +420,15 @@ pub fn type_expr<'input>(
             )
         }
         ExprKind::BinaryBitwise(op, lhs, rhs) => {
-            let lhs_t = type_expr(scope, *lhs.clone())?;
-            let rhs_t = type_expr(scope, *rhs.clone())?;
+            let lhs_span = lhs.0.span();
+            let lhs_t = type_expr(scope, *lhs)?;
+            let rhs_span = rhs.0.span();
+            let rhs_t = type_expr(scope, *rhs)?;
 
             if !lhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    lhs.0.span().containing(DiagnosticKind::ExpectedGot {
+                    lhs_span.containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
                         got: lhs_t.0.to_string(),
                     }),
@@ -436,7 +438,7 @@ pub fn type_expr<'input>(
             if !rhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    rhs.0.span().containing(DiagnosticKind::ExpectedGot {
+                    rhs_span.containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
                         got: rhs_t.0.to_string(),
                     }),
@@ -448,7 +450,7 @@ pub fn type_expr<'input>(
                 if !lhs_t.0.is_signed_integer() {
                     return Err(Diagnostic(
                         Severity::Error,
-                        lhs.0.span().containing(DiagnosticKind::ExpectedGot {
+                        lhs_span.containing(DiagnosticKind::ExpectedGot {
                             expected: "signed integer".to_string(),
                             got: lhs_t.0.to_string(),
                         }),
@@ -470,13 +472,15 @@ pub fn type_expr<'input>(
             )
         }
         ExprKind::Comparison(op, lhs, rhs) => {
-            let lhs_t = type_expr(scope, *lhs.clone())?;
-            let rhs_t = type_expr(scope, *rhs.clone())?;
+            let lhs_span = lhs.0.span();
+            let lhs_t = type_expr(scope, *lhs)?;
+            let rhs_span = rhs.0.span();
+            let rhs_t = type_expr(scope, *rhs)?;
 
             if !lhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    lhs.0.span().containing(DiagnosticKind::ExpectedGot {
+                    lhs_span.containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
                         got: lhs_t.0.to_string(),
                     }),
@@ -486,7 +490,7 @@ pub fn type_expr<'input>(
             if !rhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    rhs.0.span().containing(DiagnosticKind::ExpectedGot {
+                    rhs_span.containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
                         got: rhs_t.0.to_string(),
                     }),
@@ -509,13 +513,15 @@ pub fn type_expr<'input>(
             )
         }
         ExprKind::Arithmetic(op, lhs, rhs) => {
-            let lhs_t = type_expr(scope, *lhs.clone())?;
-            let rhs_t = type_expr(scope, *rhs.clone())?;
+            let lhs_span = lhs.0.span();
+            let lhs_t = type_expr(scope, *lhs)?;
+            let rhs_span = rhs.0.span();
+            let rhs_t = type_expr(scope, *rhs)?;
 
             if !lhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    lhs.0.span().containing(DiagnosticKind::ExpectedGot {
+                    lhs_span.containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
                         got: lhs_t.0.to_string(),
                     }),
@@ -525,7 +531,7 @@ pub fn type_expr<'input>(
             if !rhs_t.0.is_integer() {
                 return Err(Diagnostic(
                     Severity::Error,
-                    rhs.0.span().containing(DiagnosticKind::ExpectedGot {
+                    rhs_span.containing(DiagnosticKind::ExpectedGot {
                         expected: "integer".to_string(),
                         got: rhs_t.0.to_string(),
                     }),
@@ -558,17 +564,13 @@ pub fn type_expr<'input>(
                     resolved_ty.clone(),
                     TypedExprKind::Cast(Box::new(x_t), resolved_ty),
                 )
-            } else if let (TastType::Ptr(_), TastType::Ptr(_)) =
-                (x_t.0.clone(), resolved_ty.clone())
-            {
+            } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (&x_t.0, &resolved_ty) {
                 // *T -> *U cast is valid
                 TypedExpr(
                     resolved_ty.clone(),
                     TypedExprKind::Cast(Box::new(x_t), resolved_ty),
                 )
-            } else if let (TastType::Ptr(_), _) | (_, TastType::Ptr(_)) =
-                (x_t.0.clone(), resolved_ty.clone())
-            {
+            } else if let (TastType::Ptr(_), _) | (_, TastType::Ptr(_)) = (&x_t.0, &resolved_ty) {
                 // ensure one is an int
                 if x_t.0.is_integer() || resolved_ty.is_integer() {
                     // *T -> int or int -> *T cast is valid

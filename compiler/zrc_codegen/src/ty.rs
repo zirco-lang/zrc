@@ -9,7 +9,7 @@ use inkwell::{
     },
     AddressSpace,
 };
-use zrc_typeck::tast::ty::Type;
+use zrc_typeck::{tast::ty::Type, typeck::BlockReturnType};
 
 /// Create a pointer to an [`AnyTypeEnum`] instance.
 ///
@@ -54,7 +54,7 @@ pub fn create_fn<'ctx>(
 /// # Panics
 /// Panics if `ty` is not an integer type
 #[allow(clippy::needless_pass_by_value)]
-pub fn llvm_int_type<'ctx>(ctx: &'ctx Context, ty: Type) -> IntType<'ctx> {
+pub fn llvm_int_type<'ctx>(ctx: &'ctx Context, ty: &Type) -> IntType<'ctx> {
     match ty {
         Type::Bool => ctx.bool_type(),
         Type::I8 | Type::U8 => ctx.i8_type(),
@@ -74,7 +74,7 @@ pub fn llvm_int_type<'ctx>(ctx: &'ctx Context, ty: Type) -> IntType<'ctx> {
 pub fn llvm_basic_type<'ctx>(
     ctx: &'ctx Context,
     target_machine: &TargetMachine,
-    ty: Type,
+    ty: &Type,
 ) -> BasicTypeEnum<'ctx> {
     match ty {
         Type::Bool
@@ -87,7 +87,7 @@ pub fn llvm_basic_type<'ctx>(
         | Type::I64
         | Type::U64 => llvm_int_type(ctx, ty).as_basic_type_enum(),
         Type::Void => panic!("void is not a basic type"),
-        Type::Ptr(x) => create_ptr(llvm_type(ctx, target_machine, *x)).as_basic_type_enum(),
+        Type::Ptr(x) => create_ptr(llvm_type(ctx, target_machine, x)).as_basic_type_enum(),
         Type::Fn(_, _) => panic!("function is not a basic type"),
         Type::Struct(fields) => ctx
             .struct_type(
@@ -123,7 +123,7 @@ pub fn llvm_basic_type<'ctx>(
 pub fn llvm_type<'ctx>(
     ctx: &'ctx Context,
     target_machine: &TargetMachine,
-    ty: Type,
+    ty: &Type,
 ) -> AnyTypeEnum<'ctx> {
     match ty {
         Type::Bool
@@ -141,16 +141,25 @@ pub fn llvm_type<'ctx>(
 
         Type::Void => ctx.void_type().as_any_type_enum(),
 
-        Type::Fn(args, ret) => create_fn(
-            llvm_type(ctx, target_machine, ret.into_tast_type()),
-            &args
-                .clone()
-                .into_arguments()
-                .into_iter()
-                .map(|arg| llvm_basic_type(ctx, target_machine, arg.ty).into())
-                .collect::<Vec<_>>(),
-            args.is_variadic(),
-        )
-        .as_any_type_enum(),
+        Type::Fn(args, ret) => {
+            let is_variadic = args.is_variadic();
+            create_fn(
+                llvm_type(
+                    ctx,
+                    target_machine,
+                    match &**ret {
+                        BlockReturnType::Return(x) => x,
+                        BlockReturnType::Void => &Type::Void,
+                    },
+                ),
+                &args
+                    .as_arguments()
+                    .iter()
+                    .map(|arg| llvm_basic_type(ctx, target_machine, &arg.ty).into())
+                    .collect::<Vec<_>>(),
+                is_variadic,
+            )
+            .as_any_type_enum()
+        }
     }
 }
