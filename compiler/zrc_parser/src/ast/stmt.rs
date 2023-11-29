@@ -207,8 +207,8 @@ impl<'input> Display for StmtKind<'input> {
                             .collect::<Vec<_>>()
                             .join(", ")
                     )),
-                    cond.as_ref().map_or(String::new(), |x| x.to_string()),
-                    post.as_ref().map_or(String::new(), |x| x.to_string()),
+                    cond.as_ref().map_or(String::new(), ToString::to_string),
+                    post.as_ref().map_or(String::new(), ToString::to_string),
                 )
             }
 

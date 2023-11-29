@@ -112,7 +112,7 @@ impl<'input> ArgumentDeclarationList<'input> {
 
     /// Get the contained [`Vec`], variadic or not
     #[must_use]
-    pub fn as_arguments(&self) -> &Vec<ArgumentDeclaration<'input>> {
+    pub const fn as_arguments(&self) -> &Vec<ArgumentDeclaration<'input>> {
         match self {
             ArgumentDeclarationList::NonVariadic(x) | Self::Variadic(x) => x,
         }
@@ -272,8 +272,8 @@ impl<'input> Display for TypedStmt<'input> {
                         .collect::<Vec<_>>()
                         .join(", ")
                 )),
-                cond.as_ref().map_or(String::new(), |x| x.to_string()),
-                post.as_ref().map_or(String::new(), |x| x.to_string()),
+                cond.as_ref().map_or(String::new(), ToString::to_string),
+                post.as_ref().map_or(String::new(), ToString::to_string),
                 body.iter()
                     .map(|stmt| stmt
                         .to_string()
