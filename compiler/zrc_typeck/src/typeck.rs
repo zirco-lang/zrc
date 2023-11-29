@@ -12,7 +12,7 @@ pub use block::{
 pub use expr::type_expr;
 pub use ty::resolve_type;
 use zrc_parser::ast::stmt::Declaration as AstDeclaration;
-use zrc_utils::span::Spanned;
+use zrc_utils::span::{Spannable, Spanned};
 
 use crate::tast::{stmt::TypedDeclaration, ty::Type as TastType};
 
@@ -102,13 +102,17 @@ impl<'input> Default for Scope<'input> {
 /// Errors with type checker errors.
 pub fn type_program(
     program: Vec<Spanned<AstDeclaration>>,
-) -> Result<Vec<TypedDeclaration>, zrc_diagnostics::Diagnostic> {
+) -> Result<Vec<Spanned<TypedDeclaration>>, zrc_diagnostics::Diagnostic> {
     let mut scope = Scope::new();
 
     program
         .into_iter()
         .filter_map(|declaration| {
-            process_declaration(&mut scope, declaration.into_value()).transpose()
+            let span = declaration.span();
+            process_declaration(&mut scope, declaration.into_value())
+                .transpose()
+                .map(|declaration| (span, declaration))
         })
+        .map(|(span, result)| result.map(|declaration| declaration.in_span(span)))
         .collect()
 }

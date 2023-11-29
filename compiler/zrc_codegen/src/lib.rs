@@ -63,6 +63,7 @@ pub use inkwell::{
     targets::{FileType, TargetTriple},
     OptimizationLevel,
 };
+use line_col::LineColLookup;
 pub use stmt::{cg_program_to_buffer, cg_program_to_string};
 
 /// Gets the native [`TargetTriple`].
@@ -101,4 +102,26 @@ impl<'input, 'ctx> Default for CgScope<'input, 'ctx> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub struct LineLookup<'a> {
+    inner: LineColLookup<'a>,
+}
+impl<'a> LineLookup<'a> {
+    pub fn new(str: &'a str) -> Self {
+        Self {
+            inner: LineColLookup::new(str),
+        }
+    }
+
+    pub fn get_line_and_column(&self, index: usize) -> LineAndColumn {
+        let (line, col) = self.inner.get(index);
+        // LLVM says line numbers start at 1
+        LineAndColumn { line, col }
+    }
+}
+
+pub struct LineAndColumn {
+    pub line: usize,
+    pub col: usize,
 }

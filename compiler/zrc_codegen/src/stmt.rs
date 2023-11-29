@@ -4,6 +4,7 @@ use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
     context::Context,
+    debug_info::{AsDIScope, DICompileUnit, DIScope, DebugInfoBuilder},
     memory_buffer::MemoryBuffer,
     module::Module,
     passes::{PassManager, PassManagerBuilder},
@@ -14,17 +15,18 @@ use inkwell::{
     values::{BasicValueEnum, FunctionValue},
     OptimizationLevel,
 };
+use line_col::LineColLookup;
 use zrc_typeck::tast::{
     expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
     stmt::{ArgumentDeclaration, LetDeclaration, TypedDeclaration, TypedStmt, TypedStmtKind},
     ty::Type,
 };
-use zrc_utils::span::Spannable;
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 use crate::{
     expr::cg_expr,
-    ty::{create_fn, llvm_basic_type, llvm_type},
-    CgScope,
+    ty::{create_di_type, create_fn, llvm_basic_type, llvm_type},
+    CgScope, LineAndColumn, LineLookup,
 };
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
@@ -108,20 +110,54 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
 )]
 fn cg_block<'ctx, 'input, 'a>(
     ctx: &'ctx Context,
+    dbg_builder: &DebugInfoBuilder<'ctx>,
     target_machine: &TargetMachine,
     builder: &'a Builder<'ctx>,
+    compile_unit: &DICompileUnit<'ctx>,
     module: &'a Module<'ctx>,
+    source_line_lookup: &LineLookup,
     function: &'a FunctionValue<'ctx>,
     bb: &'a BasicBlock<'ctx>,
     parent_scope: &'a CgScope<'input, 'ctx>,
-    block: Vec<TypedStmt<'input>>,
+    parent_di_block: DIScope<'ctx>,
+    block: Spanned<Vec<TypedStmt<'input>>>,
     breakaway: Option<LoopBreakaway<'ctx>>,
 ) -> Option<BasicBlock<'ctx>> {
     let mut scope = parent_scope.clone();
 
+    let block_span = block.span();
+
+    let block_pos = source_line_lookup.get_line_and_column(block_span.start());
+    let lexical_block = dbg_builder.create_lexical_block(
+        parent_di_block,
+        compile_unit.get_file(),
+        block_pos.line as u32,
+        block_pos.col as u32,
+    );
+    let loc = dbg_builder.create_debug_location(
+        ctx,
+        block_pos.line as u32,
+        block_pos.col as u32,
+        lexical_block.as_debug_info_scope(),
+        None,
+    );
+    builder.set_current_debug_location(loc);
+
     block
+        .into_value()
         .into_iter()
         .try_fold(*bb, |bb, stmt| -> Option<BasicBlock> {
+            let span = stmt.0.span();
+            let pos = source_line_lookup.get_line_and_column(span.start());
+            let loc = dbg_builder.create_debug_location(
+                ctx,
+                pos.line as u32,
+                pos.col as u32,
+                lexical_block.as_debug_info_scope(),
+                None,
+            );
+            builder.set_current_debug_location(loc);
+
             match stmt.0.into_value() {
                 TypedStmtKind::ExprStmt(expr) => Some(
                     cg_expr(
@@ -138,7 +174,9 @@ fn cg_block<'ctx, 'input, 'a>(
                 ),
 
                 TypedStmtKind::IfStmt(cond, then, then_else) => {
-                    let then_else = then_else.unwrap_or(vec![]);
+                    let then_else = then_else.unwrap_or_else(|| {
+                        vec![].in_span(Span::from_positions(then.span().end(), then.span().end()))
+                    });
 
                     let (cond, _) = cg_expr(
                         ctx,
@@ -161,12 +199,16 @@ fn cg_block<'ctx, 'input, 'a>(
                     builder.position_at_end(then_bb);
                     let maybe_then_bb = cg_block(
                         ctx,
+                        dbg_builder,
                         target_machine,
                         builder,
+                        compile_unit,
                         module,
+                        source_line_lookup,
                         function,
                         &then_bb,
                         &scope,
+                        lexical_block.as_debug_info_scope(),
                         then,
                         breakaway.clone(),
                     );
@@ -174,12 +216,16 @@ fn cg_block<'ctx, 'input, 'a>(
                     builder.position_at_end(then_else_bb);
                     let maybe_then_else_bb = cg_block(
                         ctx,
+                        dbg_builder,
                         target_machine,
                         builder,
+                        compile_unit,
                         module,
+                        source_line_lookup,
                         function,
                         &then_else_bb,
                         &scope,
+                        lexical_block.as_debug_info_scope(),
                         then_else,
                         breakaway.clone(),
                     );
@@ -212,13 +258,17 @@ fn cg_block<'ctx, 'input, 'a>(
 
                 TypedStmtKind::BlockStmt(block) => cg_block(
                     ctx,
+                    dbg_builder,
                     target_machine,
                     builder,
+                    compile_unit,
                     module,
+                    source_line_lookup,
                     function,
                     &bb,
                     &scope,
-                    block,
+                    lexical_block.as_debug_info_scope(),
+                    block.in_span(block_span),
                     breakaway.clone(),
                 ),
 
@@ -346,12 +396,16 @@ fn cg_block<'ctx, 'input, 'a>(
                     builder.position_at_end(body_bb);
                     let body_bb = cg_block(
                         ctx,
+                        dbg_builder,
                         target_machine,
                         builder,
+                        compile_unit,
                         module,
+                        source_line_lookup,
                         function,
                         &body_bb,
                         &scope,
+                        lexical_block.as_debug_info_scope(),
                         body,
                         Some(LoopBreakaway {
                             on_break: exit,
@@ -425,12 +479,16 @@ fn cg_block<'ctx, 'input, 'a>(
 
                     let body_bb = cg_block(
                         ctx,
+                        dbg_builder,
                         target_machine,
                         builder,
+                        compile_unit,
                         module,
+                        source_line_lookup,
                         function,
                         &body_bb,
                         &scope,
+                        lexical_block.as_debug_info_scope(),
                         body,
                         Some(LoopBreakaway {
                             on_break: exit,
@@ -454,13 +512,16 @@ fn cg_block<'ctx, 'input, 'a>(
 pub fn cg_init_fn<'ctx>(
     ctx: &'ctx Context,
     module: &Module<'ctx>,
+    dbg_builder: &DebugInfoBuilder<'ctx>,
+    compile_unit: &DICompileUnit<'ctx>,
     target_machine: &TargetMachine,
+    line_nr: u32,
     name: &str,
     ret: Option<Type>,
     args: &[Type],
     is_variadic: bool,
-) -> FunctionValue<'ctx> {
-    let ret_type = llvm_type(ctx, target_machine, ret.unwrap_or(Type::Void));
+) -> (FunctionValue<'ctx>, DIScope<'ctx>) {
+    let ret_type = llvm_type(ctx, target_machine, ret.clone().unwrap_or(Type::Void));
     let arg_types = args
         .iter()
         .map(|ty| llvm_basic_type(ctx, target_machine, ty.clone()).into())
@@ -473,7 +534,31 @@ pub fn cg_init_fn<'ctx>(
     );
     let fn_val = module.add_function(name, fn_type, None);
 
-    fn_val
+    let dbg_fn = dbg_builder.create_function(
+        compile_unit.as_debug_info_scope(),
+        name,
+        None,
+        compile_unit.get_file(),
+        line_nr,
+        dbg_builder.create_subroutine_type(
+            compile_unit.get_file(),
+            Some(create_di_type(dbg_builder, ret.as_ref().unwrap_or(&Type::Void)).as_type()),
+            &args
+                .iter()
+                .map(|ty| create_di_type(dbg_builder, ty).as_type())
+                .collect::<Vec<_>>(),
+            0,
+        ),
+        false,
+        false,
+        line_nr,
+        0,
+        false,
+    );
+
+    fn_val.set_subprogram(dbg_fn);
+
+    (fn_val, dbg_fn.as_debug_info_scope())
 }
 
 /// Code generate and verify a program given a [`Context`] and return the final
@@ -486,26 +571,51 @@ pub fn cg_init_fn<'ctx>(
 fn cg_program<'input, 'ctx>(
     ctx: &'ctx Context,
     target_machine: &TargetMachine,
-    module_name: &str,
-    program: Vec<TypedDeclaration<'input>>,
+    file_name: &str,
+    directory: &str,
+    zrc_version: &str,
+    source_line_lookup: &LineLookup,
+    program: Vec<Spanned<TypedDeclaration<'input>>>,
 ) -> (Module<'ctx>, CgScope<'input, 'ctx>) {
     let builder = ctx.create_builder();
-    let module = ctx.create_module(module_name);
+    let module = ctx.create_module(file_name);
+
+    let (dbg_builder, compile_unit) = module.create_debug_info_builder(
+        true,
+        inkwell::debug_info::DWARFSourceLanguage::C,
+        file_name,
+        directory,
+        zrc_version,
+        false,
+        &std::env::args().collect::<Vec<_>>().join(" "),
+        0,
+        "",
+        inkwell::debug_info::DWARFEmissionKind::Full,
+        0,
+        false,
+        false,
+        "",
+        "",
+    );
 
     let mut global_scope = CgScope::new();
 
     for declaration in program {
-        match declaration {
+        let span = declaration.span();
+        match declaration.into_value() {
             TypedDeclaration::FunctionDeclaration {
                 name,
                 parameters,
                 return_type,
                 body,
             } => {
-                let fn_value = cg_init_fn(
+                let (fn_value, di_scope) = cg_init_fn(
                     ctx,
                     &module,
+                    &dbg_builder,
+                    &compile_unit,
                     target_machine,
+                    source_line_lookup.get_line_and_column(span.start()).line as u32,
                     name,
                     return_type,
                     &parameters
@@ -516,6 +626,7 @@ fn cg_program<'input, 'ctx>(
                         .collect::<Vec<_>>(),
                     parameters.is_variadic(),
                 );
+
                 global_scope.insert(name, fn_value.as_global_value().as_pointer_value());
                 // must come after the insert call so that recursion is valid
                 let mut fn_scope = global_scope.clone();
@@ -559,19 +670,25 @@ fn cg_program<'input, 'ctx>(
 
                     cg_block(
                         ctx,
+                        &dbg_builder,
                         target_machine,
                         &builder,
+                        &compile_unit,
                         &module,
+                        source_line_lookup,
                         &fn_value,
                         &entry,
                         &fn_scope,
-                        body,
+                        di_scope,
+                        body.in_span(span),
                         None,
                     );
                 }
             }
         }
     }
+
+    dbg_builder.finalize();
 
     match module.verify() {
         Ok(()) => {}
@@ -605,8 +722,11 @@ fn optimize_module(module: &Module<'_>, optimization_level: OptimizationLevel) {
 /// Panics on internal code generation failure.
 #[must_use]
 pub fn cg_program_to_string(
-    module_name: &str,
-    program: Vec<TypedDeclaration>,
+    file_name: &str,
+    directory: &str,
+    zrc_version: &str,
+    source_line_lookup: &LineLookup,
+    program: Vec<Spanned<TypedDeclaration>>,
     optimization_level: OptimizationLevel,
     triple: &TargetTriple,
     cpu: &str,
@@ -628,7 +748,15 @@ pub fn cg_program_to_string(
         )
         .unwrap();
 
-    let (module, _global_scope) = cg_program(&ctx, &target_machine, module_name, program);
+    let (module, _global_scope) = cg_program(
+        &ctx,
+        &target_machine,
+        file_name,
+        directory,
+        zrc_version,
+        source_line_lookup,
+        program,
+    );
     optimize_module(&module, optimization_level);
 
     module.print_to_string().to_string()
@@ -641,8 +769,11 @@ pub fn cg_program_to_string(
 /// Panics on internal code generation failure.
 #[must_use]
 pub fn cg_program_to_buffer(
-    module_name: &str,
-    program: Vec<TypedDeclaration>,
+    file_name: &str,
+    directory: &str,
+    zrc_version: &str,
+    source_line_lookup: &LineLookup,
+    program: Vec<Spanned<TypedDeclaration>>,
     file_type: FileType,
     optimization_level: OptimizationLevel,
     triple: &TargetTriple,
@@ -665,7 +796,15 @@ pub fn cg_program_to_buffer(
         )
         .unwrap();
 
-    let (module, _global_scope) = cg_program(&ctx, &target_machine, module_name, program);
+    let (module, _global_scope) = cg_program(
+        &ctx,
+        &target_machine,
+        file_name,
+        directory,
+        zrc_version,
+        source_line_lookup,
+        program,
+    );
     optimize_module(&module, optimization_level);
 
     target_machine

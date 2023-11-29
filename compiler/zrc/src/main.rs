@@ -50,7 +50,7 @@ use std::{
 };
 
 use anyhow::bail;
-use clap::Parser;
+use clap::{builder::ValueParserFactory, Parser};
 use zrc_codegen::OptimizationLevel;
 
 #[doc(hidden)]
@@ -281,7 +281,7 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let Some(path) = cli.path else {
+    let Some(mut path) = cli.path else {
         bail!("no input file provided");
     };
 
@@ -308,12 +308,10 @@ fn main() -> anyhow::Result<()> {
 
     let result = compile(
         &cli.emit,
-        match path.as_os_str().to_str() {
-            Some("-") => "<stdin>",
-            _ => path
-                .as_os_str()
-                .to_str()
-                .expect("Invalid UTF-8 in file name"),
+        path.clone().file_name().unwrap().to_str().unwrap(),
+        {
+            path.pop();
+            path.to_str().unwrap()
         },
         &content,
         cli.opt_level.into(),
@@ -354,7 +352,8 @@ fn main() -> anyhow::Result<()> {
 /// Drive the compilation process.
 fn compile(
     emit: &OutputFormat,
-    module_name: &str,
+    file_name: &str,
+    directory: &str,
     content: &str,
     optimization_level: OptimizationLevel,
     triple: &zrc_codegen::TargetTriple,
@@ -362,7 +361,10 @@ fn compile(
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
     match *emit {
         OutputFormat::Asm => Ok(zrc_codegen::cg_program_to_buffer(
-            module_name,
+            file_name,
+            directory,
+            &version(),
+            &zrc_codegen::LineLookup::new(content),
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             zrc_codegen::FileType::Assembly,
             optimization_level,
@@ -372,7 +374,10 @@ fn compile(
         .as_slice()
         .into()),
         OutputFormat::Object => Ok(zrc_codegen::cg_program_to_buffer(
-            module_name,
+            file_name,
+            directory,
+            &version(),
+            &zrc_codegen::LineLookup::new(content),
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             zrc_codegen::FileType::Object,
             optimization_level,
@@ -383,7 +388,10 @@ fn compile(
         .into()),
 
         OutputFormat::Llvm => Ok(zrc_codegen::cg_program_to_string(
-            module_name,
+            file_name,
+            directory,
+            &version(),
+            &zrc_codegen::LineLookup::new(content),
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             optimization_level,
             triple,
@@ -413,7 +421,7 @@ fn compile(
             zrc_parser::parser::parse_program(content)?,
         )?
         .into_iter()
-        .map(|x| x.to_string())
+        .map(|x| x.value().to_string())
         .collect::<Vec<_>>()
         .join("\n")
         .as_bytes()

@@ -2,6 +2,7 @@
 
 use inkwell::{
     context::Context,
+    debug_info::{DIBasicType, DebugInfoBuilder},
     targets::TargetMachine,
     types::{
         AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType,
@@ -10,6 +11,14 @@ use inkwell::{
     AddressSpace,
 };
 use zrc_typeck::tast::ty::Type;
+
+/// Create the LLVM [`DIBasicType`] for a [`Type`] node.
+// TODO: Properly create the composite types etc.
+pub fn create_di_type<'ctx>(dbg_builder: &DebugInfoBuilder<'ctx>, ty: &Type) -> DIBasicType<'ctx> {
+    dbg_builder
+        .create_basic_type(&ty.to_string(), 0, 0, 0)
+        .unwrap()
+}
 
 /// Create a pointer to an [`AnyTypeEnum`] instance.
 ///

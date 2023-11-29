@@ -490,8 +490,9 @@ pub fn type_block<'input>(
                                     TypedStmt(
                                         TypedStmtKind::IfStmt(
                                             typed_cond,
-                                            typed_then,
-                                            typed_then_else,
+                                            typed_then.in_span((*then).0.span()),
+                                            typed_then_else
+                                                .map(|te| te.in_span(then_else.unwrap().0.span())),
                                         )
                                         .in_span(stmt_span),
                                     ),
@@ -558,8 +559,11 @@ pub fn type_block<'input>(
 
                                 Ok(Some((
                                     TypedStmt(
-                                        TypedStmtKind::WhileStmt(typed_cond, typed_body)
-                                            .in_span(stmt_span),
+                                        TypedStmtKind::WhileStmt(
+                                            typed_cond,
+                                            typed_body.in_span(body.0.span()),
+                                        )
+                                        .in_span(stmt_span),
                                     ),
                                     match body_return_actuality {
                                         BlockReturnActuality::DoesNotReturn => {
@@ -646,7 +650,7 @@ pub fn type_block<'input>(
                                             init: typed_init.map(Box::new),
                                             cond: typed_cond,
                                             post: typed_post,
-                                            body: typed_body,
+                                            body: typed_body.in_span(body.0.span()),
                                         }
                                         .in_span(stmt_span),
                                     ),
