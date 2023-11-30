@@ -1,0 +1,45 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+description: "should contain the standard while loop form containing an if-elif-else structure, with the first if breaking, the second if continuing, and the else branch continuing.\nthe end of the loop should all meet in an ending block."
+expression: module.print_to_string().to_str().unwrap()
+info: "while (get_bool()) {    if (get_bool()) break;    else {        if (get_bool()) continue;        else {};    }}"
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+define void @test() {
+entry:
+  br label %header
+
+header:                                           ; preds = %end5, %then3, %entry
+  %call = call i1 @get_bool()
+  br i1 %call, label %body, label %exit
+
+body:                                             ; preds = %header
+  %call1 = call i1 @get_bool()
+  br i1 %call1, label %then, label %then_else
+
+exit:                                             ; preds = %then, %header
+
+then:                                             ; preds = %body
+  br label %exit
+
+then_else:                                        ; preds = %body
+  %call2 = call i1 @get_bool()
+  br i1 %call2, label %then3, label %then_else4
+
+then3:                                            ; preds = %then_else
+  br label %header
+
+then_else4:                                       ; preds = %then_else
+  br label %end
+
+end:                                              ; preds = %then_else4
+  br label %end5
+
+end5:                                             ; preds = %end
+  br label %header
+}
+
+declare i1 @get_bool()
+

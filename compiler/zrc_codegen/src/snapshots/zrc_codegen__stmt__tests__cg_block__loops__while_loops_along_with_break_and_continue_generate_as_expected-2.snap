@@ -1,0 +1,6 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+description: "ensure the snapped value is an empty basic block that theloop ending unconditionally breaks to (where cg continues)\n\nIR:\n; ModuleID = 'test'\nsource_filename = \"test\"\n\ndefine void @test() {\nentry:\n  br label %header\n\nheader:                                           ; preds = %end5, %entry\n  %call = call i1 @get_bool()\n  br i1 %call, label %body, label %exit\n\nbody:                                             ; preds = %header\n  %call1 = call i1 @get_bool()\n  br i1 %call1, label %then, label %then_else\n\nexit:                                             ; preds = %then3, %then, %header\n\nthen:                                             ; preds = %body\n  br label %exit\n\nthen_else:                                        ; preds = %body\n  %call2 = call i1 @get_bool()\n  br i1 %call2, label %then3, label %then_else4\n\nthen3:                                            ; preds = %then_else\n  br label %exit\n\nthen_else4:                                       ; preds = %then_else\n  br label %end\n\nend:                                              ; preds = %then_else4\n  br label %end5\n\nend5:                                             ; preds = %end\n  br label %header\n}\n\ndeclare i1 @get_bool()\n"
+expression: bb.get_name().to_str().unwrap()
+---
+exit
