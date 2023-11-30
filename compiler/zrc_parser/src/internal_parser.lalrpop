@@ -167,7 +167,7 @@ LetDeclaration: Vec<Spanned<LetDeclaration<'input>>> = {
     })).collect::<Vec<_>>(),
 };
 
-Type: Type<'input> = {
+pub Type: Type<'input> = {
     Spanned<IDENTIFIER> => Type(<>.map(|x| TypeKind::Identifier(x))),
     Spanned<("*" <Type>)> => Type(<>.map(|x| TypeKind::Ptr(Box::new(x)))),
     Spanned<("struct" <KeyTypeMapping>)> => 
