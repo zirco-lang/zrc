@@ -66,7 +66,9 @@ fn expect_identical_types<'a, 'input>(
     rhs: &'a TastType<'input>,
     span: Span,
 ) -> Result<(), Diagnostic> {
-    if lhs != rhs {
+    if lhs == rhs {
+        Ok(())
+    } else {
         Err(Diagnostic(
             Severity::Error,
             span.containing(DiagnosticKind::ExpectedSameType(
@@ -74,8 +76,6 @@ fn expect_identical_types<'a, 'input>(
                 rhs.to_string(),
             )),
         ))
-    } else {
-        Ok(())
     }
 }
 
@@ -86,7 +86,9 @@ fn expect(
     got_str: String,
     span: Span,
 ) -> Result<(), Diagnostic> {
-    if !condition {
+    if condition {
+        Ok(())
+    } else {
         Err(Diagnostic(
             Severity::Error,
             span.containing(DiagnosticKind::ExpectedGot {
@@ -94,8 +96,6 @@ fn expect(
                 got: got_str,
             }),
         ))
-    } else {
-        Ok(())
     }
 }
 
