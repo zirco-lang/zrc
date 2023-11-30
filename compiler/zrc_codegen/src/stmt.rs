@@ -689,7 +689,7 @@ mod tests {
 
     use crate::{
         stmt::{cg_block, cg_let_declaration},
-        test_utils::{initialize_test_function, make_test_prelude_closure},
+        test_utils::{generate_nop_fn, initialize_test_function, make_test_prelude_closure},
     };
 
     /// Ensures [`cg_let_declaration`] properly generates the allocations and
@@ -773,9 +773,7 @@ mod tests {
         use super::*;
 
         mod conditionals {
-
             use super::*;
-            use crate::test_utils::generate_nop_fn;
 
             #[test]
             fn if_statements_generate_as_expected() {
