@@ -210,3 +210,26 @@ pub(crate) fn generate_boolean_yielding_fn<'name, 'ctx>(
         ),
     );
 }
+
+/// Creates an extern function with a desired name that returns an i32.
+// TODO: Merge with the above? Make generic for any type?
+#[allow(clippy::redundant_pub_crate)]
+pub(crate) fn generate_i32_yielding_fn<'name, 'ctx>(
+    name: &'name str,
+    ctx: &'ctx Context,
+    module: &Module<'ctx>,
+    tck_scope: &mut zrc_typeck::typeck::Scope<'name>,
+    cg_scope: &mut CgScope<'name, 'ctx>,
+) {
+    let fn_val = module.add_function(name, ctx.i32_type().fn_type(&[], false), None);
+
+    cg_scope.insert(name, fn_val.as_global_value().as_pointer_value());
+
+    tck_scope.set_value(
+        name,
+        Type::Fn(
+            ArgumentDeclarationList::NonVariadic(vec![]),
+            Box::new(BlockReturnType::Return(Type::I32)),
+        ),
+    );
+}

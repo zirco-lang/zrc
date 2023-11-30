@@ -1,0 +1,29 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "should contain a diamond-shaped cfg with one branch calling a function and the other with no code, followed by a `phi` node"
+expression: module.print_to_string().to_str().unwrap()
+info: "get_bool() ? get_int() : 3"
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+define void @test() {
+entry:
+  %call = call i1 @get_bool()
+  br i1 %call, label %if_true, label %if_false
+
+if_true:                                          ; preds = %entry
+  %call1 = call i32 @get_int()
+  br label %end
+
+if_false:                                         ; preds = %entry
+  br label %end
+
+end:                                              ; preds = %if_false, %if_true
+  %yield = phi i32 [ %call1, %if_true ], [ 3, %if_false ]
+}
+
+declare i1 @get_bool()
+
+declare i32 @get_int()
+

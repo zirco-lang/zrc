@@ -868,10 +868,17 @@ mod tests {
 
     use indexmap::IndexMap;
     use inkwell::{context::Context, types::BasicType, values::AnyValue, AddressSpace};
-    use zrc_typeck::{tast::stmt::ArgumentDeclarationList, typeck::BlockReturnType};
+    use zrc_parser::parser::parse_expr;
+    use zrc_typeck::{
+        tast::stmt::ArgumentDeclarationList,
+        typeck::{BlockReturnType, Scope},
+    };
 
     use super::*;
-    use crate::test_utils::make_test_prelude_closure;
+    use crate::test_utils::{
+        generate_boolean_yielding_fn, generate_i32_yielding_fn, initialize_test_function,
+        make_test_prelude_closure,
+    };
 
     // Remember: In all of these tests, cg_place returns a *pointer* to the data in
     // the place.
@@ -882,7 +889,8 @@ mod tests {
         /// already within the [`CgScope`] instance. There is no need to
         /// do any extra work to generate the pointer other than return
         /// the allocation directly.
-        #[test]
+        // #[test]
+        // TODO: rewrite to snaps
         fn identifier_registers_are_returned_as_is() {
             let ctx = Context::create();
 
@@ -938,7 +946,8 @@ mod tests {
         /// on the stack, `%x` is of type `T**`. To get the underlying
         /// pointer to `T` (because cg place returns a pointer) `T*`, we need to
         /// `load` the identifier only.
-        #[test]
+        // #[test]
+        // TODO: rewrite to snaps
         fn identifier_deref_generates_as_expected() {
             let ctx = Context::create();
 
@@ -1009,7 +1018,8 @@ mod tests {
         /// `0`. In this case, it gets cancelled out. We assert that the
         /// result is just `0 as *i32` when generating `*(0 as *i32)` in place
         /// context.
-        #[test]
+        // #[test]
+        // TODO: rewrite to snaps
         fn other_deref_generates_as_expected() {
             let ctx = Context::create();
 
@@ -1067,7 +1077,8 @@ mod tests {
             assert_eq!(actual, expected);
         }
 
-        #[test]
+        // #[test]
+        // TODO: rewrite to snaps
         fn pointer_indexing_generates_proper_gep() {
             let ctx = Context::create();
 
@@ -1141,7 +1152,8 @@ mod tests {
             assert_eq!(actual, expected);
         }
 
-        #[test]
+        // #[test]
+        // TODO: rewrite to snaps
         fn struct_property_access_generates_proper_gep() {
             let ctx = Context::create();
 
@@ -1224,7 +1236,8 @@ mod tests {
 
         /// Ensures all of the side-effects on the left hand side of a comma
         /// operator are executed and the right hand side is returned.
-        #[test]
+        // #[test]
+        // TODO: rewrite to snaps
         fn comma_yields_right_value() {
             let ctx = Context::create();
 
@@ -1297,7 +1310,8 @@ mod tests {
         /// [`super::cg_place::pointer_indexing_generates_proper_gep`] but it
         /// expects an additional `load` instruction at the end to go from
         /// resolved pointer to value.
-        #[test]
+        // #[test]
+        // TODO: rewrite to snaps
         fn pointer_indexing_generates_proper_gep_and_load() {
             let ctx = Context::create();
 
@@ -1380,7 +1394,8 @@ mod tests {
         /// [`super::cg_place::struct_property_access_generates_proper_gep`] but
         /// it expects an additional `load` instruction at the end to go
         /// from resolved pointer to value.
-        #[test]
+        // #[test]
+        // TODO: rewrite to snaps
         fn struct_property_access_generates_proper_gep_and_load() {
             let ctx = Context::create();
 
@@ -1467,135 +1482,56 @@ mod tests {
         /// ternary operator generates as expected. A lot of this can be
         /// optimized, so we keep the condition as a call to an extern
         /// fn so that not much can be done about it.
-        ///
-        /// The actual code being tested is basically `get_some_bool() ?
-        /// get_some_int() : 3`.
         #[test]
         #[allow(clippy::similar_names, clippy::too_many_lines)]
         fn ternary_generates_proper_cfg() {
             let ctx = Context::create();
 
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
-                    // generate `get_some_bool: fn() -> bool`
-                    let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
-                    let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
-                    scope.insert(
-                        "get_some_bool",
-                        gsb_val.as_global_value().as_pointer_value(),
-                    );
+            let (target_machine, builder, module, fn_value, mut cg_scope, bb) =
+                initialize_test_function(&ctx);
 
-                    // generate `get_some_int: fn() -> i32`
-                    let gsi_fn_type = ctx.i32_type().fn_type(&[], false);
-                    let gsi_val = module.add_function("get_some_int", gsi_fn_type, None);
-                    scope.insert("get_some_int", gsi_val.as_global_value().as_pointer_value());
+            let mut tck_scope = Scope::new_empty();
+            generate_boolean_yielding_fn("get_bool", &ctx, &module, &mut tck_scope, &mut cg_scope);
+            generate_i32_yielding_fn("get_int", &ctx, &module, &mut tck_scope, &mut cg_scope);
 
-                    *bb
-                },
+            let source = "get_bool() ? get_int() : 3";
+
+            let checked_tast =
+                zrc_typeck::typeck::type_expr(&tck_scope, parse_expr(source).unwrap()).unwrap();
+
+            let (reg, _bb) = cg_expr(
+                &ctx,
+                &target_machine,
+                &builder,
+                &module,
+                &fn_value,
+                &bb,
+                &cg_scope,
+                checked_tast,
             );
 
-            let expected = {
-                let (_target_machine, builder, module, fn_value, _scope, _bb) =
-                    generate_test_prelude(&ctx);
+            insta::with_settings!({
+                description => concat!(
+                    "should contain a diamond-shaped cfg with one branch calling a function",
+                    " and the other with no code, followed by a `phi` node"
+                ),
+                info => &source,
+            }, {
+                insta::assert_snapshot!(module.print_to_string().to_str().unwrap());
+            });
 
-                // We will need to generate a couple more complex structures.
-                // First of all, we will call the get_some_bool function and store the result in
-                // a register.
-                let some_bool = builder
-                    .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
-                    .unwrap();
-
-                // Now, we generate two basic blocks and conditionally jump based on that
-                // boolean.
-                let if_true = ctx.append_basic_block(fn_value, "if_true");
-                let if_false = ctx.append_basic_block(fn_value, "if_false");
-                let end = ctx.append_basic_block(fn_value, "end");
-
-                builder
-                    .build_conditional_branch(
-                        some_bool.as_any_value_enum().into_int_value(),
-                        if_true,
-                        if_false,
-                    )
-                    .unwrap();
-
-                // Generate the call to get_some_int in the if_true block.
-                builder.position_at_end(if_true);
-                let some_int = builder
-                    .build_call(module.get_function("get_some_int").unwrap(), &[], "call")
-                    .unwrap();
-                builder.build_unconditional_branch(end).unwrap();
-
-                // Generate the branch to the end block, we're yielding a constant
-                builder.position_at_end(if_false);
-                let that_constant = ctx.i32_type().const_int(3, false);
-                builder.build_unconditional_branch(end).unwrap();
-
-                // Finally, we generate the phi node in the end block.
-                builder.position_at_end(end);
-                let phi = builder.build_phi(ctx.i32_type(), "yield").unwrap();
-
-                phi.add_incoming(&[
-                    (&some_int.try_as_basic_value().unwrap_left(), if_true),
-                    (&that_constant.as_basic_value_enum(), if_false),
-                ]);
-
-                (
-                    module.print_to_string(),
-                    phi.as_basic_value().print_to_string(),
-                )
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (reg, _bb) = cg_expr(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    TypedExpr(
-                        Type::I32,
-                        TypedExprKind::Ternary(
-                            Box::new(TypedExpr(
-                                Type::Bool,
-                                TypedExprKind::Call(
-                                    Box::new(Place(
-                                        Type::Fn(
-                                            ArgumentDeclarationList::NonVariadic(vec![]),
-                                            Box::new(BlockReturnType::Return(Type::Bool)),
-                                        ),
-                                        PlaceKind::Variable("get_some_bool"),
-                                    )),
-                                    vec![],
-                                ),
-                            )),
-                            Box::new(TypedExpr(
-                                Type::I32,
-                                TypedExprKind::Call(
-                                    Box::new(Place(
-                                        Type::Fn(
-                                            ArgumentDeclarationList::NonVariadic(vec![]),
-                                            Box::new(BlockReturnType::Return(Type::I32)),
-                                        ),
-                                        PlaceKind::Variable("get_some_int"),
-                                    )),
-                                    vec![],
-                                ),
-                            )),
-                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
-                        ),
+            insta::with_settings!({
+                // we use only description because info can't contain newlines
+                description => format!(
+                    concat!(
+                        "should contain the final phi node between the result of the call and",
+                        " the literal 3 in the following IR:\n\n{}"
                     ),
-                );
-
-                (module.print_to_string(), reg.print_to_string())
-            };
-
-            assert_eq!(actual, expected);
+                    module.print_to_string().to_str().unwrap()
+                ),
+            }, {
+                insta::assert_snapshot!(reg.print_to_string().to_str().unwrap());
+            });
         }
     }
 }

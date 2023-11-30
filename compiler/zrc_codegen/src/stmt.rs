@@ -732,6 +732,15 @@ mod tests {
             insta::assert_snapshot!(module.print_to_string().to_str().unwrap());
         });
 
+        let mut identifiers = scope
+            .identifiers
+            .into_iter()
+            .map(|(identifier, pointer)| {
+                (identifier, pointer.get_name().to_str().unwrap().to_string())
+            })
+            .collect::<Vec<_>>();
+        identifiers.sort();
+
         insta::with_settings!({
             // we use only description because info can't contain newlines
             description => format!(
@@ -742,16 +751,7 @@ mod tests {
                 module.print_to_string().to_str().unwrap()
             ),
         }, {
-            insta::assert_yaml_snapshot!(
-                scope
-                .identifiers
-                .into_iter()
-                .map(|(identifier, pointer)| (
-                    identifier,
-                    pointer.get_name().to_str().unwrap().to_string()
-                ))
-                .collect::<HashMap<_, _>>()
-            );
+            insta::assert_yaml_snapshot!(identifiers);
         });
     }
 
