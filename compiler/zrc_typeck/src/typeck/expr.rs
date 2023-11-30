@@ -456,26 +456,18 @@ pub fn type_expr<'input>(
                 ));
             }
 
-            #[allow(clippy::else_if_without_else)]
-            if matches!(op, BinaryBitwise::Shl | BinaryBitwise::Shr) {
-                if !lhs_t.0.is_signed_integer() {
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        lhs_span.containing(DiagnosticKind::ExpectedGot {
-                            expected: "signed integer".to_string(),
-                            got: lhs_t.0.to_string(),
-                        }),
-                    ));
-                }
-            } else if lhs_t.0 != rhs_t.0 {
+            if matches!(op, BinaryBitwise::Shl | BinaryBitwise::Shr) && !lhs_t.0.is_signed_integer()
+            {
                 return Err(Diagnostic(
                     Severity::Error,
-                    expr_span.containing(DiagnosticKind::ExpectedSameType(
-                        lhs_t.0.to_string(),
-                        rhs_t.0.to_string(),
-                    )),
+                    lhs_span.containing(DiagnosticKind::ExpectedGot {
+                        expected: "signed integer".to_string(),
+                        got: lhs_t.0.to_string(),
+                    }),
                 ));
             }
+
+            expect_identical_types(&lhs_t.0, &rhs_t.0, expr_span)?;
 
             TypedExpr(
                 lhs_t.0.clone(),
