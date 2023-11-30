@@ -79,6 +79,26 @@ fn expect_identical_types<'a, 'input>(
     }
 }
 
+/// Assert a condition and produce a [`DiagnosticKind::ExpectedGot`] diagnostic otherwise.
+fn expect(
+    condition: bool,
+    expected_str: String,
+    got_str: String,
+    span: Span,
+) -> Result<(), Diagnostic> {
+    if !condition {
+        Err(Diagnostic(
+            Severity::Error,
+            span.containing(DiagnosticKind::ExpectedGot {
+                expected: expected_str,
+                got: got_str,
+            }),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 // FIXME: this NEEDS to be rewritten to use references almost everywhere and be
 // no-clone. We stack overflow for deep expressions which is VERY VERY BAD.
 /// Type check and infer an [AST expression](Expr) to a [TAST
@@ -380,25 +400,18 @@ pub fn type_expr<'input>(
             let rhs_span = rhs.0.span();
             let rhs_t = type_expr(scope, *rhs)?;
 
-            if lhs_t.0 != TastType::Bool {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    lhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "bool".to_string(),
-                        got: lhs_t.0.to_string(),
-                    }),
-                ));
-            }
-
-            if rhs_t.0 != TastType::Bool {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    rhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "bool".to_string(),
-                        got: rhs_t.0.to_string(),
-                    }),
-                ));
-            }
+            expect(
+                lhs_t.0 == TastType::Bool,
+                "bool".to_string(),
+                lhs_t.0.to_string(),
+                lhs_span,
+            )?;
+            expect(
+                rhs_t.0 == TastType::Bool,
+                "bool".to_string(),
+                rhs_t.0.to_string(),
+                rhs_span,
+            )?;
 
             TypedExpr(
                 TastType::Bool,
@@ -436,35 +449,26 @@ pub fn type_expr<'input>(
             let rhs_span = rhs.0.span();
             let rhs_t = type_expr(scope, *rhs)?;
 
-            if !lhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    lhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: lhs_t.0.to_string(),
-                    }),
-                ));
-            }
+            expect(
+                lhs_t.0.is_integer(),
+                "integer".to_string(),
+                lhs_t.0.to_string(),
+                lhs_span,
+            )?;
+            expect(
+                rhs_t.0.is_integer(),
+                "integer".to_string(),
+                rhs_t.0.to_string(),
+                rhs_span,
+            )?;
 
-            if !rhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    rhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: rhs_t.0.to_string(),
-                    }),
-                ));
-            }
-
-            if matches!(op, BinaryBitwise::Shl | BinaryBitwise::Shr) && !lhs_t.0.is_signed_integer()
-            {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    lhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "signed integer".to_string(),
-                        got: lhs_t.0.to_string(),
-                    }),
-                ));
+            if matches!(op, BinaryBitwise::Shl | BinaryBitwise::Shr) {
+                expect(
+                    lhs_t.0.is_signed_integer(),
+                    "signed integer".to_string(),
+                    lhs_t.0.to_string(),
+                    lhs_span,
+                )?;
             }
 
             expect_identical_types(&lhs_t.0, &rhs_t.0, expr_span)?;
@@ -480,25 +484,18 @@ pub fn type_expr<'input>(
             let rhs_span = rhs.0.span();
             let rhs_t = type_expr(scope, *rhs)?;
 
-            if !lhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    lhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: lhs_t.0.to_string(),
-                    }),
-                ));
-            }
-
-            if !rhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    rhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: rhs_t.0.to_string(),
-                    }),
-                ));
-            }
+            expect(
+                lhs_t.0.is_integer(),
+                "integer".to_string(),
+                lhs_t.0.to_string(),
+                lhs_span,
+            )?;
+            expect(
+                rhs_t.0.is_integer(),
+                "integer".to_string(),
+                rhs_t.0.to_string(),
+                rhs_span,
+            )?;
 
             expect_identical_types(&lhs_t.0, &rhs_t.0, expr_span)?;
 
@@ -513,25 +510,18 @@ pub fn type_expr<'input>(
             let rhs_span = rhs.0.span();
             let rhs_t = type_expr(scope, *rhs)?;
 
-            if !lhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    lhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: lhs_t.0.to_string(),
-                    }),
-                ));
-            }
-
-            if !rhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    rhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: rhs_t.0.to_string(),
-                    }),
-                ));
-            }
+            expect(
+                lhs_t.0.is_integer(),
+                "integer".to_string(),
+                lhs_t.0.to_string(),
+                lhs_span,
+            )?;
+            expect(
+                rhs_t.0.is_integer(),
+                "integer".to_string(),
+                rhs_t.0.to_string(),
+                rhs_span,
+            )?;
 
             expect_identical_types(&lhs_t.0, &rhs_t.0, expr_span)?;
 
