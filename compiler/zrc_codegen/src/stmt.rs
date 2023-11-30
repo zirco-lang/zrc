@@ -809,14 +809,10 @@ mod tests {
                 )
                 .unwrap();
 
-                assert_eq!(bb.get_name().to_str().unwrap(), "end");
                 insta::with_settings!({
                     description => concat!(
-                        "should contain an unconditional break in the entry block.\n",
-                        "this unconditional break will either break to %then which calls",
-                        " nop, or it breaks to an empty bb.\n",
-                        "the diamond-shaped cfg should terminate at an empty basic block named",
-                        " 'end' -- code generation will continue from here."
+                        "should contain an conditional break over `true` in the entry block.\n",
+                        "this will either break to %then which calls nop, or it breaks to an empty bb.",
                     ),
                     info => &source,
                 }, {
