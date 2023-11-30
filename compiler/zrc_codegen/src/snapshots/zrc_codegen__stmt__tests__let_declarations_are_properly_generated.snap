@@ -1,0 +1,15 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+description: "should contain two alloca instructions, one for a and b\nthen, a store of the value `true` should be made to `b`"
+expression: module.print_to_string().to_str().unwrap()
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+define void @test() {
+entry:
+  %let_a = alloca i32, align 4
+  %let_b = alloca i1, align 1
+  store i1 true, ptr %let_b, align 1
+}
+

@@ -1,0 +1,9 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+description: "should map `a` and `b` to their `alloca`s in this IR:\n\n; ModuleID = 'test'\nsource_filename = \"test\"\n\ndefine void @test() {\nentry:\n  %let_a = alloca i32, align 4\n  %let_b = alloca i1, align 1\n  store i1 true, ptr %let_b, align 1\n}\n"
+expression: "scope.identifiers.into_iter().map(|(identifier, pointer)|\n            (identifier,\n                pointer.get_name().to_str().unwrap().to_string())).collect::<HashMap<_,\n    _>>()"
+---
+test: test
+b: let_b
+a: let_a
+

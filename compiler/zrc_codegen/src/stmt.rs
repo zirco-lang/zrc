@@ -689,10 +689,7 @@ mod tests {
 
     use crate::{
         stmt::{cg_block, cg_let_declaration},
-        test_utils::{
-            generate_boolean_yielding_fn, generate_nop_fn, initialize_test_function,
-            make_test_prelude_closure,
-        },
+        test_utils::{generate_boolean_yielding_fn, generate_nop_fn, initialize_test_function},
     };
 
     /// Ensures [`cg_let_declaration`] properly generates the allocations and
@@ -701,75 +698,61 @@ mod tests {
     fn let_declarations_are_properly_generated() {
         let ctx = Context::create();
 
-        let generate_test_prelude = make_test_prelude_closure(
-            |_ctx, _target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
+        let (target_machine, builder, module, fn_value, mut scope, bb) =
+            initialize_test_function(&ctx);
+
+        let _bb = cg_let_declaration(
+            &ctx,
+            &target_machine,
+            &builder,
+            &module,
+            &fn_value,
+            &bb,
+            &mut scope,
+            vec![
+                LetDeclaration {
+                    name: "a",
+                    ty: Type::I32,
+                    value: None,
+                },
+                LetDeclaration {
+                    name: "b",
+                    ty: Type::Bool,
+                    value: Some(TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true))),
+                },
+            ],
         );
 
-        let expected = {
-            let (_target_machine, builder, module, _fn_value, mut scope, _bb) =
-                generate_test_prelude(&ctx);
+        insta::with_settings!({
+            description => concat!(
+                "should contain two alloca instructions, one for a and b\n",
+                "then, a store of the value `true` should be made to `b`"
+            ),
+        }, {
+            insta::assert_snapshot!(module.print_to_string().to_str().unwrap());
+        });
 
-            let a_ptr = builder.build_alloca(ctx.i32_type(), "let_a").unwrap();
-            let b_ptr = builder.build_alloca(ctx.bool_type(), "let_b").unwrap();
-
-            scope.insert("a", a_ptr);
-            scope.insert("b", b_ptr);
-
-            builder
-                .build_store(b_ptr, ctx.bool_type().const_int(1, false))
-                .unwrap();
-
-            (
-                module.print_to_string(),
+        insta::with_settings!({
+            // we use only description because info can't contain newlines
+            description => format!(
+                concat!(
+                    "should map `a` and `b` to their `alloca`s in this IR:",
+                    "\n\n{}"
+                ),
+                module.print_to_string().to_str().unwrap()
+            ),
+        }, {
+            insta::assert_yaml_snapshot!(
                 scope
-                    .identifiers
-                    .into_iter()
-                    .map(|(identifier, pointer)| {
-                        (identifier, pointer.get_name().to_str().unwrap().to_string())
-                    })
-                    .collect::<HashMap<_, _>>(),
-            )
-        };
-
-        let actual = {
-            let (target_machine, builder, module, fn_value, mut scope, bb) =
-                generate_test_prelude(&ctx);
-
-            let _bb = cg_let_declaration(
-                &ctx,
-                &target_machine,
-                &builder,
-                &module,
-                &fn_value,
-                &bb,
-                &mut scope,
-                vec![
-                    LetDeclaration {
-                        name: "a",
-                        ty: Type::I32,
-                        value: None,
-                    },
-                    LetDeclaration {
-                        name: "b",
-                        ty: Type::Bool,
-                        value: Some(TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true))),
-                    },
-                ],
+                .identifiers
+                .into_iter()
+                .map(|(identifier, pointer)| (
+                    identifier,
+                    pointer.get_name().to_str().unwrap().to_string()
+                ))
+                .collect::<HashMap<_, _>>()
             );
-
-            (
-                module.print_to_string(),
-                scope
-                    .identifiers
-                    .into_iter()
-                    .map(|(identifier, pointer)| {
-                        (identifier, pointer.get_name().to_str().unwrap().to_string())
-                    })
-                    .collect::<HashMap<_, _>>(),
-            )
-        };
-
-        assert_eq!(actual, expected);
+        });
     }
 
     mod cg_block {
