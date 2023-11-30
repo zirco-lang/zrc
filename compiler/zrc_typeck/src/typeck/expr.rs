@@ -60,6 +60,25 @@ fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, Diagnostic> {
     })
 }
 
+/// Assert two types are the same and produce a validation error otherwise
+fn expect_identical_types<'a, 'input>(
+    lhs: &'a TastType<'input>,
+    rhs: &'a TastType<'input>,
+    span: Span,
+) -> Result<(), Diagnostic> {
+    if lhs != rhs {
+        Err(Diagnostic(
+            Severity::Error,
+            span.containing(DiagnosticKind::ExpectedSameType(
+                lhs.to_string(),
+                rhs.to_string(),
+            )),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 // FIXME: this NEEDS to be rewritten to use references almost everywhere and be
 // no-clone. We stack overflow for deep expressions which is VERY VERY BAD.
 /// Type check and infer an [AST expression](Expr) to a [TAST
@@ -347,15 +366,7 @@ pub fn type_expr<'input>(
                 ));
             }
 
-            if if_true_t.0 != if_false_t.0 {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::TernaryArmsMustHaveSameType(
-                        if_true_t.to_string(),
-                        if_false_t.to_string(),
-                    )),
-                ));
-            }
+            expect_identical_types(&if_true_t.0, &if_false_t.0, expr_span)?;
 
             TypedExpr(
                 if_true_t.0.clone(),
@@ -497,15 +508,7 @@ pub fn type_expr<'input>(
                 ));
             }
 
-            if lhs_t.0 != rhs_t.0 {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::ExpectedSameType(
-                        lhs_t.0.to_string(),
-                        rhs_t.0.to_string(),
-                    )),
-                ));
-            }
+            expect_identical_types(&lhs_t.0, &rhs_t.0, expr_span)?;
 
             TypedExpr(
                 TastType::Bool,
@@ -538,15 +541,7 @@ pub fn type_expr<'input>(
                 ));
             }
 
-            if lhs_t.0 != rhs_t.0 {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::ExpectedSameType(
-                        lhs_t.0.to_string(),
-                        rhs_t.0.to_string(),
-                    )),
-                ));
-            }
+            expect_identical_types(&lhs_t.0, &rhs_t.0, expr_span)?;
 
             TypedExpr(
                 lhs_t.0.clone(),
