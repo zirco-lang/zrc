@@ -609,9 +609,43 @@ pub fn type_expr<'input>(
 
 #[cfg(test)]
 mod tests {
-    use zrc_utils::spanned;
+    use zrc_utils::{span::Spannable, spanned};
 
     use super::*;
+
+    #[test]
+    fn expect_identical_types_produces_proper_diagnostic() {
+        let sample_span = Span::from_positions(0, 5);
+        assert_eq!(
+            expect_identical_types(&TastType::I32, &TastType::I8, sample_span),
+            Err(Diagnostic(
+                Severity::Error,
+                DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string())
+                    .in_span(sample_span)
+            ))
+        );
+    }
+
+    #[test]
+    fn expect_produces_proper_diagnostic() {
+        let sample_span = Span::from_positions(0, 5);
+        assert_eq!(
+            expect(
+                false,
+                "expected".to_string(),
+                "got".to_string(),
+                sample_span
+            ),
+            Err(Diagnostic(
+                Severity::Error,
+                DiagnosticKind::ExpectedGot {
+                    expected: "expected".to_string(),
+                    got: "got".to_string()
+                }
+                .in_span(sample_span)
+            ))
+        );
+    }
 
     mod desugar_assignment {
         use zrc_parser::ast::expr::Arithmetic;
