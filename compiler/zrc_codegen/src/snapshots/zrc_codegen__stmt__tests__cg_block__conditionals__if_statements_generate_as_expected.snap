@@ -1,8 +1,8 @@
 ---
 source: compiler/zrc_codegen/src/stmt.rs
-description: "should contain an unconditional break in the entry block.\nthis unconditional break will either break to %then which calls do_stuff, or it breaks to an empty bb.\nthe diamond-shaped cfg should terminate at an empty basic block named 'end' -- code generation will continue from here."
+description: "should contain an unconditional break in the entry block.\nthis unconditional break will either break to %then which calls nop, or it breaks to an empty bb.\nthe diamond-shaped cfg should terminate at an empty basic block named 'end' -- code generation will continue from here."
 expression: module.print_to_string().to_str().unwrap()
-info: if (true) do_stuff();
+info: if (true) nop();
 ---
 ; ModuleID = 'test'
 source_filename = "test"
@@ -12,7 +12,7 @@ entry:
   br i1 true, label %then, label %then_else
 
 then:                                             ; preds = %entry
-  call void @do_stuff()
+  call void @nop()
   br label %end
 
 then_else:                                        ; preds = %entry
@@ -21,5 +21,5 @@ then_else:                                        ; preds = %entry
 end:                                              ; preds = %then_else, %then
 }
 
-declare void @do_stuff()
+declare void @nop()
 

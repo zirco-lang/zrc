@@ -775,6 +775,7 @@ mod tests {
         mod conditionals {
 
             use super::*;
+            use crate::test_utils::generate_nop_fn;
 
             #[test]
             fn if_statements_generate_as_expected() {
@@ -783,24 +784,11 @@ mod tests {
                 let (target_machine, builder, module, fn_value, mut cg_scope, bb) =
                     initialize_test_function(&ctx);
 
-                let do_stuff_fn_val =
-                    module.add_function("do_stuff", ctx.void_type().fn_type(&[], false), None);
-                cg_scope.insert(
-                    "do_stuff",
-                    do_stuff_fn_val.as_global_value().as_pointer_value(),
-                );
+                let mut tck_scope = Scope::new_empty();
+                generate_nop_fn("nop", &ctx, &module, &mut tck_scope, &mut cg_scope);
 
-                let source = "if (true) do_stuff();";
-                let tck_scope = Scope::from_scopes(
-                    HashMap::from([(
-                        "do_stuff",
-                        Type::Fn(
-                            ArgumentDeclarationList::NonVariadic(vec![]),
-                            Box::new(BlockReturnType::Void),
-                        ),
-                    )]),
-                    HashMap::from([]),
-                );
+                let source = "if (true) nop();";
+
                 let checked_tast = zrc_typeck::typeck::type_block(
                     &tck_scope,
                     parse_stmt_list(source).unwrap(),
@@ -828,7 +816,7 @@ mod tests {
                     description => concat!(
                         "should contain an unconditional break in the entry block.\n",
                         "this unconditional break will either break to %then which calls",
-                        " do_stuff, or it breaks to an empty bb.\n",
+                        " nop, or it breaks to an empty bb.\n",
                         "the diamond-shaped cfg should terminate at an empty basic block named",
                         " 'end' -- code generation will continue from here."
                     ),

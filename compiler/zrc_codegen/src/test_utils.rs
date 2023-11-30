@@ -59,6 +59,10 @@ use inkwell::{
     values::FunctionValue,
     OptimizationLevel,
 };
+use zrc_typeck::{
+    tast::{stmt::ArgumentDeclarationList, ty::Type},
+    typeck::BlockReturnType,
+};
 
 use crate::{stmt::cg_init_fn, CgScope};
 
@@ -160,4 +164,26 @@ pub(crate) fn make_test_prelude_closure<'ctx>(
 
         (target_machine, builder, module, fn_value, scope, bb)
     }
+}
+
+/// Creates an extern function with a desired name that acts as a no-op.
+#[allow(clippy::redundant_pub_crate)]
+pub(crate) fn generate_nop_fn<'name, 'ctx>(
+    name: &'name str,
+    ctx: &'ctx Context,
+    module: &Module<'ctx>,
+    tck_scope: &mut zrc_typeck::typeck::Scope<'name>,
+    cg_scope: &mut CgScope<'name, 'ctx>,
+) {
+    let fn_val = module.add_function(name, ctx.void_type().fn_type(&[], false), None);
+
+    cg_scope.insert(name, fn_val.as_global_value().as_pointer_value());
+
+    tck_scope.set_value(
+        name,
+        Type::Fn(
+            ArgumentDeclarationList::NonVariadic(vec![]),
+            Box::new(BlockReturnType::Void),
+        ),
+    );
 }
