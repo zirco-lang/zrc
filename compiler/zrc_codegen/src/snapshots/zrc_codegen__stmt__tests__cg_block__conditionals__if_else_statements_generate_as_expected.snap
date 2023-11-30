@@ -1,0 +1,28 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+description: "should contain an conditional break over `true` in the entry block.\nthis will either break to %then which calls nop1, or it breaks to %then_else which calls nop2. these both then break to the end bb."
+expression: module.print_to_string().to_str().unwrap()
+info: if (true) nop1(); else nop2();
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+define void @test() {
+entry:
+  br i1 true, label %then, label %then_else
+
+then:                                             ; preds = %entry
+  call void @nop1()
+  br label %end
+
+then_else:                                        ; preds = %entry
+  call void @nop2()
+  br label %end
+
+end:                                              ; preds = %then_else, %then
+}
+
+declare void @nop1()
+
+declare void @nop2()
+

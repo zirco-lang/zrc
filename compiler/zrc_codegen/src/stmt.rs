@@ -834,111 +834,57 @@ mod tests {
             fn if_else_statements_generate_as_expected() {
                 let ctx = Context::create();
 
-                let generate_test_prelude = make_test_prelude_closure(
-                    |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
-                        // generate `do_stuff: fn() -> void`
-                        let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
-                        let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
-                        scope.insert(
-                            "do_stuff",
-                            do_stuff_val.as_global_value().as_pointer_value(),
-                        );
+                let (target_machine, builder, module, fn_value, mut cg_scope, bb) =
+                    initialize_test_function(&ctx);
 
-                        // Having access to the function type of `do_stuff` is needed to build the
-                        // indirect call within the expected case.
-                        *bb
-                    },
-                );
+                let mut tck_scope = Scope::new_empty();
+                generate_nop_fn("nop1", &ctx, &module, &mut tck_scope, &mut cg_scope);
+                generate_nop_fn("nop2", &ctx, &module, &mut tck_scope, &mut cg_scope);
 
-                let expected = {
-                    let (_target_machine, builder, module, fn_value, _scope, _bb) =
-                        generate_test_prelude(&ctx);
+                let source = "if (true) nop1(); else nop2();";
 
-                    let then = ctx.append_basic_block(fn_value, "then");
-                    let then_else = ctx.append_basic_block(fn_value, "then_else");
-                    let end = ctx.append_basic_block(fn_value, "end");
+                let checked_tast = zrc_typeck::typeck::type_block(
+                    &tck_scope,
+                    parse_stmt_list(source).unwrap(),
+                    false,
+                    BlockReturnAbility::MustNotReturn,
+                )
+                .unwrap()
+                .0;
 
-                    builder
-                        .build_conditional_branch(
-                            ctx.bool_type().const_int(1, false),
-                            then,
-                            then_else,
-                        )
-                        .unwrap();
+                let bb = cg_block(
+                    &ctx,
+                    &target_machine,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &cg_scope,
+                    checked_tast,
+                    &None,
+                )
+                .unwrap();
 
-                    builder.position_at_end(then);
-                    builder
-                        .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
-                        .unwrap();
-                    builder.build_unconditional_branch(end).unwrap();
+                insta::with_settings!({
+                    description => concat!(
+                        "should contain an conditional break over `true` in the entry block.\n",
+                        "this will either break to %then which calls nop1, or it breaks to",
+                        " %then_else which calls nop2. these both then break to the end bb."
+                    ),
+                    info => &source,
+                }, {
+                    insta::assert_snapshot!(module.print_to_string().to_str().unwrap());
+                });
 
-                    builder.position_at_end(then_else);
-                    builder
-                        .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
-                        .unwrap();
-                    builder.build_unconditional_branch(end).unwrap();
-
-                    builder.position_at_end(end);
-
-                    (
-                        module.print_to_string(),
-                        end.get_name().to_str().unwrap().to_string(),
-                    )
-                };
-
-                let actual = {
-                    let (target_machine, builder, module, fn_value, scope, bb) =
-                        generate_test_prelude(&ctx);
-
-                    let bb = cg_block(
-                        &ctx,
-                        &target_machine,
-                        &builder,
-                        &module,
-                        &fn_value,
-                        &bb,
-                        &scope,
-                        // if (true) do_stuff();
-                        vec![TypedStmt::IfStmt(
-                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
-                            vec![TypedStmt::ExprStmt(TypedExpr(
-                                Type::Void,
-                                TypedExprKind::Call(
-                                    Box::new(Place(
-                                        Type::Fn(
-                                            ArgumentDeclarationList::NonVariadic(vec![]),
-                                            Box::new(BlockReturnType::Void),
-                                        ),
-                                        PlaceKind::Variable("do_stuff"),
-                                    )),
-                                    vec![],
-                                ),
-                            ))],
-                            Some(vec![TypedStmt::ExprStmt(TypedExpr(
-                                Type::Void,
-                                TypedExprKind::Call(
-                                    Box::new(Place(
-                                        Type::Fn(
-                                            ArgumentDeclarationList::NonVariadic(vec![]),
-                                            Box::new(BlockReturnType::Void),
-                                        ),
-                                        PlaceKind::Variable("do_stuff"),
-                                    )),
-                                    vec![],
-                                ),
-                            ))]),
-                        )],
-                        &None,
-                    )
-                    .unwrap();
-
-                    (
-                        module.print_to_string(),
-                        bb.get_name().to_str().unwrap().to_string(),
-                    )
-                };
-
-                assert_eq!(actual, expected);
+                insta::with_settings!({
+                    // we use only description because info can't contain newlines
+                    description => format!(concat!(
+                        "ensure the snapped value is an empty basic block that the other",
+                        " bbs all unconditionally break to (where cg continues)\n\nIR:\n{}"
+                    ),module.print_to_string().to_str().unwrap()),
+                }, {
+                    insta::assert_snapshot!(bb.get_name().to_str().unwrap());
+                });
             }
 
             /// If both blocks of an if/else statement terminate, we must not
