@@ -689,7 +689,10 @@ mod tests {
 
     use crate::{
         stmt::{cg_block, cg_let_declaration},
-        test_utils::{generate_nop_fn, initialize_test_function, make_test_prelude_closure},
+        test_utils::{
+            generate_boolean_yielding_fn, generate_nop_fn, initialize_test_function,
+            make_test_prelude_closure,
+        },
     };
 
     /// Ensures [`cg_let_declaration`] properly generates the allocations and
@@ -784,8 +787,15 @@ mod tests {
 
                 let mut tck_scope = Scope::new_empty();
                 generate_nop_fn("nop", &ctx, &module, &mut tck_scope, &mut cg_scope);
+                generate_boolean_yielding_fn(
+                    "get_bool",
+                    &ctx,
+                    &module,
+                    &mut tck_scope,
+                    &mut cg_scope,
+                );
 
-                let source = "if (true) nop();";
+                let source = "if (get_bool()) nop();";
 
                 let checked_tast = zrc_typeck::typeck::type_block(
                     &tck_scope,
@@ -811,8 +821,10 @@ mod tests {
 
                 insta::with_settings!({
                     description => concat!(
-                        "should contain an conditional break over `true` in the entry block.\n",
-                        "this will either break to %then which calls nop, or it breaks to an empty bb.",
+                        "should contain an conditional break over the result of a function call",
+                        " in the entry block.\n",
+                        "this will either break to %then which calls nop, or it breaks to an empty",
+                        " bb.",
                     ),
                     info => &source,
                 }, {
@@ -840,8 +852,15 @@ mod tests {
                 let mut tck_scope = Scope::new_empty();
                 generate_nop_fn("nop1", &ctx, &module, &mut tck_scope, &mut cg_scope);
                 generate_nop_fn("nop2", &ctx, &module, &mut tck_scope, &mut cg_scope);
+                generate_boolean_yielding_fn(
+                    "get_bool",
+                    &ctx,
+                    &module,
+                    &mut tck_scope,
+                    &mut cg_scope,
+                );
 
-                let source = "if (true) nop1(); else nop2();";
+                let source = "if (get_bool()) nop1(); else nop2();";
 
                 let checked_tast = zrc_typeck::typeck::type_block(
                     &tck_scope,
@@ -867,7 +886,8 @@ mod tests {
 
                 insta::with_settings!({
                     description => concat!(
-                        "should contain an conditional break over `true` in the entry block.\n",
+                        "should contain an conditional break over the result of a function call",
+                        " in the entry block.\n",
                         "this will either break to %then which calls nop1, or it breaks to",
                         " %then_else which calls nop2. these both then break to the end bb."
                     ),

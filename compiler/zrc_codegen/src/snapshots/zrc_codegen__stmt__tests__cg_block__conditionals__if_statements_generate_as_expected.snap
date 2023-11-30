@@ -1,15 +1,16 @@
 ---
 source: compiler/zrc_codegen/src/stmt.rs
-description: "should contain an unconditional break in the entry block.\nthis unconditional break will either break to %then which calls nop, or it breaks to an empty bb.\nthe diamond-shaped cfg should terminate at an empty basic block named 'end' -- code generation will continue from here."
+description: "should contain an conditional break over the result of a function call in the entry block.\nthis will either break to %then which calls nop, or it breaks to an empty bb."
 expression: module.print_to_string().to_str().unwrap()
-info: if (true) nop();
+info: if (get_bool()) nop();
 ---
 ; ModuleID = 'test'
 source_filename = "test"
 
 define void @test() {
 entry:
-  br i1 true, label %then, label %then_else
+  %call = call i1 @get_bool()
+  br i1 %call, label %then, label %then_else
 
 then:                                             ; preds = %entry
   call void @nop()
@@ -22,4 +23,6 @@ end:                                              ; preds = %then_else, %then
 }
 
 declare void @nop()
+
+declare i1 @get_bool()
 
