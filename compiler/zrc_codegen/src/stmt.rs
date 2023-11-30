@@ -822,6 +822,16 @@ mod tests {
                 }, {
                     insta::assert_snapshot!(module.print_to_string().to_str().unwrap());
                 });
+
+                insta::with_settings!({
+                    // we use only description because info can't contain newlines
+                    description => format!(concat!(
+                        "ensure the snapped value is an empty basic block that the other",
+                        " bbs all unconditionally break to (where cg continues)\n\nIR:\n{}"
+                    ),module.print_to_string().to_str().unwrap()),
+                }, {
+                    insta::assert_snapshot!(bb.get_name().to_str().unwrap());
+                });
             }
 
             #[test]
