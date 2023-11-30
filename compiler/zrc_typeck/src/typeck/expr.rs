@@ -79,7 +79,8 @@ fn expect_identical_types<'a, 'input>(
     }
 }
 
-/// Assert a condition and produce a [`DiagnosticKind::ExpectedGot`] diagnostic otherwise.
+/// Assert a condition and produce a [`DiagnosticKind::ExpectedGot`] diagnostic
+/// otherwise.
 fn expect(
     condition: bool,
     expected_str: String,
