@@ -677,18 +677,19 @@ mod tests {
     use std::collections::HashMap;
 
     use inkwell::context::Context;
+    use zrc_parser::parser::parse_stmt_list;
     use zrc_typeck::{
         tast::{
             expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
             stmt::{ArgumentDeclarationList, LetDeclaration, TypedStmt},
             ty::Type,
         },
-        typeck::BlockReturnType,
+        typeck::{BlockReturnAbility, BlockReturnType, Scope},
     };
 
     use crate::{
         stmt::{cg_block, cg_let_declaration},
-        test_utils::make_test_prelude_closure,
+        test_utils::{initialize_test_function, make_test_prelude_closure},
     };
 
     /// Ensures [`cg_let_declaration`] properly generates the allocations and
@@ -772,103 +773,69 @@ mod tests {
         use super::*;
 
         mod conditionals {
+
             use super::*;
 
             #[test]
             fn if_statements_generate_as_expected() {
                 let ctx = Context::create();
 
-                let generate_test_prelude = make_test_prelude_closure(
-                    |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
-                        // generate `do_stuff: fn() -> void`
-                        let do_stuff_fn_type = ctx.void_type().fn_type(&[], false);
-                        let do_stuff_val = module.add_function("do_stuff", do_stuff_fn_type, None);
-                        scope.insert(
-                            "do_stuff",
-                            do_stuff_val.as_global_value().as_pointer_value(),
-                        );
+                let (target_machine, builder, module, fn_value, mut cg_scope, bb) =
+                    initialize_test_function(&ctx);
 
-                        // Having access to the function type of `do_stuff` is needed to build the
-                        // indirect call within the expected case.
-                        *bb
-                    },
+                let do_stuff_fn_val =
+                    module.add_function("do_stuff", ctx.void_type().fn_type(&[], false), None);
+                cg_scope.insert(
+                    "do_stuff",
+                    do_stuff_fn_val.as_global_value().as_pointer_value(),
                 );
 
-                let expected = {
-                    let (_target_machine, builder, module, fn_value, _scope, _bb) =
-                        generate_test_prelude(&ctx);
+                let source = "if (true) do_stuff();";
+                let tck_scope = Scope::from_scopes(
+                    HashMap::from([(
+                        "do_stuff",
+                        Type::Fn(
+                            ArgumentDeclarationList::NonVariadic(vec![]),
+                            Box::new(BlockReturnType::Void),
+                        ),
+                    )]),
+                    HashMap::from([]),
+                );
+                let checked_tast = zrc_typeck::typeck::type_block(
+                    &tck_scope,
+                    parse_stmt_list(source).unwrap(),
+                    false,
+                    BlockReturnAbility::MustNotReturn,
+                )
+                .unwrap()
+                .0;
 
-                    let then = ctx.append_basic_block(fn_value, "then");
-                    let then_else = ctx.append_basic_block(fn_value, "then_else");
-                    let end = ctx.append_basic_block(fn_value, "end");
+                let bb = cg_block(
+                    &ctx,
+                    &target_machine,
+                    &builder,
+                    &module,
+                    &fn_value,
+                    &bb,
+                    &cg_scope,
+                    checked_tast,
+                    &None,
+                )
+                .unwrap();
 
-                    builder
-                        .build_conditional_branch(
-                            ctx.bool_type().const_int(1, false),
-                            then,
-                            then_else,
-                        )
-                        .unwrap();
-
-                    builder.position_at_end(then);
-                    builder
-                        .build_call(module.get_function("do_stuff").unwrap(), &[], "call")
-                        .unwrap();
-                    builder.build_unconditional_branch(end).unwrap();
-
-                    builder.position_at_end(then_else);
-                    // because there is no else branch
-                    builder.build_unconditional_branch(end).unwrap();
-
-                    builder.position_at_end(end);
-
-                    (
-                        module.print_to_string(),
-                        end.get_name().to_str().unwrap().to_string(),
-                    )
-                };
-
-                let actual = {
-                    let (target_machine, builder, module, fn_value, scope, bb) =
-                        generate_test_prelude(&ctx);
-
-                    let bb = cg_block(
-                        &ctx,
-                        &target_machine,
-                        &builder,
-                        &module,
-                        &fn_value,
-                        &bb,
-                        &scope,
-                        // if (true) do_stuff();
-                        vec![TypedStmt::IfStmt(
-                            TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true)),
-                            vec![TypedStmt::ExprStmt(TypedExpr(
-                                Type::Void,
-                                TypedExprKind::Call(
-                                    Box::new(Place(
-                                        Type::Fn(
-                                            ArgumentDeclarationList::NonVariadic(vec![]),
-                                            Box::new(BlockReturnType::Void),
-                                        ),
-                                        PlaceKind::Variable("do_stuff"),
-                                    )),
-                                    vec![],
-                                ),
-                            ))],
-                            None,
-                        )],
-                        &None,
-                    )
-                    .unwrap();
-
-                    (
-                        module.print_to_string(),
-                        bb.get_name().to_str().unwrap().to_string(),
-                    )
-                };
-
-                assert_eq!(actual, expected);
+                assert_eq!(bb.get_name().to_str().unwrap(), "end");
+                insta::with_settings!({
+                    description => concat!(
+                        "should contain an unconditional break in the entry block.\n",
+                        "this unconditional break will either break to %then which calls",
+                        " do_stuff, or it breaks to an empty bb.\n",
+                        "the diamond-shaped cfg should terminate at an empty basic block named",
+                        " 'end' -- code generation will continue from here."
+                    ),
+                    info => &source,
+                }, {
+                    insta::assert_snapshot!(module.print_to_string().to_str().unwrap());
+                });
             }
 
             #[test]

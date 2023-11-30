@@ -182,7 +182,7 @@ FlowStmt: StmtKind<'input> = {
     "return" <e:Expr?> ";" => StmtKind::ReturnStmt(e),
 };
 
-StmtList: Vec<Stmt<'input>> = Stmt+;
+pub StmtList: Vec<Stmt<'input>> = Stmt+;
 
 pub Expr: Expr<'input> = Comma;
 

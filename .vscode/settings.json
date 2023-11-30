@@ -5,6 +5,7 @@
         "codegen",
         "debuggability",
         "getelementptr",
+        "insta",
         "inttoptr",
         "lalrpop",
         "Lvalue",

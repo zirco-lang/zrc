@@ -11,3 +11,5 @@ zrc_typeck = { version = "0.1.0", path = "../zrc_typeck" }
 
 [dev-dependencies]
 indexmap = "2.1.0"
+insta = { version = "1.34.0", features = ["yaml"] }
+zrc_parser = { path = "../zrc_parser" }
