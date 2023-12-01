@@ -781,6 +781,31 @@ mod tests {
                     }
                 "});
             }
+
+            #[test]
+            fn for_loops_along_with_break_and_continue_generate_as_expected() {
+                cg_snapshot_test!(indoc! {"
+                    fn get_int() -> i32;
+
+                    fn test() {
+                        // TEST: the proper while loop structure is created
+                        for (let i = 0; i < get_int(); i += 1) {
+                            // TEST: break jumps to the `end` block
+                            if (i > get_int()) break;
+                            else {
+                                // TEST: continue jumps to the latch block
+                                if (i < get_int()) continue;
+                                else {}
+                            }
+
+                            // TEST: the loop jumps to the latch block which jumps back to the
+                            // header
+                        }
+
+                        return;
+                    }
+                "});
+            }
         }
     }
 }
