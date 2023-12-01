@@ -1,0 +1,14 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "fn test() {\n    // TEST: because cg_place returns a *pointer* to the represented value, handling\n    // *5 in a place context should return the address of *5, which is &*5 = 5.\n    // for this reason, we should literally be `store`ing to the hardcoded address\n    // 5, and never *loading* from it (because if we do load we may not be actually\n    // writing to that address)\n    // we use 5 not 0 because 0 is just 'ptr null'\n    *(5 as *i32) = 0;\n\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+define void @test() {
+entry:
+  store i32 0, ptr inttoptr (i32 5 to ptr), align 4
+  ret void
+}
+

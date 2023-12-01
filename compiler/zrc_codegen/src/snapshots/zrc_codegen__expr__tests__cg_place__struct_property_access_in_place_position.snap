@@ -1,0 +1,16 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "struct S { x: i32, y: i32 }\n\nfn test() {\n    let x: S;\n\n    // TEST: the value must NOT be loaded! it must simply gep to obtain a pointer,\n    // then `store` into that pointer.\n    x.y = 4;\n\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+define void @test() {
+entry:
+  %let_x = alloca { i32, i32 }, align 8
+  %gep = getelementptr inbounds { i32, i32 }, ptr %let_x, i32 0, i32 1
+  store i32 4, ptr %gep, align 4
+  ret void
+}
+

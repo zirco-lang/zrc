@@ -866,373 +866,94 @@ mod tests {
     // Please read the "Common patterns in tests" section of crate::test_utils for
     // more information on how code generator tests are structured.
 
-    use indexmap::IndexMap;
     use indoc::indoc;
-    use inkwell::{
-        context::Context, targets::TargetTriple, types::BasicType, values::AnyValue, AddressSpace,
-    };
-    use zrc_parser::parser::{parse_expr, parse_program};
-    use zrc_typeck::{
-        tast::stmt::ArgumentDeclarationList,
-        typeck,
-        typeck::{BlockReturnType, Scope},
-    };
+    use zrc_typeck::typeck;
 
-    use super::*;
-    use crate::{
-        cg_program_to_string, cg_snapshot_test, get_native_triple,
-        test_utils::make_test_prelude_closure,
-    };
+    use crate::{cg_program_to_string, cg_snapshot_test};
 
     // Remember: In all of these tests, cg_place returns a *pointer* to the data in
     // the place.
     mod cg_place {
         use super::*;
 
-        /// When generating an identifier, the pointer to their data is stored
-        /// already within the [`CgScope`] instance. There is no need to
-        /// do any extra work to generate the pointer other than return
-        /// the allocation directly.
-        // #[test]
-        // TODO: rewrite to snaps
-        fn identifier_registers_are_returned_as_is() {
-            let ctx = Context::create();
+        #[test]
+        fn basic_identifiers_in_place_position() {
+            cg_snapshot_test!(indoc! {"
+                fn test() {
+                    let x = 6;
 
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    let x_stack_ptr = builder.build_alloca(ctx.i32_type(), "x").unwrap();
-                    scope.insert("x", x_stack_ptr);
+                    // TEST: we should simply be `store`ing to the %let_x we created
+                    x = 7;
 
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, _builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                (
-                    module.print_to_string(),
-                    scope
-                        .get("x")
-                        .unwrap()
-                        .as_basic_value_enum()
-                        .print_to_string(),
-                )
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_place(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    Place(Type::I32, PlaceKind::Variable("x")),
-                );
-
-                (
-                    module.print_to_string(),
-                    ptr.as_basic_value_enum().print_to_string(),
-                )
-            };
-
-            assert_eq!(actual, expected);
-        }
-
-        /// When dereferencing an identifier, the identifier itself represents a
-        /// `*T`, and if we consider the fact that the value is stored
-        /// on the stack, `%x` is of type `T**`. To get the underlying
-        /// pointer to `T` (because cg place returns a pointer) `T*`, we need to
-        /// `load` the identifier only.
-        // #[test]
-        // TODO: rewrite to snaps
-        fn identifier_deref_generates_as_expected() {
-            let ctx = Context::create();
-
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    // generates %x = alloca i32* and scope mapping x -> %x
-                    let x_stack_ptr = builder
-                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "x")
-                        .unwrap();
-                    scope.insert("x", x_stack_ptr);
-
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // Expect a single %yield = load i32*, i32** %x
-                let yield_ptr = builder
-                    .build_load(
-                        ctx.i32_type().ptr_type(AddressSpace::default()),
-                        scope.get("x").unwrap(),
-                        "load",
-                    )
-                    .unwrap();
-
-                (
-                    module.print_to_string(),
-                    // expected result of cg_place:
-                    yield_ptr.print_to_string(),
-                )
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_place(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    Place(
-                        Type::I32,
-                        PlaceKind::Deref(Box::new(TypedExpr(
-                            Type::Ptr(Box::new(Type::I32)),
-                            TypedExprKind::Identifier("x"),
-                        ))),
-                    ),
-                );
-
-                (
-                    module.print_to_string(),
-                    ptr.as_basic_value_enum().print_to_string(),
-                )
-            };
-
-            assert_eq!(actual, expected);
-        }
-
-        /// When dereferencing a value that's not an identifier in place context
-        /// e.g. `*0`, the address to this data is `&*0` which is just
-        /// `0`. In this case, it gets cancelled out. We assert that the
-        /// result is just `0 as *i32` when generating `*(0 as *i32)` in place
-        /// context.
-        // #[test]
-        // TODO: rewrite to snaps
-        fn other_deref_generates_as_expected() {
-            let ctx = Context::create();
-
-            let generate_test_prelude = make_test_prelude_closure(
-                |_ctx, _target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, _scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // Generates `%cast = inttoptr 0 to i32*`
-                let cast = builder
-                    .build_int_to_ptr(
-                        ctx.i32_type().const_zero(),
-                        ctx.i32_type().ptr_type(AddressSpace::default()),
-                        "cast",
-                    )
-                    .unwrap();
-
-                // The yielded value is just %cast -- see the comment at the top
-                (module.print_to_string(), cast.print_to_string())
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_place(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    Place(
-                        Type::I32,
-                        PlaceKind::Deref(Box::new(TypedExpr(
-                            Type::Ptr(Box::new(Type::I32)),
-                            TypedExprKind::Cast(
-                                Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("0"))),
-                                Type::Ptr(Box::new(Type::I32)),
-                            ),
-                        ))),
-                    ),
-                );
-
-                (
-                    module.print_to_string(),
-                    ptr.as_basic_value_enum().print_to_string(),
-                )
-            };
-
-            assert_eq!(actual, expected);
-        }
-
-        // #[test]
-        // TODO: rewrite to snaps
-        fn pointer_indexing_generates_proper_gep() {
-            let ctx = Context::create();
-
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    // generate `arr: *i32`
-                    let arr_stack_ptr = builder
-                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
-                        .unwrap();
-                    scope.insert("arr", arr_stack_ptr);
-
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
-                // the pointer to that index in the array
-                let loaded_arr = builder
-                    .build_load(
-                        ctx.i32_type().ptr_type(AddressSpace::default()),
-                        scope.get("arr").unwrap(),
-                        "load",
-                    )
-                    .unwrap();
-
-                // SAFETY: If indices are used incorrectly this may segfault
-                let indexed_ptr = unsafe {
-                    builder.build_gep(
-                        ctx.i32_type(),
-                        loaded_arr.into_pointer_value(),
-                        &[ctx.i32_type().const_int(3, false)],
-                        "gep",
-                    )
+                    return;
                 }
-                .unwrap();
-
-                (module.print_to_string(), indexed_ptr.print_to_string())
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_place(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    Place(
-                        Type::I32,
-                        PlaceKind::Index(
-                            Box::new(TypedExpr(
-                                Type::Ptr(Box::new(Type::I32)),
-                                TypedExprKind::Identifier("arr"),
-                            )),
-                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
-                        ),
-                    ),
-                );
-
-                (module.print_to_string(), ptr.print_to_string())
-            };
-
-            assert_eq!(actual, expected);
+            "});
         }
 
-        // #[test]
-        // TODO: rewrite to snaps
-        fn struct_property_access_generates_proper_gep() {
-            let ctx = Context::create();
+        #[test]
+        fn identifier_deref_generates_as_expected() {
+            cg_snapshot_test!(indoc! {"
+                fn test() {
+                    let x: *i32;
 
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    // generate: `x: { x: i32, y: i32 }`
-                    let x_stack_ptr = builder
-                        .build_alloca(
-                            ctx.struct_type(
-                                &[
-                                    ctx.i32_type().as_basic_type_enum(),
-                                    ctx.i32_type().as_basic_type_enum(),
-                                ],
-                                false,
-                            ),
-                            "x",
-                        )
-                        .unwrap();
-                    scope.insert("x", x_stack_ptr);
+                    // TEST: x is *i32, so %let_x is **i32 (ptr to the stack). we should load from
+                    // %let_x to obtain the actual pointer. we should then store to that result
+                    // value (we should never load it)
+                    *x = 4;
 
-                    *bb
-                },
-            );
+                    return;
+                }
+            "});
+        }
 
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
+        #[test]
+        fn other_deref_generates_as_expected() {
+            cg_snapshot_test!(indoc! {"
+                fn test() {
+                    // TEST: because cg_place returns a *pointer* to the represented value, handling
+                    // *5 in a place context should return the address of *5, which is &*5 = 5.
+                    // for this reason, we should literally be `store`ing to the hardcoded address
+                    // 5, and never *loading* from it (because if we do load we may not be actually
+                    // writing to that address)
+                    // we use 5 not 0 because 0 is just 'ptr null'
+                    *(5 as *i32) = 0;
 
-                // We do not load the struct, we GEP directly into it.
-                let indexed_ptr = builder
-                    .build_struct_gep(
-                        ctx.struct_type(
-                            &[
-                                ctx.i32_type().as_basic_type_enum(),
-                                ctx.i32_type().as_basic_type_enum(),
-                            ],
-                            false,
-                        ),
-                        scope.get("x").unwrap(),
-                        1,
-                        "gep",
-                    )
-                    .unwrap();
+                    return;
+                }
+            "});
+        }
 
-                (module.print_to_string(), indexed_ptr.print_to_string())
-            };
+        #[test]
+        fn pointer_indexing_in_place_position() {
+            cg_snapshot_test!(indoc! {"
+                fn test() {
+                    let x: *i32;
 
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
+                    // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).
+                    // %let_x needs to be GEP'd into and then stored into, but we must not load
+                    // from the address.
+                    x[4] = 5;
 
-                let (ptr, _bb) = cg_place(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    Place(
-                        Type::I32,
-                        PlaceKind::Dot(
-                            Box::new(Place(
-                                Type::Struct(IndexMap::from([("a", Type::I32), ("b", Type::I32)])),
-                                PlaceKind::Variable("x"),
-                            )),
-                            "b",
-                        ),
-                    ),
-                );
+                    return;
+                }
+            "});
+        }
 
-                (module.print_to_string(), ptr.print_to_string())
-            };
+        #[test]
+        fn struct_property_access_in_place_position() {
+            cg_snapshot_test!(indoc! {"
+                struct S { x: i32, y: i32 }
 
-            assert_eq!(actual, expected);
+                fn test() {
+                    let x: S;
+
+                    // TEST: the value must NOT be loaded! it must simply gep to obtain a pointer,
+                    // then `store` into that pointer.
+                    x.y = 4;
+
+                    return;
+                }
+            "});
         }
     }
     mod cg_expr {
