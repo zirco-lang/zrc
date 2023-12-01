@@ -1,0 +1,20 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "fn take_int(x: i32);\n\nfn test() {\n    let x: *i32;\n\n    // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).\n    // %let_x needs to be GEP'd into and the value `i32` at idx 4 must be loaded.\n    take_int(x[4]);\n\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+declare void @take_int(i32)
+
+define void @test() {
+entry:
+  %let_x = alloca ptr, align 8
+  %load = load ptr, ptr %let_x, align 8
+  %gep = getelementptr i32, ptr %load, i32 4
+  %load1 = load i32, ptr %gep, align 4
+  call void @take_int(i32 %load1)
+  ret void
+}
+

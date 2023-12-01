@@ -867,17 +867,21 @@ mod tests {
     // more information on how code generator tests are structured.
 
     use indexmap::IndexMap;
-    use inkwell::{context::Context, types::BasicType, values::AnyValue, AddressSpace};
-    use zrc_parser::parser::parse_expr;
+    use indoc::indoc;
+    use inkwell::{
+        context::Context, targets::TargetTriple, types::BasicType, values::AnyValue, AddressSpace,
+    };
+    use zrc_parser::parser::{parse_expr, parse_program};
     use zrc_typeck::{
         tast::stmt::ArgumentDeclarationList,
+        typeck,
         typeck::{BlockReturnType, Scope},
     };
 
     use super::*;
-    use crate::test_utils::{
-        generate_boolean_yielding_fn, generate_i32_yielding_fn, initialize_test_function,
-        make_test_prelude_closure,
+    use crate::{
+        cg_program_to_string, cg_snapshot_test, get_native_triple,
+        test_utils::make_test_prelude_closure,
     };
 
     // Remember: In all of these tests, cg_place returns a *pointer* to the data in
@@ -1234,304 +1238,67 @@ mod tests {
     mod cg_expr {
         use super::*;
 
-        /// Ensures all of the side-effects on the left hand side of a comma
-        /// operator are executed and the right hand side is returned.
-        // #[test]
-        // TODO: rewrite to snaps
-        fn comma_yields_right_value() {
-            let ctx = Context::create();
-
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
-                    // generate `f: fn() -> void`
-                    let f_fn_type = ctx.void_type().fn_type(&[], false);
-                    let f_val = module.add_function("f", f_fn_type, None);
-                    scope.insert("f", f_val.as_global_value().as_pointer_value());
-
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, _scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // First the function is called, then the number literal is returned
-                builder
-                    .build_call(module.get_function("f").unwrap(), &[], "call")
-                    .unwrap();
-
-                (
-                    module.print_to_string(),
-                    ctx.i32_type().const_int(3, false).print_to_string(),
-                )
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (reg, _bb) = cg_expr(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    TypedExpr(
-                        Type::I32,
-                        TypedExprKind::Comma(
-                            Box::new(TypedExpr(
-                                Type::Void,
-                                TypedExprKind::Call(
-                                    Box::new(Place(
-                                        Type::Fn(
-                                            ArgumentDeclarationList::NonVariadic(vec![]),
-                                            Box::new(BlockReturnType::Void),
-                                        ),
-                                        PlaceKind::Variable("f"),
-                                    )),
-                                    vec![],
-                                ),
-                            )),
-                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
-                        ),
-                    ),
-                );
-
-                (module.print_to_string(), reg.print_to_string())
-            };
-
-            assert_eq!(actual, expected);
-        }
-
-        /// This is similar to
-        /// [`super::cg_place::pointer_indexing_generates_proper_gep`] but it
-        /// expects an additional `load` instruction at the end to go from
-        /// resolved pointer to value.
-        // #[test]
-        // TODO: rewrite to snaps
-        fn pointer_indexing_generates_proper_gep_and_load() {
-            let ctx = Context::create();
-
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    // generate `arr: *i32`
-                    let arr_stack_ptr = builder
-                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
-                        .unwrap();
-                    scope.insert("arr", arr_stack_ptr);
-
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
-                // the pointer to that index in the array
-                let loaded_arr = builder
-                    .build_load(
-                        ctx.i32_type().ptr_type(AddressSpace::default()),
-                        scope.get("arr").unwrap(),
-                        "load",
-                    )
-                    .unwrap();
-
-                // SAFETY: If indices are used incorrectly this may segfault
-                let indexed_ptr = unsafe {
-                    builder.build_gep(
-                        ctx.i32_type(),
-                        loaded_arr.into_pointer_value(),
-                        &[ctx.i32_type().const_int(3, false)],
-                        "gep",
-                    )
-                }
-                .unwrap();
-
-                // Finally this value is loaded.
-                let loaded_value = builder
-                    .build_load(ctx.i32_type(), indexed_ptr, "load")
-                    .unwrap();
-
-                (module.print_to_string(), loaded_value.print_to_string())
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_expr(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    TypedExpr(
-                        Type::I32,
-                        TypedExprKind::Index(
-                            Box::new(TypedExpr(
-                                Type::Ptr(Box::new(Type::I32)),
-                                TypedExprKind::Identifier("arr"),
-                            )),
-                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
-                        ),
-                    ),
-                );
-
-                (module.print_to_string(), ptr.print_to_string())
-            };
-
-            assert_eq!(actual, expected);
-        }
-
-        /// This is similar to
-        /// [`super::cg_place::struct_property_access_generates_proper_gep`] but
-        /// it expects an additional `load` instruction at the end to go
-        /// from resolved pointer to value.
-        // #[test]
-        // TODO: rewrite to snaps
-        fn struct_property_access_generates_proper_gep_and_load() {
-            let ctx = Context::create();
-
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    // generate: `x: { x: i32, y: i32 }`
-                    let x_stack_ptr = builder
-                        .build_alloca(
-                            ctx.struct_type(
-                                &[
-                                    ctx.i32_type().as_basic_type_enum(),
-                                    ctx.i32_type().as_basic_type_enum(),
-                                ],
-                                false,
-                            ),
-                            "x",
-                        )
-                        .unwrap();
-                    scope.insert("x", x_stack_ptr);
-
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // We do not load the struct yet, we GEP directly into it.
-                let indexed_ptr = builder
-                    .build_struct_gep(
-                        ctx.struct_type(
-                            &[
-                                ctx.i32_type().as_basic_type_enum(),
-                                ctx.i32_type().as_basic_type_enum(),
-                            ],
-                            false,
-                        ),
-                        scope.get("x").unwrap(),
-                        1,
-                        "gep",
-                    )
-                    .unwrap();
-
-                // Now we load the value.
-                let loaded_value = builder
-                    .build_load(ctx.i32_type(), indexed_ptr, "load")
-                    .unwrap();
-
-                (module.print_to_string(), loaded_value.print_to_string())
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_expr(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    TypedExpr(
-                        Type::I32,
-                        TypedExprKind::Dot(
-                            Box::new(Place(
-                                Type::Struct(IndexMap::from([("a", Type::I32), ("b", Type::I32)])),
-                                PlaceKind::Variable("x"),
-                            )),
-                            "b",
-                        ),
-                    ),
-                );
-
-                (module.print_to_string(), ptr.print_to_string())
-            };
-
-            assert_eq!(actual, expected);
-        }
-
-        /// This test is a lot more complicated. It aims to ensure that the
-        /// ternary operator generates as expected. A lot of this can be
-        /// optimized, so we keep the condition as a call to an extern
-        /// fn so that not much can be done about it.
         #[test]
-        #[allow(clippy::similar_names, clippy::too_many_lines)]
-        fn ternary_generates_proper_cfg() {
-            let ctx = Context::create();
+        fn comma_yields_right_value() {
+            cg_snapshot_test!(indoc! {"
+                fn f();
+                fn g() -> i32;
+                
+                fn test() -> i32 {
+                    // TEST: f() is run, g() is run and used as the return value
+                    return f(), g();
+                }
+            "});
+        }
 
-            let (target_machine, builder, module, fn_value, mut cg_scope, bb) =
-                initialize_test_function(&ctx);
+        #[test]
+        fn pointer_indexing_in_expr_position() {
+            cg_snapshot_test!(indoc! {"
+                fn take_int(x: i32);
 
-            let mut tck_scope = Scope::new_empty();
-            generate_boolean_yielding_fn("get_bool", &ctx, &module, &mut tck_scope, &mut cg_scope);
-            generate_i32_yielding_fn("get_int", &ctx, &module, &mut tck_scope, &mut cg_scope);
+                fn test() {
+                    let x: *i32;
 
-            let source = "get_bool() ? get_int() : 3";
+                    // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).
+                    // %let_x needs to be GEP'd into and the value `i32` at idx 4 must be loaded.
+                    take_int(x[4]);
 
-            let checked_tast =
-                zrc_typeck::typeck::type_expr(&tck_scope, parse_expr(source).unwrap()).unwrap();
+                    return;
+                }
+            "});
+        }
 
-            let (reg, _bb) = cg_expr(
-                &ctx,
-                &target_machine,
-                &builder,
-                &module,
-                &fn_value,
-                &bb,
-                &cg_scope,
-                checked_tast,
-            );
+        #[test]
+        fn struct_property_access_in_expr_position() {
+            cg_snapshot_test!(indoc! {"
+                struct S { x: i32, y: i32 }
+                fn take_int(x: i32);
 
-            insta::with_settings!({
-                description => concat!(
-                    "should contain a diamond-shaped cfg with one branch calling a function",
-                    " and the other with no code, followed by a `phi` node"
-                ),
-                info => &source,
-            }, {
-                insta::assert_snapshot!(module.print_to_string().to_str().unwrap());
-            });
+                fn test() {
+                    let x: S;
 
-            insta::with_settings!({
-                // we use only description because info can't contain newlines
-                description => format!(
-                    concat!(
-                        "should contain the final phi node between the result of the call and",
-                        " the literal 3 in the following IR:\n\n{}"
-                    ),
-                    module.print_to_string().to_str().unwrap()
-                ),
-            }, {
-                insta::assert_snapshot!(reg.print_to_string().to_str().unwrap());
-            });
+                    // TEST: should GEP into `x` to get the second property (`y`) and then
+                    // load that value and call take_int
+                    take_int(x.y);
+
+                    return;
+                }
+            "});
+        }
+
+        #[test]
+        fn ternary_operations_generate() {
+            cg_snapshot_test!(indoc! {"
+                fn get_bool() -> bool;
+                fn get_int() -> i32;
+                fn take_int(x: i32);
+                fn test() {
+                    // TEST: should produce a proper diamond-shaped cfg
+                    let num = get_bool() ? get_int() : 3;
+                    take_int(num);
+                    return;
+                }
+            "});
         }
     }
 }

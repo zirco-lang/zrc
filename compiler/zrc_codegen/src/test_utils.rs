@@ -61,10 +61,10 @@ use inkwell::{
 };
 use zrc_typeck::{
     tast::{stmt::ArgumentDeclarationList, ty::Type},
-    typeck::BlockReturnType,
+    typeck::{self, BlockReturnType},
 };
 
-use crate::{stmt::cg_init_fn, CgScope};
+use crate::{cg_program_to_string, get_native_triple, stmt::cg_init_fn, CgScope};
 
 /// Initialize a new LLVM [`Builder`], [`FunctionValue`], [`CgScope`], and
 /// [`BasicBlock`] within that function. This allows you to generate code within
@@ -232,4 +232,24 @@ pub(crate) fn generate_i32_yielding_fn<'name, 'ctx>(
             Box::new(BlockReturnType::Return(Type::I32)),
         ),
     );
+}
+
+/// Creates a snapshot test given a valid input program
+#[macro_export]
+macro_rules! cg_snapshot_test {
+    ($source:expr) => {
+        let resulting_ir = cg_program_to_string(
+            "test",
+            typeck::type_program(::zrc_parser::parser::parse_program($source).unwrap()).unwrap(),
+            ::inkwell::OptimizationLevel::None,
+            &$crate::get_native_triple(),
+            "",
+        );
+
+        insta::with_settings!({
+            description => $source,
+        }, {
+            insta::assert_snapshot!(resulting_ir);
+        });
+    }
 }
