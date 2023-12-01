@@ -206,9 +206,9 @@ pub(crate) fn generate_i32_yielding_fn<'name, 'ctx>(
 #[macro_export]
 macro_rules! cg_snapshot_test {
     ($source:expr) => {
-        let resulting_ir = cg_program_to_string(
+        let resulting_ir = $crate::cg_program_to_string(
             "test",
-            typeck::type_program(::zrc_parser::parser::parse_program($source).unwrap()).unwrap(),
+            ::zrc_typeck::typeck::type_program(::zrc_parser::parser::parse_program($source).unwrap()).unwrap(),
             ::inkwell::OptimizationLevel::None,
             &$crate::get_native_triple(),
             "",

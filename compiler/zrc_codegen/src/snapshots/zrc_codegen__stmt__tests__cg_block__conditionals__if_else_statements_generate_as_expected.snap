@@ -1,11 +1,14 @@
 ---
 source: compiler/zrc_codegen/src/stmt.rs
-description: "should contain an conditional break over the result of a function call in the entry block.\nthis will either break to %then which calls nop1, or it breaks to %then_else which calls nop2. these both then break to the end bb."
-expression: module.print_to_string().to_str().unwrap()
-info: if (get_bool()) nop1(); else nop2();
+description: "fn get_bool() -> bool;\nfn nop();\n\nfn test() {\n    // TEST: properly produces a conditional break over the call result and\n    // both code baths call nop().\n    if (get_bool()) nop();\n    else {\n        nop();\n        // TEST: this path diverges\n        return;\n    }\n\n    // TEST: code generation properly continues from the if_true block\n    nop();\n    return;\n}\n"
+expression: resulting_ir
 ---
 ; ModuleID = 'test'
 source_filename = "test"
+
+declare i1 @get_bool()
+
+declare void @nop()
 
 define void @test() {
 entry:
@@ -13,19 +16,15 @@ entry:
   br i1 %call, label %then, label %then_else
 
 then:                                             ; preds = %entry
-  call void @nop1()
+  call void @nop()
   br label %end
 
 then_else:                                        ; preds = %entry
-  call void @nop2()
-  br label %end
+  call void @nop()
+  ret void
 
-end:                                              ; preds = %then_else, %then
+end:                                              ; preds = %then
+  call void @nop()
+  ret void
 }
-
-declare void @nop1()
-
-declare void @nop2()
-
-declare i1 @get_bool()
 

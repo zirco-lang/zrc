@@ -1,11 +1,12 @@
 ---
 source: compiler/zrc_codegen/src/stmt.rs
-description: "should contain the standard while loop form containing an if-elif-else structure, with the first if breaking, the second if continuing, and the else branch continuing.\nthe end of the loop should all meet in an ending block."
-expression: module.print_to_string().to_str().unwrap()
-info: "while (get_bool()) {    if (get_bool()) break;    else {        if (get_bool()) continue;        else {};    }}"
+description: "fn get_bool() -> bool;\n\nfn test() {\n    // TEST: the proper while loop structure is created\n    while (get_bool()) {\n        // TEST: break jumps to the `end` block\n        if (get_bool()) break;\n        else {\n            // TEST: continue jumps to the header block\n            if (get_bool()) continue;\n            // TEST: otherwise, we proceed\n            else {}\n        }\n\n        // TEST: the loop jumps back to the header block\n    }\n\n    // TEST: ...and code generation properly continues.\n    return;\n}\n"
+expression: resulting_ir
 ---
 ; ModuleID = 'test'
 source_filename = "test"
+
+declare i1 @get_bool()
 
 define void @test() {
 entry:
@@ -20,6 +21,7 @@ body:                                             ; preds = %header
   br i1 %call1, label %then, label %then_else
 
 exit:                                             ; preds = %then, %header
+  ret void
 
 then:                                             ; preds = %body
   br label %exit
@@ -40,6 +42,4 @@ end:                                              ; preds = %then_else4
 end5:                                             ; preds = %end
   br label %header
 }
-
-declare i1 @get_bool()
 

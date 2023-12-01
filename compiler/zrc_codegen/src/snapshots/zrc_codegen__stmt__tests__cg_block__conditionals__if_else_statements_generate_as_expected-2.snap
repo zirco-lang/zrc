@@ -1,6 +1,0 @@
----
-source: compiler/zrc_codegen/src/stmt.rs
-description: "ensure the snapped value is an empty basic block that the other bbs all unconditionally break to (where cg continues)\n\nIR:\n; ModuleID = 'test'\nsource_filename = \"test\"\n\ndefine void @test() {\nentry:\n  %call = call i1 @get_bool()\n  br i1 %call, label %then, label %then_else\n\nthen:                                             ; preds = %entry\n  call void @nop1()\n  br label %end\n\nthen_else:                                        ; preds = %entry\n  call void @nop2()\n  br label %end\n\nend:                                              ; preds = %then_else, %then\n}\n\ndeclare void @nop1()\n\ndeclare void @nop2()\n\ndeclare i1 @get_bool()\n"
-expression: bb.get_name().to_str().unwrap()
----
-end

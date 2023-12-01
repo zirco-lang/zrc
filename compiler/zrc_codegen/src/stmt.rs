@@ -676,6 +676,7 @@ mod tests {
 
     use std::collections::HashMap;
 
+    use indoc::indoc;
     use inkwell::context::Context;
     use zrc_parser::parser::parse_stmt_list;
     use zrc_typeck::{
@@ -688,71 +689,22 @@ mod tests {
     };
 
     use crate::{
+        cg_snapshot_test,
         stmt::{cg_block, cg_let_declaration},
         test_utils::{generate_boolean_yielding_fn, generate_nop_fn, initialize_test_function},
     };
 
-    /// Ensures [`cg_let_declaration`] properly generates the allocations and
-    /// assigns a value if needed.
     #[test]
     fn let_declarations_are_properly_generated() {
-        let ctx = Context::create();
+        cg_snapshot_test!(indoc! {"
+            fn test() {
+                // TEST: should allocate twice and assign to one.
+                let a: i32;
+                let b: i32 = 7;
 
-        let (target_machine, builder, module, fn_value, mut scope, bb) =
-            initialize_test_function(&ctx);
-
-        let _bb = cg_let_declaration(
-            &ctx,
-            &target_machine,
-            &builder,
-            &module,
-            &fn_value,
-            &bb,
-            &mut scope,
-            vec![
-                LetDeclaration {
-                    name: "a",
-                    ty: Type::I32,
-                    value: None,
-                },
-                LetDeclaration {
-                    name: "b",
-                    ty: Type::Bool,
-                    value: Some(TypedExpr(Type::Bool, TypedExprKind::BooleanLiteral(true))),
-                },
-            ],
-        );
-
-        insta::with_settings!({
-            description => concat!(
-                "should contain two alloca instructions, one for a and b\n",
-                "then, a store of the value `true` should be made to `b`"
-            ),
-        }, {
-            insta::assert_snapshot!(module.print_to_string().to_str().unwrap());
-        });
-
-        let mut identifiers = scope
-            .identifiers
-            .into_iter()
-            .map(|(identifier, pointer)| {
-                (identifier, pointer.get_name().to_str().unwrap().to_string())
-            })
-            .collect::<Vec<_>>();
-        identifiers.sort();
-
-        insta::with_settings!({
-            // we use only description because info can't contain newlines
-            description => format!(
-                concat!(
-                    "should map `a` and `b` to their `alloca`s in this IR:",
-                    "\n\n{}"
-                ),
-                module.print_to_string().to_str().unwrap()
-            ),
-        }, {
-            insta::assert_yaml_snapshot!(identifiers);
-        });
+                return;
+            }
+        "});
     }
 
     mod cg_block {
@@ -763,261 +715,87 @@ mod tests {
 
             #[test]
             fn if_statements_generate_as_expected() {
-                let ctx = Context::create();
+                cg_snapshot_test!(indoc! {"
+                    fn get_bool() -> bool;
+                    fn nop();
 
-                let (target_machine, builder, module, fn_value, mut cg_scope, bb) =
-                    initialize_test_function(&ctx);
+                    fn test() {
+                        // TEST: properly produces a conditional break over the call result and
+                        // both code paths join at the end
+                        if (get_bool()) nop();
 
-                let mut tck_scope = Scope::new_empty();
-                generate_nop_fn("nop", &ctx, &module, &mut tck_scope, &mut cg_scope);
-                generate_boolean_yielding_fn(
-                    "get_bool",
-                    &ctx,
-                    &module,
-                    &mut tck_scope,
-                    &mut cg_scope,
-                );
-
-                let source = "if (get_bool()) nop();";
-
-                let checked_tast = zrc_typeck::typeck::type_block(
-                    &tck_scope,
-                    parse_stmt_list(source).unwrap(),
-                    false,
-                    BlockReturnAbility::MustNotReturn,
-                )
-                .unwrap()
-                .0;
-
-                let bb = cg_block(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &cg_scope,
-                    checked_tast,
-                    &None,
-                )
-                .unwrap();
-
-                insta::with_settings!({
-                    description => concat!(
-                        "should contain an conditional break over the result of a function call",
-                        " in the entry block.\n",
-                        "this will either break to %then which calls nop, or it breaks to an empty",
-                        " bb.",
-                    ),
-                    info => &source,
-                }, {
-                    insta::assert_snapshot!(module.print_to_string().to_str().unwrap());
-                });
-
-                insta::with_settings!({
-                    // we use only description because info can't contain newlines
-                    description => format!(
-                        concat!(
-                            "ensure the snapped value is an empty basic block that the other",
-                            " bbs all unconditionally break to (where cg continues)\n\nIR:\n{}"
-                        ),
-                        module.print_to_string().to_str().unwrap()
-                    ),
-                }, {
-                    insta::assert_snapshot!(bb.get_name().to_str().unwrap());
-                });
+                        // TEST: code generation properly continues in the last block
+                        nop();
+                        return;
+                    }
+                "});
             }
 
             #[test]
             fn if_else_statements_generate_as_expected() {
-                let ctx = Context::create();
+                cg_snapshot_test!(indoc! {"
+                    fn get_bool() -> bool;
+                    fn nop();
 
-                let (target_machine, builder, module, fn_value, mut cg_scope, bb) =
-                    initialize_test_function(&ctx);
+                    fn test() {
+                        // TEST: properly produces a conditional break over the call result and
+                        // both code baths call nop().
+                        if (get_bool()) nop();
+                        else {
+                            nop();
+                            // TEST: this path diverges
+                            return;
+                        }
 
-                let mut tck_scope = Scope::new_empty();
-                generate_nop_fn("nop1", &ctx, &module, &mut tck_scope, &mut cg_scope);
-                generate_nop_fn("nop2", &ctx, &module, &mut tck_scope, &mut cg_scope);
-                generate_boolean_yielding_fn(
-                    "get_bool",
-                    &ctx,
-                    &module,
-                    &mut tck_scope,
-                    &mut cg_scope,
-                );
-
-                let source = "if (get_bool()) nop1(); else nop2();";
-
-                let checked_tast = zrc_typeck::typeck::type_block(
-                    &tck_scope,
-                    parse_stmt_list(source).unwrap(),
-                    false,
-                    BlockReturnAbility::MustNotReturn,
-                )
-                .unwrap()
-                .0;
-
-                let bb = cg_block(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &cg_scope,
-                    checked_tast,
-                    &None,
-                )
-                .unwrap();
-
-                insta::with_settings!({
-                    description => concat!(
-                        "should contain an conditional break over the result of a function call",
-                        " in the entry block.\n",
-                        "this will either break to %then which calls nop1, or it breaks to",
-                        " %then_else which calls nop2. these both then break to the end bb."
-                    ),
-                    info => &source,
-                }, {
-                    insta::assert_snapshot!(module.print_to_string().to_str().unwrap());
-                });
-
-                insta::with_settings!({
-                    // we use only description because info can't contain newlines
-                    description => format!(
-                        concat!(
-                            "ensure the snapped value is an empty basic block that the other",
-                            " bbs all unconditionally break to (where cg continues)\n\nIR:\n{}"
-                        ),
-                        module.print_to_string().to_str().unwrap()
-                    ),
-                }, {
-                    insta::assert_snapshot!(bb.get_name().to_str().unwrap());
-                });
+                        // TEST: code generation properly continues from the if_true block
+                        nop();
+                        return;
+                    }
+                "});
             }
 
-            /// If both blocks of an if/else statement terminate, we must not
-            /// generate the `end` BB.
             #[test]
             fn if_else_statements_where_both_blocks_terminate_do_not_continue_generating() {
-                let ctx = Context::create();
+                cg_snapshot_test!(indoc! {"
+                    fn get_bool() -> bool;
 
-                let (target_machine, builder, module, fn_value, mut cg_scope, bb) =
-                    initialize_test_function(&ctx);
-
-                let mut tck_scope = Scope::new_empty();
-                generate_boolean_yielding_fn(
-                    "get_bool",
-                    &ctx,
-                    &module,
-                    &mut tck_scope,
-                    &mut cg_scope,
-                );
-
-                let source = "if (get_bool()) return; else return;";
-
-                let checked_tast = zrc_typeck::typeck::type_block(
-                    &tck_scope,
-                    parse_stmt_list(source).unwrap(),
-                    false,
-                    BlockReturnAbility::MustReturn(BlockReturnType::Void),
-                )
-                .unwrap()
-                .0;
-
-                let bb = cg_block(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &cg_scope,
-                    checked_tast,
-                    &None,
-                );
-
-                // code generation halts
-                assert_eq!(bb, None);
+                    fn test() {
+                        // TEST: properly produces a conditional break over the call result
+                        // and both code paths return (diverge). there should be no %end bb.
+                        if (get_bool()) return;
+                        else return;
+                    }
+                "});
             }
         }
 
         mod loops {
             use super::*;
 
-            /// Large test that verifies while loops along with break and
-            /// continue generate as they should.
-            // TODO: Make test smaller?
             #[test]
-            #[allow(clippy::too_many_lines)]
             fn while_loops_along_with_break_and_continue_generate_as_expected() {
-                let ctx = Context::create();
+                cg_snapshot_test!(indoc! {"
+                    fn get_bool() -> bool;
 
-                let (target_machine, builder, module, fn_value, mut cg_scope, bb) =
-                    initialize_test_function(&ctx);
+                    fn test() {
+                        // TEST: the proper while loop structure is created
+                        while (get_bool()) {
+                            // TEST: break jumps to the `end` block
+                            if (get_bool()) break;
+                            else {
+                                // TEST: continue jumps to the header block
+                                if (get_bool()) continue;
+                                // TEST: otherwise, we proceed
+                                else {}
+                            }
 
-                let mut tck_scope = Scope::new_empty();
-                generate_boolean_yielding_fn(
-                    "get_bool",
-                    &ctx,
-                    &module,
-                    &mut tck_scope,
-                    &mut cg_scope,
-                );
+                            // TEST: the loop jumps back to the header block
+                        }
 
-                let source = concat!(
-                    "while (get_bool()) {",
-                    "    if (get_bool()) break;",
-                    "    else {",
-                    "        if (get_bool()) continue;",
-                    "        else {};",
-                    "    }",
-                    "}",
-                );
-
-                let checked_tast = zrc_typeck::typeck::type_block(
-                    &tck_scope,
-                    parse_stmt_list(source).unwrap(),
-                    false,
-                    BlockReturnAbility::MustNotReturn,
-                )
-                .unwrap()
-                .0;
-
-                let bb = cg_block(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &cg_scope,
-                    checked_tast,
-                    &None,
-                )
-                .unwrap();
-
-                insta::with_settings!({
-                    description => concat!(
-                        "should contain the standard while loop form containing an if-elif-else",
-                        " structure, with the first if breaking, the second if continuing, and",
-                        " the else branch continuing.\n",
-                        "the end of the loop should all meet in an ending block."
-                    ),
-                    info => &source,
-                }, {
-                    insta::assert_snapshot!(module.print_to_string().to_str().unwrap());
-                });
-
-                insta::with_settings!({
-                    // we use only description because info can't contain newlines
-                    description => format!(concat!(
-                        "ensure the snapped value is an empty basic block that the",
-                        "loop ending unconditionally breaks to (where cg continues)\n\nIR:\n{}"
-                    ),module.print_to_string().to_str().unwrap()),
-                }, {
-                    insta::assert_snapshot!(bb.get_name().to_str().unwrap());
-                });
+                        // TEST: ...and code generation properly continues.
+                        return;
+                    }
+                "});
             }
         }
     }

@@ -1,0 +1,22 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+description: "fn get_bool() -> bool;\n\nfn test() {\n    // TEST: properly produces a conditional break over the call result\n    // and both code paths return (diverge). there should be no %end bb.\n    if (get_bool()) return;\n    else return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+declare i1 @get_bool()
+
+define void @test() {
+entry:
+  %call = call i1 @get_bool()
+  br i1 %call, label %then, label %then_else
+
+then:                                             ; preds = %entry
+  ret void
+
+then_else:                                        ; preds = %entry
+  ret void
+}
+

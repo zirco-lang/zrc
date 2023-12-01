@@ -1,6 +1,0 @@
----
-source: compiler/zrc_codegen/src/expr.rs
-description: "should contain the final phi node between the result of the call and the literal 3 in the following IR:\n\n; ModuleID = 'test'\nsource_filename = \"test\"\n\ndefine void @test() {\nentry:\n  %call = call i1 @get_bool()\n  br i1 %call, label %if_true, label %if_false\n\nif_true:                                          ; preds = %entry\n  %call1 = call i32 @get_int()\n  br label %end\n\nif_false:                                         ; preds = %entry\n  br label %end\n\nend:                                              ; preds = %if_false, %if_true\n  %yield = phi i32 [ %call1, %if_true ], [ 3, %if_false ]\n}\n\ndeclare i1 @get_bool()\n\ndeclare i32 @get_int()\n"
-expression: reg.print_to_string().to_str().unwrap()
----
-  %yield = phi i32 [ %call1, %if_true ], [ 3, %if_false ]

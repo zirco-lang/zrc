@@ -1,11 +1,14 @@
 ---
 source: compiler/zrc_codegen/src/stmt.rs
-description: "should contain an conditional break over the result of a function call in the entry block.\nthis will either break to %then which calls nop, or it breaks to an empty bb."
-expression: module.print_to_string().to_str().unwrap()
-info: if (get_bool()) nop();
+description: "fn get_bool() -> bool;\nfn nop();\n\nfn test() {\n    // TEST: properly produces a conditional break over the call result and\n    // both code paths join at the end\n    if (get_bool()) nop();\n\n    // TEST: code generation properly continues in the last block\n    nop();\n    return;\n}\n"
+expression: resulting_ir
 ---
 ; ModuleID = 'test'
 source_filename = "test"
+
+declare i1 @get_bool()
+
+declare void @nop()
 
 define void @test() {
 entry:
@@ -20,9 +23,7 @@ then_else:                                        ; preds = %entry
   br label %end
 
 end:                                              ; preds = %then_else, %then
+  call void @nop()
+  ret void
 }
-
-declare void @nop()
-
-declare i1 @get_bool()
 
