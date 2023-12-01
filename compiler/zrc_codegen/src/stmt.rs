@@ -674,25 +674,9 @@ mod tests {
     // Please read the "Common patterns in tests" section of crate::test_utils for
     // more information on how code generator tests are structured.
 
-    use std::collections::HashMap;
-
     use indoc::indoc;
-    use inkwell::context::Context;
-    use zrc_parser::parser::parse_stmt_list;
-    use zrc_typeck::{
-        tast::{
-            expr::{TypedExpr, TypedExprKind},
-            stmt::LetDeclaration,
-            ty::Type,
-        },
-        typeck::{BlockReturnAbility, BlockReturnType, Scope},
-    };
 
-    use crate::{
-        cg_snapshot_test,
-        stmt::{cg_block, cg_let_declaration},
-        test_utils::{generate_boolean_yielding_fn, generate_nop_fn, initialize_test_function},
-    };
+    use crate::cg_snapshot_test;
 
     #[test]
     fn let_declarations_are_properly_generated() {

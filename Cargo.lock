@@ -1371,7 +1371,6 @@ dependencies = [
 name = "zrc_codegen"
 version = "0.1.0"
 dependencies = [
- "indexmap",
  "indoc",
  "inkwell",
  "insta",

@@ -867,9 +867,8 @@ mod tests {
     // more information on how code generator tests are structured.
 
     use indoc::indoc;
-    use zrc_typeck::typeck;
 
-    use crate::{cg_program_to_string, cg_snapshot_test};
+    use crate::cg_snapshot_test;
 
     // Remember: In all of these tests, cg_place returns a *pointer* to the data in
     // the place.
