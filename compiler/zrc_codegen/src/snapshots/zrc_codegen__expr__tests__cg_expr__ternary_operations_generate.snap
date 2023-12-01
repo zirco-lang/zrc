@@ -1,0 +1,35 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "fn get_bool() -> bool;\nfn get_int() -> i32;\nfn take_int(x: i32);\nfn test() {\n    // TEST: should produce a proper diamond-shaped cfg\n    let num = get_bool() ? get_int() : 3;\n    take_int(num);\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+declare i1 @get_bool()
+
+declare i32 @get_int()
+
+declare void @take_int(i32)
+
+define void @test() {
+entry:
+  %let_num = alloca i32, align 4
+  %call = call i1 @get_bool()
+  br i1 %call, label %if_true, label %if_false
+
+if_true:                                          ; preds = %entry
+  %call1 = call i32 @get_int()
+  br label %end
+
+if_false:                                         ; preds = %entry
+  br label %end
+
+end:                                              ; preds = %if_false, %if_true
+  %yield = phi i32 [ %call1, %if_true ], [ 3, %if_false ]
+  store i32 %yield, ptr %let_num, align 4
+  %load = load i32, ptr %let_num, align 4
+  call void @take_int(i32 %load)
+  ret void
+}
+

@@ -1,0 +1,16 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "fn test() {\n    let x: *i32;\n\n    // TEST: x is *i32, so %let_x is **i32 (ptr to the stack). we should load from\n    // %let_x to obtain the actual pointer. we should then store to that result\n    // value (we should never load it)\n    *x = 4;\n\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+define void @test() {
+entry:
+  %let_x = alloca ptr, align 8
+  %load = load ptr, ptr %let_x, align 8
+  store i32 4, ptr %load, align 4
+  ret void
+}
+

@@ -11,3 +11,8 @@ members = [
 
 [profile.release]
 lto = true
+
+# See https://insta.rs/docs/quickstart/#optional-faster-runs
+[profile.dev.package]
+insta.opt-level = 3
+similar.opt-level = 3

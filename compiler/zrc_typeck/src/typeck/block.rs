@@ -394,7 +394,7 @@ pub fn type_block<'input>(
                             )),
 
                             StmtKind::ContinueStmt if can_use_break_continue => Ok(Some((
-                                TypedStmt::BreakStmt,
+                                TypedStmt::ContinueStmt,
                                 BlockReturnActuality::DoesNotReturn,
                             ))),
                             StmtKind::ContinueStmt => Err(Diagnostic(

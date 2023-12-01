@@ -1,0 +1,59 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+description: "fn get_int() -> i32;\n\nfn test() {\n    // TEST: the proper while loop structure is created\n    for (let i = 0; i < get_int(); i += 1) {\n        // TEST: break jumps to the `end` block\n        if (i > get_int()) break;\n        else {\n            // TEST: continue jumps to the latch block\n            if (i < get_int()) continue;\n            else {}\n        }\n\n        // TEST: the loop jumps to the latch block which jumps back to the\n        // header\n    }\n\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+declare i32 @get_int()
+
+define void @test() {
+entry:
+  %let_i = alloca i32, align 4
+  store i32 0, ptr %let_i, align 4
+  br label %header
+
+header:                                           ; preds = %latch, %entry
+  %load = load i32, ptr %let_i, align 4
+  %call = call i32 @get_int()
+  %cmp = icmp ult i32 %load, %call
+  br i1 %cmp, label %body, label %exit
+
+body:                                             ; preds = %header
+  %load1 = load i32, ptr %let_i, align 4
+  %call2 = call i32 @get_int()
+  %cmp3 = icmp ugt i32 %load1, %call2
+  br i1 %cmp3, label %then, label %then_else
+
+latch:                                            ; preds = %end9, %then7
+  %load10 = load i32, ptr %let_i, align 4
+  %add = add i32 %load10, 1
+  store i32 %add, ptr %let_i, align 4
+  br label %header
+
+exit:                                             ; preds = %then, %header
+  ret void
+
+then:                                             ; preds = %body
+  br label %exit
+
+then_else:                                        ; preds = %body
+  %load4 = load i32, ptr %let_i, align 4
+  %call5 = call i32 @get_int()
+  %cmp6 = icmp ult i32 %load4, %call5
+  br i1 %cmp6, label %then7, label %then_else8
+
+then7:                                            ; preds = %then_else
+  br label %latch
+
+then_else8:                                       ; preds = %then_else
+  br label %end
+
+end:                                              ; preds = %then_else8
+  br label %end9
+
+end9:                                             ; preds = %end
+  br label %latch
+}
+

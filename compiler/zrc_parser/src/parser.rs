@@ -22,13 +22,17 @@
 
 use lalrpop_util::ParseError;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
-use zrc_utils::span::{Span, Spanned};
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{
     ast::{expr::Expr, stmt::Declaration},
     lexer,
 };
-use crate::{internal_parser, lexer::LexicalError};
+use crate::{
+    ast::{stmt::Stmt, ty::Type},
+    internal_parser,
+    lexer::LexicalError,
+};
 
 /// Converts from a LALRPOP [`ParseError`] to a corresponding [`Diagnostic`].
 fn parser_error_to_diagnostic(
@@ -124,6 +128,54 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 /// encountered while parsing the input program.
 pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration>>, Diagnostic> {
     internal_parser::ProgramParser::new()
+        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .map_err(parser_error_to_diagnostic)
+}
+
+/// Parses a singular Zirco statement list, yielding a vector of AST [`Stmt`]
+/// nodes.
+///
+/// This function only parses a single Zirco [statement](Stmt), and not an
+/// entire program. Unless you are trying to do some special integration with
+/// partial programs, you probably want to use the [`parse_program`] function
+/// instead.
+///
+/// # Example
+/// Obtaining the AST of a statement:
+/// ```
+/// use zrc_parser::parser::parse_stmt_list;
+/// let ast = parse_stmt_list("let x = 6;");
+/// ```
+///
+/// # Errors
+/// This function returns [`Err`] with a [`ZircoParserError`] if any error was
+/// encountered while parsing the input statement list.
+pub fn parse_stmt_list(input: &str) -> Result<Spanned<Vec<Stmt>>, Diagnostic> {
+    internal_parser::StmtListParser::new()
+        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .map(|stmt_list| stmt_list.in_span(Span::from_positions(0, input.len())))
+        .map_err(parser_error_to_diagnostic)
+}
+
+/// Parses a singular Zirco type, yielding an AST [`Type`] node.
+///
+/// This function only parses a single Zirco [type](Type), and not an
+/// entire program. Unless you are trying to do some special integration with
+/// partial programs, you probably want to use the [`parse_program`] function
+/// instead.
+///
+/// # Example
+/// Obtaining the AST of a type:
+/// ```
+/// use zrc_parser::parser::parse_type;
+/// let ast = parse_type("struct { x: i32 }");
+/// ```
+///
+/// # Errors
+/// This function returns [`Err`] with a [`ZircoParserError`] if any error was
+/// encountered while parsing the input expression.
+pub fn parse_type(input: &str) -> Result<Type, Diagnostic> {
+    internal_parser::TypeParser::new()
         .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
         .map_err(parser_error_to_diagnostic)
 }
@@ -374,5 +426,10 @@ mod tests {
             }
         }
     }
+
+    mod ty {}
+
+    mod stmt_list {}
+
     mod program {}
 }

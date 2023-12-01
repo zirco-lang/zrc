@@ -1,0 +1,29 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+description: "fn get_bool() -> bool;\nfn nop();\n\nfn test() {\n    // TEST: properly produces a conditional break over the call result and\n    // both code paths join at the end\n    if (get_bool()) nop();\n\n    // TEST: code generation properly continues in the last block\n    nop();\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+declare i1 @get_bool()
+
+declare void @nop()
+
+define void @test() {
+entry:
+  %call = call i1 @get_bool()
+  br i1 %call, label %then, label %then_else
+
+then:                                             ; preds = %entry
+  call void @nop()
+  br label %end
+
+then_else:                                        ; preds = %entry
+  br label %end
+
+end:                                              ; preds = %then_else, %then
+  call void @nop()
+  ret void
+}
+
