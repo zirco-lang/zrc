@@ -1,0 +1,16 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "fn test() -> i32 {\n    let x: *i32;\n\n    // TEST: should load twice, once to read the value of `x` and once to read what\n    // it points to\n    return *x;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+define i32 @test() {
+entry:
+  %let_x = alloca ptr, align 8
+  %load = load ptr, ptr %let_x, align 8
+  %load1 = load i32, ptr %load, align 4
+  ret i32 %load1
+}
+

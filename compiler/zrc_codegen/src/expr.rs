@@ -989,6 +989,19 @@ mod tests {
         }
 
         #[test]
+        fn pointer_deref_in_expr_position() {
+            cg_snapshot_test!(indoc! {"
+                fn test() -> i32 {
+                    let x: *i32;
+
+                    // TEST: should load twice, once to read the value of `x` and once to read what
+                    // it points to
+                    return *x;
+                }
+            "});
+        }
+
+        #[test]
         fn struct_property_access_in_expr_position() {
             cg_snapshot_test!(indoc! {"
                 struct S { x: i32, y: i32 }
