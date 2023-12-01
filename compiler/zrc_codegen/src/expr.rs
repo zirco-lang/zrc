@@ -963,7 +963,7 @@ mod tests {
             cg_snapshot_test!(indoc! {"
                 fn f();
                 fn g() -> i32;
-                
+
                 fn test() -> i32 {
                     // TEST: f() is run, g() is run and used as the return value
                     return f(), g();
