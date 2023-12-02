@@ -10,7 +10,7 @@ use zrc_utils::{
 };
 
 use super::ty::Type;
-use crate::lexer::StringTok;
+use crate::lexer::{NumberLiteral, StringTok};
 
 /// Arithmetic operators
 ///
@@ -238,7 +238,7 @@ pub enum ExprKind<'input> {
     SizeOf(Type<'input>),
 
     /// Any numeric literal.
-    NumberLiteral(&'input str),
+    NumberLiteral(NumberLiteral<'input>),
     /// Any string literal.
     StringLiteral(Vec<StringTok<'input>>),
     /// Any char literal
@@ -533,13 +533,25 @@ impl<'input> Expr<'input> {
 
     // These all need spans because they can't be guessed
     #[must_use]
-    pub fn build_number(lit: Spanned<&'input str>) -> Self {
+    pub fn build_number(lit: Spanned<NumberLiteral<'input>>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),
             ExprKind::NumberLiteral(lit.into_value()),
             span.end()
         ))
+    }
+    #[must_use]
+    pub fn build_number_dec(lit: Spanned<&'input str>) -> Self {
+        Self::build_number(lit.map(NumberLiteral::Decimal))
+    }
+    #[must_use]
+    pub fn build_number_hex(lit: Spanned<&'input str>) -> Self {
+        Self::build_number(lit.map(NumberLiteral::Hexadecimal))
+    }
+    #[must_use]
+    pub fn build_number_bin(lit: Spanned<&'input str>) -> Self {
+        Self::build_number(lit.map(NumberLiteral::Binary))
     }
     #[must_use]
     pub fn build_string(lit: Spanned<Vec<StringTok<'input>>>) -> Self {

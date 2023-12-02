@@ -4,7 +4,7 @@ use std::{fmt::Display, string::ToString};
 
 pub use zrc_parser::{
     ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical},
-    lexer::StringTok,
+    lexer::{NumberLiteral, StringTok},
 };
 
 use super::ty::Type;
@@ -92,7 +92,7 @@ pub enum TypedExprKind<'input> {
     SizeOf(Type<'input>),
 
     /// Any numeric literal.
-    NumberLiteral(&'input str),
+    NumberLiteral(NumberLiteral<'input>),
     /// Any string literal.bool
     StringLiteral(Vec<StringTok<'input>>),
     /// Any char literal

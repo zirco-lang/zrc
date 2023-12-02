@@ -12,8 +12,8 @@ use inkwell::{
 };
 use zrc_typeck::tast::{
     expr::{
-        Arithmetic, BinaryBitwise, Comparison, Equality, Logical, Place, PlaceKind, StringTok,
-        TypedExpr, TypedExprKind,
+        Arithmetic, BinaryBitwise, Comparison, Equality, Logical, NumberLiteral, Place, PlaceKind,
+        StringTok, TypedExpr, TypedExprKind,
     },
     ty::Type,
 };
@@ -162,13 +162,27 @@ pub(crate) fn cg_expr<'ctx, 'a>(
     expr: TypedExpr,
 ) -> (BasicValueEnum<'ctx>, BasicBlock<'ctx>) {
     match expr.1 {
-        TypedExprKind::NumberLiteral(n) => (
-            llvm_int_type(ctx, &expr.0)
-                .const_int_from_string(n, StringRadix::Decimal)
-                .unwrap()
-                .as_basic_value_enum(),
-            *bb,
-        ),
+        TypedExprKind::NumberLiteral(n) => {
+            let no_underscores = match n {
+                NumberLiteral::Decimal(x) => x.replace('_', ""),
+                NumberLiteral::Binary(x) => x.replace('_', ""),
+                NumberLiteral::Hexadecimal(x) => x.replace('_', ""),
+            };
+            (
+                llvm_int_type(ctx, &expr.0)
+                    .const_int_from_string(
+                        &no_underscores,
+                        match n {
+                            NumberLiteral::Decimal(_) => StringRadix::Decimal,
+                            NumberLiteral::Binary(_) => StringRadix::Binary,
+                            NumberLiteral::Hexadecimal(_) => StringRadix::Hexadecimal,
+                        },
+                    )
+                    .unwrap()
+                    .as_basic_value_enum(),
+                *bb,
+            )
+        }
 
         TypedExprKind::StringLiteral(str) => {
             let formatted_contents = str
@@ -1029,6 +1043,22 @@ mod tests {
                     // TEST: should produce a proper diamond-shaped cfg
                     let num = get_bool() ? get_int() : 3;
                     take_int(num);
+                    return;
+                }
+            "});
+        }
+
+        /// Tests to ensure non-decimal integer literals
+        /// 1. don't panic
+        /// 2. are valid.
+        ///
+        /// <https://github.com/zirco-lang/zrc/issues/119>
+        #[test]
+        fn regression_119_special_integer_literals() {
+            cg_snapshot_test!(indoc! {"
+                fn test() {
+                    let a = 0b10_10;
+                    let b = 0x1F_A4;
                     return;
                 }
             "});
