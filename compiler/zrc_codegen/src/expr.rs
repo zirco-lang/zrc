@@ -336,47 +336,91 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Arithmetic(op, lhs, rhs) => {
+            let lhs_ty = lhs.inferred_type.clone();
             let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, *lhs);
             let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, *rhs);
 
-            let reg = match (op, expr.inferred_type.is_signed_integer()) {
-                (Arithmetic::Addition, _) => {
-                    cg.builder
-                        .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "add")
-                }
-                (Arithmetic::Subtraction, _) => {
-                    cg.builder
-                        .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "sub")
-                }
-                (Arithmetic::Multiplication, _) => {
-                    cg.builder
-                        .build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "mul")
-                }
-                (Arithmetic::Division, true) => cg.builder.build_int_signed_div(
-                    lhs.into_int_value(),
-                    rhs.into_int_value(),
-                    "div",
-                ),
-                (Arithmetic::Division, false) => cg.builder.build_int_unsigned_div(
-                    lhs.into_int_value(),
-                    rhs.into_int_value(),
-                    "div",
-                ),
-                (Arithmetic::Modulo, true) => cg.builder.build_int_signed_rem(
-                    lhs.into_int_value(),
-                    rhs.into_int_value(),
-                    "rem",
-                ),
-                (Arithmetic::Modulo, false) => cg.builder.build_int_unsigned_rem(
-                    lhs.into_int_value(),
-                    rhs.into_int_value(),
-                    "rem",
-                ),
-            };
+            if let Type::Ptr(pointee) = lhs_ty {
+                // Most languages make incrementing a pointer increase the address by the size
+                // of the pointee type, hence our use of `gep`.
+                // REVIEW: Is this the approach we want to take?
+                #[allow(clippy::wildcard_enum_match_arm)]
+                let reg = match op {
+                    // SAFETY: this can panic if indices are used incorrectly
+                    // TODO: is this safe?
+                    Arithmetic::Addition => unsafe {
+                        cg.builder.build_gep(
+                            llvm_basic_type(cg.ctx, cg.target_machine, &pointee),
+                            lhs.into_pointer_value(),
+                            &[rhs.into_int_value()],
+                            "ptr_add",
+                        )
+                    },
+                    Arithmetic::Subtraction => {
+                        let rhs = cg
+                            .builder
+                            .build_int_neg(rhs.into_int_value(), "neg")
+                            .unwrap()
+                            .as_basic_value_enum();
 
-            BasicBlockAnd {
-                bb,
-                value: reg.unwrap().as_basic_value_enum(),
+                        // SAFETY: this can panic if indices are used incorrectly
+                        // TODO: is this safe?
+                        unsafe {
+                            cg.builder.build_gep(
+                                llvm_basic_type(cg.ctx, cg.target_machine, &pointee),
+                                lhs.into_pointer_value(),
+                                &[rhs.into_int_value()],
+                                "ptr_sub",
+                            )
+                        }
+                    }
+                    _ => panic!("invalid pointer arithmetic operation"),
+                };
+
+                BasicBlockAnd {
+                    bb,
+                    value: reg.unwrap().as_basic_value_enum(),
+                }
+            } else {
+                let reg = match (op, expr.inferred_type.is_signed_integer()) {
+                    (Arithmetic::Addition, _) => {
+                        cg.builder
+                            .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "add")
+                    }
+                    (Arithmetic::Subtraction, _) => {
+                        cg.builder
+                            .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "sub")
+                    }
+                    (Arithmetic::Multiplication, _) => {
+                        cg.builder
+                            .build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "mul")
+                    }
+                    (Arithmetic::Division, true) => cg.builder.build_int_signed_div(
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "div",
+                    ),
+                    (Arithmetic::Division, false) => cg.builder.build_int_unsigned_div(
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "div",
+                    ),
+                    (Arithmetic::Modulo, true) => cg.builder.build_int_signed_rem(
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "rem",
+                    ),
+                    (Arithmetic::Modulo, false) => cg.builder.build_int_unsigned_rem(
+                        lhs.into_int_value(),
+                        rhs.into_int_value(),
+                        "rem",
+                    ),
+                };
+
+                BasicBlockAnd {
+                    bb,
+                    value: reg.unwrap().as_basic_value_enum(),
+                }
             }
         }
 
@@ -889,6 +933,22 @@ mod tests {
                     return;
                 }
             "});
+        }
+
+        #[test]
+        fn pointer_arithmetic_generates_proper_gep() {
+            cg_snapshot_test!(indoc! {r#"
+                fn test() {
+                    let x: *i32;
+
+                    // TEST: should create a GEP that is the same as "x[4]"
+                    let y = x + 4;
+                    // TEST: and the same, with -4:
+                    let z = x - 4;
+
+                    return;
+                }
+            "#});
         }
     }
 }
