@@ -8,9 +8,9 @@ source_filename = "test"
 
 define void @test() {
 entry:
+  %let_b = alloca i32, align 4
   %let_a = alloca i32, align 4
   store i32 10, ptr %let_a, align 4
-  %let_b = alloca i32, align 4
   store i32 8100, ptr %let_b, align 4
   ret void
 }

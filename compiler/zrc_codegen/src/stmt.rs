@@ -57,7 +57,22 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
     let mut bb = *bb;
 
     for let_declaration in declarations {
-        let ptr = builder
+        // we create our own builder here because we need to insert the alloca
+        // at the beginning of the entry block, and that is easier than trying to somehow
+        // save our position.
+
+        let entry_block_builder = ctx.create_builder();
+        let first_bb = function.get_first_basic_block().unwrap();
+        match first_bb.get_first_instruction() {
+            Some(first_instruction) => {
+                entry_block_builder.position_before(&first_instruction);
+            }
+            None => {
+                entry_block_builder.position_at_end(first_bb);
+            }
+        }
+
+        let ptr = entry_block_builder
             .build_alloca(
                 llvm_basic_type(ctx, target_machine, &let_declaration.ty),
                 &format!("let_{}", let_declaration.name),
