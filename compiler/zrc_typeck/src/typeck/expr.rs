@@ -60,6 +60,46 @@ fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, Diagnostic> {
     })
 }
 
+/// Assert two types are the same and produce a validation error otherwise
+fn expect_identical_types<'a, 'input>(
+    lhs: &'a TastType<'input>,
+    rhs: &'a TastType<'input>,
+    span: Span,
+) -> Result<(), Diagnostic> {
+    if lhs == rhs {
+        Ok(())
+    } else {
+        Err(Diagnostic(
+            Severity::Error,
+            span.containing(DiagnosticKind::ExpectedSameType(
+                lhs.to_string(),
+                rhs.to_string(),
+            )),
+        ))
+    }
+}
+
+/// Assert a condition and produce a [`DiagnosticKind::ExpectedGot`] diagnostic
+/// otherwise.
+fn expect(
+    condition: bool,
+    expected_str: String,
+    got_str: String,
+    span: Span,
+) -> Result<(), Diagnostic> {
+    if condition {
+        Ok(())
+    } else {
+        Err(Diagnostic(
+            Severity::Error,
+            span.containing(DiagnosticKind::ExpectedGot {
+                expected: expected_str,
+                got: got_str,
+            }),
+        ))
+    }
+}
+
 // FIXME: this NEEDS to be rewritten to use references almost everywhere and be
 // no-clone. We stack overflow for deep expressions which is VERY VERY BAD.
 /// Type check and infer an [AST expression](Expr) to a [TAST
@@ -347,15 +387,7 @@ pub fn type_expr<'input>(
                 ));
             }
 
-            if if_true_t.0 != if_false_t.0 {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::TernaryArmsMustHaveSameType(
-                        if_true_t.to_string(),
-                        if_false_t.to_string(),
-                    )),
-                ));
-            }
+            expect_identical_types(&if_true_t.0, &if_false_t.0, expr_span)?;
 
             TypedExpr(
                 if_true_t.0.clone(),
@@ -369,25 +401,18 @@ pub fn type_expr<'input>(
             let rhs_span = rhs.0.span();
             let rhs_t = type_expr(scope, *rhs)?;
 
-            if lhs_t.0 != TastType::Bool {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    lhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "bool".to_string(),
-                        got: lhs_t.0.to_string(),
-                    }),
-                ));
-            }
-
-            if rhs_t.0 != TastType::Bool {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    rhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "bool".to_string(),
-                        got: rhs_t.0.to_string(),
-                    }),
-                ));
-            }
+            expect(
+                lhs_t.0 == TastType::Bool,
+                "bool".to_string(),
+                lhs_t.0.to_string(),
+                lhs_span,
+            )?;
+            expect(
+                rhs_t.0 == TastType::Bool,
+                "bool".to_string(),
+                rhs_t.0.to_string(),
+                rhs_span,
+            )?;
 
             TypedExpr(
                 TastType::Bool,
@@ -425,46 +450,29 @@ pub fn type_expr<'input>(
             let rhs_span = rhs.0.span();
             let rhs_t = type_expr(scope, *rhs)?;
 
-            if !lhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    lhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: lhs_t.0.to_string(),
-                    }),
-                ));
-            }
+            expect(
+                lhs_t.0.is_integer(),
+                "integer".to_string(),
+                lhs_t.0.to_string(),
+                lhs_span,
+            )?;
+            expect(
+                rhs_t.0.is_integer(),
+                "integer".to_string(),
+                rhs_t.0.to_string(),
+                rhs_span,
+            )?;
 
-            if !rhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    rhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: rhs_t.0.to_string(),
-                    }),
-                ));
-            }
-
-            #[allow(clippy::else_if_without_else)]
             if matches!(op, BinaryBitwise::Shl | BinaryBitwise::Shr) {
-                if !lhs_t.0.is_signed_integer() {
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        lhs_span.containing(DiagnosticKind::ExpectedGot {
-                            expected: "signed integer".to_string(),
-                            got: lhs_t.0.to_string(),
-                        }),
-                    ));
-                }
-            } else if lhs_t.0 != rhs_t.0 {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::ExpectedSameType(
-                        lhs_t.0.to_string(),
-                        rhs_t.0.to_string(),
-                    )),
-                ));
+                expect(
+                    lhs_t.0.is_signed_integer(),
+                    "signed integer".to_string(),
+                    lhs_t.0.to_string(),
+                    lhs_span,
+                )?;
             }
+
+            expect_identical_types(&lhs_t.0, &rhs_t.0, expr_span)?;
 
             TypedExpr(
                 lhs_t.0.clone(),
@@ -477,35 +485,20 @@ pub fn type_expr<'input>(
             let rhs_span = rhs.0.span();
             let rhs_t = type_expr(scope, *rhs)?;
 
-            if !lhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    lhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: lhs_t.0.to_string(),
-                    }),
-                ));
-            }
+            expect(
+                lhs_t.0.is_integer(),
+                "integer".to_string(),
+                lhs_t.0.to_string(),
+                lhs_span,
+            )?;
+            expect(
+                rhs_t.0.is_integer(),
+                "integer".to_string(),
+                rhs_t.0.to_string(),
+                rhs_span,
+            )?;
 
-            if !rhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    rhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: rhs_t.0.to_string(),
-                    }),
-                ));
-            }
-
-            if lhs_t.0 != rhs_t.0 {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::ExpectedSameType(
-                        lhs_t.0.to_string(),
-                        rhs_t.0.to_string(),
-                    )),
-                ));
-            }
+            expect_identical_types(&lhs_t.0, &rhs_t.0, expr_span)?;
 
             TypedExpr(
                 TastType::Bool,
@@ -518,35 +511,20 @@ pub fn type_expr<'input>(
             let rhs_span = rhs.0.span();
             let rhs_t = type_expr(scope, *rhs)?;
 
-            if !lhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    lhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: lhs_t.0.to_string(),
-                    }),
-                ));
-            }
+            expect(
+                lhs_t.0.is_integer(),
+                "integer".to_string(),
+                lhs_t.0.to_string(),
+                lhs_span,
+            )?;
+            expect(
+                rhs_t.0.is_integer(),
+                "integer".to_string(),
+                rhs_t.0.to_string(),
+                rhs_span,
+            )?;
 
-            if !rhs_t.0.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    rhs_span.containing(DiagnosticKind::ExpectedGot {
-                        expected: "integer".to_string(),
-                        got: rhs_t.0.to_string(),
-                    }),
-                ));
-            }
-
-            if lhs_t.0 != rhs_t.0 {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::ExpectedSameType(
-                        lhs_t.0.to_string(),
-                        rhs_t.0.to_string(),
-                    )),
-                ));
-            }
+            expect_identical_types(&lhs_t.0, &rhs_t.0, expr_span)?;
 
             TypedExpr(
                 lhs_t.0.clone(),
@@ -632,9 +610,43 @@ pub fn type_expr<'input>(
 
 #[cfg(test)]
 mod tests {
-    use zrc_utils::spanned;
+    use zrc_utils::{span::Spannable, spanned};
 
     use super::*;
+
+    #[test]
+    fn expect_identical_types_produces_proper_diagnostic() {
+        let sample_span = Span::from_positions(0, 5);
+        assert_eq!(
+            expect_identical_types(&TastType::I32, &TastType::I8, sample_span),
+            Err(Diagnostic(
+                Severity::Error,
+                DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string())
+                    .in_span(sample_span)
+            ))
+        );
+    }
+
+    #[test]
+    fn expect_produces_proper_diagnostic() {
+        let sample_span = Span::from_positions(0, 5);
+        assert_eq!(
+            expect(
+                false,
+                "expected".to_string(),
+                "got".to_string(),
+                sample_span
+            ),
+            Err(Diagnostic(
+                Severity::Error,
+                DiagnosticKind::ExpectedGot {
+                    expected: "expected".to_string(),
+                    got: "got".to_string()
+                }
+                .in_span(sample_span)
+            ))
+        );
+    }
 
     mod desugar_assignment {
         use zrc_parser::ast::expr::Arithmetic;
