@@ -11,13 +11,21 @@
 //!
 //! # Example
 //! ```
-//! use zrc_parser::lexer::{ZircoLexer, Tok};
+//! use zrc_parser::lexer::{ZircoLexer, Tok, NumberLiteral};
 //! use zrc_utils::{span::{Span, Spanned}, spanned};
 //!
 //! let mut lex = ZircoLexer::new("2 + 2");
-//! assert_eq!(lex.next(), Some(spanned!(0, Ok(Tok::NumberLiteral("2")), 1)));
+//! assert_eq!(lex.next(), Some(spanned!(
+//!     0,
+//!     Ok(Tok::NumberLiteral(NumberLiteral::Decimal("2"))),
+//!     1
+//! )));
 //! assert_eq!(lex.next(), Some(spanned!(2, Ok(Tok::Plus), 3)));
-//! assert_eq!(lex.next(), Some(spanned!(4, Ok(Tok::NumberLiteral("2")), 5)));
+//! assert_eq!(lex.next(), Some(spanned!(
+//!     4,
+//!     Ok(Tok::NumberLiteral(NumberLiteral::Decimal("2"))),
+//!     5
+//! )));
 //! assert_eq!(lex.next(), None);
 //! ```
 //!
@@ -177,6 +185,26 @@ fn handle_block_comment_start<'input>(
         // This means we've reached the end of our input still in a comment.
         // We can throw an error here.
         logos::FilterResult::Error(InternalLexicalError::UnterminatedBlockComment)
+    }
+}
+
+/// A valid number literal in Zirco
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NumberLiteral<'input> {
+    /// A decimal number literal
+    Decimal(&'input str),
+    /// A hexadecimal number literal
+    Hexadecimal(&'input str),
+    /// A binary number literal
+    Binary(&'input str),
+}
+impl Display for NumberLiteral<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NumberLiteral::Decimal(n) => write!(f, "{n}"),
+            NumberLiteral::Hexadecimal(n) => write!(f, "0x{n}"),
+            NumberLiteral::Binary(n) => write!(f, "0b{n}"),
+        }
     }
 }
 
@@ -417,10 +445,10 @@ pub enum Tok<'input> {
     StringLiteral(Vec<StringTok<'input>>),
     /// Any number literal
     // FIXME: Do not accept multiple decimal points like "123.456.789"
-    #[regex(r"[0-9][0-9\._]*", lexer_slice)]
-    #[regex(r"0x[0-9a-fA-F_]+", lexer_slice)]
-    #[regex(r"0b[01_]+", lexer_slice)]
-    NumberLiteral(&'input str),
+    #[regex(r"[0-9][0-9\._]*", |lex| NumberLiteral::Decimal(lex.slice()))]
+    #[regex(r"0x[0-9a-fA-F_]+", |lex| NumberLiteral::Hexadecimal(&lex.slice()[2..]))]
+    #[regex(r"0b[01_]+", |lex| NumberLiteral::Binary(&lex.slice()[2..]))]
+    NumberLiteral(NumberLiteral<'input>),
     /// Any identifier
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", lexer_slice)]
     Identifier(&'input str),
@@ -698,9 +726,9 @@ mod tests {
             Tok::Type,
             Tok::SmallArrow,
             Tok::StringLiteral(vec![StringTok::Text("str")]),
-            Tok::NumberLiteral("7_000"),
-            Tok::NumberLiteral("0xF_A"),
-            Tok::NumberLiteral("0b1_0"),
+            Tok::NumberLiteral(NumberLiteral::Decimal("7_000")),
+            Tok::NumberLiteral(NumberLiteral::Hexadecimal("F_A")),
+            Tok::NumberLiteral(NumberLiteral::Binary("1_0")),
             Tok::Identifier("abc"),
         ];
 

@@ -12,8 +12,8 @@ use inkwell::{
 };
 use zrc_typeck::tast::{
     expr::{
-        Arithmetic, BinaryBitwise, Comparison, Equality, Logical, Place, PlaceKind, StringTok,
-        TypedExpr, TypedExprKind,
+        Arithmetic, BinaryBitwise, Comparison, Equality, Logical, NumberLiteral, Place, PlaceKind,
+        StringTok, TypedExpr, TypedExprKind,
     },
     ty::Type,
 };
@@ -162,13 +162,27 @@ pub(crate) fn cg_expr<'ctx, 'a>(
     expr: TypedExpr,
 ) -> (BasicValueEnum<'ctx>, BasicBlock<'ctx>) {
     match expr.1 {
-        TypedExprKind::NumberLiteral(n) => (
-            llvm_int_type(ctx, &expr.0)
-                .const_int_from_string(n, StringRadix::Decimal)
-                .unwrap()
-                .as_basic_value_enum(),
-            *bb,
-        ),
+        TypedExprKind::NumberLiteral(n) => {
+            let no_underscores = match n {
+                NumberLiteral::Decimal(x) => x.replace('_', ""),
+                NumberLiteral::Binary(x) => x.replace('_', ""),
+                NumberLiteral::Hexadecimal(x) => x.replace('_', ""),
+            };
+            (
+                llvm_int_type(ctx, &expr.0)
+                    .const_int_from_string(
+                        &no_underscores,
+                        match n {
+                            NumberLiteral::Decimal(_) => StringRadix::Decimal,
+                            NumberLiteral::Binary(_) => StringRadix::Binary,
+                            NumberLiteral::Hexadecimal(_) => StringRadix::Hexadecimal,
+                        },
+                    )
+                    .unwrap()
+                    .as_basic_value_enum(),
+                *bb,
+            )
+        }
 
         TypedExprKind::StringLiteral(str) => {
             let formatted_contents = str
@@ -866,736 +880,188 @@ mod tests {
     // Please read the "Common patterns in tests" section of crate::test_utils for
     // more information on how code generator tests are structured.
 
-    use indexmap::IndexMap;
-    use inkwell::{context::Context, types::BasicType, values::AnyValue, AddressSpace};
-    use zrc_typeck::{tast::stmt::ArgumentDeclarationList, typeck::BlockReturnType};
+    use indoc::indoc;
 
-    use super::*;
-    use crate::test_utils::make_test_prelude_closure;
+    use crate::cg_snapshot_test;
 
     // Remember: In all of these tests, cg_place returns a *pointer* to the data in
     // the place.
     mod cg_place {
         use super::*;
 
-        /// When generating an identifier, the pointer to their data is stored
-        /// already within the [`CgScope`] instance. There is no need to
-        /// do any extra work to generate the pointer other than return
-        /// the allocation directly.
         #[test]
-        fn identifier_registers_are_returned_as_is() {
-            let ctx = Context::create();
+        fn basic_identifiers_in_place_position() {
+            cg_snapshot_test!(indoc! {"
+                fn test() {
+                    let x = 6;
 
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    let x_stack_ptr = builder.build_alloca(ctx.i32_type(), "x").unwrap();
-                    scope.insert("x", x_stack_ptr);
+                    // TEST: we should simply be `store`ing to the %let_x we created
+                    x = 7;
 
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, _builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                (
-                    module.print_to_string(),
-                    scope
-                        .get("x")
-                        .unwrap()
-                        .as_basic_value_enum()
-                        .print_to_string(),
-                )
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_place(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    Place(Type::I32, PlaceKind::Variable("x")),
-                );
-
-                (
-                    module.print_to_string(),
-                    ptr.as_basic_value_enum().print_to_string(),
-                )
-            };
-
-            assert_eq!(actual, expected);
+                    return;
+                }
+            "});
         }
 
-        /// When dereferencing an identifier, the identifier itself represents a
-        /// `*T`, and if we consider the fact that the value is stored
-        /// on the stack, `%x` is of type `T**`. To get the underlying
-        /// pointer to `T` (because cg place returns a pointer) `T*`, we need to
-        /// `load` the identifier only.
         #[test]
         fn identifier_deref_generates_as_expected() {
-            let ctx = Context::create();
+            cg_snapshot_test!(indoc! {"
+                fn test() {
+                    let x: *i32;
 
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    // generates %x = alloca i32* and scope mapping x -> %x
-                    let x_stack_ptr = builder
-                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "x")
-                        .unwrap();
-                    scope.insert("x", x_stack_ptr);
+                    // TEST: x is *i32, so %let_x is **i32 (ptr to the stack). we should load from
+                    // %let_x to obtain the actual pointer. we should then store to that result
+                    // value (we should never load it)
+                    *x = 4;
 
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // Expect a single %yield = load i32*, i32** %x
-                let yield_ptr = builder
-                    .build_load(
-                        ctx.i32_type().ptr_type(AddressSpace::default()),
-                        scope.get("x").unwrap(),
-                        "load",
-                    )
-                    .unwrap();
-
-                (
-                    module.print_to_string(),
-                    // expected result of cg_place:
-                    yield_ptr.print_to_string(),
-                )
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_place(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    Place(
-                        Type::I32,
-                        PlaceKind::Deref(Box::new(TypedExpr(
-                            Type::Ptr(Box::new(Type::I32)),
-                            TypedExprKind::Identifier("x"),
-                        ))),
-                    ),
-                );
-
-                (
-                    module.print_to_string(),
-                    ptr.as_basic_value_enum().print_to_string(),
-                )
-            };
-
-            assert_eq!(actual, expected);
+                    return;
+                }
+            "});
         }
 
-        /// When dereferencing a value that's not an identifier in place context
-        /// e.g. `*0`, the address to this data is `&*0` which is just
-        /// `0`. In this case, it gets cancelled out. We assert that the
-        /// result is just `0 as *i32` when generating `*(0 as *i32)` in place
-        /// context.
         #[test]
         fn other_deref_generates_as_expected() {
-            let ctx = Context::create();
+            cg_snapshot_test!(indoc! {"
+                fn test() {
+                    // TEST: because cg_place returns a *pointer* to the represented value, handling
+                    // *5 in a place context should return the address of *5, which is &*5 = 5.
+                    // for this reason, we should literally be `store`ing to the hardcoded address
+                    // 5, and never *loading* from it (because if we do load we may not be actually
+                    // writing to that address)
+                    // we use 5 not 0 because 0 is just 'ptr null'
+                    *(5 as *i32) = 0;
 
-            let generate_test_prelude = make_test_prelude_closure(
-                |_ctx, _target_machine, _builder, _module, _fn_value, _scope, bb| *bb,
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, _scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // Generates `%cast = inttoptr 0 to i32*`
-                let cast = builder
-                    .build_int_to_ptr(
-                        ctx.i32_type().const_zero(),
-                        ctx.i32_type().ptr_type(AddressSpace::default()),
-                        "cast",
-                    )
-                    .unwrap();
-
-                // The yielded value is just %cast -- see the comment at the top
-                (module.print_to_string(), cast.print_to_string())
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_place(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    Place(
-                        Type::I32,
-                        PlaceKind::Deref(Box::new(TypedExpr(
-                            Type::Ptr(Box::new(Type::I32)),
-                            TypedExprKind::Cast(
-                                Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("0"))),
-                                Type::Ptr(Box::new(Type::I32)),
-                            ),
-                        ))),
-                    ),
-                );
-
-                (
-                    module.print_to_string(),
-                    ptr.as_basic_value_enum().print_to_string(),
-                )
-            };
-
-            assert_eq!(actual, expected);
-        }
-
-        #[test]
-        fn pointer_indexing_generates_proper_gep() {
-            let ctx = Context::create();
-
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    // generate `arr: *i32`
-                    let arr_stack_ptr = builder
-                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
-                        .unwrap();
-                    scope.insert("arr", arr_stack_ptr);
-
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
-                // the pointer to that index in the array
-                let loaded_arr = builder
-                    .build_load(
-                        ctx.i32_type().ptr_type(AddressSpace::default()),
-                        scope.get("arr").unwrap(),
-                        "load",
-                    )
-                    .unwrap();
-
-                // SAFETY: If indices are used incorrectly this may segfault
-                let indexed_ptr = unsafe {
-                    builder.build_gep(
-                        ctx.i32_type(),
-                        loaded_arr.into_pointer_value(),
-                        &[ctx.i32_type().const_int(3, false)],
-                        "gep",
-                    )
+                    return;
                 }
-                .unwrap();
-
-                (module.print_to_string(), indexed_ptr.print_to_string())
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_place(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    Place(
-                        Type::I32,
-                        PlaceKind::Index(
-                            Box::new(TypedExpr(
-                                Type::Ptr(Box::new(Type::I32)),
-                                TypedExprKind::Identifier("arr"),
-                            )),
-                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
-                        ),
-                    ),
-                );
-
-                (module.print_to_string(), ptr.print_to_string())
-            };
-
-            assert_eq!(actual, expected);
+            "});
         }
 
         #[test]
-        fn struct_property_access_generates_proper_gep() {
-            let ctx = Context::create();
+        fn pointer_indexing_in_place_position() {
+            cg_snapshot_test!(indoc! {"
+                fn test() {
+                    let x: *i32;
 
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    // generate: `x: { x: i32, y: i32 }`
-                    let x_stack_ptr = builder
-                        .build_alloca(
-                            ctx.struct_type(
-                                &[
-                                    ctx.i32_type().as_basic_type_enum(),
-                                    ctx.i32_type().as_basic_type_enum(),
-                                ],
-                                false,
-                            ),
-                            "x",
-                        )
-                        .unwrap();
-                    scope.insert("x", x_stack_ptr);
+                    // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).
+                    // %let_x needs to be GEP'd into and then stored into, but we must not load
+                    // from the address.
+                    x[4] = 5;
 
-                    *bb
-                },
-            );
+                    return;
+                }
+            "});
+        }
 
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
+        #[test]
+        fn struct_property_access_in_place_position() {
+            cg_snapshot_test!(indoc! {"
+                struct S { x: i32, y: i32 }
 
-                // We do not load the struct, we GEP directly into it.
-                let indexed_ptr = builder
-                    .build_struct_gep(
-                        ctx.struct_type(
-                            &[
-                                ctx.i32_type().as_basic_type_enum(),
-                                ctx.i32_type().as_basic_type_enum(),
-                            ],
-                            false,
-                        ),
-                        scope.get("x").unwrap(),
-                        1,
-                        "gep",
-                    )
-                    .unwrap();
+                fn test() {
+                    let x: S;
 
-                (module.print_to_string(), indexed_ptr.print_to_string())
-            };
+                    // TEST: the value must NOT be loaded! it must simply gep to obtain a pointer,
+                    // then `store` into that pointer.
+                    x.y = 4;
 
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_place(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    Place(
-                        Type::I32,
-                        PlaceKind::Dot(
-                            Box::new(Place(
-                                Type::Struct(IndexMap::from([("a", Type::I32), ("b", Type::I32)])),
-                                PlaceKind::Variable("x"),
-                            )),
-                            "b",
-                        ),
-                    ),
-                );
-
-                (module.print_to_string(), ptr.print_to_string())
-            };
-
-            assert_eq!(actual, expected);
+                    return;
+                }
+            "});
         }
     }
     mod cg_expr {
         use super::*;
 
-        /// Ensures all of the side-effects on the left hand side of a comma
-        /// operator are executed and the right hand side is returned.
         #[test]
         fn comma_yields_right_value() {
-            let ctx = Context::create();
+            cg_snapshot_test!(indoc! {"
+                fn f();
+                fn g() -> i32;
 
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
-                    // generate `f: fn() -> void`
-                    let f_fn_type = ctx.void_type().fn_type(&[], false);
-                    let f_val = module.add_function("f", f_fn_type, None);
-                    scope.insert("f", f_val.as_global_value().as_pointer_value());
-
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, _scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // First the function is called, then the number literal is returned
-                builder
-                    .build_call(module.get_function("f").unwrap(), &[], "call")
-                    .unwrap();
-
-                (
-                    module.print_to_string(),
-                    ctx.i32_type().const_int(3, false).print_to_string(),
-                )
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (reg, _bb) = cg_expr(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    TypedExpr(
-                        Type::I32,
-                        TypedExprKind::Comma(
-                            Box::new(TypedExpr(
-                                Type::Void,
-                                TypedExprKind::Call(
-                                    Box::new(Place(
-                                        Type::Fn(
-                                            ArgumentDeclarationList::NonVariadic(vec![]),
-                                            Box::new(BlockReturnType::Void),
-                                        ),
-                                        PlaceKind::Variable("f"),
-                                    )),
-                                    vec![],
-                                ),
-                            )),
-                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
-                        ),
-                    ),
-                );
-
-                (module.print_to_string(), reg.print_to_string())
-            };
-
-            assert_eq!(actual, expected);
-        }
-
-        /// This is similar to
-        /// [`super::cg_place::pointer_indexing_generates_proper_gep`] but it
-        /// expects an additional `load` instruction at the end to go from
-        /// resolved pointer to value.
-        #[test]
-        fn pointer_indexing_generates_proper_gep_and_load() {
-            let ctx = Context::create();
-
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    // generate `arr: *i32`
-                    let arr_stack_ptr = builder
-                        .build_alloca(ctx.i32_type().ptr_type(AddressSpace::default()), "arr")
-                        .unwrap();
-                    scope.insert("arr", arr_stack_ptr);
-
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // First the `i32*` from `i32** %arr` is loaded, then a `gep` instruction gets
-                // the pointer to that index in the array
-                let loaded_arr = builder
-                    .build_load(
-                        ctx.i32_type().ptr_type(AddressSpace::default()),
-                        scope.get("arr").unwrap(),
-                        "load",
-                    )
-                    .unwrap();
-
-                // SAFETY: If indices are used incorrectly this may segfault
-                let indexed_ptr = unsafe {
-                    builder.build_gep(
-                        ctx.i32_type(),
-                        loaded_arr.into_pointer_value(),
-                        &[ctx.i32_type().const_int(3, false)],
-                        "gep",
-                    )
+                fn test() -> i32 {
+                    // TEST: f() is run, g() is run and used as the return value
+                    return f(), g();
                 }
-                .unwrap();
-
-                // Finally this value is loaded.
-                let loaded_value = builder
-                    .build_load(ctx.i32_type(), indexed_ptr, "load")
-                    .unwrap();
-
-                (module.print_to_string(), loaded_value.print_to_string())
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_expr(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    TypedExpr(
-                        Type::I32,
-                        TypedExprKind::Index(
-                            Box::new(TypedExpr(
-                                Type::Ptr(Box::new(Type::I32)),
-                                TypedExprKind::Identifier("arr"),
-                            )),
-                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
-                        ),
-                    ),
-                );
-
-                (module.print_to_string(), ptr.print_to_string())
-            };
-
-            assert_eq!(actual, expected);
+            "});
         }
 
-        /// This is similar to
-        /// [`super::cg_place::struct_property_access_generates_proper_gep`] but
-        /// it expects an additional `load` instruction at the end to go
-        /// from resolved pointer to value.
         #[test]
-        fn struct_property_access_generates_proper_gep_and_load() {
-            let ctx = Context::create();
+        fn pointer_indexing_in_expr_position() {
+            cg_snapshot_test!(indoc! {"
+                fn take_int(x: i32);
 
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, builder, _module, _fn_value, scope, bb| {
-                    // generate: `x: { x: i32, y: i32 }`
-                    let x_stack_ptr = builder
-                        .build_alloca(
-                            ctx.struct_type(
-                                &[
-                                    ctx.i32_type().as_basic_type_enum(),
-                                    ctx.i32_type().as_basic_type_enum(),
-                                ],
-                                false,
-                            ),
-                            "x",
-                        )
-                        .unwrap();
-                    scope.insert("x", x_stack_ptr);
+                fn test() {
+                    let x: *i32;
 
-                    *bb
-                },
-            );
+                    // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).
+                    // %let_x needs to be GEP'd into and the value `i32` at idx 4 must be loaded.
+                    take_int(x[4]);
 
-            let expected = {
-                let (_target_machine, builder, module, _fn_value, scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // We do not load the struct yet, we GEP directly into it.
-                let indexed_ptr = builder
-                    .build_struct_gep(
-                        ctx.struct_type(
-                            &[
-                                ctx.i32_type().as_basic_type_enum(),
-                                ctx.i32_type().as_basic_type_enum(),
-                            ],
-                            false,
-                        ),
-                        scope.get("x").unwrap(),
-                        1,
-                        "gep",
-                    )
-                    .unwrap();
-
-                // Now we load the value.
-                let loaded_value = builder
-                    .build_load(ctx.i32_type(), indexed_ptr, "load")
-                    .unwrap();
-
-                (module.print_to_string(), loaded_value.print_to_string())
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (ptr, _bb) = cg_expr(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    TypedExpr(
-                        Type::I32,
-                        TypedExprKind::Dot(
-                            Box::new(Place(
-                                Type::Struct(IndexMap::from([("a", Type::I32), ("b", Type::I32)])),
-                                PlaceKind::Variable("x"),
-                            )),
-                            "b",
-                        ),
-                    ),
-                );
-
-                (module.print_to_string(), ptr.print_to_string())
-            };
-
-            assert_eq!(actual, expected);
+                    return;
+                }
+            "});
         }
 
-        /// This test is a lot more complicated. It aims to ensure that the
-        /// ternary operator generates as expected. A lot of this can be
-        /// optimized, so we keep the condition as a call to an extern
-        /// fn so that not much can be done about it.
+        #[test]
+        fn pointer_deref_in_expr_position() {
+            cg_snapshot_test!(indoc! {"
+                fn test() -> i32 {
+                    let x: *i32;
+
+                    // TEST: should load twice, once to read the value of `x` and once to read what
+                    // it points to
+                    return *x;
+                }
+            "});
+        }
+
+        #[test]
+        fn struct_property_access_in_expr_position() {
+            cg_snapshot_test!(indoc! {"
+                struct S { x: i32, y: i32 }
+                fn take_int(x: i32);
+
+                fn test() {
+                    let x: S;
+
+                    // TEST: should GEP into `x` to get the second property (`y`) and then
+                    // load that value and call take_int
+                    take_int(x.y);
+
+                    return;
+                }
+            "});
+        }
+
+        #[test]
+        fn ternary_operations_generate() {
+            cg_snapshot_test!(indoc! {"
+                fn get_bool() -> bool;
+                fn get_int() -> i32;
+                fn take_int(x: i32);
+                fn test() {
+                    // TEST: should produce a proper diamond-shaped cfg
+                    let num = get_bool() ? get_int() : 3;
+                    take_int(num);
+                    return;
+                }
+            "});
+        }
+
+        /// Tests to ensure non-decimal integer literals
+        /// 1. don't panic
+        /// 2. are valid.
         ///
-        /// The actual code being tested is basically `get_some_bool() ?
-        /// get_some_int() : 3`.
+        /// <https://github.com/zirco-lang/zrc/issues/119>
         #[test]
-        #[allow(clippy::similar_names, clippy::too_many_lines)]
-        fn ternary_generates_proper_cfg() {
-            let ctx = Context::create();
-
-            let generate_test_prelude = make_test_prelude_closure(
-                |ctx, _target_machine, _builder, module, _fn_value, scope, bb| {
-                    // generate `get_some_bool: fn() -> bool`
-                    let gsb_fn_type = ctx.bool_type().fn_type(&[], false);
-                    let gsb_val = module.add_function("get_some_bool", gsb_fn_type, None);
-                    scope.insert(
-                        "get_some_bool",
-                        gsb_val.as_global_value().as_pointer_value(),
-                    );
-
-                    // generate `get_some_int: fn() -> i32`
-                    let gsi_fn_type = ctx.i32_type().fn_type(&[], false);
-                    let gsi_val = module.add_function("get_some_int", gsi_fn_type, None);
-                    scope.insert("get_some_int", gsi_val.as_global_value().as_pointer_value());
-
-                    *bb
-                },
-            );
-
-            let expected = {
-                let (_target_machine, builder, module, fn_value, _scope, _bb) =
-                    generate_test_prelude(&ctx);
-
-                // We will need to generate a couple more complex structures.
-                // First of all, we will call the get_some_bool function and store the result in
-                // a register.
-                let some_bool = builder
-                    .build_call(module.get_function("get_some_bool").unwrap(), &[], "call")
-                    .unwrap();
-
-                // Now, we generate two basic blocks and conditionally jump based on that
-                // boolean.
-                let if_true = ctx.append_basic_block(fn_value, "if_true");
-                let if_false = ctx.append_basic_block(fn_value, "if_false");
-                let end = ctx.append_basic_block(fn_value, "end");
-
-                builder
-                    .build_conditional_branch(
-                        some_bool.as_any_value_enum().into_int_value(),
-                        if_true,
-                        if_false,
-                    )
-                    .unwrap();
-
-                // Generate the call to get_some_int in the if_true block.
-                builder.position_at_end(if_true);
-                let some_int = builder
-                    .build_call(module.get_function("get_some_int").unwrap(), &[], "call")
-                    .unwrap();
-                builder.build_unconditional_branch(end).unwrap();
-
-                // Generate the branch to the end block, we're yielding a constant
-                builder.position_at_end(if_false);
-                let that_constant = ctx.i32_type().const_int(3, false);
-                builder.build_unconditional_branch(end).unwrap();
-
-                // Finally, we generate the phi node in the end block.
-                builder.position_at_end(end);
-                let phi = builder.build_phi(ctx.i32_type(), "yield").unwrap();
-
-                phi.add_incoming(&[
-                    (&some_int.try_as_basic_value().unwrap_left(), if_true),
-                    (&that_constant.as_basic_value_enum(), if_false),
-                ]);
-
-                (
-                    module.print_to_string(),
-                    phi.as_basic_value().print_to_string(),
-                )
-            };
-
-            let actual = {
-                let (target_machine, builder, module, fn_value, scope, bb) =
-                    generate_test_prelude(&ctx);
-
-                let (reg, _bb) = cg_expr(
-                    &ctx,
-                    &target_machine,
-                    &builder,
-                    &module,
-                    &fn_value,
-                    &bb,
-                    &scope,
-                    TypedExpr(
-                        Type::I32,
-                        TypedExprKind::Ternary(
-                            Box::new(TypedExpr(
-                                Type::Bool,
-                                TypedExprKind::Call(
-                                    Box::new(Place(
-                                        Type::Fn(
-                                            ArgumentDeclarationList::NonVariadic(vec![]),
-                                            Box::new(BlockReturnType::Return(Type::Bool)),
-                                        ),
-                                        PlaceKind::Variable("get_some_bool"),
-                                    )),
-                                    vec![],
-                                ),
-                            )),
-                            Box::new(TypedExpr(
-                                Type::I32,
-                                TypedExprKind::Call(
-                                    Box::new(Place(
-                                        Type::Fn(
-                                            ArgumentDeclarationList::NonVariadic(vec![]),
-                                            Box::new(BlockReturnType::Return(Type::I32)),
-                                        ),
-                                        PlaceKind::Variable("get_some_int"),
-                                    )),
-                                    vec![],
-                                ),
-                            )),
-                            Box::new(TypedExpr(Type::I32, TypedExprKind::NumberLiteral("3"))),
-                        ),
-                    ),
-                );
-
-                (module.print_to_string(), reg.print_to_string())
-            };
-
-            assert_eq!(actual, expected);
+        fn regression_119_special_integer_literals() {
+            cg_snapshot_test!(indoc! {"
+                fn test() {
+                    let a = 0b10_10;
+                    let b = 0x1F_A4;
+                    return;
+                }
+            "});
         }
     }
 }

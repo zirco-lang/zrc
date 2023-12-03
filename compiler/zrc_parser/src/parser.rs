@@ -22,13 +22,17 @@
 
 use lalrpop_util::ParseError;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
-use zrc_utils::span::{Span, Spanned};
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{
     ast::{expr::Expr, stmt::Declaration},
     lexer,
 };
-use crate::{internal_parser, lexer::LexicalError};
+use crate::{
+    ast::{stmt::Stmt, ty::Type},
+    internal_parser,
+    lexer::LexicalError,
+};
 
 /// Converts from a LALRPOP [`ParseError`] to a corresponding [`Diagnostic`].
 fn parser_error_to_diagnostic(
@@ -128,6 +132,54 @@ pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration>>, Diagnosti
         .map_err(parser_error_to_diagnostic)
 }
 
+/// Parses a singular Zirco statement list, yielding a vector of AST [`Stmt`]
+/// nodes.
+///
+/// This function only parses a single Zirco [statement](Stmt), and not an
+/// entire program. Unless you are trying to do some special integration with
+/// partial programs, you probably want to use the [`parse_program`] function
+/// instead.
+///
+/// # Example
+/// Obtaining the AST of a statement:
+/// ```
+/// use zrc_parser::parser::parse_stmt_list;
+/// let ast = parse_stmt_list("let x = 6;");
+/// ```
+///
+/// # Errors
+/// This function returns [`Err`] with a [`ZircoParserError`] if any error was
+/// encountered while parsing the input statement list.
+pub fn parse_stmt_list(input: &str) -> Result<Spanned<Vec<Stmt>>, Diagnostic> {
+    internal_parser::StmtListParser::new()
+        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .map(|stmt_list| stmt_list.in_span(Span::from_positions(0, input.len())))
+        .map_err(parser_error_to_diagnostic)
+}
+
+/// Parses a singular Zirco type, yielding an AST [`Type`] node.
+///
+/// This function only parses a single Zirco [type](Type), and not an
+/// entire program. Unless you are trying to do some special integration with
+/// partial programs, you probably want to use the [`parse_program`] function
+/// instead.
+///
+/// # Example
+/// Obtaining the AST of a type:
+/// ```
+/// use zrc_parser::parser::parse_type;
+/// let ast = parse_type("struct { x: i32 }");
+/// ```
+///
+/// # Errors
+/// This function returns [`Err`] with a [`ZircoParserError`] if any error was
+/// encountered while parsing the input expression.
+pub fn parse_type(input: &str) -> Result<Type, Diagnostic> {
+    internal_parser::TypeParser::new()
+        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .map_err(parser_error_to_diagnostic)
+}
+
 /// Parses a singular Zirco expression, yielding an AST [`Expr`] node.
 ///
 /// This function only parses a single Zirco [expression](Expr), and not an
@@ -168,18 +220,18 @@ mod tests {
                 parse_expr("1 + 1 - 1 * 1 / 1 % 1"),
                 Ok(Expr::build_sub(
                     Expr::build_add(
-                        Expr::build_number(spanned!(0, "1", 1)),
-                        Expr::build_number(spanned!(4, "1", 5))
+                        Expr::build_number_dec(spanned!(0, "1", 1)),
+                        Expr::build_number_dec(spanned!(4, "1", 5))
                     ),
                     Expr::build_modulo(
                         Expr::build_div(
                             Expr::build_mul(
-                                Expr::build_number(spanned!(8, "1", 9)),
-                                Expr::build_number(spanned!(12, "1", 13))
+                                Expr::build_number_dec(spanned!(8, "1", 9)),
+                                Expr::build_number_dec(spanned!(12, "1", 13))
                             ),
-                            Expr::build_number(spanned!(16, "1", 17))
+                            Expr::build_number_dec(spanned!(16, "1", 17))
                         ),
-                        Expr::build_number(spanned!(20, "1", 21))
+                        Expr::build_number_dec(spanned!(20, "1", 21))
                     )
                 ))
             );
@@ -191,17 +243,17 @@ mod tests {
                 parse_expr("1 & 1 | 1 ^ 1 << 1 >> 1"),
                 Ok(Expr::build_bit_or(
                     Expr::build_bit_and(
-                        Expr::build_number(spanned!(0, "1", 1)),
-                        Expr::build_number(spanned!(4, "1", 5))
+                        Expr::build_number_dec(spanned!(0, "1", 1)),
+                        Expr::build_number_dec(spanned!(4, "1", 5))
                     ),
                     Expr::build_bit_xor(
-                        Expr::build_number(spanned!(8, "1", 9)),
+                        Expr::build_number_dec(spanned!(8, "1", 9)),
                         Expr::build_shr(
                             Expr::build_shl(
-                                Expr::build_number(spanned!(12, "1", 13)),
-                                Expr::build_number(spanned!(17, "1", 18))
+                                Expr::build_number_dec(spanned!(12, "1", 13)),
+                                Expr::build_number_dec(spanned!(17, "1", 18))
                             ),
-                            Expr::build_number(spanned!(22, "1", 23))
+                            Expr::build_number_dec(spanned!(22, "1", 23))
                         )
                     )
                 ))
@@ -214,10 +266,10 @@ mod tests {
                 parse_expr("1 && 1 || 1"),
                 Ok(Expr::build_logical_or(
                     Expr::build_logical_and(
-                        Expr::build_number(spanned!(0, "1", 1)),
-                        Expr::build_number(spanned!(5, "1", 6))
+                        Expr::build_number_dec(spanned!(0, "1", 1)),
+                        Expr::build_number_dec(spanned!(5, "1", 6))
                     ),
-                    Expr::build_number(spanned!(10, "1", 11))
+                    Expr::build_number_dec(spanned!(10, "1", 11))
                 ))
             );
         }
@@ -228,10 +280,10 @@ mod tests {
                 parse_expr("1 == 1 != 1"),
                 Ok(Expr::build_neq(
                     Expr::build_eq(
-                        Expr::build_number(spanned!(0, "1", 1)),
-                        Expr::build_number(spanned!(5, "1", 6))
+                        Expr::build_number_dec(spanned!(0, "1", 1)),
+                        Expr::build_number_dec(spanned!(5, "1", 6))
                     ),
-                    Expr::build_number(spanned!(10, "1", 11))
+                    Expr::build_number_dec(spanned!(10, "1", 11))
                 ))
             );
         }
@@ -244,14 +296,14 @@ mod tests {
                     Expr::build_lt(
                         Expr::build_gte(
                             Expr::build_gt(
-                                Expr::build_number(spanned!(0, "1", 1)),
-                                Expr::build_number(spanned!(4, "1", 5))
+                                Expr::build_number_dec(spanned!(0, "1", 1)),
+                                Expr::build_number_dec(spanned!(4, "1", 5))
                             ),
-                            Expr::build_number(spanned!(9, "1", 10))
+                            Expr::build_number_dec(spanned!(9, "1", 10))
                         ),
-                        Expr::build_number(spanned!(13, "1", 14))
+                        Expr::build_number_dec(spanned!(13, "1", 14))
                     ),
-                    Expr::build_number(spanned!(18, "1", 19))
+                    Expr::build_number_dec(spanned!(18, "1", 19))
                 ))
             );
         }
@@ -345,7 +397,10 @@ mod tests {
 
             #[test]
             fn number_literals_parse_as_expected() {
-                assert_eq!(parse_expr("1"), Ok(Expr::build_number(spanned!(0, "1", 1))));
+                assert_eq!(
+                    parse_expr("1"),
+                    Ok(Expr::build_number_dec(spanned!(0, "1", 1)))
+                );
             }
 
             #[test]
@@ -374,5 +429,10 @@ mod tests {
             }
         }
     }
+
+    mod ty {}
+
+    mod stmt_list {}
+
     mod program {}
 }

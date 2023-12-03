@@ -1,0 +1,16 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+description: "fn test() {\n    // TEST: should allocate twice and assign to one.\n    let a: i32;\n    let b: i32 = 7;\n\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+define void @test() {
+entry:
+  %let_a = alloca i32, align 4
+  %let_b = alloca i32, align 4
+  store i32 7, ptr %let_b, align 4
+  ret void
+}
+

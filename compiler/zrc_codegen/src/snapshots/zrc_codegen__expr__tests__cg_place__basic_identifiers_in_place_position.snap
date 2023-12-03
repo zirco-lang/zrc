@@ -1,0 +1,16 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "fn test() {\n    let x = 6;\n\n    // TEST: we should simply be `store`ing to the %let_x we created\n    x = 7;\n\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+define void @test() {
+entry:
+  %let_x = alloca i32, align 4
+  store i32 6, ptr %let_x, align 4
+  store i32 7, ptr %let_x, align 4
+  ret void
+}
+

@@ -167,7 +167,7 @@ LetDeclaration: Vec<Spanned<LetDeclaration<'input>>> = {
     })).collect::<Vec<_>>(),
 };
 
-Type: Type<'input> = {
+pub Type: Type<'input> = {
     Spanned<IDENTIFIER> => Type(<>.map(|x| TypeKind::Identifier(x))),
     Spanned<("*" <Type>)> => Type(<>.map(|x| TypeKind::Ptr(Box::new(x)))),
     Spanned<("struct" <KeyTypeMapping>)> => 
@@ -182,7 +182,7 @@ FlowStmt: StmtKind<'input> = {
     "return" <e:Expr?> ";" => StmtKind::ReturnStmt(e),
 };
 
-StmtList: Vec<Stmt<'input>> = Stmt+;
+pub StmtList: Vec<Stmt<'input>> = Stmt+;
 
 pub Expr: Expr<'input> = Comma;
 
@@ -380,7 +380,7 @@ extern {
 
         STRING => lexer::Tok::StringLiteral(<Vec<lexer::StringTok<'input>>>),
         CHAR => lexer::Tok::CharLiteral(<Vec<lexer::StringTok<'input>>>),
-        NUMBER => lexer::Tok::NumberLiteral(<&'input str>),
+        NUMBER => lexer::Tok::NumberLiteral(<lexer::NumberLiteral<'input>>),
         IDENTIFIER => lexer::Tok::Identifier(<&'input str>),
 
         "true" => lexer::Tok::True,

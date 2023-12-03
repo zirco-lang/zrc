@@ -1,0 +1,19 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "struct S { x: i32, y: i32 }\nfn take_int(x: i32);\n\nfn test() {\n    let x: S;\n\n    // TEST: should GEP into `x` to get the second property (`y`) and then\n    // load that value and call take_int\n    take_int(x.y);\n\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+declare void @take_int(i32)
+
+define void @test() {
+entry:
+  %let_x = alloca { i32, i32 }, align 8
+  %gep = getelementptr inbounds { i32, i32 }, ptr %let_x, i32 0, i32 1
+  %load = load i32, ptr %gep, align 4
+  call void @take_int(i32 %load)
+  ret void
+}
+

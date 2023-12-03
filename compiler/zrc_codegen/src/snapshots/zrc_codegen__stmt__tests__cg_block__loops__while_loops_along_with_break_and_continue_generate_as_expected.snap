@@ -1,0 +1,45 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+description: "fn get_bool() -> bool;\n\nfn test() {\n    // TEST: the proper while loop structure is created\n    while (get_bool()) {\n        // TEST: break jumps to the `end` block\n        if (get_bool()) break;\n        else {\n            // TEST: continue jumps to the header block\n            if (get_bool()) continue;\n            // TEST: otherwise, we proceed\n            else {}\n        }\n\n        // TEST: the loop jumps back to the header block\n    }\n\n    // TEST: ...and code generation properly continues.\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+declare i1 @get_bool()
+
+define void @test() {
+entry:
+  br label %header
+
+header:                                           ; preds = %end5, %then3, %entry
+  %call = call i1 @get_bool()
+  br i1 %call, label %body, label %exit
+
+body:                                             ; preds = %header
+  %call1 = call i1 @get_bool()
+  br i1 %call1, label %then, label %then_else
+
+exit:                                             ; preds = %then, %header
+  ret void
+
+then:                                             ; preds = %body
+  br label %exit
+
+then_else:                                        ; preds = %body
+  %call2 = call i1 @get_bool()
+  br i1 %call2, label %then3, label %then_else4
+
+then3:                                            ; preds = %then_else
+  br label %header
+
+then_else4:                                       ; preds = %then_else
+  br label %end
+
+end:                                              ; preds = %then_else4
+  br label %end5
+
+end5:                                             ; preds = %end
+  br label %header
+}
+

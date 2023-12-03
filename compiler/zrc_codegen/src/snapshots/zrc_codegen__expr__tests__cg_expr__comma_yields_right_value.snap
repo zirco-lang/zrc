@@ -1,0 +1,19 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "fn f();\nfn g() -> i32;\n\nfn test() -> i32 {\n    // TEST: f() is run, g() is run and used as the return value\n    return f(), g();\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+declare void @f()
+
+declare i32 @g()
+
+define i32 @test() {
+entry:
+  call void @f()
+  %call = call i32 @g()
+  ret i32 %call
+}
+

@@ -1,6 +1,6 @@
 name: Report a Panic/ICE (Internal Compiler Error)
 description: If your compiler has crashed or panicked (called an ICE), report it here!
-title: "ice: panicked at 'explicit panic'"
+title: "ice: panicked at ...: ..."
 labels:
     - status/untriaged
     - type/bug/ice
