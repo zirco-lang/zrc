@@ -63,6 +63,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
 
         let entry_block_builder = ctx.create_builder();
         let first_bb = function.get_first_basic_block().unwrap();
+        #[allow(clippy::option_if_let_else)]
         match first_bb.get_first_instruction() {
             Some(first_instruction) => {
                 entry_block_builder.position_before(&first_instruction);
