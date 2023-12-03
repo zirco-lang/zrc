@@ -53,6 +53,7 @@ use std::{error::Error, fmt::Display};
 
 use ansi_term::{Color, Style};
 use line_span::LineSpanExt;
+use thiserror::Error;
 use zrc_utils::span::{Span, Spanned};
 
 /// The severity of a [`Diagnostic`].
@@ -96,199 +97,100 @@ impl Display for Diagnostic {
 // These remain as Strings, not 'input str slices, to avoid circular dependencies (it's either use
 // String, or use Tok, because str would be to-string()d from some tokens)
 #[allow(missing_docs)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum DiagnosticKind {
     // LEXER ERRORS
+    #[error("unknown token `{0}`")]
     UnknownToken(String),
+    #[error("unterminated string literal")]
     UnterminatedStringLiteral,
+    #[error("unterminated block comment")]
     UnterminatedBlockComment,
+    #[error("unknown escape sequence")]
     UnknownEscapeSequence,
     /// Raised if `===` or `!==` is found in the input.
     /// Parameter will be either `"=="` or `"!="` for what was expected.
+    #[error("JavaScript user detected -- did you mean `{0}`?")]
     JavascriptUserDetected(&'static str),
 
     // PARSER ERRORS
     /// Generic parser error
+    #[error("invalid token")]
     InvalidToken,
+    #[error("unexpected end of file, expected one of: {}", .0.join(", "))]
     UnexpectedEof(Vec<String>),
+    #[error("unrecognized token `{0}`, expected one of: {}", .1.join(", "))]
     UnrecognizedToken(String, Vec<String>),
+    #[error("extra token `{0}`")]
     ExtraToken(String),
 
     // TYPE CHECKER ERRORS
+    #[error("unable to resolve `{0}` to a type")]
     UnableToResolveType(String),
+    #[error("unable to resolve identifier `{0}`")]
     UnableToResolveIdentifier(String),
+    #[error("`{0}` is not a valid lvalue for assignment or address-of")]
     NotAnLvalue(String),
-    InvalidAssignmentRightHandSideType {
-        expected: String,
-        got: String,
-    },
+    #[error("expected `{expected}` on right hand side of assignment, got `{got}`")]
+    InvalidAssignmentRightHandSideType { expected: String, got: String },
+    #[error("expected boolean type, got `{0}`")]
     UnaryNotExpectedBoolean(String),
+    #[error("expected integer type, got `{0}`")]
     UnaryBitwiseNotExpectedInteger(String),
+    #[error("expected signed integer type, got `{0}`")]
     UnaryMinusExpectedSignedInteger(String),
+    #[error("cannot dereference non-pointer type `{0}`")]
     CannotDereferenceNonPointer(String),
+    #[error("cannot index into non-pointer type `{0}`")]
     CannotIndexIntoNonPointer(String),
+    #[error("index offset must be integer type, got `{0}`")]
     IndexOffsetMustBeInteger(String),
+    #[error("`{0}` does not have member `{1}`")]
     StructOrUnionDoesNotHaveMember(String, String),
+    #[error("cannot access member of non-struct type `{0}`")]
     StructMemberAccessOnNonStruct(String),
-    FunctionArgumentCountMismatch {
-        expected: String,
-        got: String,
-    },
+    #[error("expected `{expected}` arguments, got `{got}`")]
+    FunctionArgumentCountMismatch { expected: String, got: String },
+    #[error("expected `{expected}` for argument `{n}`, got `{got}`")]
     FunctionArgumentTypeMismatch {
         n: usize, // counts from 0
         expected: String,
         got: String,
     },
+    #[error("cannot call non-function type `{0}`")]
     CannotCallNonFunction(String),
+    #[error("ternary condition must be boolean type, got `{0}`")]
     TernaryConditionMustBeBoolean(String),
+    #[error("ternary arms must have same type, got `{0}` and `{1}`")]
     TernaryArmsMustHaveSameType(String, String),
-    ExpectedGot {
-        expected: String,
-        got: String,
-    },
+    #[error("expected `{expected}`, got `{got}`")]
+    ExpectedGot { expected: String, got: String },
+    #[error("expected both sides to have the same type, got `{0}` and `{1}`")]
     ExpectedSameType(String, String),
+    #[error(
+        "expected both sides to be the same integer, boolean or pointer type, got `{0}` and `{1}`"
+    )]
     EqualityOperators(String, String),
+    #[error("cannot cast `{0}` to `{1}`")]
     InvalidCast(String, String),
+    #[error("identifier `{0}` already in use")]
     IdentifierAlreadyInUse(String),
+    #[error("no explicit variable type present and no value to infer from")]
     NoTypeNoValue,
+    #[error("cannot use `break` outside of loop")]
     CannotUseBreakOutsideOfLoop,
+    #[error("cannot use `continue` outside of loop")]
     CannotUseContinueOutsideOfLoop,
+    #[error("cannot use `return` here")]
     CannotReturnHere,
+    #[error("expected a block to be guaranteed to return")]
     ExpectedABlockToReturn,
+    #[error("duplicate struct member `{0}`")]
     DuplicateStructMember(String),
+    #[error("cannot use variadic arguments (`...`) on a non-external function")]
     VariadicFunctionMustBeExternal,
+    #[error("cannot declare a variable of type `void` -- just discard the value")]
     CannotDeclareVoid,
-}
-
-impl Display for DiagnosticKind {
-    #[allow(clippy::too_many_lines)]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::UnknownToken(token) => write!(f, "unknown token `{token}`"),
-            Self::UnterminatedStringLiteral => write!(f, "unterminated string literal"),
-            Self::UnterminatedBlockComment => write!(f, "unterminated block comment"),
-
-            Self::InvalidToken => write!(f, "invalid token"),
-            Self::UnexpectedEof(expected) => {
-                write!(
-                    f,
-                    "unexpected end of file, expected one of: {}",
-                    expected.join(", ")
-                )
-            }
-            Self::UnrecognizedToken(got, expected) => {
-                write!(
-                    f,
-                    "unrecognized token `{got}`, expected one of: {}",
-                    expected.join(", ")
-                )
-            }
-            Self::ExtraToken(token) => write!(f, "extra token `{token}`"),
-
-            Self::UnableToResolveType(ty) => {
-                write!(f, "unable to resolve `{ty}` to a type")
-            }
-            Self::UnableToResolveIdentifier(i) => {
-                write!(f, "unable to resolve identifier `{i}`")
-            }
-            Self::NotAnLvalue(expr) => {
-                write!(
-                    f,
-                    "`{expr}` is not a valid lvalue for assignment or address-of"
-                )
-            }
-            Self::InvalidAssignmentRightHandSideType { expected, got } => write!(
-                f,
-                "expected `{expected}` on right hand side of assignment, got `{got}`"
-            ),
-            Self::UnaryNotExpectedBoolean(ty) => {
-                write!(f, "expected boolean type, got `{ty}`")
-            }
-            Self::UnaryBitwiseNotExpectedInteger(ty) => {
-                write!(f, "expected integer type, got `{ty}`")
-            }
-            Self::UnaryMinusExpectedSignedInteger(ty) => {
-                write!(f, "expected signed integer type, got `{ty}`")
-            }
-            Self::CannotDereferenceNonPointer(ty) => {
-                write!(f, "cannot dereference non-pointer type `{ty}`")
-            }
-            Self::CannotIndexIntoNonPointer(ty) => {
-                write!(f, "cannot index into non-pointer type `{ty}`")
-            }
-            Self::IndexOffsetMustBeInteger(ty) => {
-                write!(f, "index offset must be integer type, got `{ty}`")
-            }
-            Self::StructOrUnionDoesNotHaveMember(ty, member) => {
-                write!(f, "`{ty}` does not have member `{member}`")
-            }
-            Self::StructMemberAccessOnNonStruct(ty) => {
-                write!(f, "cannot access member of non-struct type `{ty}`")
-            }
-            Self::FunctionArgumentCountMismatch { expected, got } => {
-                write!(f, "expected `{expected}` arguments, got `{got}`",)
-            }
-            Self::FunctionArgumentTypeMismatch { n, expected, got } => {
-                write!(f, "expected `{expected}` for argument `{n}`, got `{got}`",)
-            }
-            Self::CannotCallNonFunction(ty) => {
-                write!(f, "cannot call non-function type `{ty}`")
-            }
-            Self::TernaryConditionMustBeBoolean(ty) => {
-                write!(f, "ternary condition must be boolean type, got `{ty}`")
-            }
-            Self::TernaryArmsMustHaveSameType(lhs_ty, rhs_ty) => {
-                write!(
-                    f,
-                    "ternary arms must have same type, got `{lhs_ty}` and `{rhs_ty}`"
-                )
-            }
-            Self::ExpectedGot { expected, got } => {
-                write!(f, "expected `{expected}`, got `{got}`")
-            }
-            Self::ExpectedSameType(ty1, ty2) => {
-                write!(
-                    f,
-                    "expected both sides to have the same type, got `{ty1}` and `{ty2}`"
-                )
-            }
-            Self::EqualityOperators(ty1, ty2) => write!(
-                f,
-                concat!(
-                    "expected both sides to be the same integer,",
-                    " boolean or pointer type, got `{}` and `{}`"
-                ),
-                ty1, ty2
-            ),
-            Self::InvalidCast(from, to) => write!(f, "cannot cast `{from}` to `{to}`"),
-            Self::IdentifierAlreadyInUse(id) => write!(f, "identifier `{id}` already in use"),
-            Self::NoTypeNoValue => write!(
-                f,
-                "no explicit variable type present and no value to infer from"
-            ),
-            Self::CannotUseBreakOutsideOfLoop => write!(f, "cannot use `break` outside of loop"),
-            Self::CannotUseContinueOutsideOfLoop => {
-                write!(f, "cannot use `continue` outside of loop")
-            }
-            Self::CannotReturnHere => write!(f, "cannot use `return` here"),
-            Self::ExpectedABlockToReturn => {
-                write!(f, "expected a block to be guaranteed to return")
-            }
-            Self::DuplicateStructMember(key) => write!(f, "duplicate struct member `{key}`"),
-            Self::VariadicFunctionMustBeExternal => write!(
-                f,
-                "cannot use variadic arguments (`...`) on a non-external function"
-            ),
-            Self::UnknownEscapeSequence => write!(f, "unknown escape sequence"),
-            Self::JavascriptUserDetected(expected) => {
-                write!(f, "JavaScript user detected -- did you mean `{expected}`?")
-            }
-            Self::CannotDeclareVoid => write!(
-                f,
-                "cannot declare a variable of type `void` -- just discard the value"
-            ),
-        }
-    }
 }
 
 /// Format and display the 'source window' -- the lines of span within str with
