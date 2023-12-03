@@ -58,8 +58,8 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
 
     for let_declaration in declarations {
         // we create our own builder here because we need to insert the alloca
-        // at the beginning of the entry block, and that is easier than trying to somehow
-        // save our position.
+        // at the beginning of the entry block, and that is easier than trying to
+        // somehow save our position.
 
         let entry_block_builder = ctx.create_builder();
         let first_bb = function.get_first_basic_block().unwrap();
