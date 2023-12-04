@@ -1,0 +1,17 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "fn test() {\n    // TEST: should properly generate \\xNN for each escape\n    let x = \"\\n\\r\\t\\\\\\\"\\x41\\0\";\n    \n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test'
+source_filename = "test"
+
+@str = private unnamed_addr constant [7 x i8] c"\0A\0D\09\\\22)\00", align 1
+
+define void @test() {
+entry:
+  %let_x = alloca ptr, align 8
+  store ptr @str, ptr %let_x, align 8
+  ret void
+}
+
