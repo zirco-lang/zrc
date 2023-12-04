@@ -13,11 +13,21 @@ use super::ty::Type;
 /// type](super::ty::Type) attached to it.
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
-pub struct TypedExpr<'input>(pub Type<'input>, pub TypedExprKind<'input>);
+pub struct TypedExpr<'input> {
+    /// The inferred [`Type`] of this node
+    pub inferred_type: Type<'input>,
+    /// The actual [`TypedExprKind`] backing this expression
+    pub kind: TypedExprKind<'input>,
+}
 
 /// The left hand side of an assignment.
 #[derive(PartialEq, Debug, Clone)]
-pub struct Place<'input>(pub Type<'input>, pub PlaceKind<'input>);
+pub struct Place<'input> {
+    /// The inferred [`Type`] of this node
+    pub inferred_type: Type<'input>,
+    /// The actual [`PlaceKind`] backing this expression
+    pub kind: PlaceKind<'input>,
+}
 /// The valid left-hand-side of a [`TypedExprKind::Assignment`].
 ///
 /// Places may be:
@@ -159,12 +169,12 @@ impl<'input> Display for PlaceKind<'input> {
 }
 impl<'input> Display for Place<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}) as ({})", self.1, self.0)
+        write!(f, "({}) as ({})", self.inferred_type, self.kind)
     }
 }
 
 impl<'input> Display for TypedExpr<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "(({}) as ({}))", self.1, self.0)
+        write!(f, "(({}) as ({}))", self.inferred_type, self.kind)
     }
 }

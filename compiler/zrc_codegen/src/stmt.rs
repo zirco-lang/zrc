@@ -91,16 +91,16 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
                 function,
                 &bb,
                 scope,
-                TypedExpr(
-                    let_declaration.ty.clone(),
-                    TypedExprKind::Assignment(
-                        Box::new(Place(
-                            let_declaration.ty,
-                            PlaceKind::Variable(let_declaration.name),
-                        )),
+                TypedExpr {
+                    inferred_type: let_declaration.ty.clone(),
+                    kind: TypedExprKind::Assignment(
+                        Box::new(Place {
+                            inferred_type: let_declaration.ty,
+                            kind: PlaceKind::Variable(let_declaration.name),
+                        }),
                         Box::new(value),
                     ),
-                ),
+                },
             )
             .1;
         }

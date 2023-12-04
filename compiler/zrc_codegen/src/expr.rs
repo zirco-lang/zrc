@@ -33,7 +33,7 @@ fn cg_place<'ctx, 'a>(
     scope: &'a CgScope<'_, 'ctx>,
     place: Place,
 ) -> (PointerValue<'ctx>, BasicBlock<'ctx>) {
-    match place.1 {
+    match place.kind {
         PlaceKind::Variable(x) => {
             let reg = scope.get(x).unwrap();
 
@@ -81,7 +81,7 @@ fn cg_place<'ctx, 'a>(
             // TODO: Is this actually safely used?
             let reg = unsafe {
                 builder.build_gep(
-                    llvm_basic_type(ctx, target_machine, &place.0),
+                    llvm_basic_type(ctx, target_machine, &place.inferred_type),
                     ptr.into_pointer_value(),
                     &[idx.into_int_value()],
                     "gep",
@@ -92,9 +92,9 @@ fn cg_place<'ctx, 'a>(
         }
 
         #[allow(clippy::wildcard_enum_match_arm)]
-        PlaceKind::Dot(x, prop) => match &(*x).0 {
+        PlaceKind::Dot(x, prop) => match &x.inferred_type {
             Type::Struct(contents) => {
-                let x_ty = llvm_basic_type(ctx, target_machine, &x.0);
+                let x_ty = llvm_basic_type(ctx, target_machine, &x.inferred_type);
                 let prop_idx = contents
                     .iter()
                     .position(|(got_key, _)| *got_key == prop)
@@ -161,7 +161,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
     scope: &'a CgScope<'_, 'ctx>,
     expr: TypedExpr,
 ) -> (BasicValueEnum<'ctx>, BasicBlock<'ctx>) {
-    match expr.1 {
+    match expr.kind {
         TypedExprKind::NumberLiteral(n) => {
             let no_underscores = match n {
                 NumberLiteral::Decimal(x) => x.replace('_', ""),
@@ -169,7 +169,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 NumberLiteral::Hexadecimal(x) => x.replace('_', ""),
             };
             (
-                llvm_int_type(ctx, &expr.0)
+                llvm_int_type(ctx, &expr.inferred_type)
                     .const_int_from_string(
                         &no_underscores,
                         match n {
@@ -283,12 +283,15 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 function,
                 bb,
                 scope,
-                Place(expr.0.clone(), PlaceKind::Variable(id)),
+                Place {
+                    inferred_type: expr.inferred_type.clone(),
+                    kind: PlaceKind::Variable(id),
+                },
             );
 
             let reg = builder
                 .build_load(
-                    llvm_basic_type(ctx, target_machine, &expr.0),
+                    llvm_basic_type(ctx, target_machine, &expr.inferred_type),
                     place.0,
                     "load",
                 )
@@ -362,7 +365,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 BinaryBitwise::Shr => builder.build_right_shift(
                     lhs.into_int_value(),
                     rhs.into_int_value(),
-                    expr.0.is_signed_integer(),
+                    expr.inferred_type.is_signed_integer(),
                     "shr",
                 ),
             };
@@ -426,7 +429,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 *rhs,
             );
 
-            let op = match (op, expr.0.is_signed_integer()) {
+            let op = match (op, expr.inferred_type.is_signed_integer()) {
                 (Comparison::Lt, true) => IntPredicate::SLT,
                 (Comparison::Lt, false) => IntPredicate::ULT,
                 (Comparison::Gt, true) => IntPredicate::SGT,
@@ -466,7 +469,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 *rhs,
             );
 
-            let reg = match (op, expr.0.is_signed_integer()) {
+            let reg = match (op, expr.inferred_type.is_signed_integer()) {
                 (Arithmetic::Addition, _) => {
                     builder.build_int_add(lhs.into_int_value(), rhs.into_int_value(), "add")
                 }
@@ -607,7 +610,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             );
 
             let reg = builder.build_load(
-                llvm_basic_type(ctx, target_machine, &expr.0),
+                llvm_basic_type(ctx, target_machine, &expr.inferred_type),
                 ptr.into_pointer_value(),
                 "load",
             );
@@ -624,11 +627,18 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 function,
                 bb,
                 scope,
-                Place(expr.0.clone(), PlaceKind::Index(ptr, idx)),
+                Place {
+                    inferred_type: expr.inferred_type.clone(),
+                    kind: PlaceKind::Index(ptr, idx),
+                },
             );
 
             let loaded = builder
-                .build_load(llvm_basic_type(ctx, target_machine, &expr.0), ptr, "load")
+                .build_load(
+                    llvm_basic_type(ctx, target_machine, &expr.inferred_type),
+                    ptr,
+                    "load",
+                )
                 .unwrap();
 
             (loaded.as_basic_value_enum(), bb)
@@ -643,18 +653,25 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 function,
                 bb,
                 scope,
-                Place(expr.0.clone(), PlaceKind::Dot(place, key)),
+                Place {
+                    inferred_type: expr.inferred_type.clone(),
+                    kind: PlaceKind::Dot(place, key),
+                },
             );
 
             let loaded = builder
-                .build_load(llvm_basic_type(ctx, target_machine, &expr.0), ptr, "load")
+                .build_load(
+                    llvm_basic_type(ctx, target_machine, &expr.inferred_type),
+                    ptr,
+                    "load",
+                )
                 .unwrap();
 
             (loaded.as_basic_value_enum(), bb)
         }
 
         TypedExprKind::Call(f, args) => {
-            let llvm_f_type = llvm_type(ctx, target_machine, &f.0).into_function_type();
+            let llvm_f_type = llvm_type(ctx, target_machine, &f.inferred_type).into_function_type();
 
             // will always be a function pointer
             let (f_ptr, bb) = cg_place(
@@ -775,7 +792,10 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             builder.position_at_end(end_bb);
             let result_reg = builder
-                .build_phi(llvm_basic_type(ctx, target_machine, &expr.0), "yield")
+                .build_phi(
+                    llvm_basic_type(ctx, target_machine, &expr.inferred_type),
+                    "yield",
+                )
                 .unwrap();
             result_reg.add_incoming(&[(&if_true, if_true_bb), (&if_false, if_false_bb)]);
             (result_reg.as_basic_value(), end_bb)
@@ -792,7 +812,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             // int -> fn = inttoptr
             // fn -> int = ptrtoint
 
-            let x_ty_is_signed_integer = (*x).0.is_signed_integer();
+            let x_ty_is_signed_integer = x.inferred_type.is_signed_integer();
 
             let (x, bb) = cg_expr(
                 ctx,
