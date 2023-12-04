@@ -27,8 +27,8 @@ macro_rules! cg_snapshot_test {
         let resulting_ir = $crate::cg_program_to_string(
             "test",
             ::zrc_typeck::typeck::type_program(
-                ::zrc_parser::parser::parse_program($source).unwrap()
-            ).unwrap(),
+                ::zrc_parser::parser::parse_program($source).expect("parsing should succeed")
+            ).expect("typeck should succeed"),
             ::inkwell::OptimizationLevel::None,
             &$crate::get_native_triple(),
             "",

@@ -642,7 +642,9 @@ mod tests {
     #[test]
     fn whitespace_should_be_skipped() {
         let lexer = ZircoLexer::new(" t\t e \n\ns\nt\r\n  s");
-        let tokens: Vec<_> = lexer.map(|x| x.transpose().unwrap()).collect();
+        let tokens: Vec<_> = lexer
+            .map(|x| x.transpose().expect("lexing should succeed"))
+            .collect();
         assert_eq!(
             tokens,
             vec![
@@ -744,7 +746,7 @@ mod tests {
 
         assert_eq!(
             ZircoLexer::new(input)
-                .map(|x| x.transpose().unwrap().into_value())
+                .map(|x| x.transpose().expect("lexing should succeed").into_value())
                 .collect::<Vec<_>>(),
             tokens
         );
@@ -773,7 +775,9 @@ mod tests {
                 "c // ghi\n",
                 "// jkl",
             ));
-            let tokens: Vec<_> = lexer.map(|x| x.transpose().unwrap()).collect();
+            let tokens: Vec<_> = lexer
+                .map(|x| x.transpose().expect("lexing should succeed"))
+                .collect();
             assert_eq!(
                 tokens,
                 vec![
@@ -788,7 +792,9 @@ mod tests {
         #[test]
         fn multiline_comments_are_skipped() {
             let lexer = ZircoLexer::new("a\nb/* abc */c/*\naaa\n*/d");
-            let tokens: Vec<_> = lexer.map(|x| x.transpose().unwrap()).collect();
+            let tokens: Vec<_> = lexer
+                .map(|x| x.transpose().expect("lexing should succeed"))
+                .collect();
             assert_eq!(
                 tokens,
                 vec![
@@ -804,7 +810,9 @@ mod tests {
         #[test]
         fn nested_multiline_comments_are_skipped() {
             let lexer = ZircoLexer::new("a/* /* */ */b"); // should lex OK
-            let tokens: Vec<_> = lexer.map(|x| x.transpose().unwrap()).collect();
+            let tokens: Vec<_> = lexer
+                .map(|x| x.transpose().expect("lexing should succeed"))
+                .collect();
             assert_eq!(
                 tokens,
                 vec![

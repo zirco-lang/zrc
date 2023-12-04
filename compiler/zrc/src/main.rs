@@ -40,7 +40,8 @@
     unsafe_op_in_unsafe_fn,
     unused_crate_dependencies,
     variant_size_differences,
-    unused_qualifications
+    unused_qualifications,
+    clippy::unwrap_used
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
@@ -104,7 +105,7 @@ fn version() -> String {
                                 .or_else(|| x.strip_suffix(" (staged)"))
                                 .unwrap_or(x)
                         })
-                        .unwrap();
+                        .expect("writing to a string should succeed");
                         output
                     })
             )
@@ -344,7 +345,9 @@ fn main() -> anyhow::Result<()> {
                     }
                 };
 
-            output.write_all(&x).unwrap();
+            output
+                .write_all(&x)
+                .expect("writing to stdout or file should succeed");
         }
     }
 

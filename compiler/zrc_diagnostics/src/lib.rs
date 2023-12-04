@@ -41,6 +41,7 @@
     unused_crate_dependencies,
     variant_size_differences,
     unused_qualifications,
+    clippy::unwrap_used,
 
     // These should be enabled in any non-user-facing code, like the parser, but not in the
     // frontend.
