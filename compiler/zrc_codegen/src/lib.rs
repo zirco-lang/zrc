@@ -51,7 +51,14 @@
 
 use std::collections::HashMap;
 
-use inkwell::{basic_block::BasicBlock, targets::TargetMachine, values::PointerValue};
+use inkwell::{
+    basic_block::BasicBlock,
+    builder::Builder,
+    context::Context,
+    module::Module,
+    targets::TargetMachine,
+    values::{FunctionValue, PointerValue},
+};
 
 mod expr;
 mod stmt;
@@ -111,4 +118,19 @@ struct BasicBlockAnd<'ctx, T> {
     bb: BasicBlock<'ctx>,
     /// Any other data the function wishes to pass
     value: T,
+}
+
+/// Common LLVM structures passed onto most code generation functions
+#[derive(Debug, Clone, Copy)]
+struct CgContext<'ctx, 'a> {
+    /// The LLVM context
+    ctx: &'ctx Context,
+    /// The LLVM target machine
+    target_machine: &'a TargetMachine,
+    /// The LLVM builder used to build instructions
+    builder: &'a Builder<'ctx>,
+    /// The LLVM module we are building in
+    module: &'a Module<'ctx>,
+    /// The LLVM function we are building in
+    fn_value: FunctionValue<'ctx>,
 }
