@@ -8,12 +8,12 @@ source_filename = "test"
 
 define void @test() {
 entry:
-  %let_x = alloca ptr, align 8
+  %let_z = alloca ptr, align 8
   %let_y = alloca ptr, align 8
+  %let_x = alloca ptr, align 8
   %load = load ptr, ptr %let_x, align 8
   %ptr_add = getelementptr i32, ptr %load, i32 4
   store ptr %ptr_add, ptr %let_y, align 8
-  %let_z = alloca ptr, align 8
   %load1 = load ptr, ptr %let_x, align 8
   %ptr_sub = getelementptr i32, ptr %load1, i32 -4
   store ptr %ptr_sub, ptr %let_z, align 8
