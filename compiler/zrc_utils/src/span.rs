@@ -30,7 +30,10 @@ impl Span {
     /// Panics if `start > end`.
     #[must_use]
     pub fn from_positions(start: usize, end: usize) -> Self {
-        assert!(end >= start, "span must have positive length");
+        assert!(
+            end >= start,
+            "span must have positive length (got span {start}..{end})"
+        );
         Self(start, end)
     }
 
