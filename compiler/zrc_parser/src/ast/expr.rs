@@ -16,9 +16,10 @@ use crate::lexer::{NumberLiteral, StringTok};
 ///
 /// For an operator to be considered an arithmetic operator, it must meet the
 /// following criteria:
-/// - Operates on two integers
-/// - Both operands must be the same type
-/// - The result type is the same as the operand types
+/// - Operates on two integers, or a pointer (lhs) an an integer (rhs)
+/// - Both operands must be the same type (except for pointer arithmetic)
+/// - The result type is the same as the operand types (or a pointer, for
+///   pointer arithmetic)
 /// - Performs some mathematical operation
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Arithmetic {

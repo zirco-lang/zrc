@@ -1,7 +1,7 @@
 //! for expressions
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
-use zrc_parser::ast::expr::{Assignment, BinaryBitwise, Expr, ExprKind};
+use zrc_parser::ast::expr::{Arithmetic, Assignment, BinaryBitwise, Expr, ExprKind};
 use zrc_utils::span::{Span, Spanned};
 
 use super::Scope;
@@ -551,20 +551,41 @@ pub fn type_expr<'input>(
             let rhs_span = rhs.0.span();
             let rhs_t = type_expr(scope, *rhs)?;
 
-            expect(
-                lhs_t.inferred_type.is_integer(),
-                "integer".to_string(),
-                lhs_t.inferred_type.to_string(),
-                lhs_span,
-            )?;
-            expect(
-                rhs_t.inferred_type.is_integer(),
-                "integer".to_string(),
-                rhs_t.inferred_type.to_string(),
-                rhs_span,
-            )?;
+            if let TastType::Ptr(_) = lhs_t.inferred_type {
+                if matches!(
+                    op,
+                    Arithmetic::Division | Arithmetic::Multiplication | Arithmetic::Modulo
+                ) {
+                    return Err(Diagnostic(
+                        Severity::Error,
+                        lhs_span.containing(DiagnosticKind::InvalidPointerArithmeticOperation(
+                            op.to_string(),
+                        )),
+                    ));
+                }
 
-            expect_identical_types(&lhs_t.inferred_type, &rhs_t.inferred_type, expr_span)?;
+                expect(
+                    rhs_t.inferred_type.is_integer(),
+                    "integer".to_string(),
+                    rhs_t.inferred_type.to_string(),
+                    rhs_span,
+                )?;
+            } else {
+                expect(
+                    lhs_t.inferred_type.is_integer(),
+                    "integer".to_string(),
+                    lhs_t.inferred_type.to_string(),
+                    lhs_span,
+                )?;
+                expect(
+                    rhs_t.inferred_type.is_integer(),
+                    "integer".to_string(),
+                    rhs_t.inferred_type.to_string(),
+                    rhs_span,
+                )?;
+
+                expect_identical_types(&lhs_t.inferred_type, &rhs_t.inferred_type, expr_span)?;
+            }
 
             TypedExpr {
                 inferred_type: lhs_t.inferred_type.clone(),

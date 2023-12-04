@@ -191,8 +191,9 @@ pub enum DiagnosticKind {
     VariadicFunctionMustBeExternal,
     #[error("cannot declare a variable of type `void` -- just discard the value")]
     CannotDeclareVoid,
+    #[error("invalid pointer arithmetic operation `{0}`")]
+    InvalidPointerArithmeticOperation(String),
 }
-
 /// Format and display the 'source window' -- the lines of span within str with
 /// the underline where the span lies.
 fn display_source_window(severity: &Severity, span: Span, source: &str) -> String {
