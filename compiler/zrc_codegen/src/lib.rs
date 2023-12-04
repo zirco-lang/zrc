@@ -51,7 +51,7 @@
 
 use std::collections::HashMap;
 
-use inkwell::{targets::TargetMachine, values::PointerValue};
+use inkwell::{basic_block::BasicBlock, targets::TargetMachine, values::PointerValue};
 
 mod expr;
 mod stmt;
@@ -101,4 +101,14 @@ impl<'input, 'ctx> Default for CgScope<'input, 'ctx> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Represents some value along with a basic block.
+/// This is used for code generation functions that may produce new basic blocks
+/// along with some result value.
+struct BasicBlockAnd<'ctx, T> {
+    /// The basic block returned
+    bb: BasicBlock<'ctx>,
+    /// Any other data the function wishes to pass
+    value: T,
 }
