@@ -149,6 +149,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     StringTok::EscapedBackslash => "\\".to_string(),
                     StringTok::EscapedCr => "\r".to_string(),
                     StringTok::EscapedNewline => "\n".to_string(),
+                    StringTok::EscapedTab => "\t".to_string(),
+                    StringTok::EscapedNull => "\0".to_string(),
                     StringTok::EscapedHexByte(byte) => {
                         format!(
                             "{}",
@@ -186,6 +188,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                             StringTok::EscapedBackslash => '\\',
                             StringTok::EscapedCr => '\r',
                             StringTok::EscapedNewline => '\n',
+                            StringTok::EscapedTab => '\t',
+                            StringTok::EscapedNull => '\0',
                             StringTok::EscapedHexByte(byte) => {
                                 char::from_u32(byte.parse::<u32>().expect("invalid byte"))
                                     .expect("invalid char")
@@ -917,6 +921,18 @@ mod tests {
                     return;
                 }
             "});
+        }
+
+        #[test]
+        fn string_literal_escapes_generate() {
+            cg_snapshot_test!(indoc! {r#"
+                fn test() {
+                    // TEST: should properly generate \xNN for each escape
+                    let x = "\n\r\t\\\"\x41\0";
+
+                    return;
+                }
+            "#});
         }
 
         /// Tests to ensure non-decimal integer literals

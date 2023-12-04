@@ -546,6 +546,14 @@ pub enum StringTok<'input> {
     #[token("\\r")]
     EscapedCr,
 
+    /// `\t`
+    #[token("\\t")]
+    EscapedTab,
+
+    /// `\0`
+    #[token("\\0")]
+    EscapedNull,
+
     /// `\xXX` with `XX` being a hex literal
     #[regex(r"\\x[0-9a-fA-F]{2}", escaped_byte_slice)]
     EscapedHexByte(&'input str),
@@ -567,6 +575,8 @@ impl Display for StringTok<'_> {
         match self {
             Self::EscapedNewline => write!(f, "\\n"),
             Self::EscapedCr => write!(f, "\\r"),
+            Self::EscapedTab => write!(f, "\\t"),
+            Self::EscapedNull => write!(f, "\\0"),
             Self::EscapedBackslash => write!(f, "\\\\"),
             Self::EscapedHexByte(byte) => write!(f, "\\x{byte}"),
             Self::EscapedDoubleQuote => write!(f, "\\\""),
