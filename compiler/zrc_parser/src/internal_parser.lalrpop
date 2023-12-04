@@ -320,7 +320,8 @@ Primary: Expr<'input> = {
     Spanned<IDENTIFIER> => Expr(<>.map(|i| ExprKind::Identifier(i))),
     Spanned<"true"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(true))),
     Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
-    Spanned<("sizeof" "(" <Type> ")")> => Expr(<>.map(|t| ExprKind::SizeOf(t))),
+    Spanned<("sizeof" <Type>)> => Expr(<>.map(|t| ExprKind::SizeOfType(t))),
+    Spanned<("sizeof" "(" <Expr> ")")> => Expr(<>.map(|ex| ExprKind::SizeOfExpr(Box::new(ex)))),
     "(" <Expr> ")" => <>,
 };
 
