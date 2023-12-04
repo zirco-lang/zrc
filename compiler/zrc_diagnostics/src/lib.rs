@@ -133,12 +133,6 @@ pub enum DiagnosticKind {
     NotAnLvalue(String),
     #[error("expected `{expected}` on right hand side of assignment, got `{got}`")]
     InvalidAssignmentRightHandSideType { expected: String, got: String },
-    #[error("expected boolean type, got `{0}`")]
-    UnaryNotExpectedBoolean(String),
-    #[error("expected integer type, got `{0}`")]
-    UnaryBitwiseNotExpectedInteger(String),
-    #[error("expected signed integer type, got `{0}`")]
-    UnaryMinusExpectedSignedInteger(String),
     #[error("cannot dereference non-pointer type `{0}`")]
     CannotDereferenceNonPointer(String),
     #[error("cannot index into non-pointer type `{0}`")]
@@ -159,8 +153,6 @@ pub enum DiagnosticKind {
     },
     #[error("cannot call non-function type `{0}`")]
     CannotCallNonFunction(String),
-    #[error("ternary condition must be boolean type, got `{0}`")]
-    TernaryConditionMustBeBoolean(String),
     #[error("ternary arms must have same type, got `{0}` and `{1}`")]
     TernaryArmsMustHaveSameType(String, String),
     #[error("expected `{expected}`, got `{got}`")]

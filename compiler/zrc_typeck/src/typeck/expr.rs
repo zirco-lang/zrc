@@ -160,14 +160,14 @@ pub fn type_expr<'input>(
 
         ExprKind::UnaryNot(x) => {
             let x_ty = type_expr(scope, *x)?;
-            if x_ty.inferred_type != TastType::Bool {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::UnaryNotExpectedBoolean(
-                        x_ty.inferred_type.to_string(),
-                    )),
-                ));
-            }
+
+            expect(
+                x_ty.inferred_type == TastType::Bool,
+                "boolean".to_string(),
+                x_ty.inferred_type.to_string(),
+                expr_span,
+            )?;
+
             TypedExpr {
                 inferred_type: x_ty.inferred_type.clone(),
                 kind: TypedExprKind::UnaryNot(Box::new(x_ty)),
@@ -175,14 +175,14 @@ pub fn type_expr<'input>(
         }
         ExprKind::UnaryBitwiseNot(x) => {
             let x_ty = type_expr(scope, *x)?;
-            if !x_ty.inferred_type.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::UnaryBitwiseNotExpectedInteger(
-                        x_ty.inferred_type.to_string(),
-                    )),
-                ));
-            }
+
+            expect(
+                x_ty.inferred_type.is_integer(),
+                "integer".to_string(),
+                x_ty.inferred_type.to_string(),
+                expr_span,
+            )?;
+
             TypedExpr {
                 inferred_type: x_ty.inferred_type.clone(),
                 kind: TypedExprKind::UnaryBitwiseNot(Box::new(x_ty)),
@@ -190,14 +190,14 @@ pub fn type_expr<'input>(
         }
         ExprKind::UnaryMinus(x) => {
             let x_ty = type_expr(scope, *x)?;
-            if !x_ty.inferred_type.is_signed_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::UnaryMinusExpectedSignedInteger(
-                        x_ty.inferred_type.to_string(),
-                    )),
-                ));
-            }
+
+            expect(
+                x_ty.inferred_type.is_signed_integer(),
+                "signed integer".to_string(),
+                x_ty.inferred_type.to_string(),
+                expr_span,
+            )?;
+
             TypedExpr {
                 inferred_type: x_ty.inferred_type.clone(),
                 kind: TypedExprKind::UnaryMinus(Box::new(x_ty)),
@@ -205,6 +205,7 @@ pub fn type_expr<'input>(
         }
         ExprKind::UnaryAddressOf(x) => {
             let x_ty = type_expr(scope, *x)?;
+
             TypedExpr {
                 inferred_type: TastType::Ptr(Box::new(x_ty.inferred_type.clone())),
                 kind: TypedExprKind::UnaryAddressOf(Box::new(expr_to_place(expr_span, x_ty)?)),
@@ -402,16 +403,12 @@ pub fn type_expr<'input>(
             let if_true_t = type_expr(scope, *if_true)?;
             let if_false_t = type_expr(scope, *if_false)?;
 
-            if cond_t.inferred_type != TastType::Bool {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    cond.0
-                        .span()
-                        .containing(DiagnosticKind::TernaryConditionMustBeBoolean(
-                            cond_t.to_string(),
-                        )),
-                ));
-            }
+            expect(
+                cond_t.inferred_type == TastType::Bool,
+                "boolean".to_string(),
+                cond_t.inferred_type.to_string(),
+                cond.0.span(),
+            )?;
 
             expect_identical_types(
                 &if_true_t.inferred_type,
