@@ -602,12 +602,12 @@ pub fn type_block<'input>(
                                     if inner_t_cond.inferred_type != TastType::Bool {
                                         return Err(Diagnostic(
                                             Severity::Error,
-                                            cond_span.unwrap().containing(
-                                                DiagnosticKind::ExpectedGot {
+                                            cond_span
+                                                .expect("span should exist if we unwrapped it")
+                                                .containing(DiagnosticKind::ExpectedGot {
                                                     expected: "bool".to_string(),
                                                     got: inner_t_cond.inferred_type.to_string(),
-                                                },
-                                            ),
+                                                }),
                                         ));
                                     }
                                 }
@@ -751,12 +751,12 @@ pub fn type_block<'input>(
                                         } else {
                                             Err(Diagnostic(
                                                 Severity::Error,
-                                                value_span.unwrap().containing(
-                                                    DiagnosticKind::ExpectedGot {
+                                                value_span
+                                                    .expect("value should exist if we unwrapped it")
+                                                    .containing(DiagnosticKind::ExpectedGot {
                                                         expected: return_ty.to_string(),
                                                         got: inferred_type.to_string(),
-                                                    },
-                                                ),
+                                                    }),
                                             ))
                                         }
                                     }

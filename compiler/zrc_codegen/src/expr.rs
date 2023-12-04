@@ -30,7 +30,9 @@ fn cg_place<'ctx, 'a>(
 ) -> BasicBlockAnd<'ctx, PointerValue<'ctx>> {
     match place.kind {
         PlaceKind::Variable(x) => {
-            let reg = scope.get(x).unwrap();
+            let reg = scope
+                .get(x)
+                .expect("identifier that passed typeck should exist in the CgScope");
 
             BasicBlockAnd { bb, value: reg }
         }
@@ -57,11 +59,12 @@ fn cg_place<'ctx, 'a>(
                     &[idx.into_int_value()],
                     "gep",
                 )
-            };
+            }
+            .expect("building GEP instruction should succeed");
 
             BasicBlockAnd {
                 bb,
-                value: reg.unwrap().as_basic_value_enum().into_pointer_value(),
+                value: reg.as_basic_value_enum().into_pointer_value(),
             }
         }
 
@@ -86,7 +89,7 @@ fn cg_place<'ctx, 'a>(
                             .expect("got more than u32::MAX as key index? HOW?"),
                         "gep",
                     )
-                    .unwrap();
+                    .expect("building GEP instruction should succeed");
 
                 BasicBlockAnd {
                     bb,
@@ -137,7 +140,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                             NumberLiteral::Hexadecimal(_) => StringRadix::Hexadecimal,
                         },
                     )
-                    .unwrap()
+                    .expect("number literal should have parsed correctly")
                     .as_basic_value_enum(),
             }
         }
@@ -168,7 +171,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 value: cg
                     .builder
                     .build_global_string_ptr(&formatted_contents, "str")
-                    .unwrap()
+                    .expect("string should have built successfully")
                     .as_basic_value_enum(),
             }
         }
@@ -200,7 +203,9 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                                     text.len() == 1,
                                     "Char literal must be exactly one character"
                                 );
-                                text.chars().next().unwrap()
+                                text.chars()
+                                    .next()
+                                    .expect("char literal should have a first character")
                             }
                         } as u64,
                         false,
@@ -241,7 +246,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     place,
                     "load",
                 )
-                .unwrap();
+                .expect("ident load should have built successfully");
 
             BasicBlockAnd {
                 bb,
@@ -253,7 +258,9 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *value);
             let BasicBlockAnd { bb, value: place } = cg_place(cg, bb, scope, *place);
 
-            cg.builder.build_store(place, value).unwrap();
+            cg.builder
+                .build_store(place, value)
+                .expect("store instruction in assignment should have built successfully");
 
             BasicBlockAnd { bb, value }
         }
@@ -285,11 +292,12 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     expr.inferred_type.is_signed_integer(),
                     "shr",
                 ),
-            };
+            }
+            .expect("binary bitwise operation should have compiled successfully");
 
             BasicBlockAnd {
                 bb,
-                value: reg.unwrap().as_basic_value_enum(),
+                value: reg.as_basic_value_enum(),
             }
         }
 
@@ -305,7 +313,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let reg = cg
                 .builder
                 .build_int_compare(op, lhs.into_int_value(), rhs.into_int_value(), "cmp")
-                .unwrap();
+                .expect("equality comparison should have compiled successfully");
 
             BasicBlockAnd {
                 bb,
@@ -331,7 +339,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let reg = cg
                 .builder
                 .build_int_compare(op, lhs.into_int_value(), rhs.into_int_value(), "cmp")
-                .unwrap();
+                .expect("comparison should have compiled successfully");
 
             BasicBlockAnd {
                 bb,
@@ -364,7 +372,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                         let rhs = cg
                             .builder
                             .build_int_neg(rhs.into_int_value(), "neg")
-                            .unwrap()
+                            .expect("negation should have compiled successfully")
                             .as_basic_value_enum();
 
                         // SAFETY: this can panic if indices are used incorrectly
@@ -379,11 +387,12 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                         }
                     }
                     _ => panic!("invalid pointer arithmetic operation"),
-                };
+                }
+                .expect("pointer arithmetic should have compiled successfully");
 
                 BasicBlockAnd {
                     bb,
-                    value: reg.unwrap().as_basic_value_enum(),
+                    value: reg.as_basic_value_enum(),
                 }
             } else {
                 let reg = match (op, expr.inferred_type.is_signed_integer()) {
@@ -419,11 +428,12 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                         rhs.into_int_value(),
                         "rem",
                     ),
-                };
+                }
+                .expect("arithmetic operation should have compiled successfully");
 
                 BasicBlockAnd {
                     bb,
-                    value: reg.unwrap().as_basic_value_enum(),
+                    value: reg.as_basic_value_enum(),
                 }
             }
         }
@@ -441,44 +451,54 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     cg.builder
                         .build_or(lhs.into_int_value(), rhs.into_int_value(), "or")
                 }
-            };
+            }
+            .expect("logical operation should have compiled successfully");
 
             BasicBlockAnd {
                 bb,
-                value: reg.unwrap().as_basic_value_enum(),
+                value: reg.as_basic_value_enum(),
             }
         }
 
         TypedExprKind::UnaryNot(x) => {
             let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *x);
 
-            let reg = cg.builder.build_not(value.into_int_value(), "not");
+            let reg = cg
+                .builder
+                .build_not(value.into_int_value(), "not")
+                .expect("not should have compiled successfully");
 
             BasicBlockAnd {
                 bb,
-                value: reg.unwrap().as_basic_value_enum(),
+                value: reg.as_basic_value_enum(),
             }
         }
 
         TypedExprKind::UnaryBitwiseNot(x) => {
             let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *x);
 
-            let reg = cg.builder.build_not(value.into_int_value(), "not");
+            let reg = cg
+                .builder
+                .build_not(value.into_int_value(), "not")
+                .expect("not should have compiled successfully");
 
             BasicBlockAnd {
                 bb,
-                value: reg.unwrap().as_basic_value_enum(),
+                value: reg.as_basic_value_enum(),
             }
         }
 
         TypedExprKind::UnaryMinus(x) => {
             let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *x);
 
-            let reg = cg.builder.build_int_neg(value.into_int_value(), "neg");
+            let reg = cg
+                .builder
+                .build_int_neg(value.into_int_value(), "neg")
+                .expect("negation should have compiled successfully");
 
             BasicBlockAnd {
                 bb,
-                value: reg.unwrap().as_basic_value_enum(),
+                value: reg.as_basic_value_enum(),
             }
         }
 
@@ -494,15 +514,18 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         TypedExprKind::UnaryDereference(ptr) => {
             let BasicBlockAnd { bb, value: ptr } = cg_expr(cg, bb, scope, *ptr);
 
-            let reg = cg.builder.build_load(
-                llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
-                ptr.into_pointer_value(),
-                "load",
-            );
+            let reg = cg
+                .builder
+                .build_load(
+                    llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
+                    ptr.into_pointer_value(),
+                    "load",
+                )
+                .expect("dereference should have compiled successfully");
 
             BasicBlockAnd {
                 bb,
-                value: reg.unwrap().as_basic_value_enum(),
+                value: reg.as_basic_value_enum(),
             }
         }
 
@@ -524,7 +547,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     ptr,
                     "load",
                 )
-                .unwrap();
+                .expect("index load should have compiled successfully");
 
             BasicBlockAnd {
                 bb,
@@ -550,7 +573,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     ptr,
                     "load",
                 )
-                .unwrap();
+                .expect("dot load should have compiled successfully");
 
             BasicBlockAnd {
                 bb,
@@ -580,7 +603,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let ret = cg
                 .builder
                 .build_indirect_call(llvm_f_type, f_ptr, &args, "call")
-                .unwrap();
+                .expect("call should have compiled successfully");
 
             BasicBlockAnd {
                 bb,
@@ -628,21 +651,25 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             cg.builder
                 .build_conditional_branch(cond.into_int_value(), if_true_bb, if_false_bb)
-                .unwrap();
+                .expect("conditional branch should have been created successfully");
 
             cg.builder.position_at_end(if_true_bb);
             let BasicBlockAnd {
                 bb: if_true_bb,
                 value: if_true,
             } = cg_expr(cg, if_true_bb, scope, *lhs);
-            cg.builder.build_unconditional_branch(end_bb).unwrap();
+            cg.builder
+                .build_unconditional_branch(end_bb)
+                .expect("unconditional branch should have been created successfully");
 
             cg.builder.position_at_end(if_false_bb);
             let BasicBlockAnd {
                 bb: if_false_bb,
                 value: if_false,
             } = cg_expr(cg, if_false_bb, scope, *rhs);
-            cg.builder.build_unconditional_branch(end_bb).unwrap();
+            cg.builder
+                .build_unconditional_branch(end_bb)
+                .expect("unconditional branch should have been created successfully");
 
             cg.builder.position_at_end(end_bb);
             let result_reg = cg
@@ -651,7 +678,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
                     "yield",
                 )
-                .unwrap();
+                .expect("phi node should have been created successfully");
             result_reg.add_incoming(&[(&if_true, if_true_bb), (&if_false, if_false_bb)]);
 
             BasicBlockAnd {
@@ -683,11 +710,11 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                         llvm_basic_type(cg.ctx, cg.target_machine, &ty),
                         "cast",
                     )
-                    .unwrap(),
+                    .expect("bitcast should have compiled successfully"),
                 (true, false) => cg
                     .builder
                     .build_ptr_to_int(x.into_pointer_value(), llvm_int_type(cg.ctx, &ty), "cast")
-                    .unwrap()
+                    .expect("ptrtoint should have compiled successfully")
                     .as_basic_value_enum(),
                 (false, true) => cg
                     .builder
@@ -696,7 +723,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                         llvm_basic_type(cg.ctx, cg.target_machine, &ty).into_pointer_type(),
                         "cast",
                     )
-                    .unwrap()
+                    .expect("inttoptr should have compiled successfully")
                     .as_basic_value_enum(),
                 (false, false) if x.get_type().is_int_type() && ty.is_integer() => {
                     // Cast between two integers
@@ -709,7 +736,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                                 llvm_basic_type(cg.ctx, cg.target_machine, &ty).into_int_type(),
                                 "cast",
                             )
-                            .unwrap()
+                            .expect("sext should have compiled successfully")
                             .as_basic_value_enum(),
 
                         // (x is signed, target is signed or unsigned)
@@ -720,7 +747,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                                 llvm_basic_type(cg.ctx, cg.target_machine, &ty).into_int_type(),
                                 "cast",
                             )
-                            .unwrap()
+                            .expect("zext should have compiled successfully")
                             .as_basic_value_enum(),
                     }
                 }
@@ -732,7 +759,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                             llvm_basic_type(cg.ctx, cg.target_machine, &ty),
                             "cast",
                         )
-                        .unwrap()
+                        .expect("bitcast should have compiled successfully")
                         .as_basic_value_enum()
                 }
             };
@@ -742,7 +769,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         TypedExprKind::SizeOf(ty) => {
             let reg = llvm_basic_type(cg.ctx, cg.target_machine, &ty)
                 .size_of()
-                .unwrap()
+                .expect("size_of should have compiled successfully")
                 .as_basic_value_enum();
 
             BasicBlockAnd { bb, value: reg }

@@ -55,7 +55,10 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
         // somehow save our position.
 
         let entry_block_builder = cg.ctx.create_builder();
-        let first_bb = cg.fn_value.get_first_basic_block().unwrap();
+        let first_bb = cg
+            .fn_value
+            .get_first_basic_block()
+            .expect("function should have at least one basic block");
         #[allow(clippy::option_if_let_else)]
         match first_bb.get_first_instruction() {
             Some(first_instruction) => {
@@ -71,7 +74,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
                 llvm_basic_type(cg.ctx, cg.target_machine, &let_declaration.ty),
                 &format!("let_{}", let_declaration.name),
             )
-            .unwrap();
+            .expect("alloca should generate successfully");
 
         scope.insert(let_declaration.name, ptr);
 
@@ -132,7 +135,7 @@ fn cg_block<'ctx, 'input, 'a>(
 
                     cg.builder
                         .build_conditional_branch(cond.into_int_value(), then_bb, then_else_bb)
-                        .unwrap();
+                        .expect("conditional branch should generate successfully");
 
                     cg.builder.position_at_end(then_bb);
                     let maybe_then_bb = cg_block(cg, then_bb, &scope, then, breakaway);
@@ -147,7 +150,9 @@ fn cg_block<'ctx, 'input, 'a>(
                             let end = cg.ctx.append_basic_block(cg.fn_value, "end");
 
                             cg.builder.position_at_end(single_bb);
-                            cg.builder.build_unconditional_branch(end).unwrap();
+                            cg.builder
+                                .build_unconditional_branch(end)
+                                .expect("branch should generate successfully");
 
                             cg.builder.position_at_end(end);
                             Some(end)
@@ -156,10 +161,14 @@ fn cg_block<'ctx, 'input, 'a>(
                             let end = cg.ctx.append_basic_block(cg.fn_value, "end");
 
                             cg.builder.position_at_end(then_bb);
-                            cg.builder.build_unconditional_branch(end).unwrap();
+                            cg.builder
+                                .build_unconditional_branch(end)
+                                .expect("branch should generate successfully");
 
                             cg.builder.position_at_end(then_else_bb);
-                            cg.builder.build_unconditional_branch(end).unwrap();
+                            cg.builder
+                                .build_unconditional_branch(end)
+                                .expect("branch should generate successfully");
 
                             cg.builder.position_at_end(end);
                             Some(end)
@@ -172,29 +181,43 @@ fn cg_block<'ctx, 'input, 'a>(
                 TypedStmt::ReturnStmt(Some(expr)) => {
                     let BasicBlockAnd { value: expr, .. } = cg_expr(cg, bb, &scope, expr);
 
-                    cg.builder.build_return(Some(&expr)).unwrap();
+                    cg.builder
+                        .build_return(Some(&expr))
+                        .expect("return should generate successfully");
 
                     None
                 }
 
                 TypedStmt::ReturnStmt(None) => {
-                    cg.builder.build_return(None).unwrap();
+                    cg.builder
+                        .build_return(None)
+                        .expect("return should generate successfully");
 
                     None
                 }
 
                 TypedStmt::ContinueStmt => {
                     cg.builder
-                        .build_unconditional_branch(breakaway.as_ref().unwrap().on_continue)
-                        .unwrap();
+                        .build_unconditional_branch(
+                            breakaway
+                                .as_ref()
+                                .expect("`breakaway` should exist all places `continue` is valid")
+                                .on_continue,
+                        )
+                        .expect("branch should generate successfully");
 
                     None
                 }
 
                 TypedStmt::BreakStmt => {
                     cg.builder
-                        .build_unconditional_branch(breakaway.as_ref().unwrap().on_break)
-                        .unwrap();
+                        .build_unconditional_branch(
+                            breakaway
+                                .as_ref()
+                                .expect("`breakaway` should exist all places `break` is valid")
+                                .on_break,
+                        )
+                        .expect("branch should generate successfully");
 
                     None
                 }
@@ -233,14 +256,18 @@ fn cg_block<'ctx, 'input, 'a>(
                     let exit = cg.ctx.append_basic_block(cg.fn_value, "exit");
 
                     // Branch to the header from the preheader.
-                    cg.builder.build_unconditional_branch(header).unwrap();
+                    cg.builder
+                        .build_unconditional_branch(header)
+                        .expect("branch should generate successfully");
 
                     // Generate the header.
                     cg.builder.position_at_end(header);
                     let header = cond.map_or_else(
                         || {
                             // If there is no condition, we always branch to the body.
-                            cg.builder.build_unconditional_branch(body_bb).unwrap();
+                            cg.builder
+                                .build_unconditional_branch(body_bb)
+                                .expect("branch should generate successfully");
 
                             header
                         },
@@ -252,7 +279,7 @@ fn cg_block<'ctx, 'input, 'a>(
 
                             cg.builder
                                 .build_conditional_branch(cond.into_int_value(), body_bb, exit)
-                                .unwrap();
+                                .expect("branch should generate successfully");
 
                             header
                         },
@@ -273,7 +300,9 @@ fn cg_block<'ctx, 'input, 'a>(
 
                     // The body breaks to latch
                     if body_bb.is_some() {
-                        cg.builder.build_unconditional_branch(latch).unwrap();
+                        cg.builder
+                            .build_unconditional_branch(latch)
+                            .expect("branch should generate successfully");
                     }
 
                     // Latch runs post and then breaks right back to the header.
@@ -282,7 +311,9 @@ fn cg_block<'ctx, 'input, 'a>(
                         cg_expr(cg, latch, &scope, post);
                     }
 
-                    cg.builder.build_unconditional_branch(header).unwrap();
+                    cg.builder
+                        .build_unconditional_branch(header)
+                        .expect("branch should generate successfully");
 
                     cg.builder.position_at_end(exit);
 
@@ -305,7 +336,9 @@ fn cg_block<'ctx, 'input, 'a>(
 
                     let exit = cg.ctx.append_basic_block(cg.fn_value, "exit");
 
-                    cg.builder.build_unconditional_branch(header).unwrap();
+                    cg.builder
+                        .build_unconditional_branch(header)
+                        .expect("branch should generate successfully");
 
                     cg.builder.position_at_end(header);
 
@@ -313,7 +346,7 @@ fn cg_block<'ctx, 'input, 'a>(
 
                     cg.builder
                         .build_conditional_branch(cond.into_int_value(), body_bb, exit)
-                        .unwrap();
+                        .expect("branch should generate successfully");
 
                     cg.builder.position_at_end(body_bb);
 
@@ -329,7 +362,9 @@ fn cg_block<'ctx, 'input, 'a>(
                     );
 
                     if body_bb.is_some() {
-                        cg.builder.build_unconditional_branch(header).unwrap();
+                        cg.builder
+                            .build_unconditional_branch(header)
+                            .expect("branch should generate successfully");
                     }
 
                     cg.builder.position_at_end(exit);
@@ -417,7 +452,9 @@ fn cg_program<'input, 'ctx>(
                         parameters.into_arguments().into_iter().enumerate()
                     {
                         if entry.get_first_instruction().is_some() {
-                            builder.position_before(&entry.get_first_instruction().unwrap());
+                            builder.position_before(&entry.get_first_instruction().expect(
+                                ".gfi.is_some() should only return true if there is an instruction",
+                            ));
                         } else {
                             builder.position_at_end(entry);
                         }
@@ -427,7 +464,7 @@ fn cg_program<'input, 'ctx>(
                                 llvm_basic_type(ctx, target_machine, &ty),
                                 &format!("arg_{name}"),
                             )
-                            .unwrap();
+                            .expect("alloca should generate successfully");
 
                         builder.position_at_end(entry);
 
@@ -439,9 +476,9 @@ fn cg_program<'input, 'ctx>(
                                         n.try_into()
                                             .expect("over u32::MAX parameters in a function? HOW?"),
                                     )
-                                    .unwrap(),
+                                    .expect("nth parameter from fn type should exist in fn value"),
                             )
-                            .unwrap();
+                            .expect("store should generate successfully");
 
                         fn_scope.insert(name, alloc);
                     }
@@ -505,7 +542,7 @@ pub fn cg_program_to_string(
     let ctx = Context::create();
 
     Target::initialize_all(&InitializationConfig::default());
-    let target = Target::from_triple(triple).unwrap();
+    let target = Target::from_triple(triple).expect("target should be ready and exist");
 
     let target_machine = target
         .create_target_machine(
@@ -517,7 +554,7 @@ pub fn cg_program_to_string(
             RelocMode::PIC,
             CodeModel::Default,
         )
-        .unwrap();
+        .expect("target machine should be created successfully");
 
     let (module, _global_scope) = cg_program(&ctx, &target_machine, module_name, program);
     optimize_module(&module, optimization_level);
@@ -542,7 +579,7 @@ pub fn cg_program_to_buffer(
     let ctx = Context::create();
 
     Target::initialize_all(&InitializationConfig::default());
-    let target = Target::from_triple(triple).unwrap();
+    let target = Target::from_triple(triple).expect("target should be ready and exist");
 
     let target_machine = target
         .create_target_machine(
@@ -554,14 +591,14 @@ pub fn cg_program_to_buffer(
             RelocMode::PIC,
             CodeModel::Default,
         )
-        .unwrap();
+        .expect("target machine should be created successfully");
 
     let (module, _global_scope) = cg_program(&ctx, &target_machine, module_name, program);
     optimize_module(&module, optimization_level);
 
     target_machine
         .write_to_memory_buffer(&module, file_type)
-        .unwrap()
+        .expect("writing to memory buffer should succeed")
 }
 
 #[cfg(test)]
