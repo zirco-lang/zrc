@@ -112,6 +112,21 @@ fn expect(
     }
 }
 
+/// Assert that a type is an integer type
+fn expect_is_integer(ty: &TastType, span: Span) -> Result<(), Diagnostic> {
+    expect(ty.is_integer(), "integer".to_string(), ty.to_string(), span)
+}
+
+/// Assert that a type is a signed integer type
+fn expect_is_signed_integer(ty: &TastType, span: Span) -> Result<(), Diagnostic> {
+    expect(
+        ty.is_signed_integer(),
+        "signed integer".to_string(),
+        ty.to_string(),
+        span,
+    )
+}
+
 // FIXME: this NEEDS to be rewritten to use references almost everywhere and be
 // no-clone. We stack overflow for deep expressions which is VERY VERY BAD.
 /// Type check and infer an [AST expression](Expr) to a [TAST
@@ -174,14 +189,10 @@ pub fn type_expr<'input>(
             }
         }
         ExprKind::UnaryBitwiseNot(x) => {
+            let x_span = x.0.span();
             let x_ty = type_expr(scope, *x)?;
 
-            expect(
-                x_ty.inferred_type.is_integer(),
-                "integer".to_string(),
-                x_ty.inferred_type.to_string(),
-                expr_span,
-            )?;
+            expect_is_integer(&x_ty.inferred_type, x_span)?;
 
             TypedExpr {
                 inferred_type: x_ty.inferred_type.clone(),
@@ -189,14 +200,10 @@ pub fn type_expr<'input>(
             }
         }
         ExprKind::UnaryMinus(x) => {
+            let x_span = x.0.span();
             let x_ty = type_expr(scope, *x)?;
 
-            expect(
-                x_ty.inferred_type.is_signed_integer(),
-                "signed integer".to_string(),
-                x_ty.inferred_type.to_string(),
-                expr_span,
-            )?;
+            expect_is_signed_integer(&x_ty.inferred_type, x_span)?;
 
             TypedExpr {
                 inferred_type: x_ty.inferred_type.clone(),
@@ -487,26 +494,11 @@ pub fn type_expr<'input>(
             let rhs_span = rhs.0.span();
             let rhs_t = type_expr(scope, *rhs)?;
 
-            expect(
-                lhs_t.inferred_type.is_integer(),
-                "integer".to_string(),
-                lhs_t.inferred_type.to_string(),
-                lhs_span,
-            )?;
-            expect(
-                rhs_t.inferred_type.is_integer(),
-                "integer".to_string(),
-                rhs_t.inferred_type.to_string(),
-                rhs_span,
-            )?;
+            expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
+            expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
             if matches!(op, BinaryBitwise::Shl | BinaryBitwise::Shr) {
-                expect(
-                    lhs_t.inferred_type.is_signed_integer(),
-                    "signed integer".to_string(),
-                    lhs_t.inferred_type.to_string(),
-                    lhs_span,
-                )?;
+                expect_is_signed_integer(&lhs_t.inferred_type, lhs_span)?;
             }
 
             expect_identical_types(&lhs_t.inferred_type, &rhs_t.inferred_type, expr_span)?;
@@ -522,18 +514,8 @@ pub fn type_expr<'input>(
             let rhs_span = rhs.0.span();
             let rhs_t = type_expr(scope, *rhs)?;
 
-            expect(
-                lhs_t.inferred_type.is_integer(),
-                "integer".to_string(),
-                lhs_t.inferred_type.to_string(),
-                lhs_span,
-            )?;
-            expect(
-                rhs_t.inferred_type.is_integer(),
-                "integer".to_string(),
-                rhs_t.inferred_type.to_string(),
-                rhs_span,
-            )?;
+            expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
+            expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
             expect_identical_types(&lhs_t.inferred_type, &rhs_t.inferred_type, expr_span)?;
 
@@ -561,25 +543,10 @@ pub fn type_expr<'input>(
                     ));
                 }
 
-                expect(
-                    rhs_t.inferred_type.is_integer(),
-                    "integer".to_string(),
-                    rhs_t.inferred_type.to_string(),
-                    rhs_span,
-                )?;
+                expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
             } else {
-                expect(
-                    lhs_t.inferred_type.is_integer(),
-                    "integer".to_string(),
-                    lhs_t.inferred_type.to_string(),
-                    lhs_span,
-                )?;
-                expect(
-                    rhs_t.inferred_type.is_integer(),
-                    "integer".to_string(),
-                    rhs_t.inferred_type.to_string(),
-                    rhs_span,
-                )?;
+                expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
+                expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
                 expect_identical_types(&lhs_t.inferred_type, &rhs_t.inferred_type, expr_span)?;
             }
@@ -596,27 +563,15 @@ pub fn type_expr<'input>(
 
             if x_t.inferred_type.is_integer() && resolved_ty.is_integer() {
                 // int -> int cast is valid
-                TypedExpr {
-                    inferred_type: resolved_ty.clone(),
-                    kind: TypedExprKind::Cast(Box::new(x_t), resolved_ty),
-                }
             } else if let (TastType::Ptr(_), TastType::Ptr(_)) = (&x_t.inferred_type, &resolved_ty)
             {
                 // *T -> *U cast is valid
-                TypedExpr {
-                    inferred_type: resolved_ty.clone(),
-                    kind: TypedExprKind::Cast(Box::new(x_t), resolved_ty),
-                }
             } else if let (TastType::Ptr(_), _) | (_, TastType::Ptr(_)) =
                 (&x_t.inferred_type, &resolved_ty)
             {
                 // ensure one is an int
                 if x_t.inferred_type.is_integer() || resolved_ty.is_integer() {
                     // *T -> int or int -> *T cast is valid
-                    TypedExpr {
-                        inferred_type: resolved_ty.clone(),
-                        kind: TypedExprKind::Cast(Box::new(x_t), resolved_ty),
-                    }
                 } else {
                     return Err(Diagnostic(
                         Severity::Error,
@@ -628,10 +583,6 @@ pub fn type_expr<'input>(
                 }
             } else if x_t.inferred_type == TastType::Bool && resolved_ty.is_integer() {
                 // bool -> int cast is valid
-                TypedExpr {
-                    inferred_type: resolved_ty.clone(),
-                    kind: TypedExprKind::Cast(Box::new(x_t), resolved_ty),
-                }
             } else {
                 return Err(Diagnostic(
                     Severity::Error,
@@ -640,6 +591,11 @@ pub fn type_expr<'input>(
                         resolved_ty.to_string(),
                     )),
                 ));
+            }
+
+            TypedExpr {
+                inferred_type: resolved_ty.clone(),
+                kind: TypedExprKind::Cast(Box::new(x_t), resolved_ty),
             }
         }
 
