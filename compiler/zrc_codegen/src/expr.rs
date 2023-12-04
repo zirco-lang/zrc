@@ -929,7 +929,7 @@ mod tests {
                 fn test() {
                     // TEST: should properly generate \xNN for each escape
                     let x = "\n\r\t\\\"\x41\0";
-                    
+
                     return;
                 }
             "#});
