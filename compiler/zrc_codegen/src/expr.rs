@@ -2,12 +2,8 @@
 
 use inkwell::{
     basic_block::BasicBlock,
-    builder::Builder,
-    context::Context,
-    module::Module,
-    targets::TargetMachine,
     types::{BasicType, StringRadix},
-    values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
+    values::{BasicValue, BasicValueEnum, PointerValue},
     IntPredicate,
 };
 use zrc_typeck::tast::{
@@ -19,124 +15,90 @@ use zrc_typeck::tast::{
 };
 
 use super::CgScope;
-use crate::ty::{llvm_basic_type, llvm_int_type, llvm_type};
+use crate::{
+    ty::{llvm_basic_type, llvm_int_type, llvm_type},
+    BasicBlockAnd, CgContext,
+};
 
 /// Resolve a place to its pointer
-#[allow(clippy::trivially_copy_pass_by_ref, clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn cg_place<'ctx, 'a>(
-    ctx: &'ctx Context,
-    target_machine: &TargetMachine,
-    builder: &'a Builder<'ctx>,
-    module: &'a Module<'ctx>,
-    function: &'a FunctionValue<'ctx>,
-    bb: &'a BasicBlock<'ctx>,
+    cg: CgContext<'ctx, 'a>,
+    bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'_, 'ctx>,
     place: Place,
-) -> (PointerValue<'ctx>, BasicBlock<'ctx>) {
-    match place.1 {
+) -> BasicBlockAnd<'ctx, PointerValue<'ctx>> {
+    match place.kind {
         PlaceKind::Variable(x) => {
             let reg = scope.get(x).unwrap();
 
-            (reg, *bb)
+            BasicBlockAnd { bb, value: reg }
         }
 
         PlaceKind::Deref(x) => {
-            let (x, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *x,
-            );
+            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *x);
 
-            (x.into_pointer_value(), bb)
+            BasicBlockAnd {
+                bb,
+                value: value.into_pointer_value(),
+            }
         }
 
         PlaceKind::Index(ptr, idx) => {
-            let (ptr, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *ptr,
-            );
-            let (idx, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                &bb,
-                scope,
-                *idx,
-            );
+            let BasicBlockAnd { bb, value: ptr } = cg_expr(cg, bb, scope, *ptr);
+            let BasicBlockAnd { bb, value: idx } = cg_expr(cg, bb, scope, *idx);
 
             // SAFETY: If indices are used incorrectly this may segfault
             // TODO: Is this actually safely used?
             let reg = unsafe {
-                builder.build_gep(
-                    llvm_basic_type(ctx, target_machine, &place.0),
+                cg.builder.build_gep(
+                    llvm_basic_type(cg.ctx, cg.target_machine, &place.inferred_type),
                     ptr.into_pointer_value(),
                     &[idx.into_int_value()],
                     "gep",
                 )
             };
 
-            (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
+            BasicBlockAnd {
+                bb,
+                value: reg.unwrap().as_basic_value_enum().into_pointer_value(),
+            }
         }
 
         #[allow(clippy::wildcard_enum_match_arm)]
-        PlaceKind::Dot(x, prop) => match &(*x).0 {
+        PlaceKind::Dot(x, prop) => match &x.inferred_type {
             Type::Struct(contents) => {
-                let x_ty = llvm_basic_type(ctx, target_machine, &x.0);
+                let x_ty = llvm_basic_type(cg.ctx, cg.target_machine, &x.inferred_type);
                 let prop_idx = contents
                     .iter()
                     .position(|(got_key, _)| *got_key == prop)
                     .expect("invalid struct field");
 
-                let (x, bb) = cg_place(
-                    ctx,
-                    target_machine,
-                    builder,
-                    module,
-                    function,
+                let BasicBlockAnd { bb, value: x } = cg_place(cg, bb, scope, *x);
+
+                let reg = cg
+                    .builder
+                    .build_struct_gep(
+                        x_ty,
+                        x,
+                        prop_idx
+                            .try_into()
+                            .expect("got more than u32::MAX as key index? HOW?"),
+                        "gep",
+                    )
+                    .unwrap();
+
+                BasicBlockAnd {
                     bb,
-                    scope,
-                    *x,
-                );
-
-                let reg = builder.build_struct_gep(
-                    x_ty,
-                    x,
-                    prop_idx
-                        .try_into()
-                        .expect("got more than u32::MAX as key index? HOW?"),
-                    "gep",
-                );
-
-                (reg.unwrap().as_basic_value_enum().into_pointer_value(), bb)
+                    value: reg.as_basic_value_enum().into_pointer_value(),
+                }
             }
             Type::Union(_) => {
                 // All we need to do is cast the pointer, but there's no `bitcast` anymore,
                 // so just return it and it'll take on the correct type
-                let (x, bb) = cg_place(
-                    ctx,
-                    target_machine,
-                    builder,
-                    module,
-                    function,
-                    bb,
-                    scope,
-                    *x,
-                );
+                let BasicBlockAnd { bb, value } = cg_place(cg, bb, scope, *x);
 
-                (x, bb)
+                BasicBlockAnd { bb, value }
             }
             _ => panic!("cannot access property of non-struct"),
         },
@@ -148,28 +110,25 @@ fn cg_place<'ctx, 'a>(
     clippy::redundant_pub_crate,
     clippy::too_many_lines,
     clippy::match_same_arms,
-    clippy::trivially_copy_pass_by_ref,
     clippy::too_many_arguments
 )]
 pub(crate) fn cg_expr<'ctx, 'a>(
-    ctx: &'ctx Context,
-    target_machine: &TargetMachine,
-    builder: &'a Builder<'ctx>,
-    module: &'a Module<'ctx>,
-    function: &'a FunctionValue<'ctx>,
-    bb: &'a BasicBlock<'ctx>,
+    cg: CgContext<'ctx, 'a>,
+    bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'_, 'ctx>,
     expr: TypedExpr,
-) -> (BasicValueEnum<'ctx>, BasicBlock<'ctx>) {
-    match expr.1 {
+) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
+    match expr.kind {
         TypedExprKind::NumberLiteral(n) => {
             let no_underscores = match n {
                 NumberLiteral::Decimal(x) => x.replace('_', ""),
                 NumberLiteral::Binary(x) => x.replace('_', ""),
                 NumberLiteral::Hexadecimal(x) => x.replace('_', ""),
             };
-            (
-                llvm_int_type(ctx, &expr.0)
+
+            BasicBlockAnd {
+                bb,
+                value: llvm_int_type(cg.ctx, &expr.inferred_type)
                     .const_int_from_string(
                         &no_underscores,
                         match n {
@@ -180,8 +139,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     )
                     .unwrap()
                     .as_basic_value_enum(),
-                *bb,
-            )
+            }
         }
 
         TypedExprKind::StringLiteral(str) => {
@@ -203,13 +161,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 })
                 .collect::<String>();
 
-            (
-                builder
+            BasicBlockAnd {
+                bb,
+                value: cg
+                    .builder
                     .build_global_string_ptr(&formatted_contents, "str")
                     .unwrap()
                     .as_basic_value_enum(),
-                *bb,
-            )
+            }
         }
         TypedExprKind::CharLiteral(str) => {
             let [ch] = str.as_slice() else {
@@ -217,8 +176,11 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             };
 
             #[allow(clippy::as_conversions)]
-            (
-                ctx.i8_type()
+            BasicBlockAnd {
+                bb,
+                value: cg
+                    .ctx
+                    .i8_type()
                     .const_int(
                         match ch {
                             StringTok::EscapedBackslash => '\\',
@@ -240,193 +202,118 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                         false,
                     )
                     .as_basic_value_enum(),
-                *bb,
-            )
+            }
         }
 
-        TypedExprKind::BooleanLiteral(value) => (
-            ctx.bool_type()
+        TypedExprKind::BooleanLiteral(value) => BasicBlockAnd {
+            bb,
+            value: cg
+                .ctx
+                .bool_type()
                 .const_int(value.into(), false)
                 .as_basic_value_enum(),
-            *bb,
-        ),
+        },
 
         TypedExprKind::Comma(lhs, rhs) => {
-            let (_, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *lhs,
-            );
-            cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                &bb,
-                scope,
-                *rhs,
-            )
+            let BasicBlockAnd { bb, .. } = cg_expr(cg, bb, scope, *lhs);
+            cg_expr(cg, bb, scope, *rhs)
         }
 
         TypedExprKind::Identifier(id) => {
-            let place = cg_place(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
+            let BasicBlockAnd { bb, value: place } = cg_place(
+                cg,
                 bb,
                 scope,
-                Place(expr.0.clone(), PlaceKind::Variable(id)),
+                Place {
+                    inferred_type: expr.inferred_type.clone(),
+                    kind: PlaceKind::Variable(id),
+                },
             );
 
-            let reg = builder
+            let reg = cg
+                .builder
                 .build_load(
-                    llvm_basic_type(ctx, target_machine, &expr.0),
-                    place.0,
+                    llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
+                    place,
                     "load",
                 )
                 .unwrap();
 
-            (reg.as_basic_value_enum(), place.1)
+            BasicBlockAnd {
+                bb,
+                value: reg.as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::Assignment(place, value) => {
-            let (value, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *value,
-            );
-            let place = cg_place(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                &bb,
-                scope,
-                *place,
-            );
+            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *value);
+            let BasicBlockAnd { bb, value: place } = cg_place(cg, bb, scope, *place);
 
-            builder.build_store(place.0, value).unwrap();
+            cg.builder.build_store(place, value).unwrap();
 
-            (value, bb)
+            BasicBlockAnd { bb, value }
         }
 
         TypedExprKind::BinaryBitwise(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *lhs,
-            );
-            let (rhs, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                &bb,
-                scope,
-                *rhs,
-            );
+            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, *lhs);
+            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, *rhs);
 
             let reg = match op {
                 BinaryBitwise::And => {
-                    builder.build_and(lhs.into_int_value(), rhs.into_int_value(), "and")
+                    cg.builder
+                        .build_and(lhs.into_int_value(), rhs.into_int_value(), "and")
                 }
                 BinaryBitwise::Or => {
-                    builder.build_or(lhs.into_int_value(), rhs.into_int_value(), "or")
+                    cg.builder
+                        .build_or(lhs.into_int_value(), rhs.into_int_value(), "or")
                 }
                 BinaryBitwise::Xor => {
-                    builder.build_xor(lhs.into_int_value(), rhs.into_int_value(), "xor")
+                    cg.builder
+                        .build_xor(lhs.into_int_value(), rhs.into_int_value(), "xor")
                 }
                 BinaryBitwise::Shl => {
-                    builder.build_left_shift(lhs.into_int_value(), rhs.into_int_value(), "shl")
+                    cg.builder
+                        .build_left_shift(lhs.into_int_value(), rhs.into_int_value(), "shl")
                 }
-                BinaryBitwise::Shr => builder.build_right_shift(
+                BinaryBitwise::Shr => cg.builder.build_right_shift(
                     lhs.into_int_value(),
                     rhs.into_int_value(),
-                    expr.0.is_signed_integer(),
+                    expr.inferred_type.is_signed_integer(),
                     "shr",
                 ),
             };
 
-            (reg.unwrap().as_basic_value_enum(), bb)
+            BasicBlockAnd {
+                bb,
+                value: reg.unwrap().as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::Equality(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *lhs,
-            );
-            let (rhs, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                &bb,
-                scope,
-                *rhs,
-            );
+            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, *lhs);
+            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, *rhs);
 
             let op = match op {
                 Equality::Eq => IntPredicate::EQ,
                 Equality::Neq => IntPredicate::NE,
             };
 
-            let reg = builder
+            let reg = cg
+                .builder
                 .build_int_compare(op, lhs.into_int_value(), rhs.into_int_value(), "cmp")
                 .unwrap();
 
-            (reg.as_basic_value_enum(), bb)
+            BasicBlockAnd {
+                bb,
+                value: reg.as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::Comparison(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *lhs,
-            );
-            let (rhs, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                &bb,
-                scope,
-                *rhs,
-            );
+            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, *lhs);
+            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, *rhs);
 
-            let op = match (op, expr.0.is_signed_integer()) {
+            let op = match (op, expr.inferred_type.is_signed_integer()) {
                 (Comparison::Lt, true) => IntPredicate::SLT,
                 (Comparison::Lt, false) => IntPredicate::ULT,
                 (Comparison::Gt, true) => IntPredicate::SGT,
@@ -437,279 +324,227 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 (Comparison::Gte, false) => IntPredicate::UGE,
             };
 
-            let reg = builder
+            let reg = cg
+                .builder
                 .build_int_compare(op, lhs.into_int_value(), rhs.into_int_value(), "cmp")
                 .unwrap();
 
-            (reg.as_basic_value_enum(), bb)
+            BasicBlockAnd {
+                bb,
+                value: reg.as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::Arithmetic(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *lhs,
-            );
-            let (rhs, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                &bb,
-                scope,
-                *rhs,
-            );
+            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, *lhs);
+            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, *rhs);
 
-            let reg = match (op, expr.0.is_signed_integer()) {
+            let reg = match (op, expr.inferred_type.is_signed_integer()) {
                 (Arithmetic::Addition, _) => {
-                    builder.build_int_add(lhs.into_int_value(), rhs.into_int_value(), "add")
+                    cg.builder
+                        .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "add")
                 }
                 (Arithmetic::Subtraction, _) => {
-                    builder.build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "sub")
+                    cg.builder
+                        .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "sub")
                 }
                 (Arithmetic::Multiplication, _) => {
-                    builder.build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "mul")
+                    cg.builder
+                        .build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "mul")
                 }
-                (Arithmetic::Division, true) => {
-                    builder.build_int_signed_div(lhs.into_int_value(), rhs.into_int_value(), "div")
-                }
-                (Arithmetic::Division, false) => builder.build_int_unsigned_div(
+                (Arithmetic::Division, true) => cg.builder.build_int_signed_div(
                     lhs.into_int_value(),
                     rhs.into_int_value(),
                     "div",
                 ),
-                (Arithmetic::Modulo, true) => {
-                    builder.build_int_signed_rem(lhs.into_int_value(), rhs.into_int_value(), "rem")
-                }
-                (Arithmetic::Modulo, false) => builder.build_int_unsigned_rem(
+                (Arithmetic::Division, false) => cg.builder.build_int_unsigned_div(
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "div",
+                ),
+                (Arithmetic::Modulo, true) => cg.builder.build_int_signed_rem(
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "rem",
+                ),
+                (Arithmetic::Modulo, false) => cg.builder.build_int_unsigned_rem(
                     lhs.into_int_value(),
                     rhs.into_int_value(),
                     "rem",
                 ),
             };
 
-            (reg.unwrap().as_basic_value_enum(), bb)
+            BasicBlockAnd {
+                bb,
+                value: reg.unwrap().as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::Logical(op, lhs, rhs) => {
-            let (lhs, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *lhs,
-            );
-            let (rhs, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                &bb,
-                scope,
-                *rhs,
-            );
+            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, *lhs);
+            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, *rhs);
 
             let reg = match op {
                 Logical::And => {
-                    builder.build_and(lhs.into_int_value(), rhs.into_int_value(), "and")
+                    cg.builder
+                        .build_and(lhs.into_int_value(), rhs.into_int_value(), "and")
                 }
-                Logical::Or => builder.build_or(lhs.into_int_value(), rhs.into_int_value(), "or"),
+                Logical::Or => {
+                    cg.builder
+                        .build_or(lhs.into_int_value(), rhs.into_int_value(), "or")
+                }
             };
 
-            (reg.unwrap().as_basic_value_enum(), bb)
+            BasicBlockAnd {
+                bb,
+                value: reg.unwrap().as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::UnaryNot(x) => {
-            let (x, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
+            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *x);
+
+            let reg = cg.builder.build_not(value.into_int_value(), "not");
+
+            BasicBlockAnd {
                 bb,
-                scope,
-                *x,
-            );
-
-            let reg = builder.build_not(x.into_int_value(), "not");
-
-            (reg.unwrap().as_basic_value_enum(), bb)
+                value: reg.unwrap().as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::UnaryBitwiseNot(x) => {
-            let (x, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
+            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *x);
+
+            let reg = cg.builder.build_not(value.into_int_value(), "not");
+
+            BasicBlockAnd {
                 bb,
-                scope,
-                *x,
-            );
-
-            let reg = builder.build_not(x.into_int_value(), "not");
-
-            (reg.unwrap().as_basic_value_enum(), bb)
+                value: reg.unwrap().as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::UnaryMinus(x) => {
-            let (x, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
+            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *x);
+
+            let reg = cg.builder.build_int_neg(value.into_int_value(), "neg");
+
+            BasicBlockAnd {
                 bb,
-                scope,
-                *x,
-            );
-
-            let reg = builder.build_int_neg(x.into_int_value(), "neg");
-
-            (reg.unwrap().as_basic_value_enum(), bb)
+                value: reg.unwrap().as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::UnaryAddressOf(x) => {
-            let (x, bb) = cg_place(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
+            let BasicBlockAnd { bb, value } = cg_place(cg, bb, scope, *x);
+
+            BasicBlockAnd {
                 bb,
-                scope,
-                *x,
-            );
-            (x.as_basic_value_enum(), bb)
+                value: value.as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::UnaryDereference(ptr) => {
-            let (ptr, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *ptr,
-            );
+            let BasicBlockAnd { bb, value: ptr } = cg_expr(cg, bb, scope, *ptr);
 
-            let reg = builder.build_load(
-                llvm_basic_type(ctx, target_machine, &expr.0),
+            let reg = cg.builder.build_load(
+                llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
                 ptr.into_pointer_value(),
                 "load",
             );
 
-            (reg.unwrap().as_basic_value_enum(), bb)
+            BasicBlockAnd {
+                bb,
+                value: reg.unwrap().as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::Index(ptr, idx) => {
-            let (ptr, bb) = cg_place(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
+            let BasicBlockAnd { bb, value: ptr } = cg_place(
+                cg,
                 bb,
                 scope,
-                Place(expr.0.clone(), PlaceKind::Index(ptr, idx)),
+                Place {
+                    inferred_type: expr.inferred_type.clone(),
+                    kind: PlaceKind::Index(ptr, idx),
+                },
             );
 
-            let loaded = builder
-                .build_load(llvm_basic_type(ctx, target_machine, &expr.0), ptr, "load")
+            let loaded = cg
+                .builder
+                .build_load(
+                    llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
+                    ptr,
+                    "load",
+                )
                 .unwrap();
 
-            (loaded.as_basic_value_enum(), bb)
+            BasicBlockAnd {
+                bb,
+                value: loaded.as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::Dot(place, key) => {
-            let (ptr, bb) = cg_place(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
+            let BasicBlockAnd { bb, value: ptr } = cg_place(
+                cg,
                 bb,
                 scope,
-                Place(expr.0.clone(), PlaceKind::Dot(place, key)),
+                Place {
+                    inferred_type: expr.inferred_type.clone(),
+                    kind: PlaceKind::Dot(place, key),
+                },
             );
 
-            let loaded = builder
-                .build_load(llvm_basic_type(ctx, target_machine, &expr.0), ptr, "load")
+            let loaded = cg
+                .builder
+                .build_load(
+                    llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
+                    ptr,
+                    "load",
+                )
                 .unwrap();
 
-            (loaded.as_basic_value_enum(), bb)
+            BasicBlockAnd {
+                bb,
+                value: loaded.as_basic_value_enum(),
+            }
         }
 
         TypedExprKind::Call(f, args) => {
-            let llvm_f_type = llvm_type(ctx, target_machine, &f.0).into_function_type();
+            let llvm_f_type =
+                llvm_type(cg.ctx, cg.target_machine, &f.inferred_type).into_function_type();
 
             // will always be a function pointer
-            let (f_ptr, bb) = cg_place(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *f,
-            );
+            let BasicBlockAnd { bb, value: f_ptr } = cg_place(cg, bb, scope, *f);
 
             let mut bb = bb;
             let old_args = args;
             let mut args = vec![];
             for arg in old_args {
-                let (new_arg, new_bb) = cg_expr(
-                    ctx,
-                    target_machine,
-                    builder,
-                    module,
-                    function,
-                    &bb,
-                    scope,
-                    arg,
-                );
+                let BasicBlockAnd {
+                    bb: new_bb,
+                    value: new_arg,
+                } = cg_expr(cg, bb, scope, arg);
                 bb = new_bb;
                 args.push(new_arg.into());
             }
 
-            let ret = builder
+            let ret = cg
+                .builder
                 .build_indirect_call(llvm_f_type, f_ptr, &args, "call")
                 .unwrap();
 
-            (
-                if ret.try_as_basic_value().is_left() {
+            BasicBlockAnd {
+                bb,
+                value: if ret.try_as_basic_value().is_left() {
                     ret.try_as_basic_value().unwrap_left()
                 } else {
-                    ctx.i8_type().get_undef().as_basic_value_enum()
+                    cg.ctx.i8_type().get_undef().as_basic_value_enum()
                 },
-                bb,
-            )
+            }
         }
         TypedExprKind::Ternary(cond, lhs, rhs) => {
-            let (cond, _) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *cond,
-            );
+            let BasicBlockAnd { value: cond, .. } = cg_expr(cg, bb, scope, *cond);
 
             // If lhs and rhs are registers, the code generated will look like:
             //   entry:
@@ -739,46 +574,42 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             //
             // This is just a weird way to `select` and will be inlined.
 
-            let if_true_bb = ctx.append_basic_block(*function, "if_true");
-            let if_false_bb = ctx.append_basic_block(*function, "if_false");
-            let end_bb = ctx.append_basic_block(*function, "end");
+            let if_true_bb = cg.ctx.append_basic_block(cg.fn_value, "if_true");
+            let if_false_bb = cg.ctx.append_basic_block(cg.fn_value, "if_false");
+            let end_bb = cg.ctx.append_basic_block(cg.fn_value, "end");
 
-            builder
+            cg.builder
                 .build_conditional_branch(cond.into_int_value(), if_true_bb, if_false_bb)
                 .unwrap();
 
-            builder.position_at_end(if_true_bb);
-            let (if_true, if_true_bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                &if_true_bb,
-                scope,
-                *lhs,
-            );
-            builder.build_unconditional_branch(end_bb).unwrap();
+            cg.builder.position_at_end(if_true_bb);
+            let BasicBlockAnd {
+                bb: if_true_bb,
+                value: if_true,
+            } = cg_expr(cg, if_true_bb, scope, *lhs);
+            cg.builder.build_unconditional_branch(end_bb).unwrap();
 
-            builder.position_at_end(if_false_bb);
-            let (if_false, if_false_bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                &if_false_bb,
-                scope,
-                *rhs,
-            );
-            builder.build_unconditional_branch(end_bb).unwrap();
+            cg.builder.position_at_end(if_false_bb);
+            let BasicBlockAnd {
+                bb: if_false_bb,
+                value: if_false,
+            } = cg_expr(cg, if_false_bb, scope, *rhs);
+            cg.builder.build_unconditional_branch(end_bb).unwrap();
 
-            builder.position_at_end(end_bb);
-            let result_reg = builder
-                .build_phi(llvm_basic_type(ctx, target_machine, &expr.0), "yield")
+            cg.builder.position_at_end(end_bb);
+            let result_reg = cg
+                .builder
+                .build_phi(
+                    llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
+                    "yield",
+                )
                 .unwrap();
             result_reg.add_incoming(&[(&if_true, if_true_bb), (&if_false, if_false_bb)]);
-            (result_reg.as_basic_value(), end_bb)
+
+            BasicBlockAnd {
+                bb: end_bb,
+                value: result_reg.as_basic_value(),
+            }
         }
         TypedExprKind::Cast(x, ty) => {
             // signed -> signed = sext
@@ -792,35 +623,29 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             // int -> fn = inttoptr
             // fn -> int = ptrtoint
 
-            let x_ty_is_signed_integer = (*x).0.is_signed_integer();
+            let x_ty_is_signed_integer = x.inferred_type.is_signed_integer();
 
-            let (x, bb) = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                bb,
-                scope,
-                *x,
-            );
+            let BasicBlockAnd { bb, value: x } = cg_expr(cg, bb, scope, *x);
 
             let reg = match (x.get_type().is_pointer_type(), matches!(ty, Type::Ptr(_))) {
-                (true, true) => builder
+                (true, true) => cg
+                    .builder
                     .build_bitcast(
                         x.into_pointer_value(),
-                        llvm_basic_type(ctx, target_machine, &ty),
+                        llvm_basic_type(cg.ctx, cg.target_machine, &ty),
                         "cast",
                     )
                     .unwrap(),
-                (true, false) => builder
-                    .build_ptr_to_int(x.into_pointer_value(), llvm_int_type(ctx, &ty), "cast")
+                (true, false) => cg
+                    .builder
+                    .build_ptr_to_int(x.into_pointer_value(), llvm_int_type(cg.ctx, &ty), "cast")
                     .unwrap()
                     .as_basic_value_enum(),
-                (false, true) => builder
+                (false, true) => cg
+                    .builder
                     .build_int_to_ptr(
                         x.into_int_value(),
-                        llvm_basic_type(ctx, target_machine, &ty).into_pointer_type(),
+                        llvm_basic_type(cg.ctx, cg.target_machine, &ty).into_pointer_type(),
                         "cast",
                     )
                     .unwrap()
@@ -829,20 +654,22 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     // Cast between two integers
                     match (x_ty_is_signed_integer, ty.is_signed_integer()) {
                         // (x is signed, target is signed or unsigned)
-                        (true, _) => builder
+                        (true, _) => cg
+                            .builder
                             .build_int_s_extend(
                                 x.into_int_value(),
-                                llvm_basic_type(ctx, target_machine, &ty).into_int_type(),
+                                llvm_basic_type(cg.ctx, cg.target_machine, &ty).into_int_type(),
                                 "cast",
                             )
                             .unwrap()
                             .as_basic_value_enum(),
 
                         // (x is signed, target is signed or unsigned)
-                        (false, _) => builder
+                        (false, _) => cg
+                            .builder
                             .build_int_z_extend(
                                 x.into_int_value(),
-                                llvm_basic_type(ctx, target_machine, &ty).into_int_type(),
+                                llvm_basic_type(cg.ctx, cg.target_machine, &ty).into_int_type(),
                                 "cast",
                             )
                             .unwrap()
@@ -851,10 +678,10 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 }
                 (false, false) => {
                     // Other casts are just bitcasts
-                    builder
+                    cg.builder
                         .build_bitcast(
                             x.into_int_value(),
-                            llvm_basic_type(ctx, target_machine, &ty),
+                            llvm_basic_type(cg.ctx, cg.target_machine, &ty),
                             "cast",
                         )
                         .unwrap()
@@ -862,15 +689,15 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 }
             };
 
-            (reg, bb)
+            BasicBlockAnd { bb, value: reg }
         }
         TypedExprKind::SizeOf(ty) => {
-            let reg = llvm_basic_type(ctx, target_machine, &ty)
+            let reg = llvm_basic_type(cg.ctx, cg.target_machine, &ty)
                 .size_of()
                 .unwrap()
                 .as_basic_value_enum();
 
-            (reg, *bb)
+            BasicBlockAnd { bb, value: reg }
         }
     }
 }

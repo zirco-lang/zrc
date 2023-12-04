@@ -157,19 +157,37 @@ fn process_let_declaration<'input>(
                     },
 
                     // Infer type from value
-                    (Some(TypedExpr(ty, ex)), None) => TastLetDeclaration {
+                    (
+                        Some(TypedExpr {
+                            inferred_type,
+                            kind,
+                        }),
+                        None,
+                    ) => TastLetDeclaration {
                         name: let_declaration.name.into_value(),
-                        ty: ty.clone(),
-                        value: Some(TypedExpr(ty, ex)),
+                        ty: inferred_type.clone(),
+                        value: Some(TypedExpr {
+                            inferred_type,
+                            kind,
+                        }),
                     },
 
                     // Both explicitly typed and inferable
-                    (Some(TypedExpr(ty, ex)), Some(resolved_ty)) => {
-                        if ty == resolved_ty {
+                    (
+                        Some(TypedExpr {
+                            inferred_type,
+                            kind,
+                        }),
+                        Some(resolved_ty),
+                    ) => {
+                        if inferred_type == resolved_ty {
                             TastLetDeclaration {
                                 name: let_declaration.name.into_value(),
-                                ty: ty.clone(),
-                                value: Some(TypedExpr(ty, ex)),
+                                ty: inferred_type.clone(),
+                                value: Some(TypedExpr {
+                                    inferred_type,
+                                    kind,
+                                }),
                             }
                         } else {
                             return Err(Diagnostic(
@@ -177,7 +195,7 @@ fn process_let_declaration<'input>(
                                 let_decl_span.containing(
                                     DiagnosticKind::InvalidAssignmentRightHandSideType {
                                         expected: resolved_ty.to_string(),
-                                        got: ty.to_string(),
+                                        got: inferred_type.to_string(),
                                     },
                                 ),
                             ));
@@ -423,12 +441,12 @@ pub fn type_block<'input>(
 
                                 let typed_cond = type_expr(&scope, cond)?;
 
-                                if typed_cond.0 != TastType::Bool {
+                                if typed_cond.inferred_type != TastType::Bool {
                                     return Err(Diagnostic(
                                         Severity::Error,
                                         cond_span.containing(DiagnosticKind::ExpectedGot {
                                             expected: "bool".to_string(),
-                                            got: typed_cond.0.to_string(),
+                                            got: typed_cond.inferred_type.to_string(),
                                         }),
                                     ));
                                 }
@@ -510,12 +528,12 @@ pub fn type_block<'input>(
                                 let cond_span = cond.0.span();
                                 let typed_cond = type_expr(&scope, cond)?;
 
-                                if typed_cond.0 != TastType::Bool {
+                                if typed_cond.inferred_type != TastType::Bool {
                                     return Err(Diagnostic(
                                         Severity::Error,
                                         cond_span.containing(DiagnosticKind::ExpectedGot {
                                             expected: "bool".to_string(),
-                                            got: typed_cond.0.to_string(),
+                                            got: typed_cond.inferred_type.to_string(),
                                         }),
                                     ));
                                 }
@@ -581,13 +599,13 @@ pub fn type_block<'input>(
                                     cond.map(|cond| type_expr(&loop_scope, cond)).transpose()?;
 
                                 if let Some(inner_t_cond) = typed_cond.clone() {
-                                    if inner_t_cond.0 != TastType::Bool {
+                                    if inner_t_cond.inferred_type != TastType::Bool {
                                         return Err(Diagnostic(
                                             Severity::Error,
                                             cond_span.unwrap().containing(
                                                 DiagnosticKind::ExpectedGot {
                                                     expected: "bool".to_string(),
-                                                    got: inner_t_cond.0.to_string(),
+                                                    got: inner_t_cond.inferred_type.to_string(),
                                                 },
                                             ),
                                         ));
@@ -698,20 +716,23 @@ pub fn type_block<'input>(
 
                                     // return x; in fn expecting to return void
                                     (
-                                        Some(TypedExpr(ty, _)),
+                                        Some(TypedExpr { inferred_type, .. }),
                                         BlockReturnAbility::MustReturn(BlockReturnType::Void)
                                         | BlockReturnAbility::MayReturn(BlockReturnType::Void),
                                     ) => Err(Diagnostic(
                                         Severity::Error,
                                         stmt_span.containing(DiagnosticKind::ExpectedGot {
                                             expected: "void".to_string(),
-                                            got: ty.to_string(),
+                                            got: inferred_type.to_string(),
                                         }),
                                     )),
 
                                     // return x; in fn expecting to return x
                                     (
-                                        Some(TypedExpr(ty, ex)),
+                                        Some(TypedExpr {
+                                            inferred_type,
+                                            kind,
+                                        }),
                                         BlockReturnAbility::MustReturn(BlockReturnType::Return(
                                             return_ty,
                                         ))
@@ -719,9 +740,12 @@ pub fn type_block<'input>(
                                             return_ty,
                                         )),
                                     ) => {
-                                        if ty == return_ty {
+                                        if inferred_type == return_ty {
                                             Ok(Some((
-                                                TypedStmt::ReturnStmt(Some(TypedExpr(ty, ex))),
+                                                TypedStmt::ReturnStmt(Some(TypedExpr {
+                                                    inferred_type,
+                                                    kind,
+                                                })),
                                                 BlockReturnActuality::WillReturn,
                                             )))
                                         } else {
@@ -730,7 +754,7 @@ pub fn type_block<'input>(
                                                 value_span.unwrap().containing(
                                                     DiagnosticKind::ExpectedGot {
                                                         expected: return_ty.to_string(),
-                                                        got: ty.to_string(),
+                                                        got: inferred_type.to_string(),
                                                     },
                                                 ),
                                             ))

@@ -2,7 +2,6 @@
 
 use inkwell::{
     basic_block::BasicBlock,
-    builder::Builder,
     context::Context,
     memory_buffer::MemoryBuffer,
     module::Module,
@@ -23,7 +22,7 @@ use zrc_typeck::tast::{
 use crate::{
     expr::cg_expr,
     ty::{create_fn, llvm_basic_type, llvm_type},
-    CgScope,
+    BasicBlockAnd, CgContext, CgScope,
 };
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
@@ -43,26 +42,20 @@ struct LoopBreakaway<'ctx> {
 ///
 /// # Panics
 /// Panics if an internal code generation error is encountered.
-#[allow(clippy::trivially_copy_pass_by_ref, clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 fn cg_let_declaration<'ctx, 'input, 'a>(
-    ctx: &'ctx Context,
-    target_machine: &TargetMachine,
-    builder: &'a Builder<'ctx>,
-    module: &'a Module<'ctx>,
-    function: &'a FunctionValue<'ctx>,
-    bb: &'a BasicBlock<'ctx>,
+    cg: CgContext<'ctx, 'a>,
+    mut bb: BasicBlock<'ctx>,
     scope: &'a mut CgScope<'input, 'ctx>,
     declarations: Vec<LetDeclaration<'input>>,
 ) -> BasicBlock<'ctx> {
-    let mut bb = *bb;
-
     for let_declaration in declarations {
         // we create our own builder here because we need to insert the alloca
         // at the beginning of the entry block, and that is easier than trying to
         // somehow save our position.
 
-        let entry_block_builder = ctx.create_builder();
-        let first_bb = function.get_first_basic_block().unwrap();
+        let entry_block_builder = cg.ctx.create_builder();
+        let first_bb = cg.fn_value.get_first_basic_block().unwrap();
         #[allow(clippy::option_if_let_else)]
         match first_bb.get_first_instruction() {
             Some(first_instruction) => {
@@ -75,7 +68,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
 
         let ptr = entry_block_builder
             .build_alloca(
-                llvm_basic_type(ctx, target_machine, &let_declaration.ty),
+                llvm_basic_type(cg.ctx, cg.target_machine, &let_declaration.ty),
                 &format!("let_{}", let_declaration.name),
             )
             .unwrap();
@@ -84,25 +77,21 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
 
         if let Some(value) = let_declaration.value {
             bb = cg_expr(
-                ctx,
-                target_machine,
-                builder,
-                module,
-                function,
-                &bb,
+                cg,
+                bb,
                 scope,
-                TypedExpr(
-                    let_declaration.ty.clone(),
-                    TypedExprKind::Assignment(
-                        Box::new(Place(
-                            let_declaration.ty,
-                            PlaceKind::Variable(let_declaration.name),
-                        )),
+                TypedExpr {
+                    inferred_type: let_declaration.ty.clone(),
+                    kind: TypedExprKind::Assignment(
+                        Box::new(Place {
+                            inferred_type: let_declaration.ty,
+                            kind: PlaceKind::Variable(let_declaration.name),
+                        }),
                         Box::new(value),
                     ),
-                ),
+                },
             )
-            .1;
+            .bb;
         }
     }
 
@@ -116,16 +105,11 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
 #[allow(
     clippy::too_many_arguments,
     clippy::too_many_lines,
-    clippy::needless_pass_by_value,
-    clippy::trivially_copy_pass_by_ref
+    clippy::needless_pass_by_value
 )]
 fn cg_block<'ctx, 'input, 'a>(
-    ctx: &'ctx Context,
-    target_machine: &TargetMachine,
-    builder: &'a Builder<'ctx>,
-    module: &'a Module<'ctx>,
-    function: &'a FunctionValue<'ctx>,
-    bb: &'a BasicBlock<'ctx>,
+    cg: CgContext<'ctx, 'a>,
+    bb: BasicBlock<'ctx>,
     parent_scope: &'a CgScope<'input, 'ctx>,
     block: Vec<TypedStmt<'input>>,
     breakaway: &Option<LoopBreakaway<'ctx>>,
@@ -134,132 +118,73 @@ fn cg_block<'ctx, 'input, 'a>(
 
     block
         .into_iter()
-        .try_fold(*bb, |bb, stmt| -> Option<BasicBlock> {
+        .try_fold(bb, |bb, stmt| -> Option<BasicBlock> {
             match stmt {
-                TypedStmt::ExprStmt(expr) => Some(
-                    cg_expr(
-                        ctx,
-                        target_machine,
-                        builder,
-                        module,
-                        function,
-                        &bb,
-                        &scope,
-                        expr,
-                    )
-                    .1,
-                ),
+                TypedStmt::ExprStmt(expr) => Some(cg_expr(cg, bb, &scope, expr).bb),
 
                 TypedStmt::IfStmt(cond, then, then_else) => {
                     let then_else = then_else.unwrap_or(vec![]);
 
-                    let (cond, _) = cg_expr(
-                        ctx,
-                        target_machine,
-                        builder,
-                        module,
-                        function,
-                        &bb,
-                        &scope,
-                        cond,
-                    );
+                    let BasicBlockAnd { value: cond, .. } = cg_expr(cg, bb, &scope, cond);
 
-                    let then_bb = ctx.append_basic_block(*function, "then");
-                    let then_else_bb = ctx.append_basic_block(*function, "then_else");
+                    let then_bb = cg.ctx.append_basic_block(cg.fn_value, "then");
+                    let then_else_bb = cg.ctx.append_basic_block(cg.fn_value, "then_else");
 
-                    builder
+                    cg.builder
                         .build_conditional_branch(cond.into_int_value(), then_bb, then_else_bb)
                         .unwrap();
 
-                    builder.position_at_end(then_bb);
-                    let maybe_then_bb = cg_block(
-                        ctx,
-                        target_machine,
-                        builder,
-                        module,
-                        function,
-                        &then_bb,
-                        &scope,
-                        then,
-                        breakaway,
-                    );
+                    cg.builder.position_at_end(then_bb);
+                    let maybe_then_bb = cg_block(cg, then_bb, &scope, then, breakaway);
 
-                    builder.position_at_end(then_else_bb);
-                    let maybe_then_else_bb = cg_block(
-                        ctx,
-                        target_machine,
-                        builder,
-                        module,
-                        function,
-                        &then_else_bb,
-                        &scope,
-                        then_else,
-                        breakaway,
-                    );
+                    cg.builder.position_at_end(then_else_bb);
+                    let maybe_then_else_bb =
+                        cg_block(cg, then_else_bb, &scope, then_else, breakaway);
 
                     match (maybe_then_bb, maybe_then_else_bb) {
                         (None, None) => None,
                         (Some(single_bb), None) | (None, Some(single_bb)) => {
-                            let end = ctx.append_basic_block(*function, "end");
+                            let end = cg.ctx.append_basic_block(cg.fn_value, "end");
 
-                            builder.position_at_end(single_bb);
-                            builder.build_unconditional_branch(end).unwrap();
+                            cg.builder.position_at_end(single_bb);
+                            cg.builder.build_unconditional_branch(end).unwrap();
 
-                            builder.position_at_end(end);
+                            cg.builder.position_at_end(end);
                             Some(end)
                         }
                         (Some(then_bb), Some(then_else_bb)) => {
-                            let end = ctx.append_basic_block(*function, "end");
+                            let end = cg.ctx.append_basic_block(cg.fn_value, "end");
 
-                            builder.position_at_end(then_bb);
-                            builder.build_unconditional_branch(end).unwrap();
+                            cg.builder.position_at_end(then_bb);
+                            cg.builder.build_unconditional_branch(end).unwrap();
 
-                            builder.position_at_end(then_else_bb);
-                            builder.build_unconditional_branch(end).unwrap();
+                            cg.builder.position_at_end(then_else_bb);
+                            cg.builder.build_unconditional_branch(end).unwrap();
 
-                            builder.position_at_end(end);
+                            cg.builder.position_at_end(end);
                             Some(end)
                         }
                     }
                 }
 
-                TypedStmt::BlockStmt(block) => cg_block(
-                    ctx,
-                    target_machine,
-                    builder,
-                    module,
-                    function,
-                    &bb,
-                    &scope,
-                    block,
-                    breakaway,
-                ),
+                TypedStmt::BlockStmt(block) => cg_block(cg, bb, &scope, block, breakaway),
 
                 TypedStmt::ReturnStmt(Some(expr)) => {
-                    let (expr, _) = cg_expr(
-                        ctx,
-                        target_machine,
-                        builder,
-                        module,
-                        function,
-                        &bb,
-                        &scope,
-                        expr,
-                    );
+                    let BasicBlockAnd { value: expr, .. } = cg_expr(cg, bb, &scope, expr);
 
-                    builder.build_return(Some(&expr)).unwrap();
+                    cg.builder.build_return(Some(&expr)).unwrap();
 
                     None
                 }
 
                 TypedStmt::ReturnStmt(None) => {
-                    builder.build_return(None).unwrap();
+                    cg.builder.build_return(None).unwrap();
 
                     None
                 }
 
                 TypedStmt::ContinueStmt => {
-                    builder
+                    cg.builder
                         .build_unconditional_branch(breakaway.as_ref().unwrap().on_continue)
                         .unwrap();
 
@@ -267,23 +192,16 @@ fn cg_block<'ctx, 'input, 'a>(
                 }
 
                 TypedStmt::BreakStmt => {
-                    builder
+                    cg.builder
                         .build_unconditional_branch(breakaway.as_ref().unwrap().on_break)
                         .unwrap();
 
                     None
                 }
 
-                TypedStmt::DeclarationList(declarations) => Some(cg_let_declaration(
-                    ctx,
-                    target_machine,
-                    builder,
-                    module,
-                    function,
-                    &bb,
-                    &mut scope,
-                    declarations,
-                )),
+                TypedStmt::DeclarationList(declarations) => {
+                    Some(cg_let_declaration(cg, bb, &mut scope, declarations))
+                }
 
                 TypedStmt::ForStmt {
                     init,
@@ -306,48 +224,33 @@ fn cg_block<'ctx, 'input, 'a>(
                     // The block we are currently in will become the preheader. Generate the `init`
                     // code if there is any.
                     if let Some(init) = init {
-                        cg_let_declaration(
-                            ctx,
-                            target_machine,
-                            builder,
-                            module,
-                            function,
-                            &bb,
-                            &mut scope,
-                            *init,
-                        );
+                        cg_let_declaration(cg, bb, &mut scope, *init);
                     }
 
-                    let header = ctx.append_basic_block(*function, "header");
-                    let body_bb = ctx.append_basic_block(*function, "body");
-                    let latch = ctx.append_basic_block(*function, "latch");
-                    let exit = ctx.append_basic_block(*function, "exit");
+                    let header = cg.ctx.append_basic_block(cg.fn_value, "header");
+                    let body_bb = cg.ctx.append_basic_block(cg.fn_value, "body");
+                    let latch = cg.ctx.append_basic_block(cg.fn_value, "latch");
+                    let exit = cg.ctx.append_basic_block(cg.fn_value, "exit");
 
                     // Branch to the header from the preheader.
-                    builder.build_unconditional_branch(header).unwrap();
+                    cg.builder.build_unconditional_branch(header).unwrap();
 
                     // Generate the header.
-                    builder.position_at_end(header);
+                    cg.builder.position_at_end(header);
                     let header = cond.map_or_else(
                         || {
                             // If there is no condition, we always branch to the body.
-                            builder.build_unconditional_branch(body_bb).unwrap();
+                            cg.builder.build_unconditional_branch(body_bb).unwrap();
 
                             header
                         },
                         |cond| {
-                            let (cond, header) = cg_expr(
-                                ctx,
-                                target_machine,
-                                builder,
-                                module,
-                                function,
-                                &header,
-                                &scope,
-                                cond,
-                            );
+                            let BasicBlockAnd {
+                                bb: header,
+                                value: cond,
+                            } = cg_expr(cg, header, &scope, cond);
 
-                            builder
+                            cg.builder
                                 .build_conditional_branch(cond.into_int_value(), body_bb, exit)
                                 .unwrap();
 
@@ -356,14 +259,10 @@ fn cg_block<'ctx, 'input, 'a>(
                     );
 
                     // Generate the body.
-                    builder.position_at_end(body_bb);
+                    cg.builder.position_at_end(body_bb);
                     let body_bb = cg_block(
-                        ctx,
-                        target_machine,
-                        builder,
-                        module,
-                        function,
-                        &body_bb,
+                        cg,
+                        body_bb,
                         &scope,
                         body,
                         &Some(LoopBreakaway {
@@ -374,27 +273,18 @@ fn cg_block<'ctx, 'input, 'a>(
 
                     // The body breaks to latch
                     if body_bb.is_some() {
-                        builder.build_unconditional_branch(latch).unwrap();
+                        cg.builder.build_unconditional_branch(latch).unwrap();
                     }
 
                     // Latch runs post and then breaks right back to the header.
-                    builder.position_at_end(latch);
+                    cg.builder.position_at_end(latch);
                     if let Some(post) = post {
-                        cg_expr(
-                            ctx,
-                            target_machine,
-                            builder,
-                            module,
-                            function,
-                            &latch,
-                            &scope,
-                            post,
-                        );
+                        cg_expr(cg, latch, &scope, post);
                     }
 
-                    builder.build_unconditional_branch(header).unwrap();
+                    cg.builder.build_unconditional_branch(header).unwrap();
 
-                    builder.position_at_end(exit);
+                    cg.builder.position_at_end(exit);
 
                     Some(exit)
                 }
@@ -409,40 +299,27 @@ fn cg_block<'ctx, 'input, 'a>(
                     // `break` => exit
                     // `continue` => header
 
-                    let header = ctx.append_basic_block(*function, "header");
+                    let header = cg.ctx.append_basic_block(cg.fn_value, "header");
 
-                    let body_bb = ctx.append_basic_block(*function, "body");
+                    let body_bb = cg.ctx.append_basic_block(cg.fn_value, "body");
 
-                    let exit = ctx.append_basic_block(*function, "exit");
+                    let exit = cg.ctx.append_basic_block(cg.fn_value, "exit");
 
-                    builder.build_unconditional_branch(header).unwrap();
+                    cg.builder.build_unconditional_branch(header).unwrap();
 
-                    builder.position_at_end(header);
+                    cg.builder.position_at_end(header);
 
-                    let (cond, _) = cg_expr(
-                        ctx,
-                        target_machine,
-                        builder,
-                        module,
-                        function,
-                        &header,
-                        &scope,
-                        cond,
-                    );
+                    let BasicBlockAnd { value: cond, .. } = cg_expr(cg, header, &scope, cond);
 
-                    builder
+                    cg.builder
                         .build_conditional_branch(cond.into_int_value(), body_bb, exit)
                         .unwrap();
 
-                    builder.position_at_end(body_bb);
+                    cg.builder.position_at_end(body_bb);
 
                     let body_bb = cg_block(
-                        ctx,
-                        target_machine,
-                        builder,
-                        module,
-                        function,
-                        &body_bb,
+                        cg,
+                        body_bb,
                         &scope,
                         body,
                         &Some(LoopBreakaway {
@@ -452,10 +329,10 @@ fn cg_block<'ctx, 'input, 'a>(
                     );
 
                     if body_bb.is_some() {
-                        builder.build_unconditional_branch(header).unwrap();
+                        cg.builder.build_unconditional_branch(header).unwrap();
                     }
 
-                    builder.position_at_end(exit);
+                    cg.builder.position_at_end(exit);
 
                     Some(exit)
                 }
@@ -570,12 +447,14 @@ fn cg_program<'input, 'ctx>(
                     }
 
                     cg_block(
-                        ctx,
-                        target_machine,
-                        &builder,
-                        &module,
-                        &fn_value,
-                        &entry,
+                        CgContext {
+                            ctx,
+                            target_machine,
+                            builder: &builder,
+                            module: &module,
+                            fn_value,
+                        },
+                        entry,
                         &fn_scope,
                         body,
                         &None,
