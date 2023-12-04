@@ -130,6 +130,7 @@ struct CgContext<'ctx, 'a> {
     /// The LLVM builder used to build instructions
     builder: &'a Builder<'ctx>,
     /// The LLVM module we are building in
+    #[allow(dead_code)]
     module: &'a Module<'ctx>,
     /// The LLVM function we are building in
     fn_value: FunctionValue<'ctx>,
