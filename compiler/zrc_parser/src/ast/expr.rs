@@ -235,8 +235,10 @@ pub enum ExprKind<'input> {
 
     /// `x as T`
     Cast(Box<Expr<'input>>, Type<'input>),
-    /// `sizeof(T)`
-    SizeOf(Type<'input>),
+    /// `sizeof T`
+    SizeOfType(Type<'input>),
+    /// `sizeof(expr)`
+    SizeOfExpr(Box<Expr<'input>>),
 
     /// Any numeric literal.
     NumberLiteral(NumberLiteral<'input>),
@@ -280,7 +282,8 @@ impl<'input> Display for ExprKind<'input> {
             Self::UnaryDereference(expr) => write!(f, "*{expr}"),
             Self::Ternary(cond, if_true, if_false) => write!(f, "{cond} ? {if_true} : {if_false}"),
             Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
-            Self::SizeOf(ty) => write!(f, "sizeof({ty})"),
+            Self::SizeOfType(ty) => write!(f, "sizeof {ty}"),
+            Self::SizeOfExpr(expr) => write!(f, "sizeof({expr})"),
             Self::Dot(expr, key) => write!(f, "{expr}.{}", key.value()),
             Self::Arrow(ptr, key) => write!(f, "{ptr}->{}", key.value()),
             Self::Cast(expr, ty) => write!(f, "{expr} as {ty}"),
@@ -528,8 +531,12 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn build_sizeof(span: Span, ty: Type<'input>) -> Self {
-        Self(ExprKind::SizeOf(ty).in_span(span))
+    pub fn build_sizeof_type(span: Span, ty: Type<'input>) -> Self {
+        Self(ExprKind::SizeOfType(ty).in_span(span))
+    }
+    #[must_use]
+    pub fn build_sizeof_expr(span: Span, expr: Self) -> Self {
+        Self(ExprKind::SizeOfExpr(Box::new(expr)).in_span(span))
     }
 
     // These all need spans because they can't be guessed

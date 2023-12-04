@@ -646,11 +646,20 @@ pub fn type_expr<'input>(
             }
         }
 
-        ExprKind::SizeOf(ty) => {
+        ExprKind::SizeOfType(ty) => {
             let resolved_ty = resolve_type(scope, ty)?;
             TypedExpr {
                 inferred_type: TastType::U64,
                 kind: TypedExprKind::SizeOf(resolved_ty),
+            }
+        }
+        // resolve `sizeof(expr)` by finding `typeof expr` and then basically becoming "sizeof
+        // typeof expr"
+        ExprKind::SizeOfExpr(x) => {
+            let x_ty = type_expr(scope, *x)?;
+            TypedExpr {
+                inferred_type: TastType::U64,
+                kind: TypedExprKind::SizeOf(x_ty.inferred_type),
             }
         }
 
@@ -687,6 +696,7 @@ pub fn type_expr<'input>(
 
 #[cfg(test)]
 mod tests {
+    use zrc_parser::lexer::NumberLiteral;
     use zrc_utils::{span::Spannable, spanned};
 
     use super::*;
@@ -793,6 +803,27 @@ mod tests {
                         7
                     ))
                 )
+            );
+        }
+    }
+
+    mod expr {
+        use super::*;
+
+        #[test]
+        fn sizeof_expr_works_as_expected() {
+            assert_eq!(
+                type_expr(
+                    &Scope::new(),
+                    Expr::build_sizeof_expr(
+                        Span::from_positions(0, 9),
+                        Expr::build_number(spanned!(8, NumberLiteral::Decimal("1"), 9))
+                    ),
+                ),
+                Ok(TypedExpr {
+                    inferred_type: TastType::U64,
+                    kind: TypedExprKind::SizeOf(TastType::I32),
+                })
             );
         }
     }
