@@ -55,7 +55,14 @@ fn cg_place<'ctx, 'a>(
             // TODO: Is this actually safely used?
             let reg = unsafe {
                 cg.builder.build_gep(
-                    llvm_basic_type(cg.ctx, cg.target_machine, &place.inferred_type),
+                    llvm_basic_type(
+                        cg.compilation_unit.get_file(),
+                        cg.dbg_builder,
+                        cg.ctx,
+                        cg.target_machine,
+                        &place.inferred_type,
+                    )
+                    .0,
                     ptr.into_pointer_value(),
                     &[idx.into_int_value()],
                     "gep",
@@ -72,7 +79,14 @@ fn cg_place<'ctx, 'a>(
         #[allow(clippy::wildcard_enum_match_arm)]
         PlaceKind::Dot(x, prop) => match &x.inferred_type {
             Type::Struct(contents) => {
-                let x_ty = llvm_basic_type(cg.ctx, cg.target_machine, &x.inferred_type);
+                let x_ty = llvm_basic_type(
+                    cg.compilation_unit.get_file(),
+                    cg.dbg_builder,
+                    cg.ctx,
+                    cg.target_machine,
+                    &x.inferred_type,
+                )
+                .0;
                 let prop_idx = contents
                     .iter()
                     .position(|(got_key, _)| *got_key == prop.into_value())
@@ -133,7 +147,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             BasicBlockAnd {
                 bb,
-                value: llvm_int_type(cg.ctx, &expr.inferred_type)
+                value: llvm_int_type(cg.dbg_builder, cg.ctx, &expr.inferred_type)
+                    .0
                     .const_int_from_string(
                         &no_underscores,
                         match n {
@@ -244,7 +259,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let reg = cg
                 .builder
                 .build_load(
-                    llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
+                    llvm_basic_type(
+                        cg.compilation_unit.get_file(),
+                        cg.dbg_builder,
+                        cg.ctx,
+                        cg.target_machine,
+                        &expr.inferred_type,
+                    )
+                    .0,
                     place,
                     "load",
                 )
@@ -364,7 +386,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     // TODO: is this safe?
                     Arithmetic::Addition => unsafe {
                         cg.builder.build_gep(
-                            llvm_basic_type(cg.ctx, cg.target_machine, &pointee),
+                            llvm_basic_type(
+                                cg.compilation_unit.get_file(),
+                                cg.dbg_builder,
+                                cg.ctx,
+                                cg.target_machine,
+                                &pointee,
+                            )
+                            .0,
                             lhs.into_pointer_value(),
                             &[rhs.into_int_value()],
                             "ptr_add",
@@ -381,7 +410,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                         // TODO: is this safe?
                         unsafe {
                             cg.builder.build_gep(
-                                llvm_basic_type(cg.ctx, cg.target_machine, &pointee),
+                                llvm_basic_type(
+                                    cg.compilation_unit.get_file(),
+                                    cg.dbg_builder,
+                                    cg.ctx,
+                                    cg.target_machine,
+                                    &pointee,
+                                )
+                                .0,
                                 lhs.into_pointer_value(),
                                 &[rhs.into_int_value()],
                                 "ptr_sub",
@@ -519,7 +555,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let reg = cg
                 .builder
                 .build_load(
-                    llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
+                    llvm_basic_type(
+                        cg.compilation_unit.get_file(),
+                        cg.dbg_builder,
+                        cg.ctx,
+                        cg.target_machine,
+                        &expr.inferred_type,
+                    )
+                    .0,
                     ptr.into_pointer_value(),
                     "load",
                 )
@@ -545,7 +588,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let loaded = cg
                 .builder
                 .build_load(
-                    llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
+                    llvm_basic_type(
+                        cg.compilation_unit.get_file(),
+                        cg.dbg_builder,
+                        cg.ctx,
+                        cg.target_machine,
+                        &expr.inferred_type,
+                    )
+                    .0,
                     ptr,
                     "load",
                 )
@@ -571,7 +621,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let loaded = cg
                 .builder
                 .build_load(
-                    llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
+                    llvm_basic_type(
+                        cg.compilation_unit.get_file(),
+                        cg.dbg_builder,
+                        cg.ctx,
+                        cg.target_machine,
+                        &expr.inferred_type,
+                    )
+                    .0,
                     ptr,
                     "load",
                 )
@@ -584,8 +641,15 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Call(f, args) => {
-            let llvm_f_type =
-                llvm_type(cg.ctx, cg.target_machine, &f.inferred_type).into_function_type();
+            let llvm_f_type = llvm_type(
+                cg.compilation_unit.get_file(),
+                cg.dbg_builder,
+                cg.ctx,
+                cg.target_machine,
+                &f.inferred_type,
+            )
+            .0
+            .into_function_type();
 
             // will always be a function pointer
             let BasicBlockAnd { bb, value: f_ptr } = cg_place(cg, bb, scope, *f);
@@ -677,7 +741,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let result_reg = cg
                 .builder
                 .build_phi(
-                    llvm_basic_type(cg.ctx, cg.target_machine, &expr.inferred_type),
+                    llvm_basic_type(
+                        cg.compilation_unit.get_file(),
+                        cg.dbg_builder,
+                        cg.ctx,
+                        cg.target_machine,
+                        &expr.inferred_type,
+                    )
+                    .0,
                     "yield",
                 )
                 .expect("phi node should have been created successfully");
@@ -712,7 +783,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     .builder
                     .build_bitcast(
                         x.into_pointer_value(),
-                        llvm_basic_type(cg.ctx, cg.target_machine, ty.value()),
+                        llvm_basic_type(
+                            cg.compilation_unit.get_file(),
+                            cg.dbg_builder,
+                            cg.ctx,
+                            cg.target_machine,
+                            ty.value(),
+                        )
+                        .0,
                         "cast",
                     )
                     .expect("bitcast should have compiled successfully"),
@@ -720,7 +798,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     .builder
                     .build_ptr_to_int(
                         x.into_pointer_value(),
-                        llvm_int_type(cg.ctx, ty.value()),
+                        llvm_int_type(cg.dbg_builder, cg.ctx, ty.value()).0,
                         "cast",
                     )
                     .expect("ptrtoint should have compiled successfully")
@@ -729,7 +807,15 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     .builder
                     .build_int_to_ptr(
                         x.into_int_value(),
-                        llvm_basic_type(cg.ctx, cg.target_machine, ty.value()).into_pointer_type(),
+                        llvm_basic_type(
+                            cg.compilation_unit.get_file(),
+                            cg.dbg_builder,
+                            cg.ctx,
+                            cg.target_machine,
+                            ty.value(),
+                        )
+                        .0
+                        .into_pointer_type(),
                         "cast",
                     )
                     .expect("inttoptr should have compiled successfully")
@@ -742,8 +828,15 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                             .builder
                             .build_int_s_extend(
                                 x.into_int_value(),
-                                llvm_basic_type(cg.ctx, cg.target_machine, ty.value())
-                                    .into_int_type(),
+                                llvm_basic_type(
+                                    cg.compilation_unit.get_file(),
+                                    cg.dbg_builder,
+                                    cg.ctx,
+                                    cg.target_machine,
+                                    ty.value(),
+                                )
+                                .0
+                                .into_int_type(),
                                 "cast",
                             )
                             .expect("sext should have compiled successfully")
@@ -754,8 +847,15 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                             .builder
                             .build_int_z_extend(
                                 x.into_int_value(),
-                                llvm_basic_type(cg.ctx, cg.target_machine, ty.value())
-                                    .into_int_type(),
+                                llvm_basic_type(
+                                    cg.compilation_unit.get_file(),
+                                    cg.dbg_builder,
+                                    cg.ctx,
+                                    cg.target_machine,
+                                    ty.value(),
+                                )
+                                .0
+                                .into_int_type(),
                                 "cast",
                             )
                             .expect("zext should have compiled successfully")
@@ -767,7 +867,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     cg.builder
                         .build_bitcast(
                             x.into_int_value(),
-                            llvm_basic_type(cg.ctx, cg.target_machine, ty.value()),
+                            llvm_basic_type(
+                                cg.compilation_unit.get_file(),
+                                cg.dbg_builder,
+                                cg.ctx,
+                                cg.target_machine,
+                                ty.value(),
+                            )
+                            .0,
                             "cast",
                         )
                         .expect("bitcast should have compiled successfully")
@@ -778,10 +885,17 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             BasicBlockAnd { bb, value: reg }
         }
         TypedExprKind::SizeOf(ty) => {
-            let reg = llvm_basic_type(cg.ctx, cg.target_machine, &ty)
-                .size_of()
-                .expect("size_of should have compiled successfully")
-                .as_basic_value_enum();
+            let reg = llvm_basic_type(
+                cg.compilation_unit.get_file(),
+                cg.dbg_builder,
+                cg.ctx,
+                cg.target_machine,
+                &ty,
+            )
+            .0
+            .size_of()
+            .expect("size_of should have compiled successfully")
+            .as_basic_value_enum();
 
             BasicBlockAnd { bb, value: reg }
         }

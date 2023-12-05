@@ -101,13 +101,18 @@ impl<'input> Default for Scope<'input> {
 /// Errors with type checker errors.
 pub fn type_program(
     program: Vec<Spanned<AstDeclaration>>,
-) -> Result<Vec<TypedDeclaration>, zrc_diagnostics::Diagnostic> {
+) -> Result<Vec<Spanned<TypedDeclaration>>, zrc_diagnostics::Diagnostic> {
     let mut scope = Scope::new();
 
     program
         .into_iter()
         .filter_map(|declaration| {
-            process_declaration(&mut scope, declaration.into_value()).transpose()
+            declaration
+                .map(|declaration| process_declaration(&mut scope, declaration).transpose())
+                .transpose()
+                .map(|x| x.transpose())
         })
+        // drop the redundant/erroneous error spans
+        .map(|x| x.map_err(|x| x.into_value()))
         .collect()
 }

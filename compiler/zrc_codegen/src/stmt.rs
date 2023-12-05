@@ -56,7 +56,14 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
 
         let ptr = entry_block_builder
             .build_alloca(
-                llvm_basic_type(cg.ctx, cg.target_machine, &let_declaration.ty),
+                llvm_basic_type(
+                    cg.compilation_unit.get_file(),
+                    cg.dbg_builder,
+                    cg.ctx,
+                    cg.target_machine,
+                    &let_declaration.ty,
+                )
+                .0,
                 &format!("let_{}", let_declaration.name.value()),
             )
             .expect("alloca should generate successfully");

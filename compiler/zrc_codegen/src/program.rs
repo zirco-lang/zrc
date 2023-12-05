@@ -2,21 +2,26 @@
 
 use inkwell::{
     context::Context,
-    debug_info::{DWARFEmissionKind, DWARFSourceLanguage},
+    debug_info::{
+        AsDIScope, DICompileUnit, DIFile, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage,
+        DebugInfoBuilder,
+    },
     memory_buffer::MemoryBuffer,
     module::{FlagBehavior, Module},
     passes::{PassManager, PassManagerBuilder},
     targets::{
         CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
     },
-    types::AnyType,
+    types::{AnyType, BasicMetadataTypeEnum, BasicType, BasicTypeEnum},
     values::{BasicValueEnum, FunctionValue},
     OptimizationLevel,
 };
+use line_numbers::LinePositions;
 use zrc_typeck::tast::{
     stmt::{ArgumentDeclaration, TypedDeclaration},
     ty::Type,
 };
+use zrc_utils::span::Spanned;
 
 use super::stmt::cg_block;
 use crate::{
@@ -27,27 +32,69 @@ use crate::{
 /// Initialize the LLVM [`FunctionValue`] for a given function prototype
 pub fn cg_init_fn<'ctx>(
     ctx: &'ctx Context,
+    dbg_builder: &DebugInfoBuilder<'ctx>,
+    compilation_unit: &DICompileUnit<'ctx>,
     module: &Module<'ctx>,
     target_machine: &TargetMachine,
     name: &str,
+    line_no: u32,
+    is_definition: bool,
     ret: Option<Type>,
     args: &[&Type],
     is_variadic: bool,
-) -> FunctionValue<'ctx> {
-    let ret_type = llvm_type(ctx, target_machine, &ret.unwrap_or(Type::Void));
-    let arg_types = args
+) -> (FunctionValue<'ctx>, DISubprogram<'ctx>) {
+    let (ret_type, ret_dbg_type) = llvm_type(
+        compilation_unit.get_file(),
+        dbg_builder,
+        ctx,
+        target_machine,
+        &ret.unwrap_or(Type::Void),
+    );
+    let (arg_types, arg_dbg_types): (Vec<_>, Vec<_>) = args
         .iter()
-        .map(|ty| llvm_basic_type(ctx, target_machine, ty).into())
-        .collect::<Vec<_>>();
+        .map(|ty| {
+            let (ty, dbg_ty) = llvm_basic_type(
+                compilation_unit.get_file(),
+                dbg_builder,
+                ctx,
+                target_machine,
+                ty,
+            );
+            (
+                <BasicTypeEnum as Into<BasicMetadataTypeEnum>>::into(ty),
+                dbg_ty,
+            )
+        })
+        .unzip();
 
-    let fn_type = create_fn(
+    let (fn_type, fn_dbg_subroutine, fn_dbg_type) = create_fn(
+        dbg_builder,
+        compilation_unit.get_file(),
         ret_type.as_any_type_enum(),
+        ret_dbg_type,
         arg_types.as_slice(),
+        arg_dbg_types.as_slice(),
         is_variadic,
     );
-    let fn_val = module.add_function(name, fn_type, None);
 
-    fn_val
+    let fn_subprogram = dbg_builder.create_function(
+        compilation_unit.as_debug_info_scope(),
+        name,
+        None,
+        compilation_unit.get_file(),
+        line_no,
+        fn_dbg_subroutine,
+        false,
+        is_definition,
+        line_no,
+        0,
+        false,
+    );
+
+    let fn_val = module.add_function(name, fn_type, None);
+    fn_val.set_subprogram(fn_subprogram);
+
+    (fn_val, fn_subprogram)
 }
 
 /// Run optimizations on the given program.
@@ -76,7 +123,8 @@ fn cg_program<'ctx>(
     optimization_level: OptimizationLevel,
     parent_directory: &str,
     file_name: &str,
-    program: Vec<TypedDeclaration<'_>>,
+    line_lookup: LinePositions,
+    program: Vec<Spanned<TypedDeclaration<'_>>>,
 ) -> Module<'ctx> {
     let builder = ctx.create_builder();
     let module = ctx.create_module(file_name);
@@ -112,18 +160,23 @@ fn cg_program<'ctx>(
     let mut global_scope = CgScope::new();
 
     for declaration in program {
-        match declaration {
+        let span = declaration.span();
+        match declaration.into_value() {
             TypedDeclaration::FunctionDeclaration {
                 name,
                 parameters,
                 return_type,
                 body,
             } => {
-                let fn_value = cg_init_fn(
+                let (fn_value, fn_subprogram) = cg_init_fn(
                     ctx,
+                    &dbg_builder,
+                    &compilation_unit,
                     &module,
                     target_machine,
                     name.value(),
+                    line_lookup.from_offset(span.start()).0,
+                    body.is_some(),
                     return_type.map(zrc_utils::span::Spanned::into_value),
                     parameters
                         .value()
@@ -155,7 +208,14 @@ fn cg_program<'ctx>(
 
                         let alloc = builder
                             .build_alloca(
-                                llvm_basic_type(ctx, target_machine, ty.value()),
+                                llvm_basic_type(
+                                    compilation_unit.get_file(),
+                                    &dbg_builder,
+                                    ctx,
+                                    target_machine,
+                                    ty.value(),
+                                )
+                                .0,
                                 &format!("arg_{}", name.value()),
                             )
                             .expect("alloca should generate successfully");
@@ -227,7 +287,8 @@ pub fn cg_program_to_string(
     parent_directory: &str,
     file_name: &str,
     cli_args: &str,
-    program: Vec<TypedDeclaration>,
+    source: &str,
+    program: Vec<Spanned<TypedDeclaration>>,
     optimization_level: OptimizationLevel,
     triple: &TargetTriple,
     cpu: &str,
@@ -258,6 +319,7 @@ pub fn cg_program_to_string(
         optimization_level,
         parent_directory,
         file_name,
+        LinePositions::from(source),
         program,
     );
 
@@ -276,7 +338,8 @@ pub fn cg_program_to_buffer(
     parent_directory: &str,
     file_name: &str,
     cli_args: &str,
-    program: Vec<TypedDeclaration>,
+    source: &str,
+    program: Vec<Spanned<TypedDeclaration>>,
     file_type: FileType,
     optimization_level: OptimizationLevel,
     triple: &TargetTriple,
@@ -308,6 +371,7 @@ pub fn cg_program_to_buffer(
         optimization_level,
         parent_directory,
         file_name,
+        LinePositions::from(source),
         program,
     );
 

@@ -31,6 +31,7 @@ macro_rules! cg_snapshot_test {
             // do not use real args because the text executables have a hash in their name and
             // this would mess up snapshots
             "zrc --fake-args",
+            $source,
             ::zrc_typeck::typeck::type_program(
                 ::zrc_parser::parser::parse_program($source).expect("parsing should succeed")
             ).expect("typeck should succeed"),

@@ -590,6 +590,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "line-numbers"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b25f5068853805faa3c19f44d0c401446e4eb3f47cc808fa331eec30f0ba35c"
+
+[[package]]
 name = "line-span"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1374,6 +1380,7 @@ dependencies = [
  "indoc",
  "inkwell",
  "insta",
+ "line-numbers",
  "zrc_parser",
  "zrc_typeck",
  "zrc_utils",

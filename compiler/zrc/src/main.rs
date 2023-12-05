@@ -390,6 +390,7 @@ fn compile(
             parent_directory,
             file_name,
             cli_args,
+            content,
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             zrc_codegen::FileType::Assembly,
             optimization_level,
@@ -403,6 +404,7 @@ fn compile(
             parent_directory,
             file_name,
             cli_args,
+            content,
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             zrc_codegen::FileType::Object,
             optimization_level,
@@ -417,6 +419,7 @@ fn compile(
             parent_directory,
             file_name,
             cli_args,
+            content,
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             optimization_level,
             triple,
@@ -446,7 +449,7 @@ fn compile(
             zrc_parser::parser::parse_program(content)?,
         )?
         .into_iter()
-        .map(|x| x.to_string())
+        .map(|x| x.value().to_string())
         .collect::<Vec<_>>()
         .join("\n")
         .as_bytes()
