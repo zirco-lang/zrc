@@ -3,8 +3,8 @@ source: compiler/zrc_codegen/src/stmt.rs
 description: "fn get_int() -> i32;\n\nfn test() {\n    // TEST: the proper while loop structure is created\n    for (let i = 0; i < get_int(); i += 1) {\n        // TEST: break jumps to the `end` block\n        if (i > get_int()) break;\n        else {\n            // TEST: continue jumps to the latch block\n            if (i < get_int()) continue;\n            else {}\n        }\n\n        // TEST: the loop jumps to the latch block which jumps back to the\n        // header\n    }\n\n    return;\n}\n"
 expression: resulting_ir
 ---
-; ModuleID = 'test'
-source_filename = "test"
+; ModuleID = 'test.zr'
+source_filename = "test.zr"
 
 declare i32 @get_int()
 
@@ -56,4 +56,11 @@ end:                                              ; preds = %then_else8
 end9:                                             ; preds = %end
   br label %latch
 }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc test runner", isOptimized: false, flags: "--fake-args", runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false)
+!2 = !DIFile(filename: "test.zr", directory: "/fake/path")
 

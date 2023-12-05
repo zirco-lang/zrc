@@ -2,8 +2,9 @@
 
 use inkwell::{
     context::Context,
+    debug_info::{DWARFEmissionKind, DWARFSourceLanguage},
     memory_buffer::MemoryBuffer,
-    module::Module,
+    module::{FlagBehavior, Module},
     passes::{PassManager, PassManagerBuilder},
     targets::{
         CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
@@ -66,15 +67,47 @@ fn optimize_module(module: &Module<'_>, optimization_level: OptimizationLevel) {
 /// Panics if code generation fails. This can be caused by an invalid TAST being
 /// passed, so make sure to type check it so invariants are upheld.
 #[must_use]
+#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 fn cg_program<'ctx>(
+    frontend_version_string: &str,
+    cli_args: &str,
     ctx: &'ctx Context,
     target_machine: &TargetMachine,
     optimization_level: OptimizationLevel,
-    module_name: &str,
+    parent_directory: &str,
+    file_name: &str,
     program: Vec<TypedDeclaration<'_>>,
 ) -> Module<'ctx> {
     let builder = ctx.create_builder();
-    let module = ctx.create_module(module_name);
+    let module = ctx.create_module(file_name);
+
+    let debug_metadata_version = ctx.i32_type().const_int(3, false);
+    module.add_basic_value_flag(
+        "Debug Info Version",
+        FlagBehavior::Warning,
+        debug_metadata_version,
+    );
+
+    let (dbg_builder, compilation_unit) = module.create_debug_info_builder(
+        true,
+        // closest equivalent to Zirco
+        DWARFSourceLanguage::C,
+        file_name,
+        parent_directory,
+        frontend_version_string,
+        false,
+        // We do not directly obtain the args here because the test executables have a path in them
+        // and that would change and mess up snapshotting
+        cli_args,
+        0,
+        "",
+        DWARFEmissionKind::Full,
+        0,
+        false,
+        false,
+        "",
+        "",
+    );
 
     let mut global_scope = CgScope::new();
 
@@ -149,6 +182,8 @@ fn cg_program<'ctx>(
                             ctx,
                             target_machine,
                             builder: &builder,
+                            dbg_builder: &dbg_builder,
+                            compilation_unit: &compilation_unit,
                             module: &module,
                             fn_value,
                         },
@@ -184,8 +219,12 @@ fn cg_program<'ctx>(
 /// # Panics
 /// Panics on internal code generation failure.
 #[must_use]
+#[allow(clippy::too_many_arguments)]
 pub fn cg_program_to_string(
-    module_name: &str,
+    frontend_version_string: &str,
+    parent_directory: &str,
+    file_name: &str,
+    cli_args: &str,
     program: Vec<TypedDeclaration>,
     optimization_level: OptimizationLevel,
     triple: &TargetTriple,
@@ -210,10 +249,13 @@ pub fn cg_program_to_string(
         .expect("target machine should be created successfully");
 
     let module = cg_program(
+        frontend_version_string,
+        cli_args,
         &ctx,
         &target_machine,
         optimization_level,
-        module_name,
+        parent_directory,
+        file_name,
         program,
     );
 
@@ -226,8 +268,12 @@ pub fn cg_program_to_string(
 /// # Panics
 /// Panics on internal code generation failure.
 #[must_use]
+#[allow(clippy::too_many_arguments)]
 pub fn cg_program_to_buffer(
-    module_name: &str,
+    frontend_version_string: &str,
+    parent_directory: &str,
+    file_name: &str,
+    cli_args: &str,
     program: Vec<TypedDeclaration>,
     file_type: FileType,
     optimization_level: OptimizationLevel,
@@ -253,10 +299,13 @@ pub fn cg_program_to_buffer(
         .expect("target machine should be created successfully");
 
     let module = cg_program(
+        frontend_version_string,
+        cli_args,
         &ctx,
         &target_machine,
         optimization_level,
-        module_name,
+        parent_directory,
+        file_name,
         program,
     );
 

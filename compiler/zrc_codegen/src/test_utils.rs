@@ -25,7 +25,12 @@
 macro_rules! cg_snapshot_test {
     ($source:expr) => {
         let resulting_ir = $crate::cg_program_to_string(
-            "test",
+            "zrc test runner",
+            "/fake/path",
+            "test.zr",
+            // do not use real args because the text executables have a hash in their name and
+            // this would mess up snapshots
+            "zrc --fake-args",
             ::zrc_typeck::typeck::type_program(
                 ::zrc_parser::parser::parse_program($source).expect("parsing should succeed")
             ).expect("typeck should succeed"),

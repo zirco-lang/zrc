@@ -3,8 +3,8 @@ source: compiler/zrc_codegen/src/expr.rs
 description: "fn test() {\n    let x: *i32;\n\n    // TEST: should create a GEP that is the same as \"x[4]\"\n    let y = x + 4;\n    // TEST: and the same, with -4:\n    let z = x - 4;\n\n    return;\n}\n"
 expression: resulting_ir
 ---
-; ModuleID = 'test'
-source_filename = "test"
+; ModuleID = 'test.zr'
+source_filename = "test.zr"
 
 define void @test() {
 entry:
@@ -19,4 +19,11 @@ entry:
   store ptr %ptr_sub, ptr %let_z, align 8
   ret void
 }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc test runner", isOptimized: false, flags: "--fake-args", runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false)
+!2 = !DIFile(filename: "test.zr", directory: "/fake/path")
 

@@ -56,6 +56,7 @@ use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
     context::Context,
+    debug_info::DebugInfoBuilder,
     module::Module,
     targets::TargetMachine,
     values::{FunctionValue, PointerValue},
@@ -131,6 +132,10 @@ struct CgContext<'ctx, 'a> {
     target_machine: &'a TargetMachine,
     /// The LLVM builder used to build instructions
     builder: &'a Builder<'ctx>,
+    /// The LLVM builder for debug info
+    dbg_builder: &'a DebugInfoBuilder<'ctx>,
+    /// The LLVM compile unit for debug info
+    compilation_unit: &'a inkwell::debug_info::DICompileUnit<'ctx>,
     /// The LLVM module we are building in
     #[allow(dead_code)]
     module: &'a Module<'ctx>,
