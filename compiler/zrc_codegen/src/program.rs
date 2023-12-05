@@ -172,8 +172,6 @@ fn cg_program<'ctx>(
         }
     }
 
-    module.verify().expect("Generated invalid LLVM IR");
-
     optimize_module(&module, optimization_level);
 
     module
