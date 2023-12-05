@@ -62,6 +62,7 @@ use inkwell::{
 };
 
 mod expr;
+mod program;
 mod stmt;
 #[cfg(test)]
 mod test_utils;
@@ -71,7 +72,7 @@ pub use inkwell::{
     targets::{FileType, TargetTriple},
     OptimizationLevel,
 };
-pub use stmt::{cg_program_to_buffer, cg_program_to_string};
+pub use program::{cg_program_to_buffer, cg_program_to_string};
 
 /// Gets the native [`TargetTriple`].
 #[must_use]
