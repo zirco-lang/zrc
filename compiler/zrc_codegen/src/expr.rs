@@ -13,6 +13,7 @@ use zrc_typeck::tast::{
     },
     ty::Type,
 };
+use zrc_utils::span::Spannable;
 
 use super::CgScope;
 use crate::{
@@ -28,7 +29,7 @@ fn cg_place<'ctx, 'a>(
     scope: &'a CgScope<'_, 'ctx>,
     place: Place,
 ) -> BasicBlockAnd<'ctx, PointerValue<'ctx>> {
-    match place.kind {
+    match place.kind.into_value() {
         PlaceKind::Variable(x) => {
             let reg = scope
                 .get(x)
@@ -74,7 +75,7 @@ fn cg_place<'ctx, 'a>(
                 let x_ty = llvm_basic_type(cg.ctx, cg.target_machine, &x.inferred_type);
                 let prop_idx = contents
                     .iter()
-                    .position(|(got_key, _)| *got_key == prop)
+                    .position(|(got_key, _)| *got_key == prop.into_value())
                     .expect("invalid struct field");
 
                 let BasicBlockAnd { bb, value: x } = cg_place(cg, bb, scope, *x);
@@ -121,7 +122,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
     scope: &'a CgScope<'_, 'ctx>,
     expr: TypedExpr,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
-    match expr.kind {
+    let expr_span = expr.kind.span();
+    match expr.kind.into_value() {
         TypedExprKind::NumberLiteral(n) => {
             let no_underscores = match n {
                 NumberLiteral::Decimal(x) => x.replace('_', ""),
@@ -235,7 +237,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 scope,
                 Place {
                     inferred_type: expr.inferred_type.clone(),
-                    kind: PlaceKind::Variable(id),
+                    kind: PlaceKind::Variable(id).in_span(expr_span),
                 },
             );
 
@@ -536,7 +538,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 scope,
                 Place {
                     inferred_type: expr.inferred_type.clone(),
-                    kind: PlaceKind::Index(ptr, idx),
+                    kind: PlaceKind::Index(ptr, idx).in_span(expr_span),
                 },
             );
 
@@ -562,7 +564,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 scope,
                 Place {
                     inferred_type: expr.inferred_type.clone(),
-                    kind: PlaceKind::Dot(place, key),
+                    kind: PlaceKind::Dot(place, key).in_span(expr_span),
                 },
             );
 
@@ -702,38 +704,46 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             let BasicBlockAnd { bb, value: x } = cg_expr(cg, bb, scope, *x);
 
-            let reg = match (x.get_type().is_pointer_type(), matches!(ty, Type::Ptr(_))) {
+            let reg = match (
+                x.get_type().is_pointer_type(),
+                matches!(ty.value(), Type::Ptr(_)),
+            ) {
                 (true, true) => cg
                     .builder
                     .build_bitcast(
                         x.into_pointer_value(),
-                        llvm_basic_type(cg.ctx, cg.target_machine, &ty),
+                        llvm_basic_type(cg.ctx, cg.target_machine, ty.value()),
                         "cast",
                     )
                     .expect("bitcast should have compiled successfully"),
                 (true, false) => cg
                     .builder
-                    .build_ptr_to_int(x.into_pointer_value(), llvm_int_type(cg.ctx, &ty), "cast")
+                    .build_ptr_to_int(
+                        x.into_pointer_value(),
+                        llvm_int_type(cg.ctx, ty.value()),
+                        "cast",
+                    )
                     .expect("ptrtoint should have compiled successfully")
                     .as_basic_value_enum(),
                 (false, true) => cg
                     .builder
                     .build_int_to_ptr(
                         x.into_int_value(),
-                        llvm_basic_type(cg.ctx, cg.target_machine, &ty).into_pointer_type(),
+                        llvm_basic_type(cg.ctx, cg.target_machine, ty.value()).into_pointer_type(),
                         "cast",
                     )
                     .expect("inttoptr should have compiled successfully")
                     .as_basic_value_enum(),
-                (false, false) if x.get_type().is_int_type() && ty.is_integer() => {
+                (false, false) if x.get_type().is_int_type() && ty.value().is_integer() => {
                     // Cast between two integers
-                    match (x_ty_is_signed_integer, ty.is_signed_integer()) {
+                    match (x_ty_is_signed_integer, ty.value().is_signed_integer()) {
                         // (x is signed, target is signed or unsigned)
                         (true, _) => cg
                             .builder
                             .build_int_s_extend(
                                 x.into_int_value(),
-                                llvm_basic_type(cg.ctx, cg.target_machine, &ty).into_int_type(),
+                                llvm_basic_type(cg.ctx, cg.target_machine, ty.value())
+                                    .into_int_type(),
                                 "cast",
                             )
                             .expect("sext should have compiled successfully")
@@ -744,7 +754,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                             .builder
                             .build_int_z_extend(
                                 x.into_int_value(),
-                                llvm_basic_type(cg.ctx, cg.target_machine, &ty).into_int_type(),
+                                llvm_basic_type(cg.ctx, cg.target_machine, ty.value())
+                                    .into_int_type(),
                                 "cast",
                             )
                             .expect("zext should have compiled successfully")
@@ -756,7 +767,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     cg.builder
                         .build_bitcast(
                             x.into_int_value(),
-                            llvm_basic_type(cg.ctx, cg.target_machine, &ty),
+                            llvm_basic_type(cg.ctx, cg.target_machine, ty.value()),
                             "cast",
                         )
                         .expect("bitcast should have compiled successfully")

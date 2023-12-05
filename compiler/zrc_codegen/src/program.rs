@@ -90,16 +90,18 @@ fn cg_program<'ctx>(
                     ctx,
                     &module,
                     target_machine,
-                    name,
-                    return_type,
-                    &parameters
+                    name.value(),
+                    return_type.map(zrc_utils::span::Spanned::into_value),
+                    parameters
+                        .value()
                         .as_arguments()
                         .iter()
-                        .map(|ArgumentDeclaration { ty, .. }| ty)
-                        .collect::<Vec<_>>(),
-                    parameters.is_variadic(),
+                        .map(|ArgumentDeclaration { ty, .. }| ty.value())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                    parameters.value().is_variadic(),
                 );
-                global_scope.insert(name, fn_value.as_global_value().as_pointer_value());
+                global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
                 // must come after the insert call so that recursion is valid
                 let mut fn_scope = global_scope.clone();
 
@@ -108,7 +110,7 @@ fn cg_program<'ctx>(
                     builder.position_at_end(entry);
 
                     for (n, ArgumentDeclaration { name, ty }) in
-                        parameters.into_arguments().into_iter().enumerate()
+                        parameters.value().as_arguments().iter().enumerate()
                     {
                         if entry.get_first_instruction().is_some() {
                             builder.position_before(&entry.get_first_instruction().expect(
@@ -120,8 +122,8 @@ fn cg_program<'ctx>(
 
                         let alloc = builder
                             .build_alloca(
-                                llvm_basic_type(ctx, target_machine, &ty),
-                                &format!("arg_{name}"),
+                                llvm_basic_type(ctx, target_machine, ty.value()),
+                                &format!("arg_{}", name.value()),
                             )
                             .expect("alloca should generate successfully");
 
@@ -139,7 +141,7 @@ fn cg_program<'ctx>(
                             )
                             .expect("store should generate successfully");
 
-                        fn_scope.insert(name, alloc);
+                        fn_scope.insert(name.value(), alloc);
                     }
 
                     cg_block(
@@ -152,7 +154,7 @@ fn cg_program<'ctx>(
                         },
                         entry,
                         &fn_scope,
-                        body,
+                        body.into_value(),
                         &None,
                     );
                 }

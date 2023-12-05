@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 inkwell = { git = "https://github.com/TheDan64/inkwell", version = "0.2.0", features = ["llvm16-0", "llvm16-0-prefer-static"] }
 zrc_typeck = { version = "0.1.0", path = "../zrc_typeck" }
+zrc_utils = { version = "0.1.0", path = "../zrc_utils" }
 
 [dev-dependencies]
 indoc = "2.0.4"

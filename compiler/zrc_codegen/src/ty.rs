@@ -155,7 +155,7 @@ pub fn llvm_type<'ctx>(
                 &args
                     .as_arguments()
                     .iter()
-                    .map(|arg| llvm_basic_type(ctx, target_machine, &arg.ty).into())
+                    .map(|arg| llvm_basic_type(ctx, target_machine, arg.ty.value()).into())
                     .collect::<Vec<_>>(),
                 is_variadic,
             )

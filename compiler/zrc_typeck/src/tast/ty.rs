@@ -1,4 +1,9 @@
 //! Type representation for the Zirco [TAST](super)
+//!
+//! Note: In the TAST, we do not assign types a span, because
+//! they may be obtained from an arbitrary location in the program
+//! (and simply inferred). If it exists *in* the source file, it is
+//! given an explicit span (e.g. argument types) however.
 
 use std::fmt::Display;
 

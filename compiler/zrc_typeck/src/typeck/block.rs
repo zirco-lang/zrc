@@ -13,7 +13,7 @@ use crate::tast::{
     expr::TypedExpr,
     stmt::{
         ArgumentDeclaration as TastArgumentDeclaration, LetDeclaration as TastLetDeclaration,
-        TypedDeclaration, TypedStmt,
+        TypedDeclaration, TypedStmt, TypedStmtKind,
     },
     ty::Type as TastType,
 };
@@ -151,7 +151,7 @@ fn process_let_declaration<'input>(
 
                     // Explicitly typed with no value
                     (None, Some(ty)) => TastLetDeclaration {
-                        name: let_declaration.name.into_value(),
+                        name: let_declaration.name,
                         ty,
                         value: None,
                     },
@@ -164,7 +164,7 @@ fn process_let_declaration<'input>(
                         }),
                         None,
                     ) => TastLetDeclaration {
-                        name: let_declaration.name.into_value(),
+                        name: let_declaration.name,
                         ty: inferred_type.clone(),
                         value: Some(TypedExpr {
                             inferred_type,
@@ -182,7 +182,7 @@ fn process_let_declaration<'input>(
                     ) => {
                         if inferred_type == resolved_ty {
                             TastLetDeclaration {
-                                name: let_declaration.name.into_value(),
+                                name: let_declaration.name,
                                 ty: inferred_type.clone(),
                                 value: Some(TypedExpr {
                                     inferred_type,
@@ -210,7 +210,7 @@ fn process_let_declaration<'input>(
                     ));
                 }
 
-                scope.set_value(result_decl.name, result_decl.ty.clone());
+                scope.set_value(result_decl.name.value(), result_decl.ty.clone());
                 Ok(result_decl)
             },
         )
@@ -224,7 +224,7 @@ fn process_let_declaration<'input>(
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
 pub fn process_declaration<'input>(
     global_scope: &mut Scope<'input>,
     declaration: AstDeclaration<'input>,
@@ -255,6 +255,7 @@ pub fn process_declaration<'input>(
             }
 
             let resolved_return_type = return_type
+                .clone()
                 .map(|ty| resolve_type(global_scope, ty))
                 .transpose()?
                 .map_or(BlockReturnType::Void, BlockReturnType::Return);
@@ -266,8 +267,9 @@ pub fn process_declaration<'input>(
                 .iter()
                 .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
                     Ok(TastArgumentDeclaration {
-                        name: parameter.value().name.into_value(),
-                        ty: resolve_type(global_scope, parameter.value().ty.clone())?,
+                        name: parameter.value().name,
+                        ty: resolve_type(global_scope, parameter.value().ty.clone())?
+                            .in_span(parameter.span()),
                     })
                 })
                 .collect::<Result<Vec<_>, Diagnostic>>()?;
@@ -292,7 +294,7 @@ pub fn process_declaration<'input>(
             );
 
             Some(TypedDeclaration::FunctionDeclaration {
-                name: name.into_value(),
+                name,
                 parameters: match parameters.value() {
                     ArgumentDeclarationList::NonVariadic(_) => {
                         tast::stmt::ArgumentDeclarationList::NonVariadic(
@@ -302,23 +304,32 @@ pub fn process_declaration<'input>(
                     ArgumentDeclarationList::Variadic(_) => {
                         tast::stmt::ArgumentDeclarationList::Variadic(resolved_parameters.clone())
                     }
-                },
-                return_type: resolved_return_type.clone().into_option(),
+                }
+                .in_span(parameters.span()),
+                return_type: resolved_return_type
+                    .clone()
+                    .into_option()
+                    .map(|existing_type| {
+                        existing_type
+                            .in_span(return_type.expect("already unwrapped before").0.span())
+                    }),
                 body: if let Some(body) = body {
                     let mut function_scope = global_scope.clone();
                     for param in resolved_parameters {
-                        function_scope.set_value(param.name, param.ty);
+                        function_scope.set_value(param.name.value(), param.ty.into_value());
                     }
 
                     // discard return actuality as it's guaranteed
                     Some(
-                        type_block(
-                            &function_scope,
-                            body,
-                            false,
-                            BlockReturnAbility::MustReturn(resolved_return_type),
-                        )?
-                        .0,
+                        body.span().containing(
+                            type_block(
+                                &function_scope,
+                                body,
+                                false,
+                                BlockReturnAbility::MustReturn(resolved_return_type),
+                            )?
+                            .0,
+                        ),
                     )
                 } else {
                     None
@@ -403,7 +414,7 @@ pub fn type_block<'input>(
                         match stmt.0.into_value() {
                             StmtKind::EmptyStmt => Ok(None),
                             StmtKind::BreakStmt if can_use_break_continue => Ok(Some((
-                                TypedStmt::BreakStmt,
+                                TypedStmt(TypedStmtKind::BreakStmt.in_span(stmt_span)),
                                 BlockReturnActuality::DoesNotReturn,
                             ))),
                             StmtKind::BreakStmt => Err(Diagnostic(
@@ -412,7 +423,7 @@ pub fn type_block<'input>(
                             )),
 
                             StmtKind::ContinueStmt if can_use_break_continue => Ok(Some((
-                                TypedStmt::ContinueStmt,
+                                TypedStmt(TypedStmtKind::ContinueStmt.in_span(stmt_span)),
                                 BlockReturnActuality::DoesNotReturn,
                             ))),
                             StmtKind::ContinueStmt => Err(Diagnostic(
@@ -422,10 +433,13 @@ pub fn type_block<'input>(
                             )),
 
                             StmtKind::DeclarationList(declarations) => Ok(Some((
-                                TypedStmt::DeclarationList(process_let_declaration(
-                                    &mut scope,
-                                    declarations.clone().into_value(),
-                                )?),
+                                TypedStmt(
+                                    TypedStmtKind::DeclarationList(process_let_declaration(
+                                        &mut scope,
+                                        declarations.clone().into_value(),
+                                    )?)
+                                    .in_span(stmt_span),
+                                ),
                                 BlockReturnActuality::DoesNotReturn, /* because expressions
                                                                       * can't
                                                                       * return */
@@ -491,7 +505,14 @@ pub fn type_block<'input>(
                                     .unzip();
 
                                 Ok(Some((
-                                    TypedStmt::IfStmt(typed_cond, typed_then, typed_then_else),
+                                    TypedStmt(
+                                        TypedStmtKind::IfStmt(
+                                            typed_cond,
+                                            typed_then,
+                                            typed_then_else,
+                                        )
+                                        .in_span(stmt_span),
+                                    ),
                                     match (
                                         then_return_actuality,
                                         then_else_return_actuality
@@ -555,7 +576,10 @@ pub fn type_block<'input>(
                                 )?;
 
                                 Ok(Some((
-                                    TypedStmt::WhileStmt(typed_cond, typed_body),
+                                    TypedStmt(
+                                        TypedStmtKind::WhileStmt(typed_cond, typed_body)
+                                            .in_span(stmt_span),
+                                    ),
                                     match body_return_actuality {
                                         BlockReturnActuality::DoesNotReturn => {
                                             BlockReturnActuality::DoesNotReturn
@@ -615,9 +639,11 @@ pub fn type_block<'input>(
                                 let typed_post =
                                     post.map(|post| type_expr(&loop_scope, post)).transpose()?;
 
+                                let body_as_block = coerce_stmt_into_block(*body);
+                                let body_as_block_span = body_as_block.span();
                                 let (typed_body, body_return_actuality) = type_block(
                                     &loop_scope,
-                                    coerce_stmt_into_block(*body),
+                                    body_as_block,
                                     true,
                                     // return ability of a sub-block is determined by this match:
                                     match return_ability.clone() {
@@ -632,12 +658,15 @@ pub fn type_block<'input>(
                                 )?;
 
                                 Ok(Some((
-                                    TypedStmt::ForStmt {
-                                        init: typed_init.map(Box::new),
-                                        cond: typed_cond,
-                                        post: typed_post,
-                                        body: typed_body,
-                                    },
+                                    TypedStmt(
+                                        TypedStmtKind::ForStmt {
+                                            init: typed_init.map(Box::new),
+                                            cond: typed_cond,
+                                            post: typed_post,
+                                            body: typed_body.in_span(body_as_block_span),
+                                        }
+                                        .in_span(stmt_span),
+                                    ),
                                     match body_return_actuality {
                                         BlockReturnActuality::DoesNotReturn => {
                                             BlockReturnActuality::DoesNotReturn
@@ -669,11 +698,19 @@ pub fn type_block<'input>(
                                         }
                                     },
                                 )?;
-                                Ok(Some((TypedStmt::BlockStmt(typed_body), return_actuality)))
+                                Ok(Some((
+                                    TypedStmt(
+                                        TypedStmtKind::BlockStmt(typed_body).in_span(stmt_span),
+                                    ),
+                                    return_actuality,
+                                )))
                             }
 
                             StmtKind::ExprStmt(expr) => Ok(Some((
-                                TypedStmt::ExprStmt(type_expr(&scope, expr)?),
+                                TypedStmt(
+                                    TypedStmtKind::ExprStmt(type_expr(&scope, expr)?)
+                                        .in_span(stmt_span),
+                                ),
                                 BlockReturnActuality::DoesNotReturn,
                             ))),
                             StmtKind::ReturnStmt(value) => {
@@ -693,7 +730,9 @@ pub fn type_block<'input>(
                                         BlockReturnAbility::MayReturn(BlockReturnType::Void)
                                         | BlockReturnAbility::MustReturn(BlockReturnType::Void),
                                     ) => Ok(Some((
-                                        TypedStmt::ReturnStmt(None),
+                                        TypedStmt(
+                                            TypedStmtKind::ReturnStmt(None).in_span(stmt_span),
+                                        ),
                                         BlockReturnActuality::WillReturn,
                                     ))),
 
@@ -742,10 +781,13 @@ pub fn type_block<'input>(
                                     ) => {
                                         if inferred_type == return_ty {
                                             Ok(Some((
-                                                TypedStmt::ReturnStmt(Some(TypedExpr {
-                                                    inferred_type,
-                                                    kind,
-                                                })),
+                                                TypedStmt(
+                                                    TypedStmtKind::ReturnStmt(Some(TypedExpr {
+                                                        inferred_type,
+                                                        kind,
+                                                    }))
+                                                    .in_span(stmt_span),
+                                                ),
                                                 BlockReturnActuality::WillReturn,
                                             )))
                                         } else {

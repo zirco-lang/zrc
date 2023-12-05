@@ -2,15 +2,18 @@
 
 use std::{fmt::Display, string::ToString};
 
+use zrc_utils::span::Spanned;
+
 use super::{expr::TypedExpr, ty::Type};
 
 /// A declaration created with `let`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LetDeclaration<'input> {
     /// The name of the identifier.
-    pub name: &'input str,
+    pub name: Spanned<&'input str>,
     /// The type of the new symbol. If set to [`None`], the type will be
     /// inferred.
+    // no span is added because it may be inferred
     pub ty: Type<'input>, // types are definite after inference
     /// The value to associate with the new symbol.
     pub value: Option<TypedExpr<'input>>,
@@ -19,17 +22,22 @@ pub struct LetDeclaration<'input> {
 impl<'input> Display for LetDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.value {
-            Some(value) => write!(f, "{}: {} = {}", self.name, self.ty, value),
-            None => write!(f, "{}: {}", self.name, self.ty),
+            Some(value) => write!(f, "{}: {} = {}", self.name.value(), self.ty, value),
+            None => write!(f, "{}: {}", self.name.value(), self.ty),
         }
     }
 }
+
+/// A zirco statement after typeck
+#[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::module_name_repetitions)]
+pub struct TypedStmt<'input>(pub Spanned<TypedStmtKind<'input>>);
 
 /// The enum representing all of the different kinds of statements in Zirco
 /// after type checking
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::module_name_repetitions)]
-pub enum TypedStmt<'input> {
+pub enum TypedStmtKind<'input> {
     // all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here
     // (basically if (x) y has become if (x) {y})
     /// `if (x) y` or `if (x) y else z`
@@ -51,7 +59,7 @@ pub enum TypedStmt<'input> {
         /// Runs after each iteration of the loop.
         post: Option<TypedExpr<'input>>,
         /// The body of the loop.
-        body: Vec<TypedStmt<'input>>,
+        body: Spanned<Vec<TypedStmt<'input>>>,
     },
     /// `{ ... }`
     BlockStmt(Vec<TypedStmt<'input>>),
@@ -67,6 +75,12 @@ pub enum TypedStmt<'input> {
     DeclarationList(Vec<LetDeclaration<'input>>),
 }
 impl<'input> Display for TypedStmt<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.value().fmt(f)
+    }
+}
+
+impl<'input> Display for TypedStmtKind<'input> {
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -138,7 +152,8 @@ impl<'input> Display for TypedStmt<'input> {
                 )),
                 cond.as_ref().map_or(String::new(), ToString::to_string),
                 post.as_ref().map_or(String::new(), ToString::to_string),
-                body.iter()
+                body.value()
+                    .iter()
                     .map(|stmt| stmt
                         .to_string()
                         .split('\n')
@@ -185,15 +200,15 @@ pub enum TypedDeclaration<'input> {
     /// A declaration of a function
     FunctionDeclaration {
         /// The name of the function.
-        name: &'input str,
+        name: Spanned<&'input str>,
         /// The parameters of the function.
-        parameters: ArgumentDeclarationList<'input>,
+        parameters: Spanned<ArgumentDeclarationList<'input>>,
         /// The return type of the function. If set to [`None`], the function is
         /// void.
-        return_type: Option<Type<'input>>,
+        return_type: Option<Spanned<Type<'input>>>,
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
-        body: Option<Vec<TypedStmt<'input>>>,
+        body: Option<Spanned<Vec<TypedStmt<'input>>>>,
     },
 }
 impl<'input> Display for TypedDeclaration<'input> {
@@ -206,9 +221,12 @@ impl<'input> Display for TypedDeclaration<'input> {
                 body: Some(body),
             } => write!(
                 f,
-                "fn {name}({}) -> {return_ty} {{\n{}\n}}",
-                parameters,
-                body.iter()
+                "fn {}({}) -> {} {{\n{}\n}}",
+                name.value(),
+                parameters.value(),
+                return_ty.value(),
+                body.value()
+                    .iter()
                     .map(|stmt| stmt
                         .to_string()
                         .split('\n')
@@ -223,7 +241,13 @@ impl<'input> Display for TypedDeclaration<'input> {
                 parameters,
                 return_type: Some(return_ty),
                 body: None,
-            } => write!(f, "fn {name}({parameters}) -> {return_ty};"),
+            } => write!(
+                f,
+                "fn {}({}) -> {};",
+                name.value(),
+                parameters.value(),
+                return_ty.value()
+            ),
             Self::FunctionDeclaration {
                 name,
                 parameters,
@@ -231,8 +255,11 @@ impl<'input> Display for TypedDeclaration<'input> {
                 body: Some(body),
             } => write!(
                 f,
-                "fn {name}({parameters}) {{\n{}\n}}",
-                body.iter()
+                "fn {}({}) {{\n{}\n}}",
+                name.value(),
+                parameters.value(),
+                body.value()
+                    .iter()
                     .map(|stmt| stmt
                         .to_string()
                         .split('\n')
@@ -247,7 +274,7 @@ impl<'input> Display for TypedDeclaration<'input> {
                 parameters,
                 return_type: None,
                 body: None,
-            } => write!(f, "fn {name}({parameters});"),
+            } => write!(f, "fn {}({});", name.value(), parameters.value()),
         }
     }
 }
@@ -317,12 +344,12 @@ impl<'input> Display for ArgumentDeclarationList<'input> {
 #[derive(PartialEq, Debug, Clone)]
 pub struct ArgumentDeclaration<'input> {
     /// The name of the parameter.
-    pub name: &'input str,
+    pub name: Spanned<&'input str>,
     /// The type of the parameter.
-    pub ty: Type<'input>,
+    pub ty: Spanned<Type<'input>>,
 }
 impl<'input> Display for ArgumentDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.name, self.ty)
+        write!(f, "{}: {}", self.name.value(), self.ty.value())
     }
 }

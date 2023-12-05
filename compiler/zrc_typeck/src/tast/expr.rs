@@ -6,6 +6,7 @@ pub use zrc_parser::{
     ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical},
     lexer::{NumberLiteral, StringTok},
 };
+use zrc_utils::span::Spanned;
 
 use super::ty::Type;
 
@@ -15,11 +16,11 @@ pub struct Place<'input> {
     /// The inferred [`Type`] of this node
     pub inferred_type: Type<'input>,
     /// The actual [`PlaceKind`] backing this expression
-    pub kind: PlaceKind<'input>,
+    pub kind: Spanned<PlaceKind<'input>>,
 }
 impl<'input> Display for Place<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}) as ({})", self.inferred_type, self.kind)
+        write!(f, "({}) as ({})", self.inferred_type, self.kind.value())
     }
 }
 
@@ -37,7 +38,7 @@ pub enum PlaceKind<'input> {
     /// `x[y]`
     Index(Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
     /// `x.y`
-    Dot(Box<Place<'input>>, &'input str),
+    Dot(Box<Place<'input>>, Spanned<&'input str>),
 }
 impl<'input> Display for PlaceKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -45,7 +46,7 @@ impl<'input> Display for PlaceKind<'input> {
             Self::Deref(expr) => write!(f, "*{expr}"),
             Self::Variable(ident) => write!(f, "{ident}"),
             Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
-            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
+            Self::Dot(expr, key) => write!(f, "{expr}.{}", key.value()),
         }
     }
 }
@@ -58,11 +59,11 @@ pub struct TypedExpr<'input> {
     /// The inferred [`Type`] of this node
     pub inferred_type: Type<'input>,
     /// The actual [`TypedExprKind`] backing this expression
-    pub kind: TypedExprKind<'input>,
+    pub kind: Spanned<TypedExprKind<'input>>,
 }
 impl<'input> Display for TypedExpr<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "(({}) as ({}))", self.inferred_type, self.kind)
+        write!(f, "(({}) as ({}))", self.inferred_type, self.kind.value())
     }
 }
 
@@ -106,7 +107,7 @@ pub enum TypedExprKind<'input> {
     /// `a[b]`
     Index(Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
     /// `a.b`
-    Dot(Box<Place<'input>>, &'input str),
+    Dot(Box<Place<'input>>, Spanned<&'input str>),
     /// `a(b, c, d, ...)`
     Call(Box<Place<'input>>, Vec<TypedExpr<'input>>),
 
@@ -118,13 +119,13 @@ pub enum TypedExprKind<'input> {
     ),
 
     /// `x as T`
-    Cast(Box<TypedExpr<'input>>, Type<'input>),
+    Cast(Box<TypedExpr<'input>>, Spanned<Type<'input>>),
     /// `sizeof(T)`
     SizeOf(Type<'input>),
 
     /// Any numeric literal.
     NumberLiteral(NumberLiteral<'input>),
-    /// Any string literal.bool
+    /// Any string literal.
     StringLiteral(Vec<StringTok<'input>>),
     /// Any char literal
     CharLiteral(Vec<StringTok<'input>>),
@@ -163,8 +164,8 @@ impl<'input> Display for TypedExprKind<'input> {
             Self::UnaryDereference(expr) => write!(f, "*{expr}"),
             Self::Ternary(cond, if_true, if_false) => write!(f, "{cond} ? {if_true} : {if_false}"),
             Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
-            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
-            Self::Cast(expr, ty) => write!(f, "{expr} as {ty}"),
+            Self::Dot(expr, key) => write!(f, "{expr}.{}", key.value()),
+            Self::Cast(expr, ty) => write!(f, "{expr} as {}", ty.value()),
             Self::SizeOf(ty) => write!(f, "sizeof({ty})"),
             Self::Call(expr, args) => write!(
                 f,

@@ -2,7 +2,7 @@
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
 use zrc_parser::ast::expr::{Arithmetic, Assignment, BinaryBitwise, Expr, ExprKind};
-use zrc_utils::span::{Span, Spanned};
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::Scope;
 use crate::{
@@ -45,28 +45,31 @@ fn desugar_assignment<'input>(
 
 /// Validate an expr into a place
 fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, Diagnostic> {
+    let kind_span = expr.kind.span();
+    let stringified = expr.to_string();
+
     #[allow(clippy::wildcard_enum_match_arm)]
-    Ok(match expr.kind {
+    Ok(match expr.kind.into_value() {
         TypedExprKind::UnaryDereference(x) => Place {
             inferred_type: expr.inferred_type,
-            kind: PlaceKind::Deref(x),
+            kind: PlaceKind::Deref(x).in_span(kind_span),
         },
         TypedExprKind::Identifier(x) => Place {
             inferred_type: expr.inferred_type,
-            kind: PlaceKind::Variable(x),
+            kind: PlaceKind::Variable(x).in_span(kind_span),
         },
         TypedExprKind::Index(x, y) => Place {
             inferred_type: expr.inferred_type,
-            kind: PlaceKind::Index(x, y),
+            kind: PlaceKind::Index(x, y).in_span(kind_span),
         },
         TypedExprKind::Dot(x, y) => Place {
             inferred_type: expr.inferred_type,
-            kind: PlaceKind::Dot(x, y),
+            kind: PlaceKind::Dot(x, y).in_span(kind_span),
         },
         _ => {
             return Err(Diagnostic(
                 Severity::Error,
-                span.containing(DiagnosticKind::NotAnLvalue(expr.to_string())),
+                span.containing(DiagnosticKind::NotAnLvalue(stringified)),
             ))
         }
     })
@@ -147,7 +150,7 @@ pub fn type_expr<'input>(
             let bt = type_expr(scope, *rhs)?;
             TypedExpr {
                 inferred_type: bt.inferred_type.clone(),
-                kind: TypedExprKind::Comma(Box::new(at), Box::new(bt)),
+                kind: TypedExprKind::Comma(Box::new(at), Box::new(bt)).in_span(expr_span),
             }
         }
         ExprKind::Assignment(mode, place, value) => {
@@ -169,7 +172,8 @@ pub fn type_expr<'input>(
 
             TypedExpr {
                 inferred_type: place_t.inferred_type.clone(),
-                kind: TypedExprKind::Assignment(Box::new(place_t), Box::new(value_t)),
+                kind: TypedExprKind::Assignment(Box::new(place_t), Box::new(value_t))
+                    .in_span(expr_span),
             }
         }
 
@@ -185,7 +189,7 @@ pub fn type_expr<'input>(
 
             TypedExpr {
                 inferred_type: x_ty.inferred_type.clone(),
-                kind: TypedExprKind::UnaryNot(Box::new(x_ty)),
+                kind: TypedExprKind::UnaryNot(Box::new(x_ty)).in_span(expr_span),
             }
         }
         ExprKind::UnaryBitwiseNot(x) => {
@@ -196,7 +200,7 @@ pub fn type_expr<'input>(
 
             TypedExpr {
                 inferred_type: x_ty.inferred_type.clone(),
-                kind: TypedExprKind::UnaryBitwiseNot(Box::new(x_ty)),
+                kind: TypedExprKind::UnaryBitwiseNot(Box::new(x_ty)).in_span(expr_span),
             }
         }
         ExprKind::UnaryMinus(x) => {
@@ -207,7 +211,7 @@ pub fn type_expr<'input>(
 
             TypedExpr {
                 inferred_type: x_ty.inferred_type.clone(),
-                kind: TypedExprKind::UnaryMinus(Box::new(x_ty)),
+                kind: TypedExprKind::UnaryMinus(Box::new(x_ty)).in_span(expr_span),
             }
         }
         ExprKind::UnaryAddressOf(x) => {
@@ -215,7 +219,8 @@ pub fn type_expr<'input>(
 
             TypedExpr {
                 inferred_type: TastType::Ptr(Box::new(x_ty.inferred_type.clone())),
-                kind: TypedExprKind::UnaryAddressOf(Box::new(expr_to_place(expr_span, x_ty)?)),
+                kind: TypedExprKind::UnaryAddressOf(Box::new(expr_to_place(expr_span, x_ty)?))
+                    .in_span(expr_span),
             }
         }
         ExprKind::UnaryDereference(x) => {
@@ -223,7 +228,7 @@ pub fn type_expr<'input>(
             if let TastType::Ptr(tt) = x_ty.inferred_type.clone() {
                 TypedExpr {
                     inferred_type: *tt,
-                    kind: TypedExprKind::UnaryDereference(Box::new(x_ty)),
+                    kind: TypedExprKind::UnaryDereference(Box::new(x_ty)).in_span(expr_span),
                 }
             } else {
                 return Err(Diagnostic(
@@ -251,7 +256,8 @@ pub fn type_expr<'input>(
             if let TastType::Ptr(points_to_ty) = ptr_t.inferred_type.clone() {
                 TypedExpr {
                     inferred_type: *points_to_ty,
-                    kind: TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_t)),
+                    kind: TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_t))
+                        .in_span(expr_span),
                 }
             } else {
                 return Err(Diagnostic(
@@ -272,10 +278,8 @@ pub fn type_expr<'input>(
                 if let Some(ty) = fields.get(key.value()) {
                     TypedExpr {
                         inferred_type: ty.clone(),
-                        kind: TypedExprKind::Dot(
-                            Box::new(expr_to_place(obj_span, obj_t)?),
-                            key.value(),
-                        ),
+                        kind: TypedExprKind::Dot(Box::new(expr_to_place(obj_span, obj_t)?), key)
+                            .in_span(expr_span),
                     }
                 } else {
                     return Err(Diagnostic(
@@ -343,7 +347,7 @@ pub fn type_expr<'input>(
                     }
 
                     for (i, (arg_type, arg_t)) in arg_types.iter().zip(args_t.iter()).enumerate() {
-                        if arg_type.ty != arg_t.inferred_type {
+                        if *arg_type.ty.value() != arg_t.inferred_type {
                             return Err(Diagnostic(
                                 Severity::Error,
                                 args.value()[i].0.span().containing(
@@ -359,7 +363,8 @@ pub fn type_expr<'input>(
 
                     TypedExpr {
                         inferred_type: ret_type.into_option().unwrap_or(TastType::Void),
-                        kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_t),
+                        kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_t)
+                            .in_span(expr_span),
                     }
                 }
                 TastType::Fn(ArgumentDeclarationList::Variadic(beginning_arg_types), ret_type) => {
@@ -376,7 +381,7 @@ pub fn type_expr<'input>(
                     for (i, (arg_type, arg_t)) in
                         beginning_arg_types.iter().zip(args_t.iter()).enumerate()
                     {
-                        if arg_type.ty != arg_t.inferred_type {
+                        if *arg_type.ty.value() != arg_t.inferred_type {
                             return Err(Diagnostic(
                                 Severity::Error,
                                 args.value()[i].0.span().containing(
@@ -393,7 +398,8 @@ pub fn type_expr<'input>(
                     // the rest may be any, so we don't need to check them
                     TypedExpr {
                         inferred_type: ret_type.into_option().unwrap_or(TastType::Void),
-                        kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_t),
+                        kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_t)
+                            .in_span(expr_span),
                     }
                 }
                 _ => {
@@ -429,7 +435,8 @@ pub fn type_expr<'input>(
                     Box::new(cond_t),
                     Box::new(if_true_t),
                     Box::new(if_false_t),
-                ),
+                )
+                .in_span(expr_span),
             }
         }
 
@@ -454,7 +461,8 @@ pub fn type_expr<'input>(
 
             TypedExpr {
                 inferred_type: TastType::Bool,
-                kind: TypedExprKind::Logical(op, Box::new(lhs_t), Box::new(rhs_t)),
+                kind: TypedExprKind::Logical(op, Box::new(lhs_t), Box::new(rhs_t))
+                    .in_span(expr_span),
             }
         }
         ExprKind::Equality(op, lhs, rhs) => {
@@ -485,7 +493,8 @@ pub fn type_expr<'input>(
 
             TypedExpr {
                 inferred_type: TastType::Bool,
-                kind: TypedExprKind::Equality(op, Box::new(lhs_t), Box::new(rhs_t)),
+                kind: TypedExprKind::Equality(op, Box::new(lhs_t), Box::new(rhs_t))
+                    .in_span(expr_span),
             }
         }
         ExprKind::BinaryBitwise(op, lhs, rhs) => {
@@ -505,7 +514,8 @@ pub fn type_expr<'input>(
 
             TypedExpr {
                 inferred_type: lhs_t.inferred_type.clone(),
-                kind: TypedExprKind::BinaryBitwise(op, Box::new(lhs_t), Box::new(rhs_t)),
+                kind: TypedExprKind::BinaryBitwise(op, Box::new(lhs_t), Box::new(rhs_t))
+                    .in_span(expr_span),
             }
         }
         ExprKind::Comparison(op, lhs, rhs) => {
@@ -521,7 +531,8 @@ pub fn type_expr<'input>(
 
             TypedExpr {
                 inferred_type: TastType::Bool,
-                kind: TypedExprKind::Comparison(op, Box::new(lhs_t), Box::new(rhs_t)),
+                kind: TypedExprKind::Comparison(op, Box::new(lhs_t), Box::new(rhs_t))
+                    .in_span(expr_span),
             }
         }
         ExprKind::Arithmetic(op, lhs, rhs) => {
@@ -553,12 +564,14 @@ pub fn type_expr<'input>(
 
             TypedExpr {
                 inferred_type: lhs_t.inferred_type.clone(),
-                kind: TypedExprKind::Arithmetic(op, Box::new(lhs_t), Box::new(rhs_t)),
+                kind: TypedExprKind::Arithmetic(op, Box::new(lhs_t), Box::new(rhs_t))
+                    .in_span(expr_span),
             }
         }
 
         ExprKind::Cast(x, ty) => {
             let x_t = type_expr(scope, *x)?;
+            let ty_span = ty.0.span();
             let resolved_ty = resolve_type(scope, ty)?;
 
             if x_t.inferred_type.is_integer() && resolved_ty.is_integer() {
@@ -595,7 +608,8 @@ pub fn type_expr<'input>(
 
             TypedExpr {
                 inferred_type: resolved_ty.clone(),
-                kind: TypedExprKind::Cast(Box::new(x_t), resolved_ty),
+                kind: TypedExprKind::Cast(Box::new(x_t), resolved_ty.in_span(ty_span))
+                    .in_span(expr_span),
             }
         }
 
@@ -603,7 +617,7 @@ pub fn type_expr<'input>(
             let resolved_ty = resolve_type(scope, ty)?;
             TypedExpr {
                 inferred_type: TastType::U64,
-                kind: TypedExprKind::SizeOf(resolved_ty),
+                kind: TypedExprKind::SizeOf(resolved_ty).in_span(expr_span),
             }
         }
         // resolve `sizeof(expr)` by finding `typeof expr` and then basically becoming "sizeof
@@ -612,21 +626,21 @@ pub fn type_expr<'input>(
             let x_ty = type_expr(scope, *x)?;
             TypedExpr {
                 inferred_type: TastType::U64,
-                kind: TypedExprKind::SizeOf(x_ty.inferred_type),
+                kind: TypedExprKind::SizeOf(x_ty.inferred_type).in_span(expr_span),
             }
         }
 
         ExprKind::NumberLiteral(n) => TypedExpr {
             inferred_type: TastType::I32,
-            kind: TypedExprKind::NumberLiteral(n),
+            kind: TypedExprKind::NumberLiteral(n).in_span(expr_span),
         },
         ExprKind::StringLiteral(str) => TypedExpr {
             inferred_type: TastType::Ptr(Box::new(TastType::U8)),
-            kind: TypedExprKind::StringLiteral(str),
+            kind: TypedExprKind::StringLiteral(str).in_span(expr_span),
         },
         ExprKind::CharLiteral(ch) => TypedExpr {
             inferred_type: TastType::U8,
-            kind: TypedExprKind::CharLiteral(ch),
+            kind: TypedExprKind::CharLiteral(ch).in_span(expr_span),
         },
         ExprKind::Identifier(i) => {
             let ty = scope.get_value(i).ok_or_else(|| {
@@ -637,12 +651,12 @@ pub fn type_expr<'input>(
             })?;
             TypedExpr {
                 inferred_type: ty.clone(),
-                kind: TypedExprKind::Identifier(i),
+                kind: TypedExprKind::Identifier(i).in_span(expr_span),
             }
         }
         ExprKind::BooleanLiteral(value) => TypedExpr {
             inferred_type: TastType::Bool,
-            kind: TypedExprKind::BooleanLiteral(value),
+            kind: TypedExprKind::BooleanLiteral(value).in_span(expr_span),
         },
     })
 }
@@ -775,7 +789,7 @@ mod tests {
                 ),
                 Ok(TypedExpr {
                     inferred_type: TastType::U64,
-                    kind: TypedExprKind::SizeOf(TastType::I32),
+                    kind: TypedExprKind::SizeOf(TastType::I32).in_span(Span::from_positions(0, 9)),
                 })
             );
         }
