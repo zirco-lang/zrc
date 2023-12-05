@@ -204,7 +204,7 @@ fn display_source_window(severity: &Severity, span: Span, source: &str) -> Strin
         .filter(|(_, line)| {
             Span::intersect(
                 Span::from_positions(line.start(), line.ending()),
-                Span::from_positions(span.start(), span.end() - 1),
+                Span::from_positions(span.start(), span.end()),
             )
             .is_some()
         })

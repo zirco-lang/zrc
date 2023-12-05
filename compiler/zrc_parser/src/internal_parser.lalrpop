@@ -105,9 +105,8 @@ Declaration: Declaration<'input> = {
 };
 
 FunctionDeclaration: Declaration<'input> = {
-    "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?> "{"
-        <s:Spanned<StmtList?>>
-    "}" => Declaration::FunctionDeclaration {
+    "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?>
+        <s:Spanned<("{" <StmtList?> "}")>> => Declaration::FunctionDeclaration {
         name: i,
         parameters: a.map(|inner| inner.unwrap_or(ArgumentDeclarationList::empty())),
         return_type: r,
