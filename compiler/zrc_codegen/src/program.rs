@@ -49,19 +49,30 @@ pub fn cg_init_fn<'ctx>(
     fn_val
 }
 
+/// Run optimizations on the given program.
+fn optimize_module(module: &Module<'_>, optimization_level: OptimizationLevel) {
+    let pmb = PassManagerBuilder::create();
+    pmb.set_optimization_level(optimization_level);
+    let pm = PassManager::<Module>::create(());
+    pmb.populate_module_pass_manager(&pm);
+    pm.run_on(module);
+}
+
 /// Code generate and verify a program given a [`Context`] and return the final
-/// global [`CgScope`], and [`Module`].
+/// LLVM [`Module`] as a result, fully optimized and ready for printing as an IR
+/// or compiling to assembly/native code.
 ///
 /// # Panics
 /// Panics if code generation fails. This can be caused by an invalid TAST being
 /// passed, so make sure to type check it so invariants are upheld.
 #[must_use]
-fn cg_program<'input, 'ctx>(
+fn cg_program<'ctx>(
     ctx: &'ctx Context,
     target_machine: &TargetMachine,
+    optimization_level: OptimizationLevel,
     module_name: &str,
-    program: Vec<TypedDeclaration<'input>>,
-) -> (Module<'ctx>, CgScope<'input, 'ctx>) {
+    program: Vec<TypedDeclaration<'_>>,
+) -> Module<'ctx> {
     let builder = ctx.create_builder();
     let module = ctx.create_module(module_name);
 
@@ -163,16 +174,9 @@ fn cg_program<'input, 'ctx>(
 
     module.verify().expect("Generated invalid LLVM IR");
 
-    (module, global_scope)
-}
+    optimize_module(&module, optimization_level);
 
-/// Run optimizations on the given program.
-fn optimize_module(module: &Module<'_>, optimization_level: OptimizationLevel) {
-    let pmb = PassManagerBuilder::create();
-    pmb.set_optimization_level(optimization_level);
-    let pm = PassManager::<Module>::create(());
-    pmb.populate_module_pass_manager(&pm);
-    pm.run_on(module);
+    module
 }
 
 /// Code generate a LLVM program to a string.
@@ -197,15 +201,21 @@ pub fn cg_program_to_string(
             triple,
             cpu,
             "",
-            // FIXME: Does this potentially run the optimizer twice? That may be inefficient.
+            // FIXME: Does this potentially run the optimizer twice (as we run it ourselves later)?
+            // That may be inefficient.
             optimization_level,
             RelocMode::PIC,
             CodeModel::Default,
         )
         .expect("target machine should be created successfully");
 
-    let (module, _global_scope) = cg_program(&ctx, &target_machine, module_name, program);
-    optimize_module(&module, optimization_level);
+    let module = cg_program(
+        &ctx,
+        &target_machine,
+        optimization_level,
+        module_name,
+        program,
+    );
 
     module.print_to_string().to_string()
 }
@@ -234,15 +244,21 @@ pub fn cg_program_to_buffer(
             triple,
             cpu,
             "",
-            // FIXME: Does this potentially run the optimizer twice? That may be inefficient.
+            // FIXME: Does this potentially run the optimizer twice (as we run it ourselves later)?
+            // That may be inefficient.
             optimization_level,
             RelocMode::PIC,
             CodeModel::Default,
         )
         .expect("target machine should be created successfully");
 
-    let (module, _global_scope) = cg_program(&ctx, &target_machine, module_name, program);
-    optimize_module(&module, optimization_level);
+    let module = cg_program(
+        &ctx,
+        &target_machine,
+        optimization_level,
+        module_name,
+        program,
+    );
 
     target_machine
         .write_to_memory_buffer(&module, file_type)
