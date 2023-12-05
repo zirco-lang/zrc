@@ -39,12 +39,14 @@ impl Span {
 
     /// Obtains the starting position of this [`Span`] as a `usize`
     #[must_use]
+    #[inline]
     pub const fn start(&self) -> usize {
         self.0
     }
 
     /// Obtains the ending position of this [`Span`] as a `usize`
     #[must_use]
+    #[inline]
     pub const fn end(&self) -> usize {
         self.1
     }
@@ -52,12 +54,14 @@ impl Span {
     /// Convert this [`Span`] into a [`RangeInclusive`], good for slicing into
     /// your input
     #[must_use]
+    #[inline]
     pub const fn range(&self) -> RangeInclusive<usize> {
         self.start()..=self.end()
     }
 
     /// Creates a [`Spanned<T>`] instance using this [`Span`] and a passed value
     #[must_use]
+    #[inline]
     pub const fn containing<T>(self, value: T) -> Spanned<T> {
         Spanned::from_span_and_value(self, value)
     }
@@ -99,23 +103,27 @@ pub struct Spanned<T>(Span, T);
 impl<T> Spanned<T> {
     /// Create a new [`Spanned<T>`] instance from a [`Span`] and some value
     #[must_use]
+    #[inline]
     pub const fn from_span_and_value(span: Span, value: T) -> Self {
         Self(span, value)
     }
 
     /// Obtains the [`Span`] associated with this [`Spanned<T>`] instance
     #[must_use]
+    #[inline]
     pub const fn span(&self) -> Span {
         self.0
     }
 
     /// Obtains a reference to the value this [`Spanned<T>`] instance wraps
+    #[inline]
     pub const fn value(&self) -> &T {
         &self.1
     }
 
     /// Applies a function to the contained value, returning a new
     /// [`Spanned<T>`] instance with the same associated [`Span`]
+    #[inline]
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Spanned<U> {
         self.span().containing(f(self.into_value()))
     }
@@ -125,23 +133,27 @@ impl<T> Spanned<T> {
     /// This differs from [`Spanned::value`] because it consumes the
     /// [`Spanned<T>`] instance and drops the [`Span`].
     #[allow(clippy::missing_const_for_fn)]
+    #[inline]
     pub fn into_value(self) -> T {
         self.1
     }
 
     /// Obtains the starting position of the contained [`Span`] as a `usize`
     #[must_use]
+    #[inline]
     pub const fn start(&self) -> usize {
         self.span().start()
     }
 
     /// Obtains the ending position of the contained [`Span`] as a `usize`
     #[must_use]
+    #[inline]
     pub const fn end(&self) -> usize {
         self.span().end()
     }
 
     /// Converts a [`&Spanned<T>`][Spanned] to a [`Spanned<&T>`].
+    #[inline]
     pub const fn as_ref(&self) -> Spanned<&T> {
         self.span().containing(&self.1)
     }
@@ -184,6 +196,7 @@ where
 
 // Automatically implement Spannable for all types
 impl<T: Sized> Spannable for T {
+    #[inline]
     fn in_span(self, span: Span) -> Spanned<Self> {
         Spanned::from_span_and_value(span, self)
     }
