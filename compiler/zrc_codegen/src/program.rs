@@ -197,6 +197,8 @@ fn cg_program<'ctx>(
         }
     }
 
+    dbg_builder.finalize();
+
     match module.verify() {
         Ok(()) => {}
 
