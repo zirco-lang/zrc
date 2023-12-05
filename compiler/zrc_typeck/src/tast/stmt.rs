@@ -66,142 +66,6 @@ pub enum TypedStmt<'input> {
     /// A let declaration
     DeclarationList(Vec<LetDeclaration<'input>>),
 }
-
-/// A struct or function declaration at the top level of a file
-#[derive(Debug, Clone, PartialEq)]
-pub enum TypedDeclaration<'input> {
-    /// A declaration of a function
-    FunctionDeclaration {
-        /// The name of the function.
-        name: &'input str,
-        /// The parameters of the function.
-        parameters: ArgumentDeclarationList<'input>,
-        /// The return type of the function. If set to [`None`], the function is
-        /// void.
-        return_type: Option<Type<'input>>,
-        /// The body of the function. If set to [`None`], this is an extern
-        /// declaration.
-        body: Option<Vec<TypedStmt<'input>>>,
-    },
-}
-
-/// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]
-///
-/// May be variadic or not. Variadic only exists on extern.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ArgumentDeclarationList<'input> {
-    /// `(a, b, ...)`
-    Variadic(Vec<ArgumentDeclaration<'input>>),
-    /// `(a, b)` without `...`
-    NonVariadic(Vec<ArgumentDeclaration<'input>>),
-}
-impl<'input> ArgumentDeclarationList<'input> {
-    /// Create the [`ArgumentDeclarationList`] for just `()`
-    #[must_use]
-    pub const fn empty() -> Self {
-        Self::NonVariadic(vec![])
-    }
-
-    /// Get the contained [`Vec`], variadic or not
-    #[must_use]
-    pub fn into_arguments(self) -> Vec<ArgumentDeclaration<'input>> {
-        match self {
-            ArgumentDeclarationList::NonVariadic(x) | Self::Variadic(x) => x,
-        }
-    }
-
-    /// Get the contained [`Vec`], variadic or not
-    #[must_use]
-    pub const fn as_arguments(&self) -> &Vec<ArgumentDeclaration<'input>> {
-        match self {
-            ArgumentDeclarationList::NonVariadic(x) | Self::Variadic(x) => x,
-        }
-    }
-
-    /// Returns `true` if this is [`ArgumentDeclarationList::Variadic`].
-    #[must_use]
-    pub const fn is_variadic(&self) -> bool {
-        match self {
-            ArgumentDeclarationList::Variadic(_) => true,
-            ArgumentDeclarationList::NonVariadic(_) => false,
-        }
-    }
-}
-impl<'input> Display for ArgumentDeclarationList<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (Self::Variadic(args) | Self::NonVariadic(args)) = self;
-
-        write!(
-            f,
-            "{}{}",
-            args.iter()
-                .map(ToString::to_string)
-                .collect::<Vec<String>>()
-                .join(", "),
-            match self {
-                Self::Variadic(_) => ", ...",
-                Self::NonVariadic(_) => "",
-            }
-        )
-    }
-}
-
-impl<'input> Display for TypedDeclaration<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::FunctionDeclaration {
-                name,
-                parameters,
-                return_type: Some(return_ty),
-                body: Some(body),
-            } => write!(
-                f,
-                "fn {name}({}) -> {return_ty} {{\n{}\n}}",
-                parameters,
-                body.iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<String>>()
-                    .join("\n")
-            ),
-            Self::FunctionDeclaration {
-                name,
-                parameters,
-                return_type: Some(return_ty),
-                body: None,
-            } => write!(f, "fn {name}({parameters}) -> {return_ty};"),
-            Self::FunctionDeclaration {
-                name,
-                parameters,
-                return_type: None,
-                body: Some(body),
-            } => write!(
-                f,
-                "fn {name}({parameters}) {{\n{}\n}}",
-                body.iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<String>>()
-                    .join("\n")
-            ),
-            Self::FunctionDeclaration {
-                name,
-                parameters,
-                return_type: None,
-                body: None,
-            } => write!(f, "fn {name}({parameters});"),
-        }
-    }
-}
-
 impl<'input> Display for TypedStmt<'input> {
     #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -312,6 +176,140 @@ impl<'input> Display for TypedStmt<'input> {
                     .join(", ")
             ),
         }
+    }
+}
+
+/// A struct or function declaration at the top level of a file
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypedDeclaration<'input> {
+    /// A declaration of a function
+    FunctionDeclaration {
+        /// The name of the function.
+        name: &'input str,
+        /// The parameters of the function.
+        parameters: ArgumentDeclarationList<'input>,
+        /// The return type of the function. If set to [`None`], the function is
+        /// void.
+        return_type: Option<Type<'input>>,
+        /// The body of the function. If set to [`None`], this is an extern
+        /// declaration.
+        body: Option<Vec<TypedStmt<'input>>>,
+    },
+}
+impl<'input> Display for TypedDeclaration<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type: Some(return_ty),
+                body: Some(body),
+            } => write!(
+                f,
+                "fn {name}({}) -> {return_ty} {{\n{}\n}}",
+                parameters,
+                body.iter()
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            ),
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type: Some(return_ty),
+                body: None,
+            } => write!(f, "fn {name}({parameters}) -> {return_ty};"),
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type: None,
+                body: Some(body),
+            } => write!(
+                f,
+                "fn {name}({parameters}) {{\n{}\n}}",
+                body.iter()
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            ),
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type: None,
+                body: None,
+            } => write!(f, "fn {name}({parameters});"),
+        }
+    }
+}
+
+/// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]
+///
+/// May be variadic or not. Variadic only exists on extern.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArgumentDeclarationList<'input> {
+    /// `(a, b, ...)`
+    Variadic(Vec<ArgumentDeclaration<'input>>),
+    /// `(a, b)` without `...`
+    NonVariadic(Vec<ArgumentDeclaration<'input>>),
+}
+impl<'input> ArgumentDeclarationList<'input> {
+    /// Create the [`ArgumentDeclarationList`] for just `()`
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self::NonVariadic(vec![])
+    }
+
+    /// Get the contained [`Vec`], variadic or not
+    #[must_use]
+    pub fn into_arguments(self) -> Vec<ArgumentDeclaration<'input>> {
+        match self {
+            ArgumentDeclarationList::NonVariadic(x) | Self::Variadic(x) => x,
+        }
+    }
+
+    /// Get the contained [`Vec`], variadic or not
+    #[must_use]
+    pub const fn as_arguments(&self) -> &Vec<ArgumentDeclaration<'input>> {
+        match self {
+            ArgumentDeclarationList::NonVariadic(x) | Self::Variadic(x) => x,
+        }
+    }
+
+    /// Returns `true` if this is [`ArgumentDeclarationList::Variadic`].
+    #[must_use]
+    pub const fn is_variadic(&self) -> bool {
+        match self {
+            ArgumentDeclarationList::Variadic(_) => true,
+            ArgumentDeclarationList::NonVariadic(_) => false,
+        }
+    }
+}
+impl<'input> Display for ArgumentDeclarationList<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (Self::Variadic(args) | Self::NonVariadic(args)) = self;
+
+        write!(
+            f,
+            "{}{}",
+            args.iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>()
+                .join(", "),
+            match self {
+                Self::Variadic(_) => ", ...",
+                Self::NonVariadic(_) => "",
+            }
+        )
     }
 }
 

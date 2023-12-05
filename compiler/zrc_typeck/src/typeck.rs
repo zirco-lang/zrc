@@ -77,7 +77,6 @@ impl<'input> Scope<'input> {
         self.type_scope.insert(identifier, ty);
     }
 }
-
 impl<'input> Default for Scope<'input> {
     fn default() -> Self {
         Self::from_scopes(

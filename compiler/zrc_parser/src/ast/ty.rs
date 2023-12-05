@@ -13,11 +13,27 @@ use zrc_utils::{
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Type<'input>(pub Spanned<TypeKind<'input>>);
+impl<'input> Display for Type<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.value().fmt(f)
+    }
+}
 
 /// The key-value pairs of a struct
 #[derive(PartialEq, Eq, Debug, Clone)]
 #[allow(clippy::type_complexity)]
 pub struct KeyTypeMapping<'input>(pub Spanned<Vec<Spanned<(Spanned<&'input str>, Type<'input>)>>>);
+impl Display for KeyTypeMapping<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, member) in self.0.value().iter().enumerate() {
+            write!(f, "{}: {}", member.value().0.value(), member.value().1)?;
+            if i < self.0.value().len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        Ok(())
+    }
+}
 
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -31,7 +47,6 @@ pub enum TypeKind<'input> {
     /// A direct union type
     Union(KeyTypeMapping<'input>),
 }
-
 impl<'input> Display for TypeKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -40,22 +55,6 @@ impl<'input> Display for TypeKind<'input> {
             Self::Struct(members) => write!(f, "struct {{ {members} }}"),
             Self::Union(members) => write!(f, "union {{ {members} }}"),
         }
-    }
-}
-impl<'input> Display for Type<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.value().fmt(f)
-    }
-}
-impl Display for KeyTypeMapping<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (i, member) in self.0.value().iter().enumerate() {
-            write!(f, "{}: {}", member.value().0.value(), member.value().1)?;
-            if i < self.0.value().len() - 1 {
-                write!(f, ", ")?;
-            }
-        }
-        Ok(())
     }
 }
 

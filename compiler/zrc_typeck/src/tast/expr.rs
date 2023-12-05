@@ -9,17 +9,6 @@ pub use zrc_parser::{
 
 use super::ty::Type;
 
-/// An [expression kind](TypedExprKind) with its yielded [result
-/// type](super::ty::Type) attached to it.
-#[derive(PartialEq, Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
-pub struct TypedExpr<'input> {
-    /// The inferred [`Type`] of this node
-    pub inferred_type: Type<'input>,
-    /// The actual [`TypedExprKind`] backing this expression
-    pub kind: TypedExprKind<'input>,
-}
-
 /// The left hand side of an assignment.
 #[derive(PartialEq, Debug, Clone)]
 pub struct Place<'input> {
@@ -28,6 +17,12 @@ pub struct Place<'input> {
     /// The actual [`PlaceKind`] backing this expression
     pub kind: PlaceKind<'input>,
 }
+impl<'input> Display for Place<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}) as ({})", self.inferred_type, self.kind)
+    }
+}
+
 /// The valid left-hand-side of a [`TypedExprKind::Assignment`].
 ///
 /// Places may be:
@@ -43,6 +38,32 @@ pub enum PlaceKind<'input> {
     Index(Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
     /// `x.y`
     Dot(Box<Place<'input>>, &'input str),
+}
+impl<'input> Display for PlaceKind<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Deref(expr) => write!(f, "*{expr}"),
+            Self::Variable(ident) => write!(f, "{ident}"),
+            Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
+            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
+        }
+    }
+}
+
+/// An [expression kind](TypedExprKind) with its yielded [result
+/// type](super::ty::Type) attached to it.
+#[derive(PartialEq, Debug, Clone)]
+#[allow(clippy::module_name_repetitions)]
+pub struct TypedExpr<'input> {
+    /// The inferred [`Type`] of this node
+    pub inferred_type: Type<'input>,
+    /// The actual [`TypedExprKind`] backing this expression
+    pub kind: TypedExprKind<'input>,
+}
+impl<'input> Display for TypedExpr<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(({}) as ({}))", self.inferred_type, self.kind)
+    }
 }
 
 /// The kind of a [`TypedExpr`]
@@ -112,7 +133,6 @@ pub enum TypedExprKind<'input> {
     /// Any boolean literal.
     BooleanLiteral(bool),
 }
-
 impl<'input> Display for TypedExprKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -155,26 +175,5 @@ impl<'input> Display for TypedExprKind<'input> {
                     .join(", ")
             ),
         }
-    }
-}
-impl<'input> Display for PlaceKind<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Deref(expr) => write!(f, "*{expr}"),
-            Self::Variable(ident) => write!(f, "{ident}"),
-            Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
-            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
-        }
-    }
-}
-impl<'input> Display for Place<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}) as ({})", self.inferred_type, self.kind)
-    }
-}
-
-impl<'input> Display for TypedExpr<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "(({}) as ({}))", self.inferred_type, self.kind)
     }
 }

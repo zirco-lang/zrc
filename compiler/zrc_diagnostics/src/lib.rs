@@ -87,6 +87,18 @@ impl Display for Severity {
 /// A diagnostic message produced by zrc
 #[derive(Debug, PartialEq, Eq)]
 pub struct Diagnostic(pub Severity, pub Spanned<DiagnosticKind>);
+impl Diagnostic {
+    /// Convert this [`Diagnostic`] to a printable string
+    #[must_use]
+    pub fn print(&self, source: &str) -> String {
+        format!(
+            "{}: {}\n{}",
+            self.0,
+            Color::White.bold().paint(self.1.value().to_string()),
+            display_source_window(&self.0, self.1.span(), source)
+        )
+    }
+}
 impl Error for Diagnostic {}
 impl Display for Diagnostic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -258,17 +270,4 @@ fn display_source_window(severity: &Severity, span: Span, source: &str) -> Strin
         })
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-impl Diagnostic {
-    /// Convert this [`Diagnostic`] to a printable string
-    #[must_use]
-    pub fn print(&self, source: &str) -> String {
-        format!(
-            "{}: {}\n{}",
-            self.0,
-            Color::White.bold().paint(self.1.value().to_string()),
-            display_source_window(&self.0, self.1.span(), source)
-        )
-    }
 }

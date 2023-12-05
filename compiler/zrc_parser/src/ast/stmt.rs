@@ -13,6 +13,11 @@ use super::{expr::Expr, ty::Type};
 /// A Zirco statement
 #[derive(PartialEq, Debug, Clone)]
 pub struct Stmt<'input>(pub Spanned<StmtKind<'input>>);
+impl<'input> Display for Stmt<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.value().fmt(f)
+    }
+}
 
 /// The enum representing all the different kinds of statements in Zirco
 ///
@@ -54,6 +59,63 @@ pub enum StmtKind<'input> {
     /// A let declaration
     DeclarationList(Spanned<Vec<Spanned<LetDeclaration<'input>>>>),
 }
+impl<'input> Display for StmtKind<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::IfStmt(cond, if_true, None) => write!(f, "if ({cond}) {if_true}"),
+            Self::IfStmt(cond, if_true, Some(if_false)) => {
+                write!(f, "if ({cond}) {if_true} else {if_false}")
+            }
+            Self::WhileStmt(cond, body) => write!(f, "while ({cond}) {body}"),
+            Self::ForStmt {
+                init,
+                cond,
+                post,
+                body,
+            } => {
+                write!(
+                    f,
+                    "for ({} {}; {}) {body}",
+                    init.as_ref().map_or(";".to_string(), |x| format!(
+                        "let {};",
+                        x.value()
+                            .iter()
+                            .map(|x| x.value().to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )),
+                    cond.as_ref().map_or(String::new(), ToString::to_string),
+                    post.as_ref().map_or(String::new(), ToString::to_string),
+                )
+            }
+
+            Self::BlockStmt(stmts) => {
+                write!(f, "{{")?;
+                for stmt in stmts {
+                    write!(f, "{stmt}")?;
+                }
+                write!(f, "}}")
+            }
+            Self::ExprStmt(expr) => write!(f, "{expr};"),
+            Self::EmptyStmt => write!(f, ";"),
+            Self::ContinueStmt => write!(f, "continue;"),
+            Self::BreakStmt => write!(f, "break;"),
+            Self::ReturnStmt(Some(expr)) => write!(f, "return {expr};",),
+            Self::ReturnStmt(None) => write!(f, "return;"),
+            Self::DeclarationList(list) => {
+                write!(
+                    f,
+                    "let {};",
+                    list.value()
+                        .iter()
+                        .map(|x| x.value().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+        }
+    }
+}
 
 /// A struct or function declaration at the top level of a file
 #[derive(PartialEq, Debug, Clone)]
@@ -80,43 +142,6 @@ pub enum Declaration<'input> {
         ty: Type<'input>,
     },
 }
-
-/// The list of arguments on a [`Declaration::FunctionDeclaration`]
-///
-/// May be variadic or not.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ArgumentDeclarationList<'input> {
-    /// `(a, b, ...)`
-    Variadic(Vec<Spanned<ArgumentDeclaration<'input>>>),
-    /// `(a, b)` without `...`
-    NonVariadic(Vec<Spanned<ArgumentDeclaration<'input>>>),
-}
-impl<'input> ArgumentDeclarationList<'input> {
-    /// Create the [`ArgumentDeclarationList`] for just `()`
-    #[must_use]
-    pub const fn empty() -> Self {
-        Self::NonVariadic(vec![])
-    }
-}
-impl<'input> Display for ArgumentDeclarationList<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (Self::Variadic(args) | Self::NonVariadic(args)) = self;
-
-        write!(
-            f,
-            "{}{}",
-            args.iter()
-                .map(|x| x.value().to_string())
-                .collect::<Vec<String>>()
-                .join(", "),
-            match self {
-                Self::Variadic(_) => ", ...",
-                Self::NonVariadic(_) => "",
-            }
-        )
-    }
-}
-
 impl<'input> Display for Declaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -177,66 +202,39 @@ impl<'input> Display for Declaration<'input> {
     }
 }
 
-impl<'input> Display for Stmt<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.value().fmt(f)
+/// The list of arguments on a [`Declaration::FunctionDeclaration`]
+///
+/// May be variadic or not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArgumentDeclarationList<'input> {
+    /// `(a, b, ...)`
+    Variadic(Vec<Spanned<ArgumentDeclaration<'input>>>),
+    /// `(a, b)` without `...`
+    NonVariadic(Vec<Spanned<ArgumentDeclaration<'input>>>),
+}
+impl<'input> ArgumentDeclarationList<'input> {
+    /// Create the [`ArgumentDeclarationList`] for just `()`
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self::NonVariadic(vec![])
     }
 }
-impl<'input> Display for StmtKind<'input> {
+impl<'input> Display for ArgumentDeclarationList<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::IfStmt(cond, if_true, None) => write!(f, "if ({cond}) {if_true}"),
-            Self::IfStmt(cond, if_true, Some(if_false)) => {
-                write!(f, "if ({cond}) {if_true} else {if_false}")
-            }
-            Self::WhileStmt(cond, body) => write!(f, "while ({cond}) {body}"),
-            Self::ForStmt {
-                init,
-                cond,
-                post,
-                body,
-            } => {
-                write!(
-                    f,
-                    "for ({} {}; {}) {body}",
-                    init.as_ref().map_or(";".to_string(), |x| format!(
-                        "let {};",
-                        x.value()
-                            .iter()
-                            .map(|x| x.value().to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )),
-                    cond.as_ref().map_or(String::new(), ToString::to_string),
-                    post.as_ref().map_or(String::new(), ToString::to_string),
-                )
-            }
+        let (Self::Variadic(args) | Self::NonVariadic(args)) = self;
 
-            Self::BlockStmt(stmts) => {
-                write!(f, "{{")?;
-                for stmt in stmts {
-                    write!(f, "{stmt}")?;
-                }
-                write!(f, "}}")
+        write!(
+            f,
+            "{}{}",
+            args.iter()
+                .map(|x| x.value().to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+            match self {
+                Self::Variadic(_) => ", ...",
+                Self::NonVariadic(_) => "",
             }
-            Self::ExprStmt(expr) => write!(f, "{expr};"),
-            Self::EmptyStmt => write!(f, ";"),
-            Self::ContinueStmt => write!(f, "continue;"),
-            Self::BreakStmt => write!(f, "break;"),
-            Self::ReturnStmt(Some(expr)) => write!(f, "return {expr};",),
-            Self::ReturnStmt(None) => write!(f, "return;"),
-            Self::DeclarationList(list) => {
-                write!(
-                    f,
-                    "let {};",
-                    list.value()
-                        .iter()
-                        .map(|x| x.value().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            }
-        }
+        )
     }
 }
 
@@ -251,7 +249,6 @@ pub struct LetDeclaration<'input> {
     /// The value to associate with the new symbol.
     pub value: Option<Expr<'input>>,
 }
-
 impl<'input> Display for LetDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.ty {
@@ -275,7 +272,6 @@ pub struct ArgumentDeclaration<'input> {
     /// The type of the parameter.
     pub ty: Type<'input>,
 }
-
 impl<'input> Display for ArgumentDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.name.value(), self.ty)
