@@ -73,7 +73,6 @@ pub use inkwell::{
     targets::{FileType, TargetTriple},
     OptimizationLevel,
 };
-use line_numbers::LinePositions;
 pub use program::{cg_program_to_buffer, cg_program_to_string};
 
 /// Gets the native [`TargetTriple`].
