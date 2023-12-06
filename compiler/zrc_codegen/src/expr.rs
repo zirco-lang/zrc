@@ -1022,6 +1022,25 @@ mod tests {
                 }
             "});
         }
+
+        #[test]
+        fn union_property_access_in_place_position() {
+            cg_snapshot_test!(indoc! {"
+                union U { x: i32, y: i8 }
+
+                fn test() {
+                    let x: U;
+
+                    // TEST: the pointer is cast and then written to as an i32
+                    x.x = 4;
+
+                    // TEST: the pointer is cast and then written to as an i8
+                    x.y = 5 as i8;
+
+                    return;
+                }
+            "});
+        }
     }
     mod cg_expr {
         use super::*;
@@ -1088,6 +1107,27 @@ mod tests {
         }
 
         #[test]
+        fn union_property_access_in_expr_position() {
+            cg_snapshot_test!(indoc! {"
+                union U { x: i32, y: i8 }
+                fn take_i32(x: i32);
+                fn take_i8(x: i8);
+
+                fn test() {
+                    let x: U;
+
+                    // TEST: the pointer is cast and then read from as an i32
+                    take_i32(x.x);
+
+                    // TEST: the pointer is cast and then read from as an i8
+                    take_i8(x.y);
+
+                    return;
+                }
+            "});
+        }
+
+        #[test]
         fn ternary_operations_generate() {
             cg_snapshot_test!(indoc! {"
                 fn get_bool() -> bool;
@@ -1144,6 +1184,105 @@ mod tests {
                     return;
                 }
             "#});
+        }
+
+        #[test]
+        fn arithmetic_operators_generate() {
+            cg_snapshot_test!(indoc! {"
+                fn get_int() -> i32;
+                fn get_uint() -> u32;
+
+                fn test() {
+                    let sx = get_int();
+                    let sy = get_int();
+                    let ux = get_uint();
+                    let uy = get_uint();
+
+                    // TEST: should create an `add i32` instruction
+                    let s_add = sx + sy;
+                    let u_add = ux + uy;
+
+                    // TEST: should create a `sub i32` instruction
+                    let s_sub = sx - sy;
+                    let u_sub = ux - uy;
+
+                    // TEST: should create a `mul i32` instruction
+                    let s_mul = sx * sy;
+                    let u_mul = ux * uy;
+
+                    // TEST: should create a `sdiv i32` instruction
+                    let s_div = sx / sy;
+                    // TEST: should create a `udiv i32` instruction
+                    let u_div = ux / uy;
+
+                    // TEST: should create a `srem i32` instruction
+                    let s_rem = sx % sy;
+                    // TEST: should create a `urem i32` instruction
+                    let u_rem = ux % uy;
+
+                    return;
+                }
+            "});
+        }
+
+        #[test]
+        fn logical_operators_generate() {
+            cg_snapshot_test!(indoc! {"
+                fn get_bool() -> bool;
+
+                fn test() {
+                    let a = get_bool();
+                    let b = get_bool();
+
+                    // TEST: should create a bit AND
+                    let and = a && b;
+
+                    // TEST: should create a bit OR
+                    let or = a || b;
+
+                    // TEST: should create a bit NOT
+                    let not = !a;
+
+                    return;
+                }
+            "});
+        }
+
+        #[test]
+        fn bitwise_operators_generate() {
+            cg_snapshot_test!(indoc! {"
+                fn get_int() -> i32;
+                fn get_uint() -> u32;
+
+                fn test() {
+                    let x = get_int();
+                    let y = get_int();
+                    let u = get_uint();
+
+                    // TEST: should create a `not i32` instruction
+                    let not = ~x;
+
+                    // TEST: should create a `and i32` instruction
+                    let and = x & y;
+
+                    // TEST: should create a `or i32` instruction
+                    let or = x | y;
+
+                    // TEST: should create a `xor i32` instruction
+                    let xor = x ^ y;
+
+                    // TEST: should create a `shl i32` instruction
+                    let shl = x << u;
+
+                    // TEST: should create a `lshr i32` instruction
+                    let lshr = u >> u;
+
+                    // TEST: should create a `ashr i32` instruction (as the lhs is signed)
+                    let ashr = x >> u;
+
+                    return;
+                }
+            "});
         }
     }
 }

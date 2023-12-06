@@ -1,0 +1,101 @@
+---
+source: compiler/zrc_codegen/src/expr.rs
+description: "fn get_int() -> i32;\nfn get_uint() -> u32;\n\nfn test() {\n    let x = get_int();\n    let y = get_int();\n    let u = get_uint();\n\n    // TEST: should create a `not i32` instruction\n    let not = ~x;\n\n    // TEST: should create a `and i32` instruction\n    let and = x & y;\n\n    // TEST: should create a `or i32` instruction\n    let or = x | y;\n\n    // TEST: should create a `xor i32` instruction\n    let xor = x ^ y;\n\n    // TEST: should create a `shl i32` instruction\n    let shl = x << u;\n\n    // TEST: should create a `lshr i32` instruction\n    let lshr = u >> u;\n\n    // TEST: should create a `ashr i32` instruction (as the lhs is signed)\n    let ashr = x >> u;\n\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test.zr'
+source_filename = "test.zr"
+
+declare i32 @get_int()
+
+declare i32 @get_uint()
+
+define void @test() !dbg !3 {
+entry:
+  %let_ashr = alloca i32, align 4
+  %let_lshr = alloca i32, align 4
+  %let_shl = alloca i32, align 4
+  %let_xor = alloca i32, align 4
+  %let_or = alloca i32, align 4
+  %let_and = alloca i32, align 4
+  %let_not = alloca i32, align 4
+  %let_u = alloca i32, align 4
+  %let_y = alloca i32, align 4
+  %let_x = alloca i32, align 4
+  %call = call i32 @get_int(), !dbg !8
+  store i32 %call, ptr %let_x, align 4, !dbg !11
+  %call1 = call i32 @get_int(), !dbg !12
+  store i32 %call1, ptr %let_y, align 4, !dbg !13
+  %call2 = call i32 @get_uint(), !dbg !14
+  store i32 %call2, ptr %let_u, align 4, !dbg !15
+  %load = load i32, ptr %let_x, align 4, !dbg !16
+  %not = xor i32 %load, -1, !dbg !16
+  store i32 %not, ptr %let_not, align 4, !dbg !17
+  %load3 = load i32, ptr %let_x, align 4, !dbg !18
+  %load4 = load i32, ptr %let_y, align 4, !dbg !19
+  %and = and i32 %load3, %load4, !dbg !19
+  store i32 %and, ptr %let_and, align 4, !dbg !20
+  %load5 = load i32, ptr %let_x, align 4, !dbg !21
+  %load6 = load i32, ptr %let_y, align 4, !dbg !22
+  %or = or i32 %load5, %load6, !dbg !22
+  store i32 %or, ptr %let_or, align 4, !dbg !23
+  %load7 = load i32, ptr %let_x, align 4, !dbg !24
+  %load8 = load i32, ptr %let_y, align 4, !dbg !25
+  %xor = xor i32 %load7, %load8, !dbg !25
+  store i32 %xor, ptr %let_xor, align 4, !dbg !26
+  %load9 = load i32, ptr %let_x, align 4, !dbg !27
+  %load10 = load i32, ptr %let_u, align 4, !dbg !28
+  %shl = shl i32 %load9, %load10, !dbg !28
+  store i32 %shl, ptr %let_shl, align 4, !dbg !29
+  %load11 = load i32, ptr %let_u, align 4, !dbg !30
+  %load12 = load i32, ptr %let_u, align 4, !dbg !31
+  %shr = lshr i32 %load11, %load12, !dbg !31
+  store i32 %shr, ptr %let_lshr, align 4, !dbg !32
+  %load13 = load i32, ptr %let_x, align 4, !dbg !33
+  %load14 = load i32, ptr %let_u, align 4, !dbg !34
+  %shr15 = ashr i32 %load13, %load14, !dbg !34
+  store i32 %shr15, ptr %let_ashr, align 4, !dbg !35
+  ret void, !dbg !36
+}
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc test runner", isOptimized: false, flags: "zrc --fake-args", runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false)
+!2 = !DIFile(filename: "test.zr", directory: "/fake/path")
+!3 = distinct !DISubprogram(name: "test", linkageName: "test", scope: null, file: !2, line: 4, type: !4, scopeLine: 4, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
+!4 = !DISubroutineType(types: !5)
+!5 = !{!6}
+!6 = !DIBasicType(name: "void")
+!7 = !{}
+!8 = !DILocation(line: 5, column: 13, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 4, column: 11)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 4, column: 1)
+!11 = !DILocation(line: 5, column: 9, scope: !9)
+!12 = !DILocation(line: 6, column: 13, scope: !9)
+!13 = !DILocation(line: 6, column: 9, scope: !9)
+!14 = !DILocation(line: 7, column: 13, scope: !9)
+!15 = !DILocation(line: 7, column: 9, scope: !9)
+!16 = !DILocation(line: 10, column: 16, scope: !9)
+!17 = !DILocation(line: 10, column: 9, scope: !9)
+!18 = !DILocation(line: 13, column: 15, scope: !9)
+!19 = !DILocation(line: 13, column: 19, scope: !9)
+!20 = !DILocation(line: 13, column: 9, scope: !9)
+!21 = !DILocation(line: 16, column: 14, scope: !9)
+!22 = !DILocation(line: 16, column: 18, scope: !9)
+!23 = !DILocation(line: 16, column: 9, scope: !9)
+!24 = !DILocation(line: 19, column: 15, scope: !9)
+!25 = !DILocation(line: 19, column: 19, scope: !9)
+!26 = !DILocation(line: 19, column: 9, scope: !9)
+!27 = !DILocation(line: 22, column: 15, scope: !9)
+!28 = !DILocation(line: 22, column: 20, scope: !9)
+!29 = !DILocation(line: 22, column: 9, scope: !9)
+!30 = !DILocation(line: 25, column: 16, scope: !9)
+!31 = !DILocation(line: 25, column: 21, scope: !9)
+!32 = !DILocation(line: 25, column: 9, scope: !9)
+!33 = !DILocation(line: 28, column: 16, scope: !9)
+!34 = !DILocation(line: 28, column: 21, scope: !9)
+!35 = !DILocation(line: 28, column: 9, scope: !9)
+!36 = !DILocation(line: 30, column: 5, scope: !9)
+

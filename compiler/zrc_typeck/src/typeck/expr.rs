@@ -130,6 +130,16 @@ fn expect_is_signed_integer(ty: &TastType, span: Span) -> Result<(), Diagnostic>
     )
 }
 
+/// Assert that a type is an unsigned integer type
+fn expect_is_unsigned_integer(ty: &TastType, span: Span) -> Result<(), Diagnostic> {
+    expect(
+        ty.is_unsigned_integer(),
+        "unsigned integer".to_string(),
+        ty.to_string(),
+        span,
+    )
+}
+
 // FIXME: this NEEDS to be rewritten to use references almost everywhere and be
 // no-clone. We stack overflow for deep expressions which is VERY VERY BAD.
 /// Type check and infer an [AST expression](Expr) to a [TAST
@@ -507,10 +517,12 @@ pub fn type_expr<'input>(
             expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
             if matches!(op, BinaryBitwise::Shl | BinaryBitwise::Shr) {
-                expect_is_signed_integer(&lhs_t.inferred_type, lhs_span)?;
+                // we can only shift by an unsigned integer
+                expect_is_unsigned_integer(&rhs_t.inferred_type, rhs_span)?;
+            } else {
+                // otherwise these must be the same type
+                expect_identical_types(&lhs_t.inferred_type, &rhs_t.inferred_type, expr_span)?;
             }
-
-            expect_identical_types(&lhs_t.inferred_type, &rhs_t.inferred_type, expr_span)?;
 
             TypedExpr {
                 inferred_type: lhs_t.inferred_type.clone(),
