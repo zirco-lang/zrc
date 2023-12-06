@@ -144,15 +144,18 @@ struct CgContext<'ctx, 'a> {
     fn_value: FunctionValue<'ctx>,
 }
 
-/// Wrapper around the [`line_numbers`] crate to properly increment the values by 1
+/// Wrapper around the [`line_numbers`] crate to properly increment the values
+/// by 1
 #[derive(Debug)]
 struct CgLineLookup(LinePositions);
 
 impl CgLineLookup {
+    /// Creates a new [`CgLineLookup`] over a string
     pub fn new(input: &str) -> Self {
         Self(LinePositions::from(input))
     }
 
+    /// Look up the `1`-indexed line number from an offset in the string
     pub fn lookup_from_index(&self, index: usize) -> u32 {
         // because LLVM line #s start at 1
         self.0.from_offset(index).0 + 1

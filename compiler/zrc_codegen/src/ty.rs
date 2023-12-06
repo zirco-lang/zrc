@@ -3,8 +3,7 @@
 use inkwell::{
     context::Context,
     debug_info::{
-        AsDIScope, DIBasicType, DIDerivedType, DIFile, DIScope, DISubroutineType, DIType,
-        DebugInfoBuilder,
+        AsDIScope, DIBasicType, DIDerivedType, DIFile, DISubroutineType, DIType, DebugInfoBuilder,
     },
     targets::TargetMachine,
     types::{
@@ -40,8 +39,9 @@ fn create_ptr<'ctx>(
 }
 /// Create a function pointer from a prototype.
 ///
-/// Returns a DIBasicType because for some reason DISubroutineType can't be cast to a DIType.
-/// Use .1 when doing .create_function, use .2 for other uses
+/// Returns a [`DIBasicType`] because for some reason [`DISubroutineType`] can't
+/// be cast to a [`DIType`]. Use .1 when doing ``.create_function``, use .2 for
+/// other uses
 ///
 /// # Panics
 /// Panics if `ty` is [`AnyTypeEnum::FunctionType`].
@@ -73,7 +73,7 @@ pub fn create_fn<'ctx>(
         dbg_builder.create_subroutine_type(file, Some(dbg_ty), dbg_args, 0),
         dbg_builder
             .create_basic_type(&ty.to_string(), 0, 0, 0)
-            .unwrap(),
+            .expect("basic type should be valid"),
     )
 }
 
@@ -239,7 +239,7 @@ pub fn llvm_type<'ctx>(
             ctx.void_type().as_any_type_enum(),
             dbg_builder
                 .create_basic_type("void", 0, 0, 0)
-                .unwrap()
+                .expect("basic type should be valid")
                 .as_type(),
         ),
 
@@ -273,9 +273,7 @@ pub fn llvm_type<'ctx>(
                     .as_arguments()
                     .iter()
                     .map(|arg| {
-                        llvm_basic_type(file, dbg_builder, ctx, target_machine, arg.ty.value())
-                            .1
-                            .into()
+                        llvm_basic_type(file, dbg_builder, ctx, target_machine, arg.ty.value()).1
                     })
                     .collect::<Vec<_>>(),
                 is_variadic,

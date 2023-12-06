@@ -3,7 +3,7 @@
 use inkwell::{
     context::Context,
     debug_info::{
-        AsDIScope, DICompileUnit, DIFile, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage,
+        AsDIScope, DICompileUnit, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage,
         DebugInfoBuilder,
     },
     memory_buffer::MemoryBuffer,
@@ -12,11 +12,10 @@ use inkwell::{
     targets::{
         CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
     },
-    types::{AnyType, BasicMetadataTypeEnum, BasicType, BasicTypeEnum},
+    types::{AnyType, BasicMetadataTypeEnum, BasicTypeEnum},
     values::{BasicValueEnum, FunctionValue},
     OptimizationLevel,
 };
-use line_numbers::LinePositions;
 use zrc_typeck::tast::{
     stmt::{ArgumentDeclaration, TypedDeclaration},
     ty::Type,
@@ -33,8 +32,9 @@ use crate::{
 /// This should only be used when generating **extern** declarations, as
 /// it does not produce the needed [`DISubprogram`] for debugging.
 /// Use [`cg_init_fn`] instead for definitions.
-/// We do not attach debugging info to extern functions, to follow with clang's (probably correct)
-/// behavior.
+/// We do not attach debugging info to extern functions, to follow with clang's
+/// (probably correct) behavior.
+#[allow(clippy::too_many_arguments)]
 pub fn cg_init_extern_fn<'ctx>(
     ctx: &'ctx Context,
     dbg_builder: &DebugInfoBuilder<'ctx>,
@@ -85,8 +85,9 @@ pub fn cg_init_extern_fn<'ctx>(
     fn_val
 }
 
-/// Same as [`cg_init_extern_fn`] but properly initializes function *definitions* with their
-/// debugging information.
+/// Same as [`cg_init_extern_fn`] but properly initializes function
+/// *definitions* with their debugging information.
+#[allow(clippy::too_many_arguments)]
 pub fn cg_init_fn<'ctx>(
     ctx: &'ctx Context,
     dbg_builder: &DebugInfoBuilder<'ctx>,
@@ -123,7 +124,7 @@ pub fn cg_init_fn<'ctx>(
         })
         .unzip();
 
-    let (fn_type, fn_dbg_subroutine, fn_dbg_type) = create_fn(
+    let (fn_type, fn_dbg_subroutine, _fn_dbg_type) = create_fn(
         dbg_builder,
         compilation_unit.get_file(),
         ret_type.as_any_type_enum(),

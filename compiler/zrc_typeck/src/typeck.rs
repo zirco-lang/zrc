@@ -110,9 +110,9 @@ pub fn type_program(
             declaration
                 .map(|declaration| process_declaration(&mut scope, declaration).transpose())
                 .transpose()
-                .map(|x| x.transpose())
+                .map(zrc_utils::span::Spanned::<Result<_, _>>::transpose)
         })
         // drop the redundant/erroneous error spans
-        .map(|x| x.map_err(|x| x.into_value()))
+        .map(|x| x.map_err(zrc_utils::span::Spanned::into_value))
         .collect()
 }
