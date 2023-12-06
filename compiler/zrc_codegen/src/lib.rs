@@ -50,7 +50,7 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 use inkwell::{
     basic_block::BasicBlock,
@@ -148,13 +148,17 @@ struct CgContext<'ctx, 'a> {
 /// Wrapper around a line and column
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct LineAndCol {
+    /// The 1-indexed line number
     line: u32,
+    /// The 1-indexed column number
+    // REVIEW: Is it truly 1-indexed? If it's 0, LLVM will treat it as "no column known"
     col: u32,
 }
 
 /// Simple tool to lookup the line and column of a location in the source file
 #[derive(Debug)]
 struct CgLineLookup {
+    /// The spans of each line in the input
     line_spans: Vec<(usize, usize)>,
 }
 
@@ -179,13 +183,13 @@ impl CgLineLookup {
             .line_spans
             .binary_search_by(|(line_start, line_end)| {
                 if *line_end < index {
-                    return std::cmp::Ordering::Less;
+                    return Ordering::Less;
                 }
                 if *line_start > index {
-                    return std::cmp::Ordering::Greater;
+                    return Ordering::Greater;
                 }
 
-                std::cmp::Ordering::Equal
+                Ordering::Equal
             })
             .expect("line should be present");
 

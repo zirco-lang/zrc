@@ -35,7 +35,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
     cg: CgContext<'ctx, 'a>,
     mut bb: BasicBlock<'ctx>,
     scope: &'a mut CgScope<'input, 'ctx>,
-    dbg_scope: &DILexicalBlock<'ctx>,
+    dbg_scope: DILexicalBlock<'ctx>,
     declarations: Vec<LetDeclaration<'input>>,
 ) -> BasicBlock<'ctx> {
     for let_declaration in declarations {
@@ -113,7 +113,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
     cg: CgContext<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     parent_scope: &'a CgScope<'input, 'ctx>,
-    parent_lexical_block: &DILexicalBlock<'ctx>,
+    parent_lexical_block: DILexicalBlock<'ctx>,
     block: Spanned<Vec<TypedStmt<'input>>>,
     breakaway: &Option<LoopBreakaway<'ctx>>,
 ) -> Option<BasicBlock<'ctx>> {
@@ -144,15 +144,16 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
 
             match stmt.0.into_value() {
                 TypedStmtKind::ExprStmt(expr) => {
-                    Some(cg_expr(cg, bb, &scope, &lexical_block, expr).bb)
+                    Some(cg_expr(cg, bb, &scope, lexical_block, expr).bb)
                 }
 
                 TypedStmtKind::IfStmt(cond, then, then_else) => {
-                    let then_else = then_else
-                        .unwrap_or(vec![].in_span(Span::from_positions(then.end(), then.end())));
+                    let then_else = then_else.unwrap_or_else(|| {
+                        vec![].in_span(Span::from_positions(then.end(), then.end()))
+                    });
 
                     let BasicBlockAnd { value: cond, .. } =
-                        cg_expr(cg, bb, &scope, &lexical_block, cond);
+                        cg_expr(cg, bb, &scope, lexical_block, cond);
 
                     let then_bb = cg.ctx.append_basic_block(cg.fn_value, "then");
                     let then_else_bb = cg.ctx.append_basic_block(cg.fn_value, "then_else");
@@ -163,14 +164,14 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
 
                     cg.builder.position_at_end(then_bb);
                     let maybe_then_bb =
-                        cg_block(cg, then_bb, &scope, &lexical_block, then, breakaway);
+                        cg_block(cg, then_bb, &scope, lexical_block, then, breakaway);
 
                     cg.builder.position_at_end(then_else_bb);
                     let maybe_then_else_bb = cg_block(
                         cg,
                         then_else_bb,
                         &scope,
-                        &lexical_block,
+                        lexical_block,
                         then_else,
                         breakaway,
                     );
@@ -211,14 +212,14 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     cg,
                     bb,
                     &scope,
-                    &lexical_block,
+                    lexical_block,
                     block.in_span(stmt_span),
                     breakaway,
                 ),
 
                 TypedStmtKind::ReturnStmt(Some(expr)) => {
                     let BasicBlockAnd { value: expr, .. } =
-                        cg_expr(cg, bb, &scope, &lexical_block, expr);
+                        cg_expr(cg, bb, &scope, lexical_block, expr);
 
                     cg.builder
                         .build_return(Some(&expr))
@@ -265,7 +266,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     cg,
                     bb,
                     &mut scope,
-                    &lexical_block,
+                    lexical_block,
                     declarations,
                 )),
 
@@ -290,7 +291,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     // The block we are currently in will become the preheader. Generate the `init`
                     // code if there is any.
                     if let Some(init) = init {
-                        cg_let_declaration(cg, bb, &mut scope, &lexical_block, *init);
+                        cg_let_declaration(cg, bb, &mut scope, lexical_block, *init);
                     }
 
                     let header = cg.ctx.append_basic_block(cg.fn_value, "header");
@@ -318,7 +319,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                             let BasicBlockAnd {
                                 bb: header,
                                 value: cond,
-                            } = cg_expr(cg, header, &scope, &lexical_block, cond);
+                            } = cg_expr(cg, header, &scope, lexical_block, cond);
 
                             cg.builder
                                 .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -334,7 +335,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         cg,
                         body_bb,
                         &scope,
-                        &lexical_block,
+                        lexical_block,
                         body,
                         &Some(LoopBreakaway {
                             on_break: exit,
@@ -352,7 +353,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     // Latch runs post and then breaks right back to the header.
                     cg.builder.position_at_end(latch);
                     if let Some(post) = post {
-                        cg_expr(cg, latch, &scope, &lexical_block, post);
+                        cg_expr(cg, latch, &scope, lexical_block, post);
                     }
 
                     cg.builder
@@ -387,7 +388,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     cg.builder.position_at_end(header);
 
                     let BasicBlockAnd { value: cond, .. } =
-                        cg_expr(cg, header, &scope, &lexical_block, cond);
+                        cg_expr(cg, header, &scope, lexical_block, cond);
 
                     cg.builder
                         .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -399,7 +400,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         cg,
                         body_bb,
                         &scope,
-                        &lexical_block,
+                        lexical_block,
                         body,
                         &Some(LoopBreakaway {
                             on_break: exit,

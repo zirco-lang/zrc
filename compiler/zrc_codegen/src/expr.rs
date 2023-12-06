@@ -28,7 +28,7 @@ fn cg_place<'ctx, 'a>(
     cg: CgContext<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'_, 'ctx>,
-    dbg_scope: &DILexicalBlock<'ctx>,
+    dbg_scope: DILexicalBlock<'ctx>,
     place: Place,
 ) -> BasicBlockAnd<'ctx, PointerValue<'ctx>> {
     let place_span = place.kind.span();
@@ -147,7 +147,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
     cg: CgContext<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'_, 'ctx>,
-    dbg_scope: &DILexicalBlock<'ctx>,
+    dbg_scope: DILexicalBlock<'ctx>,
     expr: TypedExpr,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
     let expr_span = expr.kind.span();

@@ -317,7 +317,7 @@ fn cg_program<'ctx>(
                     },
                     entry,
                     &fn_scope,
-                    &lexical_block,
+                    lexical_block,
                     body,
                     &None,
                 );
