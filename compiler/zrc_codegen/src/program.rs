@@ -231,6 +231,8 @@ fn cg_program<'ctx>(
                 return_type,
                 body: Some(body),
             } => {
+                let body_span = body.span();
+
                 let (fn_value, fn_subprogram) = cg_init_fn(
                     ctx,
                     &dbg_builder,
@@ -255,6 +257,24 @@ fn cg_program<'ctx>(
 
                 let entry = ctx.append_basic_block(fn_value, "entry");
                 builder.position_at_end(entry);
+
+                let line_and_col = line_lookup.lookup_from_index(body_span.start());
+
+                let lexical_block = dbg_builder.create_lexical_block(
+                    fn_subprogram.as_debug_info_scope(),
+                    compilation_unit.get_file(),
+                    line_and_col.line,
+                    line_and_col.col,
+                );
+
+                let debug_location = dbg_builder.create_debug_location(
+                    ctx,
+                    line_and_col.line,
+                    line_and_col.col,
+                    lexical_block.as_debug_info_scope(),
+                    None,
+                );
+                builder.set_current_debug_location(debug_location);
 
                 for (n, ArgumentDeclaration { name, ty }) in
                     parameters.value().as_arguments().iter().enumerate()
@@ -297,13 +317,6 @@ fn cg_program<'ctx>(
 
                     fn_scope.insert(name.value(), alloc);
                 }
-
-                let lexical_block = dbg_builder.create_lexical_block(
-                    fn_subprogram.as_debug_info_scope(),
-                    compilation_unit.get_file(),
-                    line_lookup.lookup_from_index(span.start()).line,
-                    line_lookup.lookup_from_index(span.start()).col,
-                );
 
                 cg_block(
                     CgContext {
