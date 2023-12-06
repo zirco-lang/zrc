@@ -70,6 +70,7 @@ mod test_utils;
 mod ty;
 
 pub use inkwell::{
+    debug_info::DWARFEmissionKind as DebugLevel,
     targets::{FileType, TargetTriple},
     OptimizationLevel,
 };

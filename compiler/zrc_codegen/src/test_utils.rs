@@ -36,6 +36,7 @@ macro_rules! cg_snapshot_test {
                 ::zrc_parser::parser::parse_program($source).expect("parsing should succeed")
             ).expect("typeck should succeed"),
             ::inkwell::OptimizationLevel::None,
+            ::inkwell::debug_info::DWARFEmissionKind::Full,
             &$crate::get_native_triple(),
             "",
         );

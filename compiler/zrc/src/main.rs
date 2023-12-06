@@ -52,7 +52,7 @@ use std::{
 
 use anyhow::bail;
 use clap::Parser;
-use zrc_codegen::OptimizationLevel;
+use zrc_codegen::{DebugLevel, OptimizationLevel};
 
 #[doc(hidden)]
 #[allow(
@@ -153,6 +153,10 @@ struct Cli {
     #[arg(short = 'O', long = "opt-level")]
     #[clap(default_value = "default")]
     opt_level: FrontendOptLevel,
+
+    /// Enable debugging information
+    #[arg(short = 'g')]
+    debug: bool,
 }
 
 /// Configuration for the Zirco optimizer
@@ -335,6 +339,11 @@ fn main() -> anyhow::Result<()> {
         &std::env::args().collect::<Vec<_>>().join(" "),
         &content,
         cli.opt_level.into(),
+        if cli.debug {
+            DebugLevel::Full
+        } else {
+            DebugLevel::None
+        },
         &cli.target
             .map_or_else(zrc_codegen::get_native_triple, |triple| {
                 zrc_codegen::TargetTriple::create(&triple)
@@ -381,6 +390,7 @@ fn compile(
     cli_args: &str,
     content: &str,
     optimization_level: OptimizationLevel,
+    debug_mode: DebugLevel,
     triple: &zrc_codegen::TargetTriple,
     cpu: &str,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
@@ -394,6 +404,7 @@ fn compile(
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             zrc_codegen::FileType::Assembly,
             optimization_level,
+            debug_mode,
             triple,
             cpu,
         )
@@ -408,6 +419,7 @@ fn compile(
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             zrc_codegen::FileType::Object,
             optimization_level,
+            debug_mode,
             triple,
             cpu,
         )
@@ -422,6 +434,7 @@ fn compile(
             content,
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             optimization_level,
+            debug_mode,
             triple,
             cpu,
         )
