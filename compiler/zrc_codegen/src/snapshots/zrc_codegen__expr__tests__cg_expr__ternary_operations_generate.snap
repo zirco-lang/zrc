@@ -12,7 +12,7 @@ declare i32 @get_int()
 
 declare void @take_int(i32)
 
-define void @test() {
+define void @test() !dbg !3 {
 entry:
   %let_num = alloca i32, align 4
   %call = call i1 @get_bool()
@@ -37,6 +37,11 @@ end:                                              ; preds = %if_false, %if_true
 !llvm.dbg.cu = !{!1}
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc test runner", isOptimized: false, flags: "--fake-args", runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc test runner", isOptimized: false, flags: "zrc --fake-args", runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false)
 !2 = !DIFile(filename: "test.zr", directory: "/fake/path")
+!3 = distinct !DISubprogram(name: "test", linkageName: "test", scope: null, file: !2, line: 4, type: !4, scopeLine: 4, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
+!4 = !DISubroutineType(types: !5)
+!5 = !{!6}
+!6 = !DIBasicType(name: "void")
+!7 = !{}
 

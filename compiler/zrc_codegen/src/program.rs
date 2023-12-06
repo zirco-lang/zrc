@@ -26,10 +26,67 @@ use zrc_utils::span::Spanned;
 use super::stmt::cg_block;
 use crate::{
     ty::{create_fn, llvm_basic_type, llvm_type},
-    CgContext, CgScope,
+    CgContext, CgLineLookup, CgScope,
 };
 
 /// Initialize the LLVM [`FunctionValue`] for a given function prototype
+/// This should only be used when generating **extern** declarations, as
+/// it does not produce the needed [`DISubprogram`] for debugging.
+/// Use [`cg_init_fn`] instead for definitions.
+/// We do not attach debugging info to extern functions, to follow with clang's (probably correct)
+/// behavior.
+pub fn cg_init_extern_fn<'ctx>(
+    ctx: &'ctx Context,
+    dbg_builder: &DebugInfoBuilder<'ctx>,
+    compilation_unit: &DICompileUnit<'ctx>,
+    module: &Module<'ctx>,
+    target_machine: &TargetMachine,
+    name: &str,
+    ret: Option<Type>,
+    args: &[&Type],
+    is_variadic: bool,
+) -> FunctionValue<'ctx> {
+    let (ret_type, ret_dbg_type) = llvm_type(
+        compilation_unit.get_file(),
+        dbg_builder,
+        ctx,
+        target_machine,
+        &ret.unwrap_or(Type::Void),
+    );
+    let (arg_types, arg_dbg_types): (Vec<_>, Vec<_>) = args
+        .iter()
+        .map(|ty| {
+            let (ty, dbg_ty) = llvm_basic_type(
+                compilation_unit.get_file(),
+                dbg_builder,
+                ctx,
+                target_machine,
+                ty,
+            );
+            (
+                <BasicTypeEnum as Into<BasicMetadataTypeEnum>>::into(ty),
+                dbg_ty,
+            )
+        })
+        .unzip();
+
+    let (fn_type, _, _) = create_fn(
+        dbg_builder,
+        compilation_unit.get_file(),
+        ret_type.as_any_type_enum(),
+        ret_dbg_type,
+        arg_types.as_slice(),
+        arg_dbg_types.as_slice(),
+        is_variadic,
+    );
+
+    let fn_val = module.add_function(name, fn_type, None);
+
+    fn_val
+}
+
+/// Same as [`cg_init_extern_fn`] but properly initializes function *definitions* with their
+/// debugging information.
 pub fn cg_init_fn<'ctx>(
     ctx: &'ctx Context,
     dbg_builder: &DebugInfoBuilder<'ctx>,
@@ -38,7 +95,6 @@ pub fn cg_init_fn<'ctx>(
     target_machine: &TargetMachine,
     name: &str,
     line_no: u32,
-    is_definition: bool,
     ret: Option<Type>,
     args: &[&Type],
     is_variadic: bool,
@@ -84,8 +140,12 @@ pub fn cg_init_fn<'ctx>(
         compilation_unit.get_file(),
         line_no,
         fn_dbg_subroutine,
+        // REVIEW: Are these values correct? They're the only values that seem to prevent invalid
+        // codegen
+        // This is not local to our unit -- it is exported.
         false,
-        is_definition,
+        // This is, in fact, a definition.
+        true,
         line_no,
         0,
         false,
@@ -123,7 +183,7 @@ fn cg_program<'ctx>(
     optimization_level: OptimizationLevel,
     parent_directory: &str,
     file_name: &str,
-    line_lookup: LinePositions,
+    line_lookup: &CgLineLookup,
     program: Vec<Spanned<TypedDeclaration<'_>>>,
 ) -> Module<'ctx> {
     let builder = ctx.create_builder();
@@ -145,7 +205,7 @@ fn cg_program<'ctx>(
         frontend_version_string,
         false,
         // We do not directly obtain the args here because the test executables have a path in them
-        // and that would change and mess up snapshotting
+        // and that would change and mess up snapshotflagting
         cli_args,
         0,
         "",
@@ -161,22 +221,22 @@ fn cg_program<'ctx>(
 
     for declaration in program {
         let span = declaration.span();
+
         match declaration.into_value() {
             TypedDeclaration::FunctionDeclaration {
                 name,
                 parameters,
                 return_type,
-                body,
+                body: Some(body),
             } => {
-                let (fn_value, fn_subprogram) = cg_init_fn(
+                let (fn_value, _fn_subprogram) = cg_init_fn(
                     ctx,
                     &dbg_builder,
                     &compilation_unit,
                     &module,
                     target_machine,
                     name.value(),
-                    line_lookup.from_offset(span.start()).0,
-                    body.is_some(),
+                    line_lookup.lookup_from_index(span.start()),
                     return_type.map(zrc_utils::span::Spanned::into_value),
                     parameters
                         .value()
@@ -191,68 +251,93 @@ fn cg_program<'ctx>(
                 // must come after the insert call so that recursion is valid
                 let mut fn_scope = global_scope.clone();
 
-                if let Some(body) = body {
-                    let entry = ctx.append_basic_block(fn_value, "entry");
-                    builder.position_at_end(entry);
+                let entry = ctx.append_basic_block(fn_value, "entry");
+                builder.position_at_end(entry);
 
-                    for (n, ArgumentDeclaration { name, ty }) in
-                        parameters.value().as_arguments().iter().enumerate()
-                    {
-                        if entry.get_first_instruction().is_some() {
-                            builder.position_before(&entry.get_first_instruction().expect(
-                                ".gfi.is_some() should only return true if there is an instruction",
-                            ));
-                        } else {
-                            builder.position_at_end(entry);
-                        }
-
-                        let alloc = builder
-                            .build_alloca(
-                                llvm_basic_type(
-                                    compilation_unit.get_file(),
-                                    &dbg_builder,
-                                    ctx,
-                                    target_machine,
-                                    ty.value(),
-                                )
-                                .0,
-                                &format!("arg_{}", name.value()),
-                            )
-                            .expect("alloca should generate successfully");
-
+                for (n, ArgumentDeclaration { name, ty }) in
+                    parameters.value().as_arguments().iter().enumerate()
+                {
+                    if entry.get_first_instruction().is_some() {
+                        builder.position_before(&entry.get_first_instruction().expect(
+                            ".gfi.is_some() should only return true if there is an instruction",
+                        ));
+                    } else {
                         builder.position_at_end(entry);
-
-                        builder
-                            .build_store::<BasicValueEnum>(
-                                alloc,
-                                fn_value
-                                    .get_nth_param(
-                                        n.try_into()
-                                            .expect("over u32::MAX parameters in a function? HOW?"),
-                                    )
-                                    .expect("nth parameter from fn type should exist in fn value"),
-                            )
-                            .expect("store should generate successfully");
-
-                        fn_scope.insert(name.value(), alloc);
                     }
 
-                    cg_block(
-                        CgContext {
-                            ctx,
-                            target_machine,
-                            builder: &builder,
-                            dbg_builder: &dbg_builder,
-                            compilation_unit: &compilation_unit,
-                            module: &module,
-                            fn_value,
-                        },
-                        entry,
-                        &fn_scope,
-                        body.into_value(),
-                        &None,
-                    );
+                    let alloc = builder
+                        .build_alloca(
+                            llvm_basic_type(
+                                compilation_unit.get_file(),
+                                &dbg_builder,
+                                ctx,
+                                target_machine,
+                                ty.value(),
+                            )
+                            .0,
+                            &format!("arg_{}", name.value()),
+                        )
+                        .expect("alloca should generate successfully");
+
+                    builder.position_at_end(entry);
+
+                    builder
+                        .build_store::<BasicValueEnum>(
+                            alloc,
+                            fn_value
+                                .get_nth_param(
+                                    n.try_into()
+                                        .expect("over u32::MAX parameters in a function? HOW?"),
+                                )
+                                .expect("nth parameter from fn type should exist in fn value"),
+                        )
+                        .expect("store should generate successfully");
+
+                    fn_scope.insert(name.value(), alloc);
                 }
+
+                cg_block(
+                    CgContext {
+                        ctx,
+                        target_machine,
+                        builder: &builder,
+                        dbg_builder: &dbg_builder,
+                        compilation_unit: &compilation_unit,
+                        module: &module,
+                        fn_value,
+                    },
+                    entry,
+                    &fn_scope,
+                    body.into_value(),
+                    &None,
+                );
+            }
+            // We do not attach debugging information to extern functions, this is clang's behavior
+            // so I assume it's correct.
+            TypedDeclaration::FunctionDeclaration {
+                name,
+                parameters,
+                return_type,
+                body: None,
+            } => {
+                let fn_value = cg_init_extern_fn(
+                    ctx,
+                    &dbg_builder,
+                    &compilation_unit,
+                    &module,
+                    target_machine,
+                    name.value(),
+                    return_type.map(zrc_utils::span::Spanned::into_value),
+                    parameters
+                        .value()
+                        .as_arguments()
+                        .iter()
+                        .map(|ArgumentDeclaration { ty, .. }| ty.value())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                    parameters.value().is_variadic(),
+                );
+                global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
             }
         }
     }
@@ -319,7 +404,7 @@ pub fn cg_program_to_string(
         optimization_level,
         parent_directory,
         file_name,
-        LinePositions::from(source),
+        &CgLineLookup::new(source),
         program,
     );
 
@@ -371,7 +456,7 @@ pub fn cg_program_to_buffer(
         optimization_level,
         parent_directory,
         file_name,
-        LinePositions::from(source),
+        &CgLineLookup::new(source),
         program,
     );
 

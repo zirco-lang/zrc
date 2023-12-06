@@ -73,6 +73,7 @@ pub use inkwell::{
     targets::{FileType, TargetTriple},
     OptimizationLevel,
 };
+use line_numbers::LinePositions;
 pub use program::{cg_program_to_buffer, cg_program_to_string};
 
 /// Gets the native [`TargetTriple`].
@@ -141,4 +142,19 @@ struct CgContext<'ctx, 'a> {
     module: &'a Module<'ctx>,
     /// The LLVM function we are building in
     fn_value: FunctionValue<'ctx>,
+}
+
+/// Wrapper around the [`line_numbers`] crate to properly increment the values by 1
+#[derive(Debug)]
+struct CgLineLookup(LinePositions);
+
+impl CgLineLookup {
+    pub fn new(input: &str) -> Self {
+        Self(LinePositions::from(input))
+    }
+
+    pub fn lookup_from_index(&self, index: usize) -> u32 {
+        // because LLVM line #s start at 1
+        self.0.from_offset(index).0 + 1
+    }
 }
