@@ -1,11 +1,14 @@
 //! Code generation for statements
 
-use inkwell::basic_block::BasicBlock;
+use inkwell::{
+    basic_block::BasicBlock,
+    debug_info::{AsDIScope, DILexicalBlock},
+};
 use zrc_typeck::tast::{
     expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
     stmt::{LetDeclaration, TypedStmt, TypedStmtKind},
 };
-use zrc_utils::span::Spannable;
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 use crate::{expr::cg_expr, ty::llvm_basic_type, BasicBlockAnd, CgContext, CgScope};
 
@@ -32,6 +35,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
     cg: CgContext<'ctx, 'a>,
     mut bb: BasicBlock<'ctx>,
     scope: &'a mut CgScope<'input, 'ctx>,
+    dbg_scope: &DILexicalBlock<'ctx>,
     declarations: Vec<LetDeclaration<'input>>,
 ) -> BasicBlock<'ctx> {
     for let_declaration in declarations {
@@ -75,6 +79,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
                 cg,
                 bb,
                 scope,
+                dbg_scope,
                 TypedExpr {
                     inferred_type: let_declaration.ty.clone(),
                     kind: value.kind.span().containing(TypedExprKind::Assignment(
@@ -108,21 +113,46 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
     cg: CgContext<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     parent_scope: &'a CgScope<'input, 'ctx>,
-    block: Vec<TypedStmt<'input>>,
+    parent_lexical_block: &DILexicalBlock<'ctx>,
+    block: Spanned<Vec<TypedStmt<'input>>>,
     breakaway: &Option<LoopBreakaway<'ctx>>,
 ) -> Option<BasicBlock<'ctx>> {
     let mut scope = parent_scope.clone();
+    let block_span = block.span();
+    let block_line_col = cg.line_lookup.lookup_from_index(block_span.start());
+    let lexical_block = cg.dbg_builder.create_lexical_block(
+        parent_lexical_block.as_debug_info_scope(),
+        cg.compilation_unit.get_file(),
+        block_line_col.line,
+        block_line_col.col,
+    );
 
     block
+        .into_value()
         .into_iter()
         .try_fold(bb, |bb, stmt| -> Option<BasicBlock> {
+            let stmt_span = stmt.0.span();
+            let stmt_line_col = cg.line_lookup.lookup_from_index(stmt_span.start());
+            let debug_location = cg.dbg_builder.create_debug_location(
+                cg.ctx,
+                stmt_line_col.line,
+                stmt_line_col.col,
+                lexical_block.as_debug_info_scope(),
+                None,
+            );
+            cg.builder.set_current_debug_location(debug_location);
+
             match stmt.0.into_value() {
-                TypedStmtKind::ExprStmt(expr) => Some(cg_expr(cg, bb, &scope, expr).bb),
+                TypedStmtKind::ExprStmt(expr) => {
+                    Some(cg_expr(cg, bb, &scope, &lexical_block, expr).bb)
+                }
 
                 TypedStmtKind::IfStmt(cond, then, then_else) => {
-                    let then_else = then_else.unwrap_or(vec![]);
+                    let then_else = then_else
+                        .unwrap_or(vec![].in_span(Span::from_positions(then.end(), then.end())));
 
-                    let BasicBlockAnd { value: cond, .. } = cg_expr(cg, bb, &scope, cond);
+                    let BasicBlockAnd { value: cond, .. } =
+                        cg_expr(cg, bb, &scope, &lexical_block, cond);
 
                     let then_bb = cg.ctx.append_basic_block(cg.fn_value, "then");
                     let then_else_bb = cg.ctx.append_basic_block(cg.fn_value, "then_else");
@@ -132,11 +162,18 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         .expect("conditional branch should generate successfully");
 
                     cg.builder.position_at_end(then_bb);
-                    let maybe_then_bb = cg_block(cg, then_bb, &scope, then, breakaway);
+                    let maybe_then_bb =
+                        cg_block(cg, then_bb, &scope, &lexical_block, then, breakaway);
 
                     cg.builder.position_at_end(then_else_bb);
-                    let maybe_then_else_bb =
-                        cg_block(cg, then_else_bb, &scope, then_else, breakaway);
+                    let maybe_then_else_bb = cg_block(
+                        cg,
+                        then_else_bb,
+                        &scope,
+                        &lexical_block,
+                        then_else,
+                        breakaway,
+                    );
 
                     match (maybe_then_bb, maybe_then_else_bb) {
                         (None, None) => None,
@@ -170,10 +207,18 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     }
                 }
 
-                TypedStmtKind::BlockStmt(block) => cg_block(cg, bb, &scope, block, breakaway),
+                TypedStmtKind::BlockStmt(block) => cg_block(
+                    cg,
+                    bb,
+                    &scope,
+                    &lexical_block,
+                    block.in_span(stmt_span),
+                    breakaway,
+                ),
 
                 TypedStmtKind::ReturnStmt(Some(expr)) => {
-                    let BasicBlockAnd { value: expr, .. } = cg_expr(cg, bb, &scope, expr);
+                    let BasicBlockAnd { value: expr, .. } =
+                        cg_expr(cg, bb, &scope, &lexical_block, expr);
 
                     cg.builder
                         .build_return(Some(&expr))
@@ -216,9 +261,13 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     None
                 }
 
-                TypedStmtKind::DeclarationList(declarations) => {
-                    Some(cg_let_declaration(cg, bb, &mut scope, declarations))
-                }
+                TypedStmtKind::DeclarationList(declarations) => Some(cg_let_declaration(
+                    cg,
+                    bb,
+                    &mut scope,
+                    &lexical_block,
+                    declarations,
+                )),
 
                 TypedStmtKind::ForStmt {
                     init,
@@ -241,7 +290,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     // The block we are currently in will become the preheader. Generate the `init`
                     // code if there is any.
                     if let Some(init) = init {
-                        cg_let_declaration(cg, bb, &mut scope, *init);
+                        cg_let_declaration(cg, bb, &mut scope, &lexical_block, *init);
                     }
 
                     let header = cg.ctx.append_basic_block(cg.fn_value, "header");
@@ -269,7 +318,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                             let BasicBlockAnd {
                                 bb: header,
                                 value: cond,
-                            } = cg_expr(cg, header, &scope, cond);
+                            } = cg_expr(cg, header, &scope, &lexical_block, cond);
 
                             cg.builder
                                 .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -285,7 +334,8 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         cg,
                         body_bb,
                         &scope,
-                        body.into_value(),
+                        &lexical_block,
+                        body,
                         &Some(LoopBreakaway {
                             on_break: exit,
                             on_continue: latch,
@@ -302,7 +352,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     // Latch runs post and then breaks right back to the header.
                     cg.builder.position_at_end(latch);
                     if let Some(post) = post {
-                        cg_expr(cg, latch, &scope, post);
+                        cg_expr(cg, latch, &scope, &lexical_block, post);
                     }
 
                     cg.builder
@@ -336,7 +386,8 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
 
                     cg.builder.position_at_end(header);
 
-                    let BasicBlockAnd { value: cond, .. } = cg_expr(cg, header, &scope, cond);
+                    let BasicBlockAnd { value: cond, .. } =
+                        cg_expr(cg, header, &scope, &lexical_block, cond);
 
                     cg.builder
                         .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -348,6 +399,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         cg,
                         body_bb,
                         &scope,
+                        &lexical_block,
                         body,
                         &Some(LoopBreakaway {
                             on_break: exit,

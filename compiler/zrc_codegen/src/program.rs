@@ -230,14 +230,14 @@ fn cg_program<'ctx>(
                 return_type,
                 body: Some(body),
             } => {
-                let (fn_value, _fn_subprogram) = cg_init_fn(
+                let (fn_value, fn_subprogram) = cg_init_fn(
                     ctx,
                     &dbg_builder,
                     &compilation_unit,
                     &module,
                     target_machine,
                     name.value(),
-                    line_lookup.lookup_from_index(span.start()),
+                    line_lookup.lookup_from_index(span.start()).line,
                     return_type.map(zrc_utils::span::Spanned::into_value),
                     parameters
                         .value()
@@ -297,6 +297,13 @@ fn cg_program<'ctx>(
                     fn_scope.insert(name.value(), alloc);
                 }
 
+                let lexical_block = dbg_builder.create_lexical_block(
+                    fn_subprogram.as_debug_info_scope(),
+                    compilation_unit.get_file(),
+                    line_lookup.lookup_from_index(span.start()).line,
+                    line_lookup.lookup_from_index(span.start()).col,
+                );
+
                 cg_block(
                     CgContext {
                         ctx,
@@ -306,10 +313,12 @@ fn cg_program<'ctx>(
                         compilation_unit: &compilation_unit,
                         module: &module,
                         fn_value,
+                        line_lookup,
                     },
                     entry,
                     &fn_scope,
-                    body.into_value(),
+                    &lexical_block,
+                    body,
                     &None,
                 );
             }

@@ -10,37 +10,37 @@ declare i1 @get_bool()
 
 define void @test() !dbg !3 {
 entry:
-  br label %header
+  br label %header, !dbg !8
 
 header:                                           ; preds = %end5, %then3, %entry
-  %call = call i1 @get_bool()
-  br i1 %call, label %body, label %exit
+  %call = call i1 @get_bool(), !dbg !11
+  br i1 %call, label %body, label %exit, !dbg !11
 
 body:                                             ; preds = %header
-  %call1 = call i1 @get_bool()
-  br i1 %call1, label %then, label %then_else
+  %call1 = call i1 @get_bool(), !dbg !12
+  br i1 %call1, label %then, label %then_else, !dbg !12
 
 exit:                                             ; preds = %then, %header
-  ret void
+  ret void, !dbg !14
 
 then:                                             ; preds = %body
-  br label %exit
+  br label %exit, !dbg !15
 
 then_else:                                        ; preds = %body
-  %call2 = call i1 @get_bool()
-  br i1 %call2, label %then3, label %then_else4
+  %call2 = call i1 @get_bool(), !dbg !17
+  br i1 %call2, label %then3, label %then_else4, !dbg !17
 
 then3:                                            ; preds = %then_else
-  br label %header
+  br label %header, !dbg !19
 
 then_else4:                                       ; preds = %then_else
-  br label %end
+  br label %end, !dbg !19
 
 end:                                              ; preds = %then_else4
-  br label %end5
+  br label %end5, !dbg !19
 
 end5:                                             ; preds = %end
-  br label %header
+  br label %header, !dbg !19
 }
 
 !llvm.module.flags = !{!0}
@@ -54,4 +54,17 @@ end5:                                             ; preds = %end
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
 !7 = !{}
+!8 = !DILocation(line: 5, column: 5, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 3, column: 11)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 3, column: 1)
+!11 = !DILocation(line: 5, column: 12, scope: !9)
+!12 = !DILocation(line: 7, column: 13, scope: !13)
+!13 = distinct !DILexicalBlock(scope: !9, file: !2, line: 5, column: 24)
+!14 = !DILocation(line: 19, column: 5, scope: !9)
+!15 = !DILocation(line: 7, column: 25, scope: !16)
+!16 = distinct !DILexicalBlock(scope: !13, file: !2, line: 7, column: 25)
+!17 = !DILocation(line: 10, column: 17, scope: !18)
+!18 = distinct !DILexicalBlock(scope: !13, file: !2, line: 8, column: 14)
+!19 = !DILocation(line: 10, column: 29, scope: !20)
+!20 = distinct !DILexicalBlock(scope: !18, file: !2, line: 10, column: 29)
 

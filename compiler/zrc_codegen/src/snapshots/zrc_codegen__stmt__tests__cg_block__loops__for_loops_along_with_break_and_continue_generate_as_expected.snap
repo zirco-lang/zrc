@@ -11,50 +11,50 @@ declare i32 @get_int()
 define void @test() !dbg !3 {
 entry:
   %let_i = alloca i32, align 4
-  store i32 0, ptr %let_i, align 4
-  br label %header
+  store i32 0, ptr %let_i, align 4, !dbg !8
+  br label %header, !dbg !8
 
 header:                                           ; preds = %latch, %entry
-  %load = load i32, ptr %let_i, align 4
-  %call = call i32 @get_int()
-  %cmp = icmp ult i32 %load, %call
-  br i1 %cmp, label %body, label %exit
+  %load = load i32, ptr %let_i, align 4, !dbg !11
+  %call = call i32 @get_int(), !dbg !12
+  %cmp = icmp ult i32 %load, %call, !dbg !12
+  br i1 %cmp, label %body, label %exit, !dbg !12
 
 body:                                             ; preds = %header
-  %load1 = load i32, ptr %let_i, align 4
-  %call2 = call i32 @get_int()
-  %cmp3 = icmp ugt i32 %load1, %call2
-  br i1 %cmp3, label %then, label %then_else
+  %load1 = load i32, ptr %let_i, align 4, !dbg !13
+  %call2 = call i32 @get_int(), !dbg !15
+  %cmp3 = icmp ugt i32 %load1, %call2, !dbg !15
+  br i1 %cmp3, label %then, label %then_else, !dbg !15
 
 latch:                                            ; preds = %end9, %then7
-  %load10 = load i32, ptr %let_i, align 4
-  %add = add i32 %load10, 1
-  store i32 %add, ptr %let_i, align 4
-  br label %header
+  %load10 = load i32, ptr %let_i, align 4, !dbg !16
+  %add = add i32 %load10, 1, !dbg !17
+  store i32 %add, ptr %let_i, align 4, !dbg !16
+  br label %header, !dbg !16
 
 exit:                                             ; preds = %then, %header
-  ret void
+  ret void, !dbg !18
 
 then:                                             ; preds = %body
-  br label %exit
+  br label %exit, !dbg !19
 
 then_else:                                        ; preds = %body
-  %load4 = load i32, ptr %let_i, align 4
-  %call5 = call i32 @get_int()
-  %cmp6 = icmp ult i32 %load4, %call5
-  br i1 %cmp6, label %then7, label %then_else8
+  %load4 = load i32, ptr %let_i, align 4, !dbg !21
+  %call5 = call i32 @get_int(), !dbg !23
+  %cmp6 = icmp ult i32 %load4, %call5, !dbg !23
+  br i1 %cmp6, label %then7, label %then_else8, !dbg !23
 
 then7:                                            ; preds = %then_else
-  br label %latch
+  br label %latch, !dbg !24
 
 then_else8:                                       ; preds = %then_else
-  br label %end
+  br label %end, !dbg !24
 
 end:                                              ; preds = %then_else8
-  br label %end9
+  br label %end9, !dbg !24
 
 end9:                                             ; preds = %end
-  br label %latch
+  br label %latch, !dbg !24
 }
 
 !llvm.module.flags = !{!0}
@@ -68,4 +68,22 @@ end9:                                             ; preds = %end
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
 !7 = !{}
+!8 = !DILocation(line: 5, column: 14, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 3, column: 11)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 3, column: 1)
+!11 = !DILocation(line: 5, column: 21, scope: !9)
+!12 = !DILocation(line: 5, column: 25, scope: !9)
+!13 = !DILocation(line: 7, column: 13, scope: !14)
+!14 = distinct !DILexicalBlock(scope: !9, file: !2, line: 5, column: 44)
+!15 = !DILocation(line: 7, column: 17, scope: !14)
+!16 = !DILocation(line: 5, column: 36, scope: !9)
+!17 = !DILocation(line: 5, column: 41, scope: !9)
+!18 = !DILocation(line: 18, column: 5, scope: !9)
+!19 = !DILocation(line: 7, column: 28, scope: !20)
+!20 = distinct !DILexicalBlock(scope: !14, file: !2, line: 7, column: 28)
+!21 = !DILocation(line: 10, column: 17, scope: !22)
+!22 = distinct !DILexicalBlock(scope: !14, file: !2, line: 8, column: 14)
+!23 = !DILocation(line: 10, column: 21, scope: !22)
+!24 = !DILocation(line: 10, column: 32, scope: !25)
+!25 = distinct !DILexicalBlock(scope: !22, file: !2, line: 10, column: 32)
 

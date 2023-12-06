@@ -12,20 +12,20 @@ declare void @nop()
 
 define void @test() !dbg !3 {
 entry:
-  %call = call i1 @get_bool()
-  br i1 %call, label %then, label %then_else
+  %call = call i1 @get_bool(), !dbg !8
+  br i1 %call, label %then, label %then_else, !dbg !8
 
 then:                                             ; preds = %entry
-  call void @nop()
-  br label %end
+  call void @nop(), !dbg !11
+  br label %end, !dbg !13
 
 then_else:                                        ; preds = %entry
-  call void @nop()
-  ret void
+  call void @nop(), !dbg !15
+  ret void, !dbg !13
 
 end:                                              ; preds = %then
-  call void @nop()
-  ret void
+  call void @nop(), !dbg !16
+  ret void, !dbg !17
 }
 
 !llvm.module.flags = !{!0}
@@ -39,4 +39,14 @@ end:                                              ; preds = %then
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
 !7 = !{}
+!8 = !DILocation(line: 7, column: 9, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 4, column: 11)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 4, column: 1)
+!11 = !DILocation(line: 7, column: 21, scope: !12)
+!12 = distinct !DILexicalBlock(scope: !9, file: !2, line: 7, column: 21)
+!13 = !DILocation(line: 11, column: 9, scope: !14)
+!14 = distinct !DILexicalBlock(scope: !9, file: !2, line: 8, column: 10)
+!15 = !DILocation(line: 9, column: 9, scope: !14)
+!16 = !DILocation(line: 15, column: 5, scope: !9)
+!17 = !DILocation(line: 16, column: 5, scope: !9)
 

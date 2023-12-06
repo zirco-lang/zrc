@@ -9,9 +9,9 @@ source_filename = "test.zr"
 define void @test() !dbg !3 {
 entry:
   %let_x = alloca { i32, i32 }, align 8
-  %gep = getelementptr inbounds { i32, i32 }, ptr %let_x, i32 0, i32 1
-  store i32 4, ptr %gep, align 4
-  ret void
+  %gep = getelementptr inbounds { i32, i32 }, ptr %let_x, i32 0, i32 1, !dbg !8
+  store i32 4, ptr %gep, align 4, !dbg !8
+  ret void, !dbg !11
 }
 
 !llvm.module.flags = !{!0}
@@ -25,4 +25,8 @@ entry:
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
 !7 = !{}
+!8 = !DILocation(line: 8, column: 5, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 3, column: 11)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 3, column: 1)
+!11 = !DILocation(line: 10, column: 5, scope: !9)
 

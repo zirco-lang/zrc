@@ -43,11 +43,11 @@ pub enum TypedStmtKind<'input> {
     /// `if (x) y` or `if (x) y else z`
     IfStmt(
         TypedExpr<'input>,
-        Vec<TypedStmt<'input>>,
-        Option<Vec<TypedStmt<'input>>>,
+        Spanned<Vec<TypedStmt<'input>>>,
+        Option<Spanned<Vec<TypedStmt<'input>>>>,
     ),
     /// `while (x) y`
-    WhileStmt(TypedExpr<'input>, Vec<TypedStmt<'input>>),
+    WhileStmt(TypedExpr<'input>, Spanned<Vec<TypedStmt<'input>>>),
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
@@ -88,6 +88,7 @@ impl<'input> Display for TypedStmtKind<'input> {
                 f,
                 "if ({cond}) {{\n{}\n}} else {{\n{}\n}}",
                 if_true
+                    .value()
                     .iter()
                     .map(|stmt| stmt
                         .to_string()
@@ -98,6 +99,7 @@ impl<'input> Display for TypedStmtKind<'input> {
                     .collect::<Vec<_>>()
                     .join("\n"),
                 if_false
+                    .value()
                     .iter()
                     .map(|stmt| stmt
                         .to_string()
@@ -112,6 +114,7 @@ impl<'input> Display for TypedStmtKind<'input> {
                 f,
                 "if ({cond}) {{\n{}\n}}",
                 if_true
+                    .value()
                     .iter()
                     .map(|stmt| stmt
                         .to_string()
@@ -125,7 +128,8 @@ impl<'input> Display for TypedStmtKind<'input> {
             Self::WhileStmt(cond, body) => write!(
                 f,
                 "while ({cond}) {{\n{}\n}}",
-                body.iter()
+                body.value()
+                    .iter()
                     .map(|stmt| stmt
                         .to_string()
                         .split('\n')

@@ -133,6 +133,8 @@ struct CgContext<'ctx, 'a> {
     target_machine: &'a TargetMachine,
     /// The LLVM builder used to build instructions
     builder: &'a Builder<'ctx>,
+    /// The lookup for lines in the source file
+    line_lookup: &'a CgLineLookup,
     /// The LLVM builder for debug info
     dbg_builder: &'a DebugInfoBuilder<'ctx>,
     /// The LLVM compile unit for debug info
@@ -144,20 +146,53 @@ struct CgContext<'ctx, 'a> {
     fn_value: FunctionValue<'ctx>,
 }
 
-/// Wrapper around the [`line_numbers`] crate to properly increment the values
-/// by 1
+/// Wrapper around a line and column
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LineAndCol {
+    line: u32,
+    col: u32,
+}
+
+/// Simple tool to lookup the line and column of a location in the source file
 #[derive(Debug)]
-struct CgLineLookup(LinePositions);
+struct CgLineLookup {
+    line_spans: Vec<(usize, usize)>,
+}
 
 impl CgLineLookup {
     /// Creates a new [`CgLineLookup`] over a string
     pub fn new(input: &str) -> Self {
-        Self(LinePositions::from(input))
+        let mut line_start = 0;
+        let mut line_spans = vec![];
+        for line in input.split('\n') {
+            let line_end = line_start + line.len() + "\n".len();
+            // TODO: this assumes lines terminate with \n, not \r\n.
+            line_spans.push((line_start, line_end - 1));
+            line_start = line_end;
+        }
+
+        Self { line_spans }
     }
 
     /// Look up the `1`-indexed line number from an offset in the string
-    pub fn lookup_from_index(&self, index: usize) -> u32 {
-        // because LLVM line #s start at 1
-        self.0.from_offset(index).0 + 1
+    pub fn lookup_from_index(&self, index: usize) -> LineAndCol {
+        let line = self
+            .line_spans
+            .binary_search_by(|(line_start, line_end)| {
+                if *line_end < index {
+                    return std::cmp::Ordering::Less;
+                }
+                if *line_start > index {
+                    return std::cmp::Ordering::Greater;
+                }
+
+                std::cmp::Ordering::Equal
+            })
+            .expect("line should be present");
+
+        LineAndCol {
+            line: line as u32 + 1,
+            col: (index - self.line_spans[line].0) as u32 + 1,
+        }
     }
 }

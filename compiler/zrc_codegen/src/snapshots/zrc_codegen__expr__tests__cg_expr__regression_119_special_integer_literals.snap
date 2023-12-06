@@ -10,9 +10,9 @@ define void @test() !dbg !3 {
 entry:
   %let_b = alloca i32, align 4
   %let_a = alloca i32, align 4
-  store i32 10, ptr %let_a, align 4
-  store i32 8100, ptr %let_b, align 4
-  ret void
+  store i32 10, ptr %let_a, align 4, !dbg !8
+  store i32 8100, ptr %let_b, align 4, !dbg !11
+  ret void, !dbg !12
 }
 
 !llvm.module.flags = !{!0}
@@ -26,4 +26,9 @@ entry:
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
 !7 = !{}
+!8 = !DILocation(line: 2, column: 9, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 1, column: 11)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 1)
+!11 = !DILocation(line: 3, column: 9, scope: !9)
+!12 = !DILocation(line: 4, column: 5, scope: !9)
 

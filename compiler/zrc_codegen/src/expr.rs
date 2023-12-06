@@ -2,6 +2,7 @@
 
 use inkwell::{
     basic_block::BasicBlock,
+    debug_info::{AsDIScope, DILexicalBlock},
     types::{BasicType, StringRadix},
     values::{BasicValue, BasicValueEnum, PointerValue},
     IntPredicate,
@@ -27,8 +28,20 @@ fn cg_place<'ctx, 'a>(
     cg: CgContext<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'_, 'ctx>,
+    dbg_scope: &DILexicalBlock<'ctx>,
     place: Place,
 ) -> BasicBlockAnd<'ctx, PointerValue<'ctx>> {
+    let place_span = place.kind.span();
+    let line_and_col = cg.line_lookup.lookup_from_index(place_span.start());
+    let debug_location = cg.dbg_builder.create_debug_location(
+        cg.ctx,
+        line_and_col.line,
+        line_and_col.col,
+        dbg_scope.as_debug_info_scope(),
+        None,
+    );
+    cg.builder.set_current_debug_location(debug_location);
+
     match place.kind.into_value() {
         PlaceKind::Variable(x) => {
             let reg = scope
@@ -39,7 +52,7 @@ fn cg_place<'ctx, 'a>(
         }
 
         PlaceKind::Deref(x) => {
-            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *x);
+            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, dbg_scope, *x);
 
             BasicBlockAnd {
                 bb,
@@ -48,8 +61,8 @@ fn cg_place<'ctx, 'a>(
         }
 
         PlaceKind::Index(ptr, idx) => {
-            let BasicBlockAnd { bb, value: ptr } = cg_expr(cg, bb, scope, *ptr);
-            let BasicBlockAnd { bb, value: idx } = cg_expr(cg, bb, scope, *idx);
+            let BasicBlockAnd { bb, value: ptr } = cg_expr(cg, bb, scope, dbg_scope, *ptr);
+            let BasicBlockAnd { bb, value: idx } = cg_expr(cg, bb, scope, dbg_scope, *idx);
 
             // SAFETY: If indices are used incorrectly this may segfault
             // TODO: Is this actually safely used?
@@ -92,7 +105,7 @@ fn cg_place<'ctx, 'a>(
                     .position(|(got_key, _)| *got_key == prop.into_value())
                     .expect("invalid struct field");
 
-                let BasicBlockAnd { bb, value: x } = cg_place(cg, bb, scope, *x);
+                let BasicBlockAnd { bb, value: x } = cg_place(cg, bb, scope, dbg_scope, *x);
 
                 let reg = cg
                     .builder
@@ -114,7 +127,7 @@ fn cg_place<'ctx, 'a>(
             Type::Union(_) => {
                 // All we need to do is cast the pointer, but there's no `bitcast` anymore,
                 // so just return it and it'll take on the correct type
-                let BasicBlockAnd { bb, value } = cg_place(cg, bb, scope, *x);
+                let BasicBlockAnd { bb, value } = cg_place(cg, bb, scope, dbg_scope, *x);
 
                 BasicBlockAnd { bb, value }
             }
@@ -134,9 +147,20 @@ pub(crate) fn cg_expr<'ctx, 'a>(
     cg: CgContext<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'_, 'ctx>,
+    dbg_scope: &DILexicalBlock<'ctx>,
     expr: TypedExpr,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
     let expr_span = expr.kind.span();
+    let line_and_col = cg.line_lookup.lookup_from_index(expr_span.start());
+    let debug_location = cg.dbg_builder.create_debug_location(
+        cg.ctx,
+        line_and_col.line,
+        line_and_col.col,
+        dbg_scope.as_debug_info_scope(),
+        None,
+    );
+    cg.builder.set_current_debug_location(debug_location);
+
     match expr.kind.into_value() {
         TypedExprKind::NumberLiteral(n) => {
             let no_underscores = match n {
@@ -241,8 +265,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         },
 
         TypedExprKind::Comma(lhs, rhs) => {
-            let BasicBlockAnd { bb, .. } = cg_expr(cg, bb, scope, *lhs);
-            cg_expr(cg, bb, scope, *rhs)
+            let BasicBlockAnd { bb, .. } = cg_expr(cg, bb, scope, dbg_scope, *lhs);
+            cg_expr(cg, bb, scope, dbg_scope, *rhs)
         }
 
         TypedExprKind::Identifier(id) => {
@@ -250,6 +274,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 cg,
                 bb,
                 scope,
+                dbg_scope,
                 Place {
                     inferred_type: expr.inferred_type.clone(),
                     kind: PlaceKind::Variable(id).in_span(expr_span),
@@ -279,8 +304,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Assignment(place, value) => {
-            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *value);
-            let BasicBlockAnd { bb, value: place } = cg_place(cg, bb, scope, *place);
+            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, dbg_scope, *value);
+            let BasicBlockAnd { bb, value: place } = cg_place(cg, bb, scope, dbg_scope, *place);
 
             cg.builder
                 .build_store(place, value)
@@ -290,8 +315,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::BinaryBitwise(op, lhs, rhs) => {
-            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, *lhs);
-            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, *rhs);
+            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, dbg_scope, *lhs);
+            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, dbg_scope, *rhs);
 
             let reg = match op {
                 BinaryBitwise::And => {
@@ -326,8 +351,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Equality(op, lhs, rhs) => {
-            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, *lhs);
-            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, *rhs);
+            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, dbg_scope, *lhs);
+            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, dbg_scope, *rhs);
 
             let op = match op {
                 Equality::Eq => IntPredicate::EQ,
@@ -346,8 +371,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Comparison(op, lhs, rhs) => {
-            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, *lhs);
-            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, *rhs);
+            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, dbg_scope, *lhs);
+            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, dbg_scope, *rhs);
 
             let op = match (op, expr.inferred_type.is_signed_integer()) {
                 (Comparison::Lt, true) => IntPredicate::SLT,
@@ -373,8 +398,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
         TypedExprKind::Arithmetic(op, lhs, rhs) => {
             let lhs_ty = lhs.inferred_type.clone();
-            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, *lhs);
-            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, *rhs);
+            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, dbg_scope, *lhs);
+            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, dbg_scope, *rhs);
 
             if let Type::Ptr(pointee) = lhs_ty {
                 // Most languages make incrementing a pointer increase the address by the size
@@ -477,8 +502,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Logical(op, lhs, rhs) => {
-            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, *lhs);
-            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, *rhs);
+            let BasicBlockAnd { bb, value: lhs } = cg_expr(cg, bb, scope, dbg_scope, *lhs);
+            let BasicBlockAnd { bb, value: rhs } = cg_expr(cg, bb, scope, dbg_scope, *rhs);
 
             let reg = match op {
                 Logical::And => {
@@ -499,7 +524,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryNot(x) => {
-            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *x);
+            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, dbg_scope, *x);
 
             let reg = cg
                 .builder
@@ -513,7 +538,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryBitwiseNot(x) => {
-            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *x);
+            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, dbg_scope, *x);
 
             let reg = cg
                 .builder
@@ -527,7 +552,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryMinus(x) => {
-            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, *x);
+            let BasicBlockAnd { bb, value } = cg_expr(cg, bb, scope, dbg_scope, *x);
 
             let reg = cg
                 .builder
@@ -541,7 +566,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryAddressOf(x) => {
-            let BasicBlockAnd { bb, value } = cg_place(cg, bb, scope, *x);
+            let BasicBlockAnd { bb, value } = cg_place(cg, bb, scope, dbg_scope, *x);
 
             BasicBlockAnd {
                 bb,
@@ -550,7 +575,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryDereference(ptr) => {
-            let BasicBlockAnd { bb, value: ptr } = cg_expr(cg, bb, scope, *ptr);
+            let BasicBlockAnd { bb, value: ptr } = cg_expr(cg, bb, scope, dbg_scope, *ptr);
 
             let reg = cg
                 .builder
@@ -579,6 +604,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 cg,
                 bb,
                 scope,
+                dbg_scope,
                 Place {
                     inferred_type: expr.inferred_type.clone(),
                     kind: PlaceKind::Index(ptr, idx).in_span(expr_span),
@@ -612,6 +638,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 cg,
                 bb,
                 scope,
+                dbg_scope,
                 Place {
                     inferred_type: expr.inferred_type.clone(),
                     kind: PlaceKind::Dot(place, key).in_span(expr_span),
@@ -652,7 +679,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             .into_function_type();
 
             // will always be a function pointer
-            let BasicBlockAnd { bb, value: f_ptr } = cg_place(cg, bb, scope, *f);
+            let BasicBlockAnd { bb, value: f_ptr } = cg_place(cg, bb, scope, dbg_scope, *f);
 
             let mut bb = bb;
             let old_args = args;
@@ -661,7 +688,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 let BasicBlockAnd {
                     bb: new_bb,
                     value: new_arg,
-                } = cg_expr(cg, bb, scope, arg);
+                } = cg_expr(cg, bb, scope, dbg_scope, arg);
                 bb = new_bb;
                 args.push(new_arg.into());
             }
@@ -681,7 +708,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             }
         }
         TypedExprKind::Ternary(cond, lhs, rhs) => {
-            let BasicBlockAnd { value: cond, .. } = cg_expr(cg, bb, scope, *cond);
+            let BasicBlockAnd { value: cond, .. } = cg_expr(cg, bb, scope, dbg_scope, *cond);
 
             // If lhs and rhs are registers, the code generated will look like:
             //   entry:
@@ -723,7 +750,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let BasicBlockAnd {
                 bb: if_true_bb,
                 value: if_true,
-            } = cg_expr(cg, if_true_bb, scope, *lhs);
+            } = cg_expr(cg, if_true_bb, scope, dbg_scope, *lhs);
             cg.builder
                 .build_unconditional_branch(end_bb)
                 .expect("unconditional branch should have been created successfully");
@@ -732,7 +759,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let BasicBlockAnd {
                 bb: if_false_bb,
                 value: if_false,
-            } = cg_expr(cg, if_false_bb, scope, *rhs);
+            } = cg_expr(cg, if_false_bb, scope, dbg_scope, *rhs);
             cg.builder
                 .build_unconditional_branch(end_bb)
                 .expect("unconditional branch should have been created successfully");
@@ -773,7 +800,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             let x_ty_is_signed_integer = x.inferred_type.is_signed_integer();
 
-            let BasicBlockAnd { bb, value: x } = cg_expr(cg, bb, scope, *x);
+            let BasicBlockAnd { bb, value: x } = cg_expr(cg, bb, scope, dbg_scope, *x);
 
             let reg = match (
                 x.get_type().is_pointer_type(),

@@ -11,11 +11,11 @@ declare void @take_int(i32)
 define void @test() !dbg !3 {
 entry:
   %let_x = alloca ptr, align 8
-  %load = load ptr, ptr %let_x, align 8
-  %gep = getelementptr i32, ptr %load, i32 4
-  %load1 = load i32, ptr %gep, align 4
-  call void @take_int(i32 %load1)
-  ret void
+  %load = load ptr, ptr %let_x, align 8, !dbg !8
+  %gep = getelementptr i32, ptr %load, i32 4, !dbg !11
+  %load1 = load i32, ptr %gep, align 4, !dbg !11
+  call void @take_int(i32 %load1), !dbg !11
+  ret void, !dbg !12
 }
 
 !llvm.module.flags = !{!0}
@@ -29,4 +29,9 @@ entry:
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
 !7 = !{}
+!8 = !DILocation(line: 8, column: 14, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 3, column: 11)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 3, column: 1)
+!11 = !DILocation(line: 8, column: 16, scope: !9)
+!12 = !DILocation(line: 10, column: 5, scope: !9)
 

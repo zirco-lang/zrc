@@ -9,9 +9,9 @@ source_filename = "test.zr"
 define i32 @test() !dbg !3 {
 entry:
   %let_x = alloca ptr, align 8
-  %load = load ptr, ptr %let_x, align 8
-  %load1 = load i32, ptr %load, align 4
-  ret i32 %load1
+  %load = load ptr, ptr %let_x, align 8, !dbg !8
+  %load1 = load i32, ptr %load, align 4, !dbg !8
+  ret i32 %load1, !dbg !8
 }
 
 !llvm.module.flags = !{!0}
@@ -25,4 +25,7 @@ entry:
 !5 = !{!6}
 !6 = !DIBasicType(name: "i32")
 !7 = !{}
+!8 = !DILocation(line: 6, column: 13, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 1, column: 18)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 1)
 

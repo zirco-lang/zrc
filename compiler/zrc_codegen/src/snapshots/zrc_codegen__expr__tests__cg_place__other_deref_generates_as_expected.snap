@@ -8,8 +8,8 @@ source_filename = "test.zr"
 
 define void @test() !dbg !3 {
 entry:
-  store i32 0, ptr inttoptr (i32 5 to ptr), align 4
-  ret void
+  store i32 0, ptr inttoptr (i32 5 to ptr), align 4, !dbg !8
+  ret void, !dbg !11
 }
 
 !llvm.module.flags = !{!0}
@@ -23,4 +23,8 @@ entry:
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
 !7 = !{}
+!8 = !DILocation(line: 8, column: 7, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 1, column: 11)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 1)
+!11 = !DILocation(line: 10, column: 5, scope: !9)
 

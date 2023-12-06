@@ -452,6 +452,8 @@ pub fn type_block<'input>(
                                 // instead of MayReturn)
 
                                 let cond_span = cond.0.span();
+                                let then_span = then.0.span();
+                                let te_span = then_else.as_ref().map(|x| x.0.span());
 
                                 let typed_cond = type_expr(&scope, cond)?;
 
@@ -508,8 +510,14 @@ pub fn type_block<'input>(
                                     TypedStmt(
                                         TypedStmtKind::IfStmt(
                                             typed_cond,
-                                            typed_then,
-                                            typed_then_else,
+                                            typed_then.in_span(then_span),
+                                            typed_then_else.map(|x| {
+                                                x.in_span(
+                                                    te_span.expect(
+                                                        "should have been unwrapped already",
+                                                    ),
+                                                )
+                                            }),
                                         )
                                         .in_span(stmt_span),
                                     ),
@@ -547,6 +555,7 @@ pub fn type_block<'input>(
                                 // won't/will return statically
 
                                 let cond_span = cond.0.span();
+                                let body_span = body.0.span();
                                 let typed_cond = type_expr(&scope, cond)?;
 
                                 if typed_cond.inferred_type != TastType::Bool {
@@ -577,8 +586,11 @@ pub fn type_block<'input>(
 
                                 Ok(Some((
                                     TypedStmt(
-                                        TypedStmtKind::WhileStmt(typed_cond, typed_body)
-                                            .in_span(stmt_span),
+                                        TypedStmtKind::WhileStmt(
+                                            typed_cond,
+                                            typed_body.in_span(body_span),
+                                        )
+                                        .in_span(stmt_span),
                                     ),
                                     match body_return_actuality {
                                         BlockReturnActuality::DoesNotReturn => {
