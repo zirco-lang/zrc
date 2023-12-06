@@ -1376,6 +1376,7 @@ dependencies = [
  "insta",
  "zrc_parser",
  "zrc_typeck",
+ "zrc_utils",
 ]
 
 [[package]]

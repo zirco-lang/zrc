@@ -3,8 +3,8 @@ source: compiler/zrc_codegen/src/expr.rs
 description: "fn get_bool() -> bool;\nfn get_int() -> i32;\nfn take_int(x: i32);\nfn test() {\n    // TEST: should produce a proper diamond-shaped cfg\n    let num = get_bool() ? get_int() : 3;\n    take_int(num);\n    return;\n}\n"
 expression: resulting_ir
 ---
-; ModuleID = 'test'
-source_filename = "test"
+; ModuleID = 'test.zr'
+source_filename = "test.zr"
 
 declare i1 @get_bool()
 
@@ -12,24 +12,44 @@ declare i32 @get_int()
 
 declare void @take_int(i32)
 
-define void @test() {
+define void @test() !dbg !3 {
 entry:
   %let_num = alloca i32, align 4
-  %call = call i1 @get_bool()
-  br i1 %call, label %if_true, label %if_false
+  %call = call i1 @get_bool(), !dbg !8
+  br i1 %call, label %if_true, label %if_false, !dbg !8
 
 if_true:                                          ; preds = %entry
-  %call1 = call i32 @get_int()
-  br label %end
+  %call1 = call i32 @get_int(), !dbg !11
+  br label %end, !dbg !11
 
 if_false:                                         ; preds = %entry
-  br label %end
+  br label %end, !dbg !12
 
 end:                                              ; preds = %if_false, %if_true
-  %yield = phi i32 [ %call1, %if_true ], [ 3, %if_false ]
-  store i32 %yield, ptr %let_num, align 4
-  %load = load i32, ptr %let_num, align 4
-  call void @take_int(i32 %load)
-  ret void
+  %yield = phi i32 [ %call1, %if_true ], [ 3, %if_false ], !dbg !12
+  store i32 %yield, ptr %let_num, align 4, !dbg !13
+  %load = load i32, ptr %let_num, align 4, !dbg !14
+  call void @take_int(i32 %load), !dbg !14
+  ret void, !dbg !15
 }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc test runner", isOptimized: false, flags: "zrc --fake-args", runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false)
+!2 = !DIFile(filename: "test.zr", directory: "/fake/path")
+!3 = distinct !DISubprogram(name: "test", linkageName: "test", scope: null, file: !2, line: 4, type: !4, scopeLine: 4, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
+!4 = !DISubroutineType(types: !5)
+!5 = !{!6}
+!6 = !DIBasicType(name: "void")
+!7 = !{}
+!8 = !DILocation(line: 6, column: 15, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 4, column: 11)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 4, column: 1)
+!11 = !DILocation(line: 6, column: 28, scope: !9)
+!12 = !DILocation(line: 6, column: 40, scope: !9)
+!13 = !DILocation(line: 6, column: 9, scope: !9)
+!14 = !DILocation(line: 7, column: 14, scope: !9)
+!15 = !DILocation(line: 8, column: 5, scope: !9)
 

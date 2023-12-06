@@ -3,20 +3,41 @@ source: compiler/zrc_codegen/src/expr.rs
 description: "fn test() {\n    let x: *i32;\n\n    // TEST: should create a GEP that is the same as \"x[4]\"\n    let y = x + 4;\n    // TEST: and the same, with -4:\n    let z = x - 4;\n\n    return;\n}\n"
 expression: resulting_ir
 ---
-; ModuleID = 'test'
-source_filename = "test"
+; ModuleID = 'test.zr'
+source_filename = "test.zr"
 
-define void @test() {
+define void @test() !dbg !3 {
 entry:
   %let_z = alloca ptr, align 8
   %let_y = alloca ptr, align 8
   %let_x = alloca ptr, align 8
-  %load = load ptr, ptr %let_x, align 8
-  %ptr_add = getelementptr i32, ptr %load, i32 4
-  store ptr %ptr_add, ptr %let_y, align 8
-  %load1 = load ptr, ptr %let_x, align 8
-  %ptr_sub = getelementptr i32, ptr %load1, i32 -4
-  store ptr %ptr_sub, ptr %let_z, align 8
-  ret void
+  %load = load ptr, ptr %let_x, align 8, !dbg !8
+  %ptr_add = getelementptr i32, ptr %load, i32 4, !dbg !11
+  store ptr %ptr_add, ptr %let_y, align 8, !dbg !12
+  %load1 = load ptr, ptr %let_x, align 8, !dbg !13
+  %ptr_sub = getelementptr i32, ptr %load1, i32 -4, !dbg !14
+  store ptr %ptr_sub, ptr %let_z, align 8, !dbg !15
+  ret void, !dbg !16
 }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc test runner", isOptimized: false, flags: "zrc --fake-args", runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false)
+!2 = !DIFile(filename: "test.zr", directory: "/fake/path")
+!3 = distinct !DISubprogram(name: "test", linkageName: "test", scope: null, file: !2, line: 1, type: !4, scopeLine: 1, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
+!4 = !DISubroutineType(types: !5)
+!5 = !{!6}
+!6 = !DIBasicType(name: "void")
+!7 = !{}
+!8 = !DILocation(line: 5, column: 13, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 1, column: 11)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 1)
+!11 = !DILocation(line: 5, column: 17, scope: !9)
+!12 = !DILocation(line: 5, column: 9, scope: !9)
+!13 = !DILocation(line: 7, column: 13, scope: !9)
+!14 = !DILocation(line: 7, column: 17, scope: !9)
+!15 = !DILocation(line: 7, column: 9, scope: !9)
+!16 = !DILocation(line: 9, column: 5, scope: !9)
 

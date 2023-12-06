@@ -52,7 +52,7 @@ use std::{
 
 use anyhow::bail;
 use clap::Parser;
-use zrc_codegen::OptimizationLevel;
+use zrc_codegen::{DebugLevel, OptimizationLevel};
 
 #[doc(hidden)]
 #[allow(
@@ -153,6 +153,10 @@ struct Cli {
     #[arg(short = 'O', long = "opt-level")]
     #[clap(default_value = "default")]
     opt_level: FrontendOptLevel,
+
+    /// Enable debugging information
+    #[arg(short = 'g')]
+    debug: bool,
 }
 
 /// Configuration for the Zirco optimizer
@@ -286,11 +290,31 @@ fn main() -> anyhow::Result<()> {
         bail!("no input file provided");
     };
 
+    let directory_name: String;
+    let file_name: String;
     let mut input: Box<dyn std::io::Read + 'static> = if path.clone().into_os_string() == "-" {
+        directory_name = "/dev".to_string();
+        file_name = "stdin".to_string();
         Box::new(std::io::stdin())
     } else {
         match std::fs::File::open(&path) {
-            Ok(file) => Box::new(file),
+            Ok(file) => {
+                let mut canonical = std::fs::canonicalize(path)?;
+                file_name = canonical
+                    .file_name()
+                    .expect("file name should exist")
+                    .to_str()
+                    .expect("should be a valid str")
+                    .to_string();
+                canonical.pop();
+
+                directory_name = canonical
+                    .to_str()
+                    .expect("directory should be a valid str")
+                    .to_string();
+
+                Box::new(file)
+            }
             Err(err) => {
                 bail!(err);
             }
@@ -308,16 +332,18 @@ fn main() -> anyhow::Result<()> {
     }
 
     let result = compile(
+        &version(),
         &cli.emit,
-        match path.as_os_str().to_str() {
-            Some("-") => "<stdin>",
-            _ => path
-                .as_os_str()
-                .to_str()
-                .expect("Invalid UTF-8 in file name"),
-        },
+        &directory_name,
+        &file_name,
+        &std::env::args().collect::<Vec<_>>().join(" "),
         &content,
         cli.opt_level.into(),
+        if cli.debug {
+            DebugLevel::Full
+        } else {
+            DebugLevel::None
+        },
         &cli.target
             .map_or_else(zrc_codegen::get_native_triple, |triple| {
                 zrc_codegen::TargetTriple::create(&triple)
@@ -355,30 +381,45 @@ fn main() -> anyhow::Result<()> {
 }
 
 /// Drive the compilation process.
+#[allow(clippy::too_many_arguments)]
 fn compile(
+    frontend_version_string: &str,
     emit: &OutputFormat,
-    module_name: &str,
+    parent_directory: &str,
+    file_name: &str,
+    cli_args: &str,
     content: &str,
     optimization_level: OptimizationLevel,
+    debug_mode: DebugLevel,
     triple: &zrc_codegen::TargetTriple,
     cpu: &str,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
     match *emit {
         OutputFormat::Asm => Ok(zrc_codegen::cg_program_to_buffer(
-            module_name,
+            frontend_version_string,
+            parent_directory,
+            file_name,
+            cli_args,
+            content,
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             zrc_codegen::FileType::Assembly,
             optimization_level,
+            debug_mode,
             triple,
             cpu,
         )
         .as_slice()
         .into()),
         OutputFormat::Object => Ok(zrc_codegen::cg_program_to_buffer(
-            module_name,
+            frontend_version_string,
+            parent_directory,
+            file_name,
+            cli_args,
+            content,
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             zrc_codegen::FileType::Object,
             optimization_level,
+            debug_mode,
             triple,
             cpu,
         )
@@ -386,9 +427,14 @@ fn compile(
         .into()),
 
         OutputFormat::Llvm => Ok(zrc_codegen::cg_program_to_string(
-            module_name,
+            frontend_version_string,
+            parent_directory,
+            file_name,
+            cli_args,
+            content,
             zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
             optimization_level,
+            debug_mode,
             triple,
             cpu,
         )
@@ -416,7 +462,7 @@ fn compile(
             zrc_parser::parser::parse_program(content)?,
         )?
         .into_iter()
-        .map(|x| x.to_string())
+        .map(|x| x.value().to_string())
         .collect::<Vec<_>>()
         .join("\n")
         .as_bytes()
