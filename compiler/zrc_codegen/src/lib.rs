@@ -195,8 +195,12 @@ impl CgLineLookup {
             .expect("line should be present");
 
         LineAndCol {
-            line: line as u32 + 1,
-            col: (index - self.line_spans[line].0) as u32 + 1,
+            line: u32::try_from(line)
+                .expect("there should probably never be more than u32::MAX lines in a file")
+                + 1,
+            col: u32::try_from(index - self.line_spans[line].0)
+                .expect("there should probably never be more than u32::MAX columns in a line")
+                + 1,
         }
     }
 }
