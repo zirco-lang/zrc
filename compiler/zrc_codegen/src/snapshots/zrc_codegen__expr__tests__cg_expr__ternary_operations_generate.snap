@@ -15,23 +15,29 @@ declare void @take_int(i32)
 define void @test() !dbg !3 {
 entry:
   %let_num = alloca i32, align 4
-  %call = call i1 @get_bool(), !dbg !8
-  br i1 %call, label %if_true, label %if_false, !dbg !8
+  call void @llvm.dbg.declare(metadata ptr %let_num, metadata !8, metadata !DIExpression()), !dbg !12
+  %call = call i1 @get_bool(), !dbg !13
+  br i1 %call, label %if_true, label %if_false, !dbg !13
 
 if_true:                                          ; preds = %entry
-  %call1 = call i32 @get_int(), !dbg !11
-  br label %end, !dbg !11
+  %call1 = call i32 @get_int(), !dbg !14
+  br label %end, !dbg !14
 
 if_false:                                         ; preds = %entry
-  br label %end, !dbg !12
+  br label %end, !dbg !15
 
 end:                                              ; preds = %if_false, %if_true
-  %yield = phi i32 [ %call1, %if_true ], [ 3, %if_false ], !dbg !12
-  store i32 %yield, ptr %let_num, align 4, !dbg !13
-  %load = load i32, ptr %let_num, align 4, !dbg !14
-  call void @take_int(i32 %load), !dbg !14
-  ret void, !dbg !15
+  %yield = phi i32 [ %call1, %if_true ], [ 3, %if_false ], !dbg !15
+  store i32 %yield, ptr %let_num, align 4, !dbg !12
+  %load = load i32, ptr %let_num, align 4, !dbg !16
+  call void @take_int(i32 %load), !dbg !16
+  ret void, !dbg !17
 }
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #0
+
+attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 
 !llvm.module.flags = !{!0}
 !llvm.dbg.cu = !{!1}
@@ -43,13 +49,15 @@ end:                                              ; preds = %if_false, %if_true
 !4 = !DISubroutineType(types: !5)
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
-!7 = !{}
-!8 = !DILocation(line: 6, column: 15, scope: !9)
+!7 = !{!8}
+!8 = !DILocalVariable(name: "num", scope: !9, file: !2, line: 6, type: !11)
 !9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 4, column: 11)
-!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 4, column: 1)
-!11 = !DILocation(line: 6, column: 28, scope: !9)
-!12 = !DILocation(line: 6, column: 40, scope: !9)
-!13 = !DILocation(line: 6, column: 9, scope: !9)
-!14 = !DILocation(line: 7, column: 14, scope: !9)
-!15 = !DILocation(line: 8, column: 5, scope: !9)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 4, column: 11)
+!11 = !DIBasicType(name: "i32")
+!12 = !DILocation(line: 6, column: 9, scope: !9)
+!13 = !DILocation(line: 6, column: 15, scope: !9)
+!14 = !DILocation(line: 6, column: 28, scope: !9)
+!15 = !DILocation(line: 6, column: 40, scope: !9)
+!16 = !DILocation(line: 7, column: 14, scope: !9)
+!17 = !DILocation(line: 8, column: 5, scope: !9)
 

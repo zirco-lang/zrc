@@ -25,6 +25,6 @@ entry:
 !7 = !{}
 !8 = !DILocation(line: 8, column: 7, scope: !9)
 !9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 1, column: 11)
-!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 1)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 11)
 !11 = !DILocation(line: 10, column: 5, scope: !9)
 

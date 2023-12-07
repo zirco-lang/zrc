@@ -36,9 +36,22 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
     mut bb: BasicBlock<'ctx>,
     scope: &'a mut CgScope<'input, 'ctx>,
     dbg_scope: DILexicalBlock<'ctx>,
-    declarations: Vec<LetDeclaration<'input>>,
+    declarations: Vec<Spanned<LetDeclaration<'input>>>,
 ) -> BasicBlock<'ctx> {
-    for let_declaration in declarations {
+    for spanned_let_declaration in declarations {
+        let span = spanned_let_declaration.span();
+        let let_declaration = spanned_let_declaration.into_value();
+
+        let stmt_line_col = cg.line_lookup.lookup_from_index(span.start());
+        let debug_location = cg.dbg_builder.create_debug_location(
+            cg.ctx,
+            stmt_line_col.line,
+            stmt_line_col.col,
+            dbg_scope.as_debug_info_scope(),
+            None,
+        );
+        cg.builder.set_current_debug_location(debug_location);
+
         // we create our own builder here because we need to insert the alloca
         // at the beginning of the entry block, and that is easier than trying to
         // somehow save our position.
@@ -48,6 +61,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
             .fn_value
             .get_first_basic_block()
             .expect("function should have at least one basic block");
+
         #[allow(clippy::option_if_let_else)]
         match first_bb.get_first_instruction() {
             Some(first_instruction) => {
@@ -58,21 +72,33 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
             }
         }
 
+        let (ty, dbg_ty) = llvm_basic_type(
+            cg.compilation_unit.get_file(),
+            cg.dbg_builder,
+            cg.ctx,
+            cg.target_machine,
+            &let_declaration.ty,
+        );
+
         let ptr = entry_block_builder
-            .build_alloca(
-                llvm_basic_type(
-                    cg.compilation_unit.get_file(),
-                    cg.dbg_builder,
-                    cg.ctx,
-                    cg.target_machine,
-                    &let_declaration.ty,
-                )
-                .0,
-                &format!("let_{}", let_declaration.name.value()),
-            )
+            .build_alloca(ty, &format!("let_{}", let_declaration.name.value()))
             .expect("alloca should generate successfully");
 
         scope.insert(let_declaration.name.value(), ptr);
+
+        let decl = cg.dbg_builder.create_auto_variable(
+            dbg_scope.as_debug_info_scope(),
+            let_declaration.name.value(),
+            cg.compilation_unit.get_file(),
+            cg.line_lookup.lookup_from_index(span.start()).line,
+            dbg_ty,
+            true,
+            0,
+            0,
+        );
+
+        cg.dbg_builder
+            .insert_declare_at_end(ptr, Some(decl), None, debug_location, first_bb);
 
         if let Some(value) = let_declaration.value {
             bb = cg_expr(
@@ -152,6 +178,9 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         vec![].in_span(Span::from_positions(then.end(), then.end()))
                     });
 
+                    let then_end = then.end();
+                    let then_else_end = then_else.end();
+
                     let BasicBlockAnd { value: cond, .. } =
                         cg_expr(cg, bb, &scope, lexical_block, cond);
 
@@ -181,6 +210,18 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         (Some(single_bb), None) | (None, Some(single_bb)) => {
                             let end = cg.ctx.append_basic_block(cg.fn_value, "end");
 
+                            let then_end_line_col = cg.line_lookup.lookup_from_index(then_end);
+                            let terminating_debug_location = cg.dbg_builder.create_debug_location(
+                                cg.ctx,
+                                then_end_line_col.line,
+                                then_end_line_col.col,
+                                lexical_block.as_debug_info_scope(),
+                                None,
+                            );
+
+                            cg.builder
+                                .set_current_debug_location(terminating_debug_location);
+
                             cg.builder.position_at_end(single_bb);
                             cg.builder
                                 .build_unconditional_branch(end)
@@ -192,10 +233,34 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         (Some(then_bb), Some(then_else_bb)) => {
                             let end = cg.ctx.append_basic_block(cg.fn_value, "end");
 
+                            let then_end_line_col = cg.line_lookup.lookup_from_index(then_end);
+                            let then_terminating_debug_location =
+                                cg.dbg_builder.create_debug_location(
+                                    cg.ctx,
+                                    then_end_line_col.line,
+                                    then_end_line_col.col,
+                                    lexical_block.as_debug_info_scope(),
+                                    None,
+                                );
+                            cg.builder
+                                .set_current_debug_location(then_terminating_debug_location);
                             cg.builder.position_at_end(then_bb);
                             cg.builder
                                 .build_unconditional_branch(end)
                                 .expect("branch should generate successfully");
+
+                            let then_else_end_line_col =
+                                cg.line_lookup.lookup_from_index(then_else_end);
+                            let then_else_terminating_debug_location =
+                                cg.dbg_builder.create_debug_location(
+                                    cg.ctx,
+                                    then_else_end_line_col.line,
+                                    then_else_end_line_col.col,
+                                    lexical_block.as_debug_info_scope(),
+                                    None,
+                                );
+                            cg.builder
+                                .set_current_debug_location(then_else_terminating_debug_location);
 
                             cg.builder.position_at_end(then_else_bb);
                             cg.builder

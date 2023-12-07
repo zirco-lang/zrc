@@ -113,11 +113,11 @@ fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
 fn process_let_declaration<'input>(
     scope: &mut Scope<'input>,
     declarations: Vec<Spanned<AstLetDeclaration<'input>>>,
-) -> Result<Vec<TastLetDeclaration<'input>>, Diagnostic> {
+) -> Result<Vec<Spanned<TastLetDeclaration<'input>>>, Diagnostic> {
     declarations
         .into_iter()
         .map(
-            |let_declaration| -> Result<TastLetDeclaration, Diagnostic> {
+            |let_declaration| -> Result<Spanned<TastLetDeclaration>, Diagnostic> {
                 let let_decl_span = let_declaration.span();
                 let let_declaration = let_declaration.into_value();
 
@@ -211,7 +211,7 @@ fn process_let_declaration<'input>(
                 }
 
                 scope.set_value(result_decl.name.value(), result_decl.ty.clone());
-                Ok(result_decl)
+                Ok(result_decl.in_span(let_decl_span))
             },
         )
         .collect::<Result<Vec<_>, Diagnostic>>()

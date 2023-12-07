@@ -15,23 +15,33 @@ entry:
   %let_and = alloca i1, align 1
   %let_b = alloca i1, align 1
   %let_a = alloca i1, align 1
-  %call = call i1 @get_bool(), !dbg !8
-  store i1 %call, ptr %let_a, align 1, !dbg !11
-  %call1 = call i1 @get_bool(), !dbg !12
-  store i1 %call1, ptr %let_b, align 1, !dbg !13
-  %load = load i1, ptr %let_a, align 1, !dbg !14
-  %load2 = load i1, ptr %let_b, align 1, !dbg !15
-  %and = and i1 %load, %load2, !dbg !15
-  store i1 %and, ptr %let_and, align 1, !dbg !16
-  %load3 = load i1, ptr %let_a, align 1, !dbg !17
-  %load4 = load i1, ptr %let_b, align 1, !dbg !18
-  %or = or i1 %load3, %load4, !dbg !18
-  store i1 %or, ptr %let_or, align 1, !dbg !19
-  %load5 = load i1, ptr %let_a, align 1, !dbg !20
-  %not = xor i1 %load5, true, !dbg !20
-  store i1 %not, ptr %let_not, align 1, !dbg !21
-  ret void, !dbg !22
+  call void @llvm.dbg.declare(metadata ptr %let_a, metadata !8, metadata !DIExpression()), !dbg !16
+  %call = call i1 @get_bool(), !dbg !17
+  store i1 %call, ptr %let_a, align 1, !dbg !16
+  call void @llvm.dbg.declare(metadata ptr %let_b, metadata !12, metadata !DIExpression()), !dbg !18
+  %call1 = call i1 @get_bool(), !dbg !19
+  store i1 %call1, ptr %let_b, align 1, !dbg !18
+  call void @llvm.dbg.declare(metadata ptr %let_and, metadata !13, metadata !DIExpression()), !dbg !20
+  %load = load i1, ptr %let_a, align 1, !dbg !21
+  %load2 = load i1, ptr %let_b, align 1, !dbg !22
+  %and = and i1 %load, %load2, !dbg !22
+  store i1 %and, ptr %let_and, align 1, !dbg !20
+  call void @llvm.dbg.declare(metadata ptr %let_or, metadata !14, metadata !DIExpression()), !dbg !23
+  %load3 = load i1, ptr %let_a, align 1, !dbg !24
+  %load4 = load i1, ptr %let_b, align 1, !dbg !25
+  %or = or i1 %load3, %load4, !dbg !25
+  store i1 %or, ptr %let_or, align 1, !dbg !23
+  call void @llvm.dbg.declare(metadata ptr %let_not, metadata !15, metadata !DIExpression()), !dbg !26
+  %load5 = load i1, ptr %let_a, align 1, !dbg !27
+  %not = xor i1 %load5, true, !dbg !27
+  store i1 %not, ptr %let_not, align 1, !dbg !26
+  ret void, !dbg !28
 }
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #0
+
+attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 
 !llvm.module.flags = !{!0}
 !llvm.dbg.cu = !{!1}
@@ -43,20 +53,26 @@ entry:
 !4 = !DISubroutineType(types: !5)
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
-!7 = !{}
-!8 = !DILocation(line: 4, column: 13, scope: !9)
+!7 = !{!8, !12, !13, !14, !15}
+!8 = !DILocalVariable(name: "a", scope: !9, file: !2, line: 4, type: !11)
 !9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 3, column: 11)
-!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 3, column: 1)
-!11 = !DILocation(line: 4, column: 9, scope: !9)
-!12 = !DILocation(line: 5, column: 13, scope: !9)
-!13 = !DILocation(line: 5, column: 9, scope: !9)
-!14 = !DILocation(line: 8, column: 15, scope: !9)
-!15 = !DILocation(line: 8, column: 20, scope: !9)
-!16 = !DILocation(line: 8, column: 9, scope: !9)
-!17 = !DILocation(line: 11, column: 14, scope: !9)
-!18 = !DILocation(line: 11, column: 19, scope: !9)
-!19 = !DILocation(line: 11, column: 9, scope: !9)
-!20 = !DILocation(line: 14, column: 16, scope: !9)
-!21 = !DILocation(line: 14, column: 9, scope: !9)
-!22 = !DILocation(line: 16, column: 5, scope: !9)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 3, column: 11)
+!11 = !DIBasicType(name: "bool")
+!12 = !DILocalVariable(name: "b", scope: !9, file: !2, line: 5, type: !11)
+!13 = !DILocalVariable(name: "and", scope: !9, file: !2, line: 8, type: !11)
+!14 = !DILocalVariable(name: "or", scope: !9, file: !2, line: 11, type: !11)
+!15 = !DILocalVariable(name: "not", scope: !9, file: !2, line: 14, type: !11)
+!16 = !DILocation(line: 4, column: 9, scope: !9)
+!17 = !DILocation(line: 4, column: 13, scope: !9)
+!18 = !DILocation(line: 5, column: 9, scope: !9)
+!19 = !DILocation(line: 5, column: 13, scope: !9)
+!20 = !DILocation(line: 8, column: 9, scope: !9)
+!21 = !DILocation(line: 8, column: 15, scope: !9)
+!22 = !DILocation(line: 8, column: 20, scope: !9)
+!23 = !DILocation(line: 11, column: 9, scope: !9)
+!24 = !DILocation(line: 11, column: 14, scope: !9)
+!25 = !DILocation(line: 11, column: 19, scope: !9)
+!26 = !DILocation(line: 14, column: 9, scope: !9)
+!27 = !DILocation(line: 14, column: 16, scope: !9)
+!28 = !DILocation(line: 16, column: 5, scope: !9)
 

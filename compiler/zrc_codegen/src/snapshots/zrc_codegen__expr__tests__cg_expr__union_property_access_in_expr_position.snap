@@ -13,12 +13,18 @@ declare void @take_i8(i8)
 define void @test() !dbg !3 {
 entry:
   %let_x = alloca i32, align 4
-  %load = load i32, ptr %let_x, align 4, !dbg !8
-  call void @take_i32(i32 %load), !dbg !8
-  %load1 = load i8, ptr %let_x, align 1, !dbg !11
-  call void @take_i8(i8 %load1), !dbg !11
-  ret void, !dbg !12
+  call void @llvm.dbg.declare(metadata ptr %let_x, metadata !8, metadata !DIExpression()), !dbg !15
+  %load = load i32, ptr %let_x, align 4, !dbg !16
+  call void @take_i32(i32 %load), !dbg !16
+  %load1 = load i8, ptr %let_x, align 1, !dbg !17
+  call void @take_i8(i8 %load1), !dbg !17
+  ret void, !dbg !18
 }
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #0
+
+attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 
 !llvm.module.flags = !{!0}
 !llvm.dbg.cu = !{!1}
@@ -30,10 +36,16 @@ entry:
 !4 = !DISubroutineType(types: !5)
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
-!7 = !{}
-!8 = !DILocation(line: 9, column: 14, scope: !9)
+!7 = !{!8}
+!8 = !DILocalVariable(name: "x", scope: !9, file: !2, line: 6, type: !11)
 !9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 5, column: 11)
-!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 5, column: 1)
-!11 = !DILocation(line: 12, column: 13, scope: !9)
-!12 = !DILocation(line: 14, column: 5, scope: !9)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 5, column: 11)
+!11 = !DICompositeType(tag: DW_TAG_union_type, name: "(union { x: i32, y: i8 })", scope: !2, file: !2, elements: !12)
+!12 = !{!13, !14}
+!13 = !DIBasicType(name: "i32")
+!14 = !DIBasicType(name: "i8")
+!15 = !DILocation(line: 6, column: 9, scope: !9)
+!16 = !DILocation(line: 9, column: 14, scope: !9)
+!17 = !DILocation(line: 12, column: 13, scope: !9)
+!18 = !DILocation(line: 14, column: 5, scope: !9)
 

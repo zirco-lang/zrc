@@ -51,7 +51,7 @@ pub enum TypedStmtKind<'input> {
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
-        init: Option<Box<Vec<LetDeclaration<'input>>>>,
+        init: Option<Box<Vec<Spanned<LetDeclaration<'input>>>>>,
         /// Runs before each iteration of the loop. If this evaluates to
         /// `false`, the loop will end. If this is [`None`], the loop
         /// will run forever.
@@ -72,7 +72,7 @@ pub enum TypedStmtKind<'input> {
     /// `return;` or `return x;`
     ReturnStmt(Option<TypedExpr<'input>>),
     /// A let declaration
-    DeclarationList(Vec<LetDeclaration<'input>>),
+    DeclarationList(Vec<Spanned<LetDeclaration<'input>>>),
 }
 impl<'input> Display for TypedStmt<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -150,7 +150,7 @@ impl<'input> Display for TypedStmtKind<'input> {
                 init.as_ref().map_or(String::new(), |x| format!(
                     "let {};",
                     x.iter()
-                        .map(ToString::to_string)
+                        .map(|x| x.value().to_string())
                         .collect::<Vec<_>>()
                         .join(", ")
                 )),
@@ -190,7 +190,7 @@ impl<'input> Display for TypedStmtKind<'input> {
                 f,
                 "let {};",
                 list.iter()
-                    .map(ToString::to_string)
+                    .map(|x| x.value().to_string())
                     .collect::<Vec<_>>()
                     .join(", ")
             ),

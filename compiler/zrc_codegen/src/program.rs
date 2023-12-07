@@ -287,18 +287,16 @@ fn cg_program<'ctx>(
                         builder.position_at_end(entry);
                     }
 
+                    let (ty, dbg_ty) = llvm_basic_type(
+                        compilation_unit.get_file(),
+                        &dbg_builder,
+                        ctx,
+                        target_machine,
+                        ty.value(),
+                    );
+
                     let alloc = builder
-                        .build_alloca(
-                            llvm_basic_type(
-                                compilation_unit.get_file(),
-                                &dbg_builder,
-                                ctx,
-                                target_machine,
-                                ty.value(),
-                            )
-                            .0,
-                            &format!("arg_{}", name.value()),
-                        )
+                        .build_alloca(ty, &format!("arg_{}", name.value()))
                         .expect("alloca should generate successfully");
 
                     builder.position_at_end(entry);
@@ -314,6 +312,36 @@ fn cg_program<'ctx>(
                                 .expect("nth parameter from fn type should exist in fn value"),
                         )
                         .expect("store should generate successfully");
+
+                    let ident_line_col = line_lookup.lookup_from_index(name.start());
+
+                    let id_debug_location = dbg_builder.create_debug_location(
+                        ctx,
+                        ident_line_col.line,
+                        ident_line_col.col,
+                        lexical_block.as_debug_info_scope(),
+                        None,
+                    );
+
+                    let decl = dbg_builder.create_parameter_variable(
+                        fn_subprogram.as_debug_info_scope(),
+                        name.value(),
+                        u32::try_from(n)
+                            .expect("should not be more than u32::MAX args in a function"),
+                        compilation_unit.get_file(),
+                        ident_line_col.line,
+                        dbg_ty,
+                        true,
+                        0,
+                    );
+
+                    dbg_builder.insert_declare_at_end(
+                        alloc,
+                        Some(decl),
+                        None,
+                        id_debug_location,
+                        entry,
+                    );
 
                     fn_scope.insert(name.value(), alloc);
                 }

@@ -11,14 +11,22 @@ entry:
   %let_z = alloca ptr, align 8
   %let_y = alloca ptr, align 8
   %let_x = alloca ptr, align 8
-  %load = load ptr, ptr %let_x, align 8, !dbg !8
-  %ptr_add = getelementptr i32, ptr %load, i32 4, !dbg !11
-  store ptr %ptr_add, ptr %let_y, align 8, !dbg !12
-  %load1 = load ptr, ptr %let_x, align 8, !dbg !13
-  %ptr_sub = getelementptr i32, ptr %load1, i32 -4, !dbg !14
-  store ptr %ptr_sub, ptr %let_z, align 8, !dbg !15
-  ret void, !dbg !16
+  call void @llvm.dbg.declare(metadata ptr %let_x, metadata !8, metadata !DIExpression()), !dbg !15
+  call void @llvm.dbg.declare(metadata ptr %let_y, metadata !13, metadata !DIExpression()), !dbg !16
+  %load = load ptr, ptr %let_x, align 8, !dbg !17
+  %ptr_add = getelementptr i32, ptr %load, i32 4, !dbg !18
+  store ptr %ptr_add, ptr %let_y, align 8, !dbg !16
+  call void @llvm.dbg.declare(metadata ptr %let_z, metadata !14, metadata !DIExpression()), !dbg !19
+  %load1 = load ptr, ptr %let_x, align 8, !dbg !20
+  %ptr_sub = getelementptr i32, ptr %load1, i32 -4, !dbg !21
+  store ptr %ptr_sub, ptr %let_z, align 8, !dbg !19
+  ret void, !dbg !22
 }
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #0
+
+attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 
 !llvm.module.flags = !{!0}
 !llvm.dbg.cu = !{!1}
@@ -30,14 +38,20 @@ entry:
 !4 = !DISubroutineType(types: !5)
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
-!7 = !{}
-!8 = !DILocation(line: 5, column: 13, scope: !9)
+!7 = !{!8, !13, !14}
+!8 = !DILocalVariable(name: "x", scope: !9, file: !2, line: 2, type: !11)
 !9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 1, column: 11)
-!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 1)
-!11 = !DILocation(line: 5, column: 17, scope: !9)
-!12 = !DILocation(line: 5, column: 9, scope: !9)
-!13 = !DILocation(line: 7, column: 13, scope: !9)
-!14 = !DILocation(line: 7, column: 17, scope: !9)
-!15 = !DILocation(line: 7, column: 9, scope: !9)
-!16 = !DILocation(line: 9, column: 5, scope: !9)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 11)
+!11 = !DIDerivedType(tag: DW_TAG_pointer_type, name: "\22i32\22", baseType: !12, dwarfAddressSpace: 0)
+!12 = !DIBasicType(name: "i32")
+!13 = !DILocalVariable(name: "y", scope: !9, file: !2, line: 5, type: !11)
+!14 = !DILocalVariable(name: "z", scope: !9, file: !2, line: 7, type: !11)
+!15 = !DILocation(line: 2, column: 9, scope: !9)
+!16 = !DILocation(line: 5, column: 9, scope: !9)
+!17 = !DILocation(line: 5, column: 13, scope: !9)
+!18 = !DILocation(line: 5, column: 17, scope: !9)
+!19 = !DILocation(line: 7, column: 9, scope: !9)
+!20 = !DILocation(line: 7, column: 13, scope: !9)
+!21 = !DILocation(line: 7, column: 17, scope: !9)
+!22 = !DILocation(line: 9, column: 5, scope: !9)
 

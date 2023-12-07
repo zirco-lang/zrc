@@ -10,9 +10,16 @@ define void @test() !dbg !3 {
 entry:
   %let_b = alloca i32, align 4
   %let_a = alloca i32, align 4
-  store i32 7, ptr %let_b, align 4, !dbg !8
-  ret void, !dbg !11
+  call void @llvm.dbg.declare(metadata ptr %let_a, metadata !8, metadata !DIExpression()), !dbg !13
+  call void @llvm.dbg.declare(metadata ptr %let_b, metadata !12, metadata !DIExpression()), !dbg !14
+  store i32 7, ptr %let_b, align 4, !dbg !14
+  ret void, !dbg !15
 }
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #0
+
+attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 
 !llvm.module.flags = !{!0}
 !llvm.dbg.cu = !{!1}
@@ -24,9 +31,13 @@ entry:
 !4 = !DISubroutineType(types: !5)
 !5 = !{!6}
 !6 = !DIBasicType(name: "void")
-!7 = !{}
-!8 = !DILocation(line: 4, column: 9, scope: !9)
+!7 = !{!8, !12}
+!8 = !DILocalVariable(name: "a", scope: !9, file: !2, line: 3, type: !11)
 !9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 1, column: 11)
-!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 1)
-!11 = !DILocation(line: 6, column: 5, scope: !9)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 11)
+!11 = !DIBasicType(name: "i32")
+!12 = !DILocalVariable(name: "b", scope: !9, file: !2, line: 4, type: !11)
+!13 = !DILocation(line: 3, column: 9, scope: !9)
+!14 = !DILocation(line: 4, column: 9, scope: !9)
+!15 = !DILocation(line: 6, column: 5, scope: !9)
 
