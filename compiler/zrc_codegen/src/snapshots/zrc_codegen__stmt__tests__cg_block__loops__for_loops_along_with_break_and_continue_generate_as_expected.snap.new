@@ -1,0 +1,100 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+assertion_line: 605
+description: "fn get_int() -> i32;\n\nfn test() {\n    // TEST: the proper while loop structure is created\n    for (let i = 0; i < get_int(); i += 1) {\n        // TEST: break jumps to the `end` block\n        if (i > get_int()) break;\n        else {\n            // TEST: continue jumps to the latch block\n            if (i < get_int()) continue;\n            else {}\n        }\n\n        // TEST: the loop jumps to the latch block which jumps back to the\n        // header\n    }\n\n    return;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test.zr'
+source_filename = "test.zr"
+
+declare i32 @get_int()
+
+define void @test() !dbg !3 {
+entry:
+  %let_i = alloca i32, align 4
+  call void @llvm.dbg.declare(metadata ptr %let_i, metadata !8, metadata !DIExpression()), !dbg !12
+  store i32 0, ptr %let_i, align 4, !dbg !12
+  br label %header, !dbg !12
+
+header:                                           ; preds = %latch, %entry
+  %load = load i32, ptr %let_i, align 4, !dbg !13
+  %call = call i32 @get_int(), !dbg !14
+  %cmp = icmp ult i32 %load, %call, !dbg !14
+  br i1 %cmp, label %body, label %exit, !dbg !14
+
+body:                                             ; preds = %header
+  %load1 = load i32, ptr %let_i, align 4, !dbg !15
+  %call2 = call i32 @get_int(), !dbg !17
+  %cmp3 = icmp ugt i32 %load1, %call2, !dbg !17
+  br i1 %cmp3, label %then, label %then_else, !dbg !17
+
+latch:                                            ; preds = %end9, %then7
+  %load10 = load i32, ptr %let_i, align 4, !dbg !18
+  %add = add i32 %load10, 1, !dbg !19
+  store i32 %add, ptr %let_i, align 4, !dbg !18
+  br label %header, !dbg !18
+
+exit:                                             ; preds = %then, %header
+  ret void, !dbg !20
+
+then:                                             ; preds = %body
+  br label %exit, !dbg !21
+
+then_else:                                        ; preds = %body
+  %load4 = load i32, ptr %let_i, align 4, !dbg !23
+  %call5 = call i32 @get_int(), !dbg !25
+  %cmp6 = icmp ult i32 %load4, %call5, !dbg !25
+  br i1 %cmp6, label %then7, label %then_else8, !dbg !25
+
+then7:                                            ; preds = %then_else
+  br label %latch, !dbg !26
+
+then_else8:                                       ; preds = %then_else
+  br label %end, !dbg !28
+
+end:                                              ; preds = %then_else8
+  br label %end9, !dbg !29
+
+end9:                                             ; preds = %end
+  br label %latch, !dbg !29
+}
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #0
+
+attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc test runner", isOptimized: false, flags: "zrc --fake-args", runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false)
+!2 = !DIFile(filename: "test.zr", directory: "/fake/path")
+!3 = distinct !DISubprogram(name: "test", linkageName: "test", scope: null, file: !2, line: 3, type: !4, scopeLine: 3, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
+!4 = !DISubroutineType(types: !5)
+!5 = !{!6}
+!6 = !DIBasicType(name: "void")
+!7 = !{!8}
+!8 = !DILocalVariable(name: "i", scope: !9, file: !2, line: 5, type: !11)
+!9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 3, column: 11)
+!10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 3, column: 11)
+!11 = !DIBasicType(name: "i32")
+!12 = !DILocation(line: 5, column: 14, scope: !9)
+!13 = !DILocation(line: 5, column: 21, scope: !9)
+!14 = !DILocation(line: 5, column: 25, scope: !9)
+!15 = !DILocation(line: 7, column: 13, scope: !16)
+!16 = distinct !DILexicalBlock(scope: !9, file: !2, line: 5, column: 44)
+!17 = !DILocation(line: 7, column: 17, scope: !16)
+!18 = !DILocation(line: 5, column: 36, scope: !9)
+!19 = !DILocation(line: 5, column: 41, scope: !9)
+!20 = !DILocation(line: 18, column: 5, scope: !9)
+!21 = !DILocation(line: 7, column: 28, scope: !22)
+!22 = distinct !DILexicalBlock(scope: !16, file: !2, line: 7, column: 28)
+!23 = !DILocation(line: 10, column: 17, scope: !24)
+!24 = distinct !DILexicalBlock(scope: !16, file: !2, line: 8, column: 14)
+!25 = !DILocation(line: 10, column: 21, scope: !24)
+!26 = !DILocation(line: 10, column: 32, scope: !27)
+!27 = distinct !DILexicalBlock(scope: !24, file: !2, line: 10, column: 32)
+!28 = !DILocation(line: 10, column: 41, scope: !24)
+!29 = !DILocation(line: 7, column: 34, scope: !16)
+
