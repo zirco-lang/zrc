@@ -20,12 +20,12 @@ then:                                             ; preds = %entry
   br label %end, !dbg !13
 
 then_else:                                        ; preds = %entry
-  call void @nop(), !dbg !15
-  ret void, !dbg !13
+  call void @nop(), !dbg !14
+  ret void, !dbg !16
 
 end:                                              ; preds = %then
-  call void @nop(), !dbg !16
-  ret void, !dbg !17
+  call void @nop(), !dbg !17
+  ret void, !dbg !18
 }
 
 !llvm.module.flags = !{!0}
@@ -44,9 +44,10 @@ end:                                              ; preds = %then
 !10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 4, column: 11)
 !11 = !DILocation(line: 7, column: 21, scope: !12)
 !12 = distinct !DILexicalBlock(scope: !9, file: !2, line: 7, column: 21)
-!13 = !DILocation(line: 11, column: 9, scope: !14)
-!14 = distinct !DILexicalBlock(scope: !9, file: !2, line: 8, column: 10)
-!15 = !DILocation(line: 9, column: 9, scope: !14)
-!16 = !DILocation(line: 15, column: 5, scope: !9)
-!17 = !DILocation(line: 16, column: 5, scope: !9)
+!13 = !DILocation(line: 7, column: 27, scope: !9)
+!14 = !DILocation(line: 9, column: 9, scope: !15)
+!15 = distinct !DILexicalBlock(scope: !9, file: !2, line: 8, column: 10)
+!16 = !DILocation(line: 11, column: 9, scope: !15)
+!17 = !DILocation(line: 15, column: 5, scope: !9)
+!18 = !DILocation(line: 16, column: 5, scope: !9)
 

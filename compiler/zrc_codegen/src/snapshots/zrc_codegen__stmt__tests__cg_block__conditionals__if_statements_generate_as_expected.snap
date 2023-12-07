@@ -17,14 +17,14 @@ entry:
 
 then:                                             ; preds = %entry
   call void @nop(), !dbg !11
-  br label %end, !dbg !11
+  br label %end, !dbg !13
 
 then_else:                                        ; preds = %entry
-  br label %end, !dbg !11
+  br label %end, !dbg !13
 
 end:                                              ; preds = %then_else, %then
-  call void @nop(), !dbg !13
-  ret void, !dbg !14
+  call void @nop(), !dbg !14
+  ret void, !dbg !15
 }
 
 !llvm.module.flags = !{!0}
@@ -43,6 +43,7 @@ end:                                              ; preds = %then_else, %then
 !10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 4, column: 11)
 !11 = !DILocation(line: 7, column: 21, scope: !12)
 !12 = distinct !DILexicalBlock(scope: !9, file: !2, line: 7, column: 21)
-!13 = !DILocation(line: 10, column: 5, scope: !9)
-!14 = !DILocation(line: 11, column: 5, scope: !9)
+!13 = !DILocation(line: 7, column: 27, scope: !9)
+!14 = !DILocation(line: 10, column: 5, scope: !9)
+!15 = !DILocation(line: 11, column: 5, scope: !9)
 

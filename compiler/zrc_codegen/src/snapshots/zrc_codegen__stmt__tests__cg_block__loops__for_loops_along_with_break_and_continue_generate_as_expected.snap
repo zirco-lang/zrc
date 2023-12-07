@@ -49,13 +49,13 @@ then7:                                            ; preds = %then_else
   br label %latch, !dbg !26
 
 then_else8:                                       ; preds = %then_else
-  br label %end, !dbg !26
+  br label %end, !dbg !28
 
 end:                                              ; preds = %then_else8
-  br label %end9, !dbg !26
+  br label %end9, !dbg !29
 
 end9:                                             ; preds = %end
-  br label %latch, !dbg !26
+  br label %latch, !dbg !29
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
@@ -94,4 +94,6 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !25 = !DILocation(line: 10, column: 21, scope: !24)
 !26 = !DILocation(line: 10, column: 32, scope: !27)
 !27 = distinct !DILexicalBlock(scope: !24, file: !2, line: 10, column: 32)
+!28 = !DILocation(line: 10, column: 41, scope: !24)
+!29 = !DILocation(line: 7, column: 34, scope: !16)
 

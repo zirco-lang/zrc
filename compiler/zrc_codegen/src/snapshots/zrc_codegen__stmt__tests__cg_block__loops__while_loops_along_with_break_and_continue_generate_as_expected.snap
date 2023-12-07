@@ -34,13 +34,13 @@ then3:                                            ; preds = %then_else
   br label %header, !dbg !19
 
 then_else4:                                       ; preds = %then_else
-  br label %end, !dbg !19
+  br label %end, !dbg !21
 
 end:                                              ; preds = %then_else4
-  br label %end5, !dbg !19
+  br label %end5, !dbg !22
 
 end5:                                             ; preds = %end
-  br label %header, !dbg !19
+  br label %header, !dbg !22
 }
 
 !llvm.module.flags = !{!0}
@@ -67,4 +67,6 @@ end5:                                             ; preds = %end
 !18 = distinct !DILexicalBlock(scope: !13, file: !2, line: 8, column: 14)
 !19 = !DILocation(line: 10, column: 29, scope: !20)
 !20 = distinct !DILexicalBlock(scope: !18, file: !2, line: 10, column: 29)
+!21 = !DILocation(line: 10, column: 38, scope: !18)
+!22 = !DILocation(line: 7, column: 31, scope: !13)
 
