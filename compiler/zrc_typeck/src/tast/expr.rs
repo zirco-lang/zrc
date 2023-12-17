@@ -20,7 +20,7 @@ pub struct Place<'input> {
 }
 impl<'input> Display for Place<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}) as ({})", self.inferred_type, self.kind.value())
+        write!(f, "({}) as ({})", self.inferred_type, self.kind)
     }
 }
 
@@ -46,7 +46,7 @@ impl<'input> Display for PlaceKind<'input> {
             Self::Deref(expr) => write!(f, "*{expr}"),
             Self::Variable(ident) => write!(f, "{ident}"),
             Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
-            Self::Dot(expr, key) => write!(f, "{expr}.{}", key.value()),
+            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
         }
     }
 }
@@ -63,7 +63,7 @@ pub struct TypedExpr<'input> {
 }
 impl<'input> Display for TypedExpr<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "(({}) as ({}))", self.inferred_type, self.kind.value())
+        write!(f, "(({}) as ({}))", self.inferred_type, self.kind)
     }
 }
 
@@ -164,8 +164,8 @@ impl<'input> Display for TypedExprKind<'input> {
             Self::UnaryDereference(expr) => write!(f, "*{expr}"),
             Self::Ternary(cond, if_true, if_false) => write!(f, "{cond} ? {if_true} : {if_false}"),
             Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
-            Self::Dot(expr, key) => write!(f, "{expr}.{}", key.value()),
-            Self::Cast(expr, ty) => write!(f, "{expr} as {}", ty.value()),
+            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
+            Self::Cast(expr, ty) => write!(f, "{expr} as {ty}"),
             Self::SizeOf(ty) => write!(f, "sizeof({ty})"),
             Self::Call(expr, args) => write!(
                 f,

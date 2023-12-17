@@ -158,6 +158,14 @@ impl<T> Spanned<T> {
         self.span().containing(&self.1)
     }
 }
+impl<T> Display for Spanned<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.value().fmt(f)
+    }
+}
 impl<T> Spanned<Option<T>> {
     /// Converts a [`Spanned<Option<T>>`] to a [`Option<Spanned<T>>`].
     /// Note: This is not reversible because if you wanted to create a

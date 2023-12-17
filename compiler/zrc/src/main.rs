@@ -443,7 +443,7 @@ fn compile(
 
         OutputFormat::Ast => Ok(zrc_parser::parser::parse_program(content)?
             .into_iter()
-            .map(|x| format!("{}", x.into_value()))
+            .map(|x| format!("{x}"))
             .collect::<Vec<_>>()
             .join("\n")
             .as_bytes()
@@ -462,7 +462,7 @@ fn compile(
             zrc_parser::parser::parse_program(content)?,
         )?
         .into_iter()
-        .map(|x| x.value().to_string())
+        .map(|x| x.to_string())
         .collect::<Vec<_>>()
         .join("\n")
         .as_bytes()

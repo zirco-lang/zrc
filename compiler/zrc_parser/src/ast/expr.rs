@@ -284,8 +284,8 @@ impl<'input> Display for ExprKind<'input> {
             Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
             Self::SizeOfType(ty) => write!(f, "sizeof {ty}"),
             Self::SizeOfExpr(expr) => write!(f, "sizeof({expr})"),
-            Self::Dot(expr, key) => write!(f, "{expr}.{}", key.value()),
-            Self::Arrow(ptr, key) => write!(f, "{ptr}->{}", key.value()),
+            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
+            Self::Arrow(ptr, key) => write!(f, "{ptr}->{key}"),
             Self::Cast(expr, ty) => write!(f, "{expr} as {ty}"),
             Self::Call(expr, args) => write!(
                 f,

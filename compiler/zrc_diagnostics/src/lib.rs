@@ -94,7 +94,7 @@ impl Diagnostic {
         format!(
             "{}: {}\n{}",
             self.0,
-            Color::White.bold().paint(self.1.value().to_string()),
+            Color::White.bold().paint(self.1.to_string()),
             display_source_window(&self.0, self.1.span(), source)
         )
     }
@@ -102,7 +102,7 @@ impl Diagnostic {
 impl Error for Diagnostic {}
 impl Display for Diagnostic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.0, self.1.value())
+        write!(f, "{}: {}", self.0, self.1)
     }
 }
 

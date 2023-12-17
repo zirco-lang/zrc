@@ -296,7 +296,7 @@ fn cg_program<'ctx>(
                     );
 
                     let alloc = builder
-                        .build_alloca(ty, &format!("arg_{}", name.value()))
+                        .build_alloca(ty, &format!("arg_{name}"))
                         .expect("alloca should generate successfully");
 
                     builder.position_at_end(entry);
