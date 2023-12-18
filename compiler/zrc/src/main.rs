@@ -381,7 +381,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 /// Drive the compilation process.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::wildcard_enum_match_arm)]
 fn compile(
     frontend_version_string: &str,
     emit: &OutputFormat,
@@ -394,6 +394,58 @@ fn compile(
     triple: &zrc_codegen::TargetTriple,
     cpu: &str,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
+    // === PARSER ===
+    let ast = zrc_parser::parser::parse_program(content)?;
+
+    // display the AST if the user wants it
+    if matches!(
+        emit,
+        OutputFormat::Ast | OutputFormat::AstDebug | OutputFormat::AstDebugPretty,
+    ) {
+        return Ok(match *emit {
+            OutputFormat::Ast => ast
+                .into_iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+            OutputFormat::AstDebug => format!("{ast:?}"),
+            OutputFormat::AstDebugPretty => format!("{ast:#?}"),
+
+            // unreachable because we test above
+            _ => unreachable!(),
+        }
+        .as_bytes()
+        .into());
+    }
+
+    // otherwise, move on:
+    // === TYPE CHECKER ===
+    let typed_ast = zrc_typeck::typeck::type_program(ast)?;
+
+    // display the TAST if the user wants it
+    if matches!(
+        emit,
+        OutputFormat::Tast | OutputFormat::TastDebug | OutputFormat::TastDebugPretty,
+    ) {
+        return Ok(match *emit {
+            OutputFormat::Tast => typed_ast
+                .into_iter()
+                .map(|x| x.value().to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+            OutputFormat::TastDebug => format!("{typed_ast:?}"),
+            OutputFormat::TastDebugPretty => format!("{typed_ast:#?}"),
+
+            // unreachable because we test above
+            _ => unreachable!(),
+        }
+        .as_bytes()
+        .into());
+    }
+
+    // otherwise, move on:
+    // === CODE GENERATOR ===
+
     match *emit {
         OutputFormat::Asm => Ok(zrc_codegen::cg_program_to_buffer(
             frontend_version_string,
@@ -401,7 +453,7 @@ fn compile(
             file_name,
             cli_args,
             content,
-            zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
+            typed_ast,
             zrc_codegen::FileType::Assembly,
             optimization_level,
             debug_mode,
@@ -416,7 +468,7 @@ fn compile(
             file_name,
             cli_args,
             content,
-            zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
+            typed_ast,
             zrc_codegen::FileType::Object,
             optimization_level,
             debug_mode,
@@ -432,7 +484,7 @@ fn compile(
             file_name,
             cli_args,
             content,
-            zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?,
+            typed_ast,
             optimization_level,
             debug_mode,
             triple,
@@ -441,43 +493,7 @@ fn compile(
         .as_bytes()
         .into()),
 
-        OutputFormat::Ast => Ok(zrc_parser::parser::parse_program(content)?
-            .into_iter()
-            .map(|x| format!("{x}"))
-            .collect::<Vec<_>>()
-            .join("\n")
-            .as_bytes()
-            .into()),
-        OutputFormat::AstDebug => Ok(format!("{:?}", zrc_parser::parser::parse_program(content)?)
-            .as_bytes()
-            .into()),
-        OutputFormat::AstDebugPretty => Ok(format!(
-            "{:#?}",
-            zrc_parser::parser::parse_program(content)?
-        )
-        .as_bytes()
-        .into()),
-
-        OutputFormat::Tast => Ok(zrc_typeck::typeck::type_program(
-            zrc_parser::parser::parse_program(content)?,
-        )?
-        .into_iter()
-        .map(|x| x.to_string())
-        .collect::<Vec<_>>()
-        .join("\n")
-        .as_bytes()
-        .into()),
-        OutputFormat::TastDebug => Ok(format!(
-            "{:?}",
-            zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?
-        )
-        .as_bytes()
-        .into()),
-        OutputFormat::TastDebugPretty => Ok(format!(
-            "{:#?}",
-            zrc_typeck::typeck::type_program(zrc_parser::parser::parse_program(content)?)?
-        )
-        .as_bytes()
-        .into()),
+        // unreachable because we return in the above cases
+        _ => unreachable!(),
     }
 }
