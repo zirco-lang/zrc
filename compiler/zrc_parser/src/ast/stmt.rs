@@ -80,7 +80,7 @@ impl<'input> Display for StmtKind<'input> {
                         "let {};",
                         x.value()
                             .iter()
-                            .map(|x| x.value().to_string())
+                            .map(ToString::to_string)
                             .collect::<Vec<_>>()
                             .join(", ")
                     )),
@@ -108,7 +108,7 @@ impl<'input> Display for StmtKind<'input> {
                     "let {};",
                     list.value()
                         .iter()
-                        .map(|x| x.value().to_string())
+                        .map(ToString::to_string)
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
@@ -152,10 +152,7 @@ impl<'input> Display for Declaration<'input> {
                 body: Some(body),
             } => write!(
                 f,
-                "fn {}({}) -> {} {{\n{}\n}}",
-                name.value(),
-                parameters.value(),
-                return_ty.0.value(),
+                "fn {name}({parameters}) -> {return_ty} {{\n{}\n}}",
                 body.value()
                     .iter()
                     .map(|stmt| format!("    {stmt}"))
@@ -167,13 +164,7 @@ impl<'input> Display for Declaration<'input> {
                 parameters,
                 return_type: Some(return_ty),
                 body: None,
-            } => write!(
-                f,
-                "fn {}({}) -> {};",
-                name.value(),
-                parameters.value(),
-                return_ty.0.value()
-            ),
+            } => write!(f, "fn {name}({parameters}) -> {return_ty};"),
             Self::FunctionDeclaration {
                 name,
                 parameters,
@@ -181,9 +172,7 @@ impl<'input> Display for Declaration<'input> {
                 body: Some(body),
             } => write!(
                 f,
-                "fn {}({}) {{\n{}\n}}",
-                name.value(),
-                parameters.value(),
+                "fn {name}({parameters}) {{\n{}\n}}",
                 body.value()
                     .iter()
                     .map(|stmt| format!("    {stmt}"))
@@ -195,9 +184,9 @@ impl<'input> Display for Declaration<'input> {
                 parameters,
                 return_type: None,
                 body: None,
-            } => write!(f, "fn {}({});", name.value(), parameters.value()),
+            } => write!(f, "fn {name}({parameters});"),
 
-            Self::TypeAliasDeclaration { name, ty } => write!(f, "type {} = {ty};", name.value()),
+            Self::TypeAliasDeclaration { name, ty } => write!(f, "type {name} = {ty};"),
         }
     }
 }
@@ -227,7 +216,7 @@ impl<'input> Display for ArgumentDeclarationList<'input> {
             f,
             "{}{}",
             args.iter()
-                .map(|x| x.value().to_string())
+                .map(ToString::to_string)
                 .collect::<Vec<String>>()
                 .join(", "),
             match self {
@@ -253,12 +242,12 @@ impl<'input> Display for LetDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.ty {
             None => match &self.value {
-                None => write!(f, "{}", self.name.value()),
-                Some(value) => write!(f, "{} = {}", self.name.value(), value),
+                None => write!(f, "{}", self.name),
+                Some(value) => write!(f, "{} = {}", self.name, value),
             },
             Some(ty) => match &self.value {
-                None => write!(f, "{}: {}", self.name.value(), ty),
-                Some(value) => write!(f, "{}: {} = {}", self.name.value(), ty, value),
+                None => write!(f, "{}: {}", self.name, ty),
+                Some(value) => write!(f, "{}: {} = {}", self.name, ty, value),
             },
         }
     }
@@ -274,6 +263,6 @@ pub struct ArgumentDeclaration<'input> {
 }
 impl<'input> Display for ArgumentDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.name.value(), self.ty)
+        write!(f, "{}: {}", self.name, self.ty)
     }
 }

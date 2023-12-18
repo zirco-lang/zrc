@@ -81,7 +81,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
         );
 
         let ptr = entry_block_builder
-            .build_alloca(ty, &format!("let_{}", let_declaration.name.value()))
+            .build_alloca(ty, &format!("let_{}", let_declaration.name))
             .expect("alloca should generate successfully");
 
         scope.insert(let_declaration.name.value(), ptr);
