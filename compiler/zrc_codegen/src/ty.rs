@@ -108,6 +108,7 @@ pub fn llvm_int_type<'ctx>(
 ///
 /// # Panics
 /// Panics if `ty` is not a basic type
+#[allow(clippy::too_many_lines)]
 pub fn llvm_basic_type<'ctx>(
     file: DIFile<'ctx>,
     dbg_builder: &DebugInfoBuilder<'ctx>,
@@ -162,7 +163,7 @@ pub fn llvm_basic_type<'ctx>(
                             dbg_builder
                                 .create_member_type(
                                     file.as_debug_info_scope(),
-                                    &key,
+                                    key,
                                     file,
                                     0,
                                     0,
