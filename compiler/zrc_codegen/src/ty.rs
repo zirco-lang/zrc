@@ -158,8 +158,21 @@ pub fn llvm_basic_type<'ctx>(
                     None,
                     &fields
                         .into_iter()
-                        .map(|(_, key_ty)| {
-                            llvm_basic_type(file, dbg_builder, ctx, target_machine, key_ty).1
+                        .map(|(key, key_ty)| {
+                            dbg_builder
+                                .create_member_type(
+                                    file.as_debug_info_scope(),
+                                    &key,
+                                    file,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    llvm_basic_type(file, dbg_builder, ctx, target_machine, key_ty)
+                                        .1,
+                                )
+                                .as_type()
                         })
                         .collect::<Vec<_>>(),
                     0,
