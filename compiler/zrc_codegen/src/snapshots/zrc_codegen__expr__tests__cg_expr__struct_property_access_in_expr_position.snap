@@ -11,11 +11,11 @@ declare void @take_int(i32)
 define void @test() !dbg !3 {
 entry:
   %let_x = alloca { i32, i32 }, align 8
-  call void @llvm.dbg.declare(metadata ptr %let_x, metadata !8, metadata !DIExpression()), !dbg !14
-  %gep = getelementptr inbounds { i32, i32 }, ptr %let_x, i32 0, i32 1, !dbg !15
-  %load = load i32, ptr %gep, align 4, !dbg !15
-  call void @take_int(i32 %load), !dbg !15
-  ret void, !dbg !16
+  call void @llvm.dbg.declare(metadata ptr %let_x, metadata !8, metadata !DIExpression()), !dbg !16
+  %gep = getelementptr inbounds { i32, i32 }, ptr %let_x, i32 0, i32 1, !dbg !17
+  %load = load i32, ptr %gep, align 4, !dbg !17
+  call void @take_int(i32 %load), !dbg !17
+  ret void, !dbg !18
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
@@ -38,9 +38,11 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 4, column: 11)
 !10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 4, column: 11)
 !11 = !DICompositeType(tag: DW_TAG_structure_type, name: "(struct { x: i32, y: i32 })", scope: !2, file: !2, elements: !12)
-!12 = !{!13, !13}
-!13 = !DIBasicType(name: "i32")
-!14 = !DILocation(line: 5, column: 9, scope: !9)
-!15 = !DILocation(line: 9, column: 14, scope: !9)
-!16 = !DILocation(line: 11, column: 5, scope: !9)
+!12 = !{!13, !15}
+!13 = !DIDerivedType(tag: DW_TAG_member, name: "x", scope: !2, file: !2, baseType: !14)
+!14 = !DIBasicType(name: "i32")
+!15 = !DIDerivedType(tag: DW_TAG_member, name: "y", scope: !2, file: !2, baseType: !14)
+!16 = !DILocation(line: 5, column: 9, scope: !9)
+!17 = !DILocation(line: 9, column: 14, scope: !9)
+!18 = !DILocation(line: 11, column: 5, scope: !9)
 
