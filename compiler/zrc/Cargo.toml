@@ -9,7 +9,7 @@ edition = "2021"
 zrc_parser = { version = "0.1.0", path = "../zrc_parser" }
 zrc_typeck = { version = "0.1.0", path = "../zrc_typeck" }
 zrc_codegen = { version = "0.1.0", path = "../zrc_codegen" }
-anyhow = "1.0.75"
+anyhow = "1.0.76"
 zrc_diagnostics = { version = "0.1.0", path = "../zrc_diagnostics" }
 clap = { version = "4.4.11", features = ["derive"] }
 shadow-rs = "0.25.0"
