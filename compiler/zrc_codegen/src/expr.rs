@@ -171,18 +171,23 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             BasicBlockAnd {
                 bb,
-                value: llvm_int_type(cg.dbg_builder, cg.ctx, &expr.inferred_type)
-                    .0
-                    .const_int_from_string(
-                        &no_underscores,
-                        match n {
-                            NumberLiteral::Decimal(_) => StringRadix::Decimal,
-                            NumberLiteral::Binary(_) => StringRadix::Binary,
-                            NumberLiteral::Hexadecimal(_) => StringRadix::Hexadecimal,
-                        },
-                    )
-                    .expect("number literal should have parsed correctly")
-                    .as_basic_value_enum(),
+                value: llvm_int_type(
+                    cg.dbg_builder,
+                    cg.ctx,
+                    cg.target_machine,
+                    &expr.inferred_type,
+                )
+                .0
+                .const_int_from_string(
+                    &no_underscores,
+                    match n {
+                        NumberLiteral::Decimal(_) => StringRadix::Decimal,
+                        NumberLiteral::Binary(_) => StringRadix::Binary,
+                        NumberLiteral::Hexadecimal(_) => StringRadix::Hexadecimal,
+                    },
+                )
+                .expect("number literal should have parsed correctly")
+                .as_basic_value_enum(),
             }
         }
 
@@ -825,7 +830,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     .builder
                     .build_ptr_to_int(
                         x.into_pointer_value(),
-                        llvm_int_type(cg.dbg_builder, cg.ctx, ty.value()).0,
+                        llvm_int_type(cg.dbg_builder, cg.ctx, cg.target_machine, ty.value()).0,
                         "cast",
                     )
                     .expect("ptrtoint should have compiled successfully")
@@ -999,7 +1004,7 @@ mod tests {
                     // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).
                     // %let_x needs to be GEP'd into and then stored into, but we must not load
                     // from the address.
-                    x[4] = 5;
+                    x[4 as usize] = 5;
 
                     return;
                 }
@@ -1068,7 +1073,7 @@ mod tests {
 
                     // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).
                     // %let_x needs to be GEP'd into and the value `i32` at idx 4 must be loaded.
-                    take_int(x[4]);
+                    take_int(x[4 as usize]);
 
                     return;
                 }
@@ -1177,9 +1182,9 @@ mod tests {
                     let x: *i32;
 
                     // TEST: should create a GEP that is the same as "x[4]"
-                    let y = x + 4;
+                    let y = x + 4 as usize;
                     // TEST: and the same, with -4:
-                    let z = x - 4;
+                    let z = x - 4 as usize;
 
                     return;
                 }

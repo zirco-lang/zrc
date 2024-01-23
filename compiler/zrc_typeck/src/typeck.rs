@@ -90,6 +90,8 @@ impl<'input> Default for Scope<'input> {
                 ("u32", TastType::U32),
                 ("i64", TastType::I64),
                 ("u64", TastType::U64),
+                ("isize", TastType::Isize),
+                ("usize", TastType::Usize),
                 ("bool", TastType::Bool),
                 // void is not producible
             ]),
