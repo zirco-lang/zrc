@@ -483,6 +483,60 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
 
                     Some(exit)
                 }
+
+                TypedStmtKind::DoWhileStmt(body, cond) => {
+                    // `do..while` loops are slightly different from `while` loops.
+                    // the preheader breaks directly to the *body* and forces it to run at
+                    // least once. the body can then later break to the header which checks the
+                    // condition and will loop or exit.
+
+                    // `break` => exit
+                    // `continue` => header
+
+                    let body_bb = cg.ctx.append_basic_block(cg.fn_value, "body");
+                    let body_start = body_bb;
+
+                    let header = cg.ctx.append_basic_block(cg.fn_value, "header");
+
+                    let exit = cg.ctx.append_basic_block(cg.fn_value, "exit");
+
+                    cg.builder
+                        .build_unconditional_branch(body_bb)
+                        .expect("branch should generate successfully");
+
+                    cg.builder.position_at_end(body_bb);
+
+                    let body_bb = cg_block(
+                        cg,
+                        body_bb,
+                        &scope,
+                        lexical_block,
+                        body,
+                        &Some(LoopBreakaway {
+                            on_break: exit,
+                            on_continue: header,
+                        }),
+                    );
+
+                    if body_bb.is_some() {
+                        cg.builder
+                            .build_unconditional_branch(header)
+                            .expect("branch should generate successfully");
+                    }
+
+                    cg.builder.position_at_end(header);
+
+                    let BasicBlockAnd { value: cond, .. } =
+                        cg_expr(cg, header, &scope, lexical_block, cond);
+
+                    cg.builder
+                        .build_conditional_branch(cond.into_int_value(), body_start, exit)
+                        .expect("branch should generate successfully");
+
+                    cg.builder.position_at_end(exit);
+
+                    Some(exit)
+                }
             }
         })
 }
@@ -619,6 +673,22 @@ mod tests {
                             // TEST: the loop jumps to the latch block which jumps back to the
                             // header
                         }
+
+                        return;
+                    }
+                "});
+            }
+
+            #[test]
+            fn do_while_loops_generate_as_expected() {
+                cg_snapshot_test!(indoc! {"
+                    fn get_bool() -> bool;
+
+                    fn test() {
+                        // TEST: the proper `do..while` loop structure is created
+                        do {
+                            get_bool(); // for fake side effects
+                        } while (get_bool());
 
                         return;
                     }
