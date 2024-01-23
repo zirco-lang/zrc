@@ -9,7 +9,7 @@ use crate::{
     tast::{
         expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
         stmt::ArgumentDeclarationList,
-        ty::Type as TastType,
+        ty::{Fn, Type as TastType},
     },
     typeck::resolve_type,
 };
@@ -345,7 +345,10 @@ pub fn type_expr<'input>(
 
             #[allow(clippy::wildcard_enum_match_arm)]
             match ft.inferred_type.clone() {
-                TastType::Fn(ArgumentDeclarationList::NonVariadic(arg_types), ret_type) => {
+                TastType::Fn(Fn {
+                    arguments: ArgumentDeclarationList::NonVariadic(arg_types),
+                    returns: ret_type,
+                }) => {
                     if arg_types.len() != args_t.len() {
                         return Err(Diagnostic(
                             Severity::Error,
@@ -377,7 +380,10 @@ pub fn type_expr<'input>(
                             .in_span(expr_span),
                     }
                 }
-                TastType::Fn(ArgumentDeclarationList::Variadic(beginning_arg_types), ret_type) => {
+                TastType::Fn(Fn {
+                    arguments: ArgumentDeclarationList::Variadic(beginning_arg_types),
+                    returns: ret_type,
+                }) => {
                     if beginning_arg_types.len() > args_t.len() {
                         return Err(Diagnostic(
                             Severity::Error,

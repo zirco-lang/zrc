@@ -15,7 +15,7 @@ use crate::tast::{
         ArgumentDeclaration as TastArgumentDeclaration, LetDeclaration as TastLetDeclaration,
         TypedDeclaration, TypedStmt, TypedStmtKind,
     },
-    ty::Type as TastType,
+    ty::{Fn, Type as TastType},
 };
 
 /// Describes whether a block returns void or a type.
@@ -249,13 +249,6 @@ pub fn process_declaration<'input>(
             return_type,
             body,
         } => {
-            if global_scope.global_values.has(name.value()) {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    name.map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
-                ));
-            }
-
             let resolved_return_type = return_type
                 .clone()
                 .map(|ty| resolve_type(&global_scope.types, ty))
@@ -276,23 +269,72 @@ pub fn process_declaration<'input>(
                 })
                 .collect::<Result<Vec<_>, Diagnostic>>()?;
 
-            global_scope.global_values.insert(
+            let fn_type = Fn {
+                arguments: match parameters.value() {
+                    ArgumentDeclarationList::NonVariadic(_) => {
+                        tast::stmt::ArgumentDeclarationList::NonVariadic(
+                            resolved_parameters.clone(),
+                        )
+                    }
+                    ArgumentDeclarationList::Variadic(_) => {
+                        tast::stmt::ArgumentDeclarationList::Variadic(resolved_parameters.clone())
+                    }
+                },
+                returns: Box::new(resolved_return_type.clone()),
+            };
+
+            let has_existing_implementation = if let Some(ty) =
+                global_scope.global_values.resolve(name.value())
+            {
+                if let TastType::Fn(_) = ty {
+                    // if a function has already been declared with this name...
+
+                    let canonical = global_scope.declarations.get(name.value()).expect(
+                        "global_scope.declarations was not populated with function properly",
+                    );
+
+                    // TODO: store and reference previous declaration's span in the error
+                    if canonical.fn_type != fn_type {
+                        return Err(Diagnostic(
+                            Severity::Error,
+                            name.map(|_| {
+                                DiagnosticKind::ConflictingFunctionDeclarations(
+                                    canonical.fn_type.to_string(),
+                                    fn_type.to_string(),
+                                )
+                            }),
+                        ));
+                    }
+
+                    // TODO: store and reference previous declaration's span in the error
+                    if body.is_some() && canonical.has_implementation {
+                        return Err(Diagnostic(
+                            Severity::Error,
+                            name.map(|x| DiagnosticKind::ConflictingImplementations(x.to_string())),
+                        ));
+                    }
+
+                    canonical.has_implementation
+                } else {
+                    return Err(Diagnostic(
+                        Severity::Error,
+                        name.map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
+                    ));
+                }
+            } else {
+                false
+            };
+
+            global_scope
+                .global_values
+                .insert(name.into_value(), TastType::Fn(fn_type.clone()));
+
+            global_scope.declarations.insert(
                 name.into_value(),
-                TastType::Fn(
-                    match parameters.value() {
-                        ArgumentDeclarationList::NonVariadic(_) => {
-                            tast::stmt::ArgumentDeclarationList::NonVariadic(
-                                resolved_parameters.clone(),
-                            )
-                        }
-                        ArgumentDeclarationList::Variadic(_) => {
-                            tast::stmt::ArgumentDeclarationList::Variadic(
-                                resolved_parameters.clone(),
-                            )
-                        }
-                    },
-                    Box::new(resolved_return_type.clone()),
-                ),
+                super::FunctionDeclarationGlobalMetadata {
+                    fn_type,
+                    has_implementation: body.is_some() || has_existing_implementation,
+                },
             );
 
             Some(TypedDeclaration::FunctionDeclaration {
@@ -885,5 +927,66 @@ pub fn type_block<'input, 'gs>(
                 " -- this should have been caught when checking that block"
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use tast::stmt::ArgumentDeclarationList as TastArgumentDeclarationList;
+    use zrc_parser::ast::{
+        expr::{Expr, ExprKind},
+        stmt::ArgumentDeclarationList as AstArgumentDeclarationList,
+        ty::{Type, TypeKind},
+    };
+    use zrc_utils::spanned;
+
+    use super::*;
+    use crate::typeck::{FunctionDeclarationGlobalMetadata, TypeScope, ValueScope};
+
+    #[test]
+    fn re_declaration_works_as_expected() {
+        assert!(process_declaration(
+            &mut GlobalScope {
+                global_values: ValueScope::from([(
+                    "get_true",
+                    TastType::Fn(Fn {
+                        arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
+                        returns: Box::new(BlockReturnType::Return(TastType::Bool))
+                    })
+                )]),
+                types: TypeScope::from([("bool", TastType::Bool)]),
+                declarations: HashMap::from([(
+                    "get_true",
+                    FunctionDeclarationGlobalMetadata {
+                        fn_type: Fn {
+                            arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
+                            returns: Box::new(BlockReturnType::Return(TastType::Bool))
+                        },
+                        has_implementation: false
+                    }
+                )])
+            },
+            AstDeclaration::FunctionDeclaration {
+                name: spanned!(0, "get_true", 0),
+                parameters: spanned!(0, AstArgumentDeclarationList::NonVariadic(vec![]), 0),
+                return_type: Some(Type(spanned!(0, TypeKind::Identifier("bool"), 0))),
+                body: Some(spanned!(
+                    0,
+                    vec![Stmt(spanned!(
+                        0,
+                        StmtKind::ReturnStmt(Some(Expr(spanned!(
+                            0,
+                            ExprKind::BooleanLiteral(true),
+                            0
+                        )))),
+                        0
+                    ))],
+                    0
+                ))
+            }
+        )
+        .is_ok());
     }
 }

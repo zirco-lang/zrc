@@ -14,7 +14,7 @@ pub use ty::resolve_type;
 use zrc_parser::ast::stmt::Declaration as AstDeclaration;
 use zrc_utils::span::Spanned;
 
-use crate::tast::{stmt::TypedDeclaration, ty::Type as TastType};
+use crate::tast::{self, stmt::TypedDeclaration, ty::Type as TastType};
 
 /// Represents a typing scope: a scope that contains the mapping from a type's
 /// name to its internal [`TastType`] representation.
@@ -151,6 +151,16 @@ where
     }
 }
 
+/// Auxillary data attached to a [`tast::ty::Fn`] in the [`GlobalScope`]
+#[derive(Debug)]
+pub struct FunctionDeclarationGlobalMetadata<'input> {
+    /// The corresponding [`Fn`] we wrap
+    fn_type: tast::ty::Fn<'input>,
+    /// If a declaration exists to implement this function
+    /// (Only one may exist)
+    has_implementation: bool,
+}
+
 /// Represents the "global scope" of a single Zirco program.
 ///
 /// The global scope contains all of the things that must be defined at the
@@ -165,6 +175,9 @@ pub struct GlobalScope<'input> {
 
     /// Maps every global value (static and function) to its data type
     pub global_values: ValueScope<'input>,
+
+    /// Contains data about every global [`tast::ty::Fn`]
+    pub declarations: HashMap<&'input str, FunctionDeclarationGlobalMetadata<'input>>,
 }
 impl<'input> GlobalScope<'input> {
     /// Create a new [`GlobalScope`] containing nothing -- not even primitives.
@@ -174,6 +187,7 @@ impl<'input> GlobalScope<'input> {
         GlobalScope {
             types: TypeScope::new_empty(),
             global_values: ValueScope::new(),
+            declarations: HashMap::new(),
         }
     }
 
@@ -184,6 +198,7 @@ impl<'input> GlobalScope<'input> {
         GlobalScope {
             types: TypeScope::new(),
             global_values: ValueScope::new(),
+            declarations: HashMap::new(),
         }
     }
 
