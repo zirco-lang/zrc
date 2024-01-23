@@ -150,7 +150,7 @@ fn expect_is_unsigned_integer(ty: &TastType, span: Span) -> Result<(), Diagnosti
 #[allow(clippy::too_many_lines)] // FIXME: make this fn shorter
 #[allow(clippy::module_name_repetitions)]
 pub fn type_expr<'input>(
-    scope: &Scope<'input>,
+    scope: &Scope<'input, '_>,
     expr: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let expr_span = expr.0.span();
@@ -584,7 +584,7 @@ pub fn type_expr<'input>(
         ExprKind::Cast(x, ty) => {
             let x_t = type_expr(scope, *x)?;
             let ty_span = ty.0.span();
-            let resolved_ty = resolve_type(scope, ty)?;
+            let resolved_ty = resolve_type(scope.types, ty)?;
 
             if x_t.inferred_type.is_integer() && resolved_ty.is_integer() {
                 // int -> int cast is valid
@@ -626,7 +626,7 @@ pub fn type_expr<'input>(
         }
 
         ExprKind::SizeOfType(ty) => {
-            let resolved_ty = resolve_type(scope, ty)?;
+            let resolved_ty = resolve_type(scope.types, ty)?;
             TypedExpr {
                 inferred_type: TastType::U64,
                 kind: TypedExprKind::SizeOf(resolved_ty).in_span(expr_span),
@@ -655,7 +655,7 @@ pub fn type_expr<'input>(
             kind: TypedExprKind::CharLiteral(ch).in_span(expr_span),
         },
         ExprKind::Identifier(i) => {
-            let ty = scope.get_value(i).ok_or_else(|| {
+            let ty = scope.values.resolve(i).ok_or_else(|| {
                 Diagnostic(
                     Severity::Error,
                     expr_span.containing(DiagnosticKind::UnableToResolveIdentifier(i.to_string())),
@@ -788,12 +788,13 @@ mod tests {
 
     mod expr {
         use super::*;
+        use crate::typeck::GlobalScope;
 
         #[test]
         fn sizeof_expr_works_as_expected() {
             assert_eq!(
                 type_expr(
-                    &Scope::new(),
+                    &GlobalScope::new().create_subscope(),
                     Expr::build_sizeof_expr(
                         Span::from_positions(0, 9),
                         Expr::build_number(spanned!(8, NumberLiteral::Decimal("1"), 9))

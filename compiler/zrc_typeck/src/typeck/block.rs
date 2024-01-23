@@ -7,7 +7,7 @@ use zrc_parser::ast::stmt::{
 };
 use zrc_utils::span::{Spannable, Spanned};
 
-use super::{resolve_type, type_expr, Scope};
+use super::{resolve_type, type_expr, GlobalScope, Scope};
 use crate::tast::{
     self,
     expr::TypedExpr,
@@ -111,7 +111,7 @@ fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
 /// # Errors
 /// Errors with type checker errors.
 fn process_let_declaration<'input>(
-    scope: &mut Scope<'input>,
+    scope: &mut Scope<'input, '_>,
     declarations: Vec<Spanned<AstLetDeclaration<'input>>>,
 ) -> Result<Vec<Spanned<TastLetDeclaration<'input>>>, Diagnostic> {
     declarations
@@ -121,7 +121,7 @@ fn process_let_declaration<'input>(
                 let let_decl_span = let_declaration.span();
                 let let_declaration = let_declaration.into_value();
 
-                if scope.get_value(let_declaration.name.value()).is_some() {
+                if scope.values.has(let_declaration.name.value()) {
                     // TODO: In the future we may allow shadowing but currently no
                     return Err(Diagnostic(
                         Severity::Error,
@@ -138,7 +138,7 @@ fn process_let_declaration<'input>(
 
                 let resolved_ty = let_declaration
                     .ty
-                    .map(|ty| resolve_type(scope, ty))
+                    .map(|ty| resolve_type(scope.types, ty))
                     .transpose()?;
 
                 let result_decl = match (typed_expr, resolved_ty) {
@@ -210,7 +210,9 @@ fn process_let_declaration<'input>(
                     ));
                 }
 
-                scope.set_value(result_decl.name.value(), result_decl.ty.clone());
+                scope
+                    .values
+                    .insert(result_decl.name.value(), result_decl.ty.clone());
                 Ok(result_decl.in_span(let_decl_span))
             },
         )
@@ -226,7 +228,7 @@ fn process_let_declaration<'input>(
 /// Errors if a type checker error is encountered.
 #[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
 pub fn process_declaration<'input>(
-    global_scope: &mut Scope<'input>,
+    global_scope: &mut GlobalScope<'input>,
     declaration: AstDeclaration<'input>,
 ) -> Result<Option<TypedDeclaration<'input>>, Diagnostic> {
     Ok(match declaration {
@@ -247,7 +249,7 @@ pub fn process_declaration<'input>(
             return_type,
             body,
         } => {
-            if global_scope.get_value(name.value()).is_some() {
+            if global_scope.global_values.has(name.value()) {
                 return Err(Diagnostic(
                     Severity::Error,
                     name.map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
@@ -256,7 +258,7 @@ pub fn process_declaration<'input>(
 
             let resolved_return_type = return_type
                 .clone()
-                .map(|ty| resolve_type(global_scope, ty))
+                .map(|ty| resolve_type(&global_scope.types, ty))
                 .transpose()?
                 .map_or(BlockReturnType::Void, BlockReturnType::Return);
 
@@ -268,13 +270,13 @@ pub fn process_declaration<'input>(
                 .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
                     Ok(TastArgumentDeclaration {
                         name: parameter.value().name,
-                        ty: resolve_type(global_scope, parameter.value().ty.clone())?
+                        ty: resolve_type(&global_scope.types, parameter.value().ty.clone())?
                             .in_span(parameter.span()),
                     })
                 })
                 .collect::<Result<Vec<_>, Diagnostic>>()?;
 
-            global_scope.set_value(
+            global_scope.global_values.insert(
                 name.into_value(),
                 TastType::Fn(
                     match parameters.value() {
@@ -314,9 +316,11 @@ pub fn process_declaration<'input>(
                             .in_span(return_type.expect("already unwrapped before").0.span())
                     }),
                 body: if let Some(body) = body {
-                    let mut function_scope = global_scope.clone();
+                    let mut function_scope = global_scope.create_subscope();
                     for param in resolved_parameters {
-                        function_scope.set_value(param.name.value(), param.ty.into_value());
+                        function_scope
+                            .values
+                            .insert(param.name.value(), param.ty.into_value());
                     }
 
                     // discard return actuality as it's guaranteed
@@ -337,16 +341,16 @@ pub fn process_declaration<'input>(
             })
         }
         AstDeclaration::TypeAliasDeclaration { name, ty } => {
-            if global_scope.get_type(name.value()).is_some() {
+            if global_scope.types.has(name.value()) {
                 return Err(Diagnostic(
                     Severity::Error,
                     name.map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
                 ));
             }
 
-            let resolved_ty = resolve_type(global_scope, ty)?;
+            let resolved_ty = resolve_type(&global_scope.types, ty)?;
 
-            global_scope.set_type(name.value(), resolved_ty.clone());
+            global_scope.types.insert(name.value(), resolved_ty.clone());
 
             None
         }
@@ -392,13 +396,13 @@ pub fn process_declaration<'input>(
 // it on sub-blocks in the TAST (this may be helpful in control flow analysis)
 #[allow(clippy::too_many_lines)]
 #[allow(clippy::module_name_repetitions)]
-pub fn type_block<'input>(
-    parent_scope: &Scope<'input>,
+pub fn type_block<'input, 'gs>(
+    parent_scope: &Scope<'input, 'gs>,
     input_block: Spanned<Vec<Stmt<'input>>>,
     can_use_break_continue: bool,
     return_ability: BlockReturnAbility,
 ) -> Result<(Vec<TypedStmt<'input>>, BlockReturnActuality), Diagnostic> {
-    let mut scope: Scope<'input> = parent_scope.clone();
+    let mut scope: Scope<'input, 'gs> = parent_scope.clone();
 
     let input_block_span = input_block.span();
 
