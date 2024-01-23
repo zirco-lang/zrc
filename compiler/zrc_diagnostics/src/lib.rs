@@ -150,8 +150,6 @@ pub enum DiagnosticKind {
     CannotDereferenceNonPointer(String),
     #[error("cannot index into non-pointer type `{0}`")]
     CannotIndexIntoNonPointer(String),
-    #[error("index offset must be integer type, got `{0}`")]
-    IndexOffsetMustBeInteger(String),
     #[error("`{0}` does not have member `{1}`")]
     StructOrUnionDoesNotHaveMember(String, String),
     #[error("cannot access member of non-struct type `{0}`")]

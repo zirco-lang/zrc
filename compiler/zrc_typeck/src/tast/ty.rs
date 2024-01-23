@@ -33,6 +33,10 @@ pub enum Type<'input> {
     I64,
     /// `u64`
     U64,
+    /// `usize`
+    Usize,
+    /// `isize`
+    Isize,
     /// `void`, only producible by calling a void function (`fn()`)
     Void,
     /// `bool`
@@ -62,6 +66,8 @@ impl<'input> Display for Type<'input> {
             Self::U32 => write!(f, "u32"),
             Self::I64 => write!(f, "i64"),
             Self::U64 => write!(f, "u64"),
+            Self::Usize => write!(f, "usize"),
+            Self::Isize => write!(f, "isize"),
             Self::Bool => write!(f, "bool"),
             Self::Ptr(pointee_ty) => write!(f, "*({pointee_ty})"),
             Self::Void => write!(f, "void"),
@@ -100,22 +106,25 @@ impl<'input> Type<'input> {
     /// Returns `true` if this is an integer type like [`Type::I8`].
     #[must_use]
     pub const fn is_integer(&self) -> bool {
-        use Type::{I16, I32, I64, I8, U16, U32, U64, U8};
-        matches!(self, I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64)
+        use Type::{Isize, Usize, I16, I32, I64, I8, U16, U32, U64, U8};
+        matches!(
+            self,
+            I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64 | Isize | Usize
+        )
     }
 
     /// Returns `true` if this is a signed integer type like [`Type::I8`].
     #[must_use]
     pub const fn is_signed_integer(&self) -> bool {
-        use Type::{I16, I32, I64, I8};
-        matches!(self, I8 | I16 | I32 | I64)
+        use Type::{Isize, I16, I32, I64, I8};
+        matches!(self, I8 | I16 | I32 | I64 | Isize)
     }
 
     /// Returns `true` if this is an unsigned integer type like [`Type::U8`].
     #[must_use]
     pub const fn is_unsigned_integer(&self) -> bool {
-        use Type::{U16, U32, U64, U8};
-        matches!(self, U8 | U16 | U32 | U64)
+        use Type::{Usize, U16, U32, U64, U8};
+        matches!(self, U8 | U16 | U32 | U64 | Usize)
     }
 
     /// Try to get the value we point at, or None if not a pointer.

@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/expr.rs
-description: "fn test() {\n    let x: *i32;\n\n    // TEST: should create a GEP that is the same as \"x[4]\"\n    let y = x + 4;\n    // TEST: and the same, with -4:\n    let z = x - 4;\n\n    return;\n}\n"
+description: "fn test() {\n    let x: *i32;\n\n    // TEST: should create a GEP that is the same as \"x[4]\"\n    let y = x + 4 as usize;\n    // TEST: and the same, with -4:\n    let z = x - 4 as usize;\n\n    return;\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -14,11 +14,11 @@ entry:
   call void @llvm.dbg.declare(metadata ptr %let_x, metadata !8, metadata !DIExpression()), !dbg !15
   call void @llvm.dbg.declare(metadata ptr %let_y, metadata !13, metadata !DIExpression()), !dbg !16
   %load = load ptr, ptr %let_x, align 8, !dbg !17
-  %ptr_add = getelementptr i32, ptr %load, i32 4, !dbg !18
+  %ptr_add = getelementptr i32, ptr %load, i64 4, !dbg !18
   store ptr %ptr_add, ptr %let_y, align 8, !dbg !16
   call void @llvm.dbg.declare(metadata ptr %let_z, metadata !14, metadata !DIExpression()), !dbg !19
   %load1 = load ptr, ptr %let_x, align 8, !dbg !20
-  %ptr_sub = getelementptr i32, ptr %load1, i32 -4, !dbg !21
+  %ptr_sub = getelementptr i32, ptr %load1, i64 -4, !dbg !21
   store ptr %ptr_sub, ptr %let_z, align 8, !dbg !19
   ret void, !dbg !22
 }

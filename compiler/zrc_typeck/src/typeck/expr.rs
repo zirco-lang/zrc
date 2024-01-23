@@ -254,14 +254,12 @@ pub fn type_expr<'input>(
             let ptr_t = type_expr(scope, *ptr)?;
             let offset_t = type_expr(scope, *offset)?;
 
-            if !offset_t.inferred_type.is_integer() {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::IndexOffsetMustBeInteger(
-                        offset_t.inferred_type.to_string(),
-                    )),
-                ));
-            }
+            expect(
+                offset_t.inferred_type == TastType::Usize,
+                "usize".to_string(),
+                offset_t.inferred_type.to_string(),
+                offset_t.kind.span(),
+            )?;
 
             if let TastType::Ptr(points_to_ty) = ptr_t.inferred_type.clone() {
                 TypedExpr {
@@ -566,7 +564,12 @@ pub fn type_expr<'input>(
                     ));
                 }
 
-                expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
+                expect(
+                    rhs_t.inferred_type == TastType::Usize,
+                    "usize".to_string(),
+                    rhs_t.inferred_type.to_string(),
+                    rhs_t.kind.span(),
+                )?;
             } else {
                 expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
                 expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
@@ -628,7 +631,7 @@ pub fn type_expr<'input>(
         ExprKind::SizeOfType(ty) => {
             let resolved_ty = resolve_type(scope, ty)?;
             TypedExpr {
-                inferred_type: TastType::U64,
+                inferred_type: TastType::Usize,
                 kind: TypedExprKind::SizeOf(resolved_ty).in_span(expr_span),
             }
         }
@@ -637,7 +640,7 @@ pub fn type_expr<'input>(
         ExprKind::SizeOfExpr(x) => {
             let x_ty = type_expr(scope, *x)?;
             TypedExpr {
-                inferred_type: TastType::U64,
+                inferred_type: TastType::Usize,
                 kind: TypedExprKind::SizeOf(x_ty.inferred_type).in_span(expr_span),
             }
         }
@@ -800,7 +803,7 @@ mod tests {
                     ),
                 ),
                 Ok(TypedExpr {
-                    inferred_type: TastType::U64,
+                    inferred_type: TastType::Usize,
                     kind: TypedExprKind::SizeOf(TastType::I32).in_span(Span::from_positions(0, 9)),
                 })
             );
