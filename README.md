@@ -6,6 +6,8 @@
 
 A modern programming language focusing on a strong type system and modern syntax
 
+[Repository Statistics](https://repo-tracker.com/r/gh/zirco-lang/zrc)
+
 </div>
 
 ## About Zirco
