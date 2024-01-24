@@ -956,8 +956,6 @@ mod tests {
 
                     // TEST: we should simply be `store`ing to the %let_x we created
                     x = 7;
-
-                    return;
                 }
             "});
         }
@@ -972,8 +970,6 @@ mod tests {
                     // %let_x to obtain the actual pointer. we should then store to that result
                     // value (we should never load it)
                     *x = 4;
-
-                    return;
                 }
             "});
         }
@@ -989,8 +985,6 @@ mod tests {
                     // writing to that address)
                     // we use 5 not 0 because 0 is just 'ptr null'
                     *(5 as *i32) = 0;
-
-                    return;
                 }
             "});
         }
@@ -1005,8 +999,6 @@ mod tests {
                     // %let_x needs to be GEP'd into and then stored into, but we must not load
                     // from the address.
                     x[4 as usize] = 5;
-
-                    return;
                 }
             "});
         }
@@ -1022,8 +1014,6 @@ mod tests {
                     // TEST: the value must NOT be loaded! it must simply gep to obtain a pointer,
                     // then `store` into that pointer.
                     x.y = 4;
-
-                    return;
                 }
             "});
         }
@@ -1041,8 +1031,6 @@ mod tests {
 
                     // TEST: the pointer is cast and then written to as an i8
                     x.y = 5 as i8;
-
-                    return;
                 }
             "});
         }
@@ -1074,8 +1062,6 @@ mod tests {
                     // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).
                     // %let_x needs to be GEP'd into and the value `i32` at idx 4 must be loaded.
                     take_int(x[4 as usize]);
-
-                    return;
                 }
             "});
         }
@@ -1105,8 +1091,6 @@ mod tests {
                     // TEST: should GEP into `x` to get the second property (`y`) and then
                     // load that value and call take_int
                     take_int(x.y);
-
-                    return;
                 }
             "});
         }
@@ -1126,8 +1110,6 @@ mod tests {
 
                     // TEST: the pointer is cast and then read from as an i8
                     take_i8(x.y);
-
-                    return;
                 }
             "});
         }
@@ -1142,7 +1124,6 @@ mod tests {
                     // TEST: should produce a proper diamond-shaped cfg
                     let num = get_bool() ? get_int() : 3;
                     take_int(num);
-                    return;
                 }
             "});
         }
@@ -1153,8 +1134,6 @@ mod tests {
                 fn test() {
                     // TEST: should properly generate \xNN for each escape
                     let x = "\n\r\t\\\"\x41\0";
-
-                    return;
                 }
             "#});
         }
@@ -1170,7 +1149,6 @@ mod tests {
                 fn test() {
                     let a = 0b10_10;
                     let b = 0x1F_A4;
-                    return;
                 }
             "});
         }
@@ -1185,8 +1163,6 @@ mod tests {
                     let y = x + 4 as usize;
                     // TEST: and the same, with -4:
                     let z = x - 4 as usize;
-
-                    return;
                 }
             "#});
         }
@@ -1224,8 +1200,6 @@ mod tests {
                     let s_rem = sx % sy;
                     // TEST: should create a `urem i32` instruction
                     let u_rem = ux % uy;
-
-                    return;
                 }
             "});
         }
@@ -1247,8 +1221,6 @@ mod tests {
 
                     // TEST: should create a bit NOT
                     let not = !a;
-
-                    return;
                 }
             "});
         }
@@ -1284,8 +1256,6 @@ mod tests {
 
                     // TEST: should create a `ashr i32` instruction (as the lhs is signed)
                     let ashr = x >> u;
-
-                    return;
                 }
             "});
         }

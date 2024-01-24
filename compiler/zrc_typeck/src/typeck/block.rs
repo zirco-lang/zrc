@@ -5,7 +5,7 @@ use zrc_parser::ast::stmt::{
     ArgumentDeclarationList, Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration,
     Stmt, StmtKind,
 };
-use zrc_utils::span::{Spannable, Spanned};
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{resolve_type, type_expr, GlobalScope, Scope};
 use crate::tast::{
@@ -449,7 +449,7 @@ pub fn type_block<'input, 'gs>(
     let input_block_span = input_block.span();
 
     // At first, the block does not return.
-    let (tast_block, return_actualities): (Vec<_>, Vec<_>) = input_block
+    let (mut tast_block, return_actualities): (Vec<_>, Vec<_>) = input_block
         .into_value()
         .into_iter()
         .filter_map(
@@ -961,16 +961,23 @@ pub fn type_block<'input, 'gs>(
         (BlockReturnAbility::MayReturn(_), BlockReturnActuality::DoesNotReturn) => {
             Ok((tast_block, BlockReturnActuality::DoesNotReturn))
         }
-        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::MightReturn) => Err(Diagnostic(
+        (
+            BlockReturnAbility::MustReturn(BlockReturnType::Void),
+            BlockReturnActuality::MightReturn | BlockReturnActuality::DoesNotReturn,
+        ) => {
+            tast_block.push(TypedStmt(TypedStmtKind::ReturnStmt(None).in_span(
+                Span::from_positions(input_block_span.end() - 1, input_block_span.end()),
+            )));
+
+            Ok((tast_block, BlockReturnActuality::WillReturn))
+        }
+        (
+            BlockReturnAbility::MustReturn(_),
+            BlockReturnActuality::MightReturn | BlockReturnActuality::DoesNotReturn,
+        ) => Err(Diagnostic(
             Severity::Error,
             input_block_span.containing(DiagnosticKind::ExpectedABlockToReturn),
         )),
-        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::DoesNotReturn) => {
-            Err(Diagnostic(
-                Severity::Error,
-                input_block_span.containing(DiagnosticKind::ExpectedABlockToReturn),
-            ))
-        }
         (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => {
             panic!(concat!(
                 "block must not return, but a sub-block may return",

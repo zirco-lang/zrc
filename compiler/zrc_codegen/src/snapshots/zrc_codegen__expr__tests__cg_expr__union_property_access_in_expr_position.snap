@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/expr.rs
-description: "union U { x: i32, y: i8 }\nfn take_i32(x: i32);\nfn take_i8(x: i8);\n\nfn test() {\n    let x: U;\n\n    // TEST: the pointer is cast and then read from as an i32\n    take_i32(x.x);\n\n    // TEST: the pointer is cast and then read from as an i8\n    take_i8(x.y);\n\n    return;\n}\n"
+description: "union U { x: i32, y: i8 }\nfn take_i32(x: i32);\nfn take_i8(x: i8);\n\nfn test() {\n    let x: U;\n\n    // TEST: the pointer is cast and then read from as an i32\n    take_i32(x.x);\n\n    // TEST: the pointer is cast and then read from as an i8\n    take_i8(x.y);\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -47,5 +47,5 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !15 = !DILocation(line: 6, column: 9, scope: !9)
 !16 = !DILocation(line: 9, column: 14, scope: !9)
 !17 = !DILocation(line: 12, column: 13, scope: !9)
-!18 = !DILocation(line: 14, column: 5, scope: !9)
+!18 = !DILocation(line: 13, column: 1, scope: !9)
 

@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/expr.rs
-description: "fn test() {\n    let x: *i32;\n\n    // TEST: should create a GEP that is the same as \"x[4]\"\n    let y = x + 4 as usize;\n    // TEST: and the same, with -4:\n    let z = x - 4 as usize;\n\n    return;\n}\n"
+description: "fn test() {\n    let x: *i32;\n\n    // TEST: should create a GEP that is the same as \"x[4]\"\n    let y = x + 4 as usize;\n    // TEST: and the same, with -4:\n    let z = x - 4 as usize;\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -53,5 +53,5 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !19 = !DILocation(line: 7, column: 9, scope: !9)
 !20 = !DILocation(line: 7, column: 13, scope: !9)
 !21 = !DILocation(line: 7, column: 17, scope: !9)
-!22 = !DILocation(line: 9, column: 5, scope: !9)
+!22 = !DILocation(line: 8, column: 1, scope: !9)
 

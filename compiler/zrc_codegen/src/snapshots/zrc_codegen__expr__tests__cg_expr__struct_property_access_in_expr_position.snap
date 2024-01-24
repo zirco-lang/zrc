@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/expr.rs
-description: "struct S { x: i32, y: i32 }\nfn take_int(x: i32);\n\nfn test() {\n    let x: S;\n\n    // TEST: should GEP into `x` to get the second property (`y`) and then\n    // load that value and call take_int\n    take_int(x.y);\n\n    return;\n}\n"
+description: "struct S { x: i32, y: i32 }\nfn take_int(x: i32);\n\nfn test() {\n    let x: S;\n\n    // TEST: should GEP into `x` to get the second property (`y`) and then\n    // load that value and call take_int\n    take_int(x.y);\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -44,5 +44,5 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !15 = !DIDerivedType(tag: DW_TAG_member, name: "y", scope: !2, file: !2, baseType: !14)
 !16 = !DILocation(line: 5, column: 9, scope: !9)
 !17 = !DILocation(line: 9, column: 14, scope: !9)
-!18 = !DILocation(line: 11, column: 5, scope: !9)
+!18 = !DILocation(line: 10, column: 1, scope: !9)
 

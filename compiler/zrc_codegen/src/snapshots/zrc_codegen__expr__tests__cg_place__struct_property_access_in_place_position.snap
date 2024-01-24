@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/expr.rs
-description: "struct S { x: i32, y: i32 }\n\nfn test() {\n    let x: S;\n\n    // TEST: the value must NOT be loaded! it must simply gep to obtain a pointer,\n    // then `store` into that pointer.\n    x.y = 4;\n\n    return;\n}\n"
+description: "struct S { x: i32, y: i32 }\n\nfn test() {\n    let x: S;\n\n    // TEST: the value must NOT be loaded! it must simply gep to obtain a pointer,\n    // then `store` into that pointer.\n    x.y = 4;\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -41,5 +41,5 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !15 = !DIDerivedType(tag: DW_TAG_member, name: "y", scope: !2, file: !2, baseType: !14)
 !16 = !DILocation(line: 4, column: 9, scope: !9)
 !17 = !DILocation(line: 8, column: 5, scope: !9)
-!18 = !DILocation(line: 10, column: 5, scope: !9)
+!18 = !DILocation(line: 9, column: 1, scope: !9)
 
