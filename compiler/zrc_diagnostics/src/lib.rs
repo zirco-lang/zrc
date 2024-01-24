@@ -55,7 +55,7 @@ use std::{error::Error, fmt::Display};
 use ansi_term::{Color, Style};
 use line_span::LineSpanExt;
 use thiserror::Error;
-use zrc_utils::span::{Span, Spanned};
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 /// The severity of a [`Diagnostic`].
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -201,6 +201,17 @@ pub enum DiagnosticKind {
     #[error("function {0} has multiple implementations in this unit")]
     ConflictingImplementations(String),
 }
+impl DiagnosticKind {
+    /// Create an [error] diagnostic in a given [`Span`]
+    ///
+    /// [error]: [`Severity::Error`]
+    #[must_use]
+    #[inline]
+    pub fn error_in(self, span: Span) -> Diagnostic {
+        Diagnostic(Severity::Error, self.in_span(span))
+    }
+}
+
 /// Format and display the 'source window' -- the lines of span within str with
 /// the underline where the span lies.
 fn display_source_window(severity: &Severity, span: Span, source: &str) -> String {
@@ -272,4 +283,32 @@ fn display_source_window(severity: &Severity, span: Span, source: &str) -> Strin
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// A trait to easily create [`Diagnostic`]s from [`Span`]s
+/// See also: [`Spannable`]
+pub trait SpanExt {
+    /// Create a [`Diagnostic`] from this [`Span`] and a [`DiagnosticKind`]
+    #[must_use]
+    fn error(self, kind: DiagnosticKind) -> Diagnostic;
+}
+impl SpanExt for Span {
+    #[inline]
+    fn error(self, kind: DiagnosticKind) -> Diagnostic {
+        Diagnostic(Severity::Error, kind.in_span(self))
+    }
+}
+
+/// A trait to easily create [`Diagnostic`]s from [`Spanned`]s
+/// See also: [`SpanExt`] and [`Spannable`]
+pub trait SpannedExt<T> {
+    /// Create a [`Diagnostic`] from this [`Spanned`] and a [`DiagnosticKind`]
+    #[must_use]
+    fn error(self, f: impl Fn(T) -> DiagnosticKind) -> Diagnostic;
+}
+impl<T> SpannedExt<T> for Spanned<T> {
+    #[inline]
+    fn error(self, f: impl Fn(T) -> DiagnosticKind) -> Diagnostic {
+        Diagnostic(Severity::Error, self.map(f))
+    }
 }

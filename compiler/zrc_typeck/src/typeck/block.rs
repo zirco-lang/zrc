@@ -1,21 +1,14 @@
 //! for blocks
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
-use zrc_parser::ast::stmt::{
-    ArgumentDeclarationList, Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration,
-    Stmt, StmtKind,
-};
+use zrc_parser::ast::stmt::{Stmt, StmtKind};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
-use super::{resolve_type, type_expr, GlobalScope, Scope};
+use super::{declaration::process_let_declaration, scope::Scope, type_expr};
 use crate::tast::{
-    self,
     expr::TypedExpr,
-    stmt::{
-        ArgumentDeclaration as TastArgumentDeclaration, LetDeclaration as TastLetDeclaration,
-        TypedDeclaration, TypedStmt, TypedStmtKind,
-    },
-    ty::{Fn, Type as TastType},
+    stmt::{TypedStmt, TypedStmtKind},
+    ty::Type as TastType,
 };
 
 /// Describes whether a block returns void or a type.
@@ -68,6 +61,17 @@ pub enum BlockReturnAbility<'input> {
     /// Any sub-blocks of this block MAY return. At least one MUST return.
     MustReturn(BlockReturnType<'input>),
 }
+impl<'input> BlockReturnAbility<'input> {
+    /// Determine the [`BlockReturnAbility`] of a sub-scope. `MustReturn`
+    /// become`MayReturn`.
+    #[must_use]
+    pub fn demote(self) -> Self {
+        match self {
+            Self::MustNotReturn => Self::MustNotReturn,
+            Self::MayReturn(x) | Self::MustReturn(x) => Self::MayReturn(x),
+        }
+    }
+}
 
 /// Describes if a block labeled [MAY return](BlockReturnAbility::MayReturn)
 /// actually returns.
@@ -76,19 +80,60 @@ pub enum BlockReturnAbility<'input> {
 /// return](BlockReturnAbility::MustReturn) when a block contains a nested block
 /// (because the outer block must have at least *one* path which is guaranteed
 /// to return)
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 #[allow(clippy::module_name_repetitions)]
 pub enum BlockReturnActuality {
     /// The block is guaranteed to never return on any path.
-    DoesNotReturn,
+    NeverReturns,
 
     /// The block will return on some paths but not all. In some cases, this may
     /// be selected even if the block will always return, as it is sometimes
     /// unknown.
-    MightReturn,
+    SometimesReturns,
 
     /// The block is guaranteed to return on any path.
-    WillReturn,
+    AlwaysReturns,
+}
+impl BlockReturnActuality {
+    /// Determine the [`BlockReturnActuality`] if a code path is not always
+    /// guaranteed to execute. `AlwaysReturns` becomes `SometimesReturns`.
+    #[must_use]
+    pub const fn demote(self) -> Self {
+        match self {
+            Self::NeverReturns => Self::NeverReturns,
+            Self::SometimesReturns | Self::AlwaysReturns => Self::SometimesReturns,
+        }
+    }
+
+    /// Take two [`BlockReturnActuality`] instances corresponding to two
+    /// different code paths: one or the other may execute (not neither and
+    /// not both). Determine the [`BlockReturnActuality`] of this compound
+    /// statement.
+    ///
+    /// Never + Never => Never
+    /// Never + Sometimes => Sometimes
+    /// Never + Always => Sometimes
+    /// Sometimes + Sometimes => Sometimes
+    /// Sometimes + Always => Sometimes
+    /// Always + Always => Always
+    #[must_use]
+    #[allow(clippy::min_ident_chars)]
+    pub const fn join(a: Self, b: Self) -> Self {
+        match (a, b) {
+            (Self::NeverReturns, Self::NeverReturns) => Self::NeverReturns,
+
+            (
+                Self::NeverReturns | Self::SometimesReturns,
+                Self::SometimesReturns | Self::AlwaysReturns,
+            )
+            | (
+                Self::SometimesReturns | Self::AlwaysReturns,
+                Self::NeverReturns | Self::SometimesReturns,
+            ) => Self::SometimesReturns,
+
+            (Self::AlwaysReturns, Self::AlwaysReturns) => Self::AlwaysReturns,
+        }
+    }
 }
 
 /// Convert a single [AST statement](Stmt) like `x;` to a block statement `{ x;
@@ -101,301 +146,6 @@ fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
     stmt.0.map(|value| match value {
         StmtKind::BlockStmt(stmts) => stmts,
         stmt_kind => vec![Stmt(stmt_kind.in_span(span))],
-    })
-}
-
-/// Process a vector of [AST let declarations](AstLetDeclaration) and insert it
-/// into the scope, returning a vector of [TAST let
-/// declarations](TastLetDeclaration).
-///
-/// # Errors
-/// Errors with type checker errors.
-fn process_let_declaration<'input>(
-    scope: &mut Scope<'input, '_>,
-    declarations: Vec<Spanned<AstLetDeclaration<'input>>>,
-) -> Result<Vec<Spanned<TastLetDeclaration<'input>>>, Diagnostic> {
-    declarations
-        .into_iter()
-        .map(
-            |let_declaration| -> Result<Spanned<TastLetDeclaration>, Diagnostic> {
-                let let_decl_span = let_declaration.span();
-                let let_declaration = let_declaration.into_value();
-
-                if scope.values.has(let_declaration.name.value()) {
-                    // TODO: In the future we may allow shadowing but currently no
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        let_declaration
-                            .name
-                            .map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
-                    ));
-                }
-
-                let typed_expr = let_declaration
-                    .value
-                    .map(|expr| type_expr(scope, expr))
-                    .transpose()?;
-
-                let resolved_ty = let_declaration
-                    .ty
-                    .map(|ty| resolve_type(scope.types, ty))
-                    .transpose()?;
-
-                let result_decl = match (typed_expr, resolved_ty) {
-                    (None, None) => {
-                        return Err(Diagnostic(
-                            Severity::Error,
-                            let_decl_span.containing(DiagnosticKind::NoTypeNoValue),
-                        ));
-                    }
-
-                    // Explicitly typed with no value
-                    (None, Some(ty)) => TastLetDeclaration {
-                        name: let_declaration.name,
-                        ty,
-                        value: None,
-                    },
-
-                    // Infer type from value
-                    (
-                        Some(TypedExpr {
-                            inferred_type,
-                            kind,
-                        }),
-                        None,
-                    ) => TastLetDeclaration {
-                        name: let_declaration.name,
-                        ty: inferred_type.clone(),
-                        value: Some(TypedExpr {
-                            inferred_type,
-                            kind,
-                        }),
-                    },
-
-                    // Both explicitly typed and inferable
-                    (
-                        Some(TypedExpr {
-                            inferred_type,
-                            kind,
-                        }),
-                        Some(resolved_ty),
-                    ) => {
-                        if inferred_type == resolved_ty {
-                            TastLetDeclaration {
-                                name: let_declaration.name,
-                                ty: inferred_type.clone(),
-                                value: Some(TypedExpr {
-                                    inferred_type,
-                                    kind,
-                                }),
-                            }
-                        } else {
-                            return Err(Diagnostic(
-                                Severity::Error,
-                                let_decl_span.containing(
-                                    DiagnosticKind::InvalidAssignmentRightHandSideType {
-                                        expected: resolved_ty.to_string(),
-                                        got: inferred_type.to_string(),
-                                    },
-                                ),
-                            ));
-                        }
-                    }
-                };
-
-                if result_decl.ty == TastType::Void {
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        let_decl_span.containing(DiagnosticKind::CannotDeclareVoid),
-                    ));
-                }
-
-                scope
-                    .values
-                    .insert(result_decl.name.value(), result_decl.ty.clone());
-                Ok(result_decl.in_span(let_decl_span))
-            },
-        )
-        .collect::<Result<Vec<_>, Diagnostic>>()
-}
-
-/// Process a top-level [AST declaration](AstDeclaration), insert it into the
-/// scope, and return a [TAST declaration](TypedDeclaration).
-///
-/// This should only be used in the global scope.
-///
-/// # Errors
-/// Errors if a type checker error is encountered.
-#[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
-pub fn process_declaration<'input>(
-    global_scope: &mut GlobalScope<'input>,
-    declaration: AstDeclaration<'input>,
-) -> Result<Option<TypedDeclaration<'input>>, Diagnostic> {
-    Ok(match declaration {
-        AstDeclaration::FunctionDeclaration {
-            parameters,
-            body: Some(_),
-            ..
-        } if matches!(parameters.value(), ArgumentDeclarationList::Variadic(_)) => {
-            return Err(Diagnostic(
-                Severity::Error,
-                parameters.map(|_| DiagnosticKind::VariadicFunctionMustBeExternal),
-            ));
-        }
-
-        AstDeclaration::FunctionDeclaration {
-            name,
-            parameters,
-            return_type,
-            body,
-        } => {
-            let resolved_return_type = return_type
-                .clone()
-                .map(|ty| resolve_type(&global_scope.types, ty))
-                .transpose()?
-                .map_or(BlockReturnType::Void, BlockReturnType::Return);
-
-            let (ArgumentDeclarationList::NonVariadic(inner_params)
-            | ArgumentDeclarationList::Variadic(inner_params)) = parameters.value();
-
-            let resolved_parameters = inner_params
-                .iter()
-                .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
-                    Ok(TastArgumentDeclaration {
-                        name: parameter.value().name,
-                        ty: resolve_type(&global_scope.types, parameter.value().ty.clone())?
-                            .in_span(parameter.span()),
-                    })
-                })
-                .collect::<Result<Vec<_>, Diagnostic>>()?;
-
-            let fn_type = Fn {
-                arguments: match parameters.value() {
-                    ArgumentDeclarationList::NonVariadic(_) => {
-                        tast::stmt::ArgumentDeclarationList::NonVariadic(
-                            resolved_parameters.clone(),
-                        )
-                    }
-                    ArgumentDeclarationList::Variadic(_) => {
-                        tast::stmt::ArgumentDeclarationList::Variadic(resolved_parameters.clone())
-                    }
-                },
-                returns: Box::new(resolved_return_type.clone()),
-            };
-
-            let has_existing_implementation = if let Some(ty) =
-                global_scope.global_values.resolve(name.value())
-            {
-                if let TastType::Fn(_) = ty {
-                    // if a function has already been declared with this name...
-
-                    let canonical = global_scope.declarations.get(name.value()).expect(
-                        "global_scope.declarations was not populated with function properly",
-                    );
-
-                    // TODO: store and reference previous declaration's span in the error
-                    if canonical.fn_type != fn_type {
-                        return Err(Diagnostic(
-                            Severity::Error,
-                            name.map(|_| {
-                                DiagnosticKind::ConflictingFunctionDeclarations(
-                                    canonical.fn_type.to_string(),
-                                    fn_type.to_string(),
-                                )
-                            }),
-                        ));
-                    }
-
-                    // TODO: store and reference previous declaration's span in the error
-                    if body.is_some() && canonical.has_implementation {
-                        return Err(Diagnostic(
-                            Severity::Error,
-                            name.map(|x| DiagnosticKind::ConflictingImplementations(x.to_string())),
-                        ));
-                    }
-
-                    canonical.has_implementation
-                } else {
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        name.map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
-                    ));
-                }
-            } else {
-                false
-            };
-
-            global_scope
-                .global_values
-                .insert(name.into_value(), TastType::Fn(fn_type.clone()));
-
-            global_scope.declarations.insert(
-                name.into_value(),
-                super::FunctionDeclarationGlobalMetadata {
-                    fn_type,
-                    has_implementation: body.is_some() || has_existing_implementation,
-                },
-            );
-
-            Some(TypedDeclaration::FunctionDeclaration {
-                name,
-                parameters: match parameters.value() {
-                    ArgumentDeclarationList::NonVariadic(_) => {
-                        tast::stmt::ArgumentDeclarationList::NonVariadic(
-                            resolved_parameters.clone(),
-                        )
-                    }
-                    ArgumentDeclarationList::Variadic(_) => {
-                        tast::stmt::ArgumentDeclarationList::Variadic(resolved_parameters.clone())
-                    }
-                }
-                .in_span(parameters.span()),
-                return_type: resolved_return_type
-                    .clone()
-                    .into_option()
-                    .map(|existing_type| {
-                        existing_type
-                            .in_span(return_type.expect("already unwrapped before").0.span())
-                    }),
-                body: if let Some(body) = body {
-                    let mut function_scope = global_scope.create_subscope();
-                    for param in resolved_parameters {
-                        function_scope
-                            .values
-                            .insert(param.name.value(), param.ty.into_value());
-                    }
-
-                    // discard return actuality as it's guaranteed
-                    Some(
-                        body.span().containing(
-                            type_block(
-                                &function_scope,
-                                body,
-                                false,
-                                BlockReturnAbility::MustReturn(resolved_return_type),
-                            )?
-                            .0,
-                        ),
-                    )
-                } else {
-                    None
-                },
-            })
-        }
-        AstDeclaration::TypeAliasDeclaration { name, ty } => {
-            if global_scope.types.has(name.value()) {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    name.map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
-                ));
-            }
-
-            let resolved_ty = resolve_type(&global_scope.types, ty)?;
-
-            global_scope.types.insert(name.value(), resolved_ty.clone());
-
-            None
-        }
     })
 }
 
@@ -461,22 +211,20 @@ pub fn type_block<'input, 'gs>(
                             StmtKind::EmptyStmt => Ok(None),
                             StmtKind::BreakStmt if can_use_break_continue => Ok(Some((
                                 TypedStmt(TypedStmtKind::BreakStmt.in_span(stmt_span)),
-                                BlockReturnActuality::DoesNotReturn,
+                                BlockReturnActuality::NeverReturns,
                             ))),
-                            StmtKind::BreakStmt => Err(Diagnostic(
-                                Severity::Error,
-                                stmt_span.containing(DiagnosticKind::CannotUseBreakOutsideOfLoop),
-                            )),
+                            StmtKind::BreakStmt => {
+                                Err(DiagnosticKind::CannotUseBreakOutsideOfLoop.error_in(stmt_span))
+                            }
 
                             StmtKind::ContinueStmt if can_use_break_continue => Ok(Some((
                                 TypedStmt(TypedStmtKind::ContinueStmt.in_span(stmt_span)),
-                                BlockReturnActuality::DoesNotReturn,
+                                BlockReturnActuality::NeverReturns,
                             ))),
-                            StmtKind::ContinueStmt => Err(Diagnostic(
-                                Severity::Error,
-                                stmt_span
-                                    .containing(DiagnosticKind::CannotUseContinueOutsideOfLoop),
-                            )),
+                            StmtKind::ContinueStmt => {
+                                Err(DiagnosticKind::CannotUseContinueOutsideOfLoop
+                                    .error_in(stmt_span))
+                            }
 
                             StmtKind::DeclarationList(declarations) => Ok(Some((
                                 TypedStmt(
@@ -486,9 +234,9 @@ pub fn type_block<'input, 'gs>(
                                     )?)
                                     .in_span(stmt_span),
                                 ),
-                                BlockReturnActuality::DoesNotReturn, /* because expressions
-                                                                      * can't
-                                                                      * return */
+                                BlockReturnActuality::NeverReturns, /* because expressions
+                                                                     * can't
+                                                                     * return */
                             ))),
 
                             StmtKind::IfStmt(cond, then, then_else) => {
@@ -504,29 +252,18 @@ pub fn type_block<'input, 'gs>(
                                 let typed_cond = type_expr(&scope, cond)?;
 
                                 if typed_cond.inferred_type != TastType::Bool {
-                                    return Err(Diagnostic(
-                                        Severity::Error,
-                                        cond_span.containing(DiagnosticKind::ExpectedGot {
-                                            expected: "bool".to_string(),
-                                            got: typed_cond.inferred_type.to_string(),
-                                        }),
-                                    ));
+                                    return Err(DiagnosticKind::ExpectedGot {
+                                        expected: "bool".to_string(),
+                                        got: typed_cond.inferred_type.to_string(),
+                                    }
+                                    .error_in(cond_span));
                                 }
 
                                 let (typed_then, then_return_actuality) = type_block(
                                     &scope,
                                     coerce_stmt_into_block(*then),
                                     can_use_break_continue,
-                                    // return ability of a sub-block is determined by this match:
-                                    match return_ability.clone() {
-                                        BlockReturnAbility::MustNotReturn => {
-                                            BlockReturnAbility::MustNotReturn
-                                        }
-                                        BlockReturnAbility::MustReturn(x)
-                                        | BlockReturnAbility::MayReturn(x) => {
-                                            BlockReturnAbility::MayReturn(x)
-                                        }
-                                    },
+                                    return_ability.clone().demote(),
                                 )?;
 
                                 let (typed_then_else, then_else_return_actuality) = then_else
@@ -536,17 +273,7 @@ pub fn type_block<'input, 'gs>(
                                             &scope,
                                             coerce_stmt_into_block(*then_else),
                                             can_use_break_continue,
-                                            // return ability of a sub-block is determined by this
-                                            // match:
-                                            match return_ability.clone() {
-                                                BlockReturnAbility::MustNotReturn => {
-                                                    BlockReturnAbility::MustNotReturn
-                                                }
-                                                BlockReturnAbility::MustReturn(x)
-                                                | BlockReturnAbility::MayReturn(x) => {
-                                                    BlockReturnAbility::MayReturn(x)
-                                                }
-                                            },
+                                            return_ability.clone().demote(),
                                         )
                                     })
                                     .transpose()?
@@ -567,32 +294,11 @@ pub fn type_block<'input, 'gs>(
                                         )
                                         .in_span(stmt_span),
                                     ),
-                                    match (
+                                    BlockReturnActuality::join(
                                         then_return_actuality,
                                         then_else_return_actuality
-                                            .unwrap_or(BlockReturnActuality::DoesNotReturn),
-                                    ) {
-                                        (
-                                            BlockReturnActuality::DoesNotReturn,
-                                            BlockReturnActuality::DoesNotReturn,
-                                        ) => BlockReturnActuality::DoesNotReturn,
-                                        (
-                                            BlockReturnActuality::DoesNotReturn,
-                                            BlockReturnActuality::WillReturn,
-                                        )
-                                        | (
-                                            BlockReturnActuality::WillReturn,
-                                            BlockReturnActuality::DoesNotReturn,
-                                        )
-                                        | (BlockReturnActuality::MightReturn, _)
-                                        | (_, BlockReturnActuality::MightReturn) => {
-                                            BlockReturnActuality::MightReturn
-                                        }
-                                        (
-                                            BlockReturnActuality::WillReturn,
-                                            BlockReturnActuality::WillReturn,
-                                        ) => BlockReturnActuality::WillReturn,
-                                    },
+                                            .unwrap_or(BlockReturnActuality::NeverReturns),
+                                    ),
                                 )))
                             }
                             StmtKind::WhileStmt(cond, body) => {
@@ -605,29 +311,18 @@ pub fn type_block<'input, 'gs>(
                                 let typed_cond = type_expr(&scope, cond)?;
 
                                 if typed_cond.inferred_type != TastType::Bool {
-                                    return Err(Diagnostic(
-                                        Severity::Error,
-                                        cond_span.containing(DiagnosticKind::ExpectedGot {
-                                            expected: "bool".to_string(),
-                                            got: typed_cond.inferred_type.to_string(),
-                                        }),
-                                    ));
+                                    return Err(DiagnosticKind::ExpectedGot {
+                                        expected: "bool".to_string(),
+                                        got: typed_cond.inferred_type.to_string(),
+                                    }
+                                    .error_in(cond_span));
                                 }
 
                                 let (typed_body, body_return_actuality) = type_block(
                                     &scope,
                                     coerce_stmt_into_block(*body),
                                     true,
-                                    // return ability of a sub-block is determined by this match:
-                                    match return_ability.clone() {
-                                        BlockReturnAbility::MustNotReturn => {
-                                            BlockReturnAbility::MustNotReturn
-                                        }
-                                        BlockReturnAbility::MustReturn(x)
-                                        | BlockReturnAbility::MayReturn(x) => {
-                                            BlockReturnAbility::MayReturn(x)
-                                        }
-                                    },
+                                    return_ability.clone().demote(),
                                 )?;
 
                                 Ok(Some((
@@ -638,18 +333,7 @@ pub fn type_block<'input, 'gs>(
                                         )
                                         .in_span(stmt_span),
                                     ),
-                                    match body_return_actuality {
-                                        BlockReturnActuality::DoesNotReturn => {
-                                            BlockReturnActuality::DoesNotReturn
-                                        }
-
-                                        // in case the loop does not run at all or runs infinitely,
-                                        // WillReturn counts too
-                                        BlockReturnActuality::MightReturn
-                                        | BlockReturnActuality::WillReturn => {
-                                            BlockReturnActuality::MightReturn
-                                        }
-                                    },
+                                    body_return_actuality.demote(),
                                 )))
                             }
                             StmtKind::DoWhileStmt(body, cond) => {
@@ -658,29 +342,18 @@ pub fn type_block<'input, 'gs>(
                                 let typed_cond = type_expr(&scope, cond)?;
 
                                 if typed_cond.inferred_type != TastType::Bool {
-                                    return Err(Diagnostic(
-                                        Severity::Error,
-                                        cond_span.containing(DiagnosticKind::ExpectedGot {
-                                            expected: "bool".to_string(),
-                                            got: typed_cond.inferred_type.to_string(),
-                                        }),
-                                    ));
+                                    return Err(DiagnosticKind::ExpectedGot {
+                                        expected: "bool".to_string(),
+                                        got: typed_cond.inferred_type.to_string(),
+                                    }
+                                    .error_in(cond_span));
                                 }
 
                                 let (typed_body, body_return_actuality) = type_block(
                                     &scope,
                                     coerce_stmt_into_block(*body),
                                     true,
-                                    // return ability of a sub-block is determined by this match:
-                                    match return_ability.clone() {
-                                        BlockReturnAbility::MustNotReturn => {
-                                            BlockReturnAbility::MustNotReturn
-                                        }
-                                        BlockReturnAbility::MustReturn(x)
-                                        | BlockReturnAbility::MayReturn(x) => {
-                                            BlockReturnAbility::MayReturn(x)
-                                        }
-                                    },
+                                    return_ability.clone().demote(),
                                 )?;
 
                                 Ok(Some((
@@ -691,21 +364,9 @@ pub fn type_block<'input, 'gs>(
                                         )
                                         .in_span(stmt_span),
                                     ),
-                                    match body_return_actuality {
-                                        BlockReturnActuality::DoesNotReturn => {
-                                            BlockReturnActuality::DoesNotReturn
-                                        }
-
-                                        // In a `do..while` loop, there is a GUARENTEE that the
-                                        // body will run at least once. For this reason,
-                                        // we map WillReturn to WillReturn unlike `for` and `while`.
-                                        BlockReturnActuality::MightReturn => {
-                                            BlockReturnActuality::MightReturn
-                                        }
-                                        BlockReturnActuality::WillReturn => {
-                                            BlockReturnActuality::WillReturn
-                                        }
-                                    },
+                                    // Unlike `while`, a `do..while` loop is guaranteed to run at
+                                    // least once. For this reason, we do not need to `demote` it.
+                                    body_return_actuality,
                                 )))
                             }
                             StmtKind::ForStmt {
@@ -759,16 +420,7 @@ pub fn type_block<'input, 'gs>(
                                     &loop_scope,
                                     body_as_block,
                                     true,
-                                    // return ability of a sub-block is determined by this match:
-                                    match return_ability.clone() {
-                                        BlockReturnAbility::MustNotReturn => {
-                                            BlockReturnAbility::MustNotReturn
-                                        }
-                                        BlockReturnAbility::MustReturn(x)
-                                        | BlockReturnAbility::MayReturn(x) => {
-                                            BlockReturnAbility::MayReturn(x)
-                                        }
-                                    },
+                                    return_ability.clone().demote(),
                                 )?;
 
                                 Ok(Some((
@@ -781,18 +433,7 @@ pub fn type_block<'input, 'gs>(
                                         }
                                         .in_span(stmt_span),
                                     ),
-                                    match body_return_actuality {
-                                        BlockReturnActuality::DoesNotReturn => {
-                                            BlockReturnActuality::DoesNotReturn
-                                        }
-
-                                        // in case the loop does not run at all or runs infinitely,
-                                        // WillReturn counts too
-                                        BlockReturnActuality::MightReturn
-                                        | BlockReturnActuality::WillReturn => {
-                                            BlockReturnActuality::MightReturn
-                                        }
-                                    },
+                                    body_return_actuality.demote(),
                                 )))
                             }
 
@@ -801,16 +442,7 @@ pub fn type_block<'input, 'gs>(
                                     &scope,
                                     body.in_span(stmt_span),
                                     can_use_break_continue,
-                                    // return ability of a sub-block is determined by this match:
-                                    match return_ability.clone() {
-                                        BlockReturnAbility::MustNotReturn => {
-                                            BlockReturnAbility::MustNotReturn
-                                        }
-                                        BlockReturnAbility::MustReturn(x)
-                                        | BlockReturnAbility::MayReturn(x) => {
-                                            BlockReturnAbility::MayReturn(x)
-                                        }
-                                    },
+                                    return_ability.clone().demote(),
                                 )?;
                                 Ok(Some((
                                     TypedStmt(
@@ -825,7 +457,7 @@ pub fn type_block<'input, 'gs>(
                                     TypedStmtKind::ExprStmt(type_expr(&scope, expr)?)
                                         .in_span(stmt_span),
                                 ),
-                                BlockReturnActuality::DoesNotReturn,
+                                BlockReturnActuality::NeverReturns,
                             ))),
                             StmtKind::ReturnStmt(value) => {
                                 let value_span = value.as_ref().map(|inner| inner.0.span());
@@ -833,10 +465,9 @@ pub fn type_block<'input, 'gs>(
                                     value.map(|expr| type_expr(&scope, expr)).transpose()?;
                                 match (resolved_value, return_ability.clone()) {
                                     // expects no return
-                                    (_, BlockReturnAbility::MustNotReturn) => Err(Diagnostic(
-                                        Severity::Error,
-                                        stmt_span.containing(DiagnosticKind::CannotReturnHere),
-                                    )),
+                                    (_, BlockReturnAbility::MustNotReturn) => {
+                                        Err(DiagnosticKind::CannotReturnHere.error_in(stmt_span))
+                                    }
 
                                     // return; in void fn
                                     (
@@ -847,7 +478,7 @@ pub fn type_block<'input, 'gs>(
                                         TypedStmt(
                                             TypedStmtKind::ReturnStmt(None).in_span(stmt_span),
                                         ),
-                                        BlockReturnActuality::WillReturn,
+                                        BlockReturnActuality::AlwaysReturns,
                                     ))),
 
                                     // return; in fn with required return type
@@ -859,26 +490,22 @@ pub fn type_block<'input, 'gs>(
                                         | BlockReturnAbility::MustReturn(BlockReturnType::Return(
                                             return_ty,
                                         )),
-                                    ) => Err(Diagnostic(
-                                        Severity::Error,
-                                        stmt_span.containing(DiagnosticKind::ExpectedGot {
-                                            expected: return_ty.to_string(),
-                                            got: "void".to_string(),
-                                        }),
-                                    )),
+                                    ) => Err(DiagnosticKind::ExpectedGot {
+                                        expected: return_ty.to_string(),
+                                        got: "void".to_string(),
+                                    }
+                                    .error_in(stmt_span)),
 
                                     // return x; in fn expecting to return void
                                     (
                                         Some(TypedExpr { inferred_type, .. }),
                                         BlockReturnAbility::MustReturn(BlockReturnType::Void)
                                         | BlockReturnAbility::MayReturn(BlockReturnType::Void),
-                                    ) => Err(Diagnostic(
-                                        Severity::Error,
-                                        stmt_span.containing(DiagnosticKind::ExpectedGot {
-                                            expected: "void".to_string(),
-                                            got: inferred_type.to_string(),
-                                        }),
-                                    )),
+                                    ) => Err(DiagnosticKind::ExpectedGot {
+                                        expected: "void".to_string(),
+                                        got: inferred_type.to_string(),
+                                    }
+                                    .error_in(stmt_span)),
 
                                     // return x; in fn expecting to return x
                                     (
@@ -902,7 +529,7 @@ pub fn type_block<'input, 'gs>(
                                                     }))
                                                     .in_span(stmt_span),
                                                 ),
-                                                BlockReturnActuality::WillReturn,
+                                                BlockReturnActuality::AlwaysReturns,
                                             )))
                                         } else {
                                             Err(Diagnostic(
@@ -931,125 +558,59 @@ pub fn type_block<'input, 'gs>(
     let might_return = return_actualities.iter().any(|x| {
         matches!(
             x,
-            BlockReturnActuality::MightReturn | BlockReturnActuality::WillReturn
+            BlockReturnActuality::SometimesReturns | BlockReturnActuality::AlwaysReturns
         )
     });
     let will_return = return_actualities
         .iter()
-        .any(|x| matches!(x, BlockReturnActuality::WillReturn));
+        .any(|x| matches!(x, BlockReturnActuality::AlwaysReturns));
 
     let return_actuality = match (might_return, will_return) {
-        (_, true) => BlockReturnActuality::WillReturn,
-        (true, false) => BlockReturnActuality::MightReturn,
-        (false, false) => BlockReturnActuality::DoesNotReturn,
+        (_, true) => BlockReturnActuality::AlwaysReturns,
+        (true, false) => BlockReturnActuality::SometimesReturns,
+        (false, false) => BlockReturnActuality::NeverReturns,
     };
 
-    #[allow(clippy::match_same_arms)] // for clarity
     match (return_ability, return_actuality) {
-        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::DoesNotReturn) => {
-            Ok((tast_block, BlockReturnActuality::DoesNotReturn))
+        (
+            BlockReturnAbility::MustNotReturn | BlockReturnAbility::MayReturn(_),
+            BlockReturnActuality::NeverReturns,
+        ) => Ok(BlockReturnActuality::NeverReturns),
+
+        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::SometimesReturns) => {
+            Ok(BlockReturnActuality::SometimesReturns)
         }
-        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::WillReturn) => {
-            Ok((tast_block, BlockReturnActuality::WillReturn))
-        }
-        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::WillReturn) => {
-            Ok((tast_block, BlockReturnActuality::WillReturn))
-        }
-        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::MightReturn) => {
-            Ok((tast_block, BlockReturnActuality::MightReturn))
-        }
-        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::DoesNotReturn) => {
-            Ok((tast_block, BlockReturnActuality::DoesNotReturn))
-        }
+
+        (
+            BlockReturnAbility::MustReturn(_) | BlockReturnAbility::MayReturn(_),
+            BlockReturnActuality::AlwaysReturns,
+        ) => Ok(BlockReturnActuality::AlwaysReturns),
+
         (
             BlockReturnAbility::MustReturn(BlockReturnType::Void),
-            BlockReturnActuality::MightReturn | BlockReturnActuality::DoesNotReturn,
+            BlockReturnActuality::SometimesReturns | BlockReturnActuality::NeverReturns,
         ) => {
             tast_block.push(TypedStmt(TypedStmtKind::ReturnStmt(None).in_span(
                 Span::from_positions(input_block_span.end() - 1, input_block_span.end()),
             )));
 
-            Ok((tast_block, BlockReturnActuality::WillReturn))
+            Ok(BlockReturnActuality::AlwaysReturns)
         }
+
         (
             BlockReturnAbility::MustReturn(_),
-            BlockReturnActuality::MightReturn | BlockReturnActuality::DoesNotReturn,
-        ) => Err(Diagnostic(
-            Severity::Error,
-            input_block_span.containing(DiagnosticKind::ExpectedABlockToReturn),
-        )),
-        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => {
-            panic!(concat!(
-                "block must not return, but a sub-block may return",
-                " -- this should have been caught when checking that block"
-            ));
-        }
-        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::WillReturn) => {
+            BlockReturnActuality::SometimesReturns | BlockReturnActuality::NeverReturns,
+        ) => Err(DiagnosticKind::ExpectedABlockToReturn.error_in(input_block_span)),
+
+        (
+            BlockReturnAbility::MustNotReturn,
+            BlockReturnActuality::SometimesReturns | BlockReturnActuality::AlwaysReturns,
+        ) => {
             panic!(concat!(
                 "block must not return, but a sub-block may return",
                 " -- this should have been caught when checking that block"
             ));
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-
-    use tast::stmt::ArgumentDeclarationList as TastArgumentDeclarationList;
-    use zrc_parser::ast::{
-        expr::{Expr, ExprKind},
-        stmt::ArgumentDeclarationList as AstArgumentDeclarationList,
-        ty::{Type, TypeKind},
-    };
-    use zrc_utils::spanned;
-
-    use super::*;
-    use crate::typeck::{FunctionDeclarationGlobalMetadata, TypeScope, ValueScope};
-
-    #[test]
-    fn re_declaration_works_as_expected() {
-        assert!(process_declaration(
-            &mut GlobalScope {
-                global_values: ValueScope::from([(
-                    "get_true",
-                    TastType::Fn(Fn {
-                        arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
-                        returns: Box::new(BlockReturnType::Return(TastType::Bool))
-                    })
-                )]),
-                types: TypeScope::from([("bool", TastType::Bool)]),
-                declarations: HashMap::from([(
-                    "get_true",
-                    FunctionDeclarationGlobalMetadata {
-                        fn_type: Fn {
-                            arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
-                            returns: Box::new(BlockReturnType::Return(TastType::Bool))
-                        },
-                        has_implementation: false
-                    }
-                )])
-            },
-            AstDeclaration::FunctionDeclaration {
-                name: spanned!(0, "get_true", 0),
-                parameters: spanned!(0, AstArgumentDeclarationList::NonVariadic(vec![]), 0),
-                return_type: Some(Type(spanned!(0, TypeKind::Identifier("bool"), 0))),
-                body: Some(spanned!(
-                    0,
-                    vec![Stmt(spanned!(
-                        0,
-                        StmtKind::ReturnStmt(Some(Expr(spanned!(
-                            0,
-                            ExprKind::BooleanLiteral(true),
-                            0
-                        )))),
-                        0
-                    ))],
-                    0
-                ))
-            }
-        )
-        .is_ok());
-    }
+    .map(|actuality| (tast_block, actuality))
 }

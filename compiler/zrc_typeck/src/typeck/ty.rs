@@ -1,11 +1,10 @@
 //! for types
 
 use indexmap::IndexMap;
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind};
-use zrc_utils::span::Spannable;
 
-use super::TypeScope;
+use super::scope::TypeCtx;
 use crate::tast::ty::Type as TastType;
 
 /// Resolve an identifier to its corresponding [`tast::ty::Type`].
@@ -14,7 +13,7 @@ use crate::tast::ty::Type as TastType;
 /// Errors if the identifier is not found in the type scope or a key is
 /// double-defined.
 pub fn resolve_type<'input>(
-    type_scope: &TypeScope<'input>,
+    type_scope: &TypeCtx<'input>,
     ty: ParserType<'input>,
 ) -> Result<TastType<'input>, Diagnostic> {
     let span = ty.0.span();
@@ -23,10 +22,7 @@ pub fn resolve_type<'input>(
             if let Some(ty) = type_scope.resolve(x) {
                 ty.clone()
             } else {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    DiagnosticKind::UnableToResolveType(x.to_string()).in_span(span),
-                ));
+                return Err(DiagnosticKind::UnableToResolveType(x.to_string()).error_in(span));
             }
         }
         ParserTypeKind::Ptr(pointee_ty) => {
@@ -49,7 +45,7 @@ pub fn resolve_type<'input>(
 /// Errors if a key is not unique or is unresolvable.
 #[allow(clippy::type_complexity)]
 pub(super) fn resolve_key_type_mapping<'input>(
-    type_scope: &TypeScope<'input>,
+    type_scope: &TypeCtx<'input>,
     members: KeyTypeMapping<'input>,
 ) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {
     let mut map: IndexMap<&'input str, TastType> = IndexMap::new();
@@ -58,10 +54,9 @@ pub(super) fn resolve_key_type_mapping<'input>(
         let (key, ast_type) = member.into_value();
 
         if map.contains_key(key.value()) {
-            return Err(Diagnostic(
-                zrc_diagnostics::Severity::Error,
-                DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).in_span(span),
-            ));
+            return Err(
+                DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
+            );
         }
         map.insert(key.value(), resolve_type(type_scope, ast_type)?);
     }
@@ -70,7 +65,7 @@ pub(super) fn resolve_key_type_mapping<'input>(
 
 #[cfg(test)]
 mod tests {
-
+    use zrc_diagnostics::Severity;
     use zrc_parser::ast::ty::KeyTypeMapping;
     use zrc_utils::{span::Span, spanned};
 
@@ -80,7 +75,7 @@ mod tests {
     fn pointers_and_identifiers_resolve_as_expected() {
         assert_eq!(
             resolve_type(
-                &TypeScope::from([("i32", TastType::I32)]),
+                &TypeCtx::from([("i32", TastType::I32)]),
                 ParserType::build_ptr(
                     Span::from_positions(0, 4),
                     ParserType::build_ident(spanned!(1, "i32", 4)),
@@ -94,7 +89,7 @@ mod tests {
     fn invalid_types_produce_error() {
         assert_eq!(
             resolve_type(
-                &TypeScope::new_empty(),
+                &TypeCtx::new_empty(),
                 ParserType::build_ident(spanned!(0, "x", 1))
             ),
             Err(Diagnostic(
@@ -109,7 +104,7 @@ mod tests {
         // struct { x: i32, y: i32 }
         assert_eq!(
             resolve_type(
-                &TypeScope::default(),
+                &TypeCtx::default(),
                 ParserType(spanned!(
                     0,
                     ParserTypeKind::Struct(KeyTypeMapping(spanned!(
@@ -149,7 +144,7 @@ mod tests {
         // struct { x: i32, x: i32 }
         assert_eq!(
             resolve_type(
-                &TypeScope::default(),
+                &TypeCtx::default(),
                 ParserType::build_struct_from_contents(
                     Span::from_positions(0, 25),
                     KeyTypeMapping(spanned!(
