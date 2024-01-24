@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/expr.rs
-description: "fn test() {\n    let x: *i32;\n\n    // TEST: x is *i32, so %let_x is **i32 (ptr to the stack). we should load from\n    // %let_x to obtain the actual pointer. we should then store to that result\n    // value (we should never load it)\n    *x = 4;\n\n    return;\n}\n"
+description: "fn test() {\n    let x: *i32;\n\n    // TEST: x is *i32, so %let_x is **i32 (ptr to the stack). we should load from\n    // %let_x to obtain the actual pointer. we should then store to that result\n    // value (we should never load it)\n    *x = 4;\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -38,5 +38,5 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !12 = !DIBasicType(name: "i32")
 !13 = !DILocation(line: 2, column: 9, scope: !9)
 !14 = !DILocation(line: 7, column: 6, scope: !9)
-!15 = !DILocation(line: 9, column: 5, scope: !9)
+!15 = !DILocation(line: 8, column: 1, scope: !9)
 

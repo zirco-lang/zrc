@@ -557,8 +557,6 @@ mod tests {
                 // TEST: should allocate twice and assign to one.
                 let a: i32;
                 let b: i32 = 7;
-
-                return;
             }
         "});
     }
@@ -605,7 +603,6 @@ mod tests {
 
                         // TEST: code generation properly continues from the if_true block
                         nop();
-                        return;
                     }
                 "});
             }
@@ -673,8 +670,6 @@ mod tests {
                             // TEST: the loop jumps to the latch block which jumps back to the
                             // header
                         }
-
-                        return;
                     }
                 "});
             }
@@ -689,8 +684,6 @@ mod tests {
                         do {
                             get_bool(); // for fake side effects
                         } while (get_bool());
-
-                        return;
                     }
                 "});
             }

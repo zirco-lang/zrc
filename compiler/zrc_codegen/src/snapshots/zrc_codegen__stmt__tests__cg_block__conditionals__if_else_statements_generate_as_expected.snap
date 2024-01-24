@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/stmt.rs
-description: "fn get_bool() -> bool;\nfn nop();\n\nfn test() {\n    // TEST: properly produces a conditional break over the call result and\n    // both code baths call nop().\n    if (get_bool()) nop();\n    else {\n        nop();\n        // TEST: this path diverges\n        return;\n    }\n\n    // TEST: code generation properly continues from the if_true block\n    nop();\n    return;\n}\n"
+description: "fn get_bool() -> bool;\nfn nop();\n\nfn test() {\n    // TEST: properly produces a conditional break over the call result and\n    // both code baths call nop().\n    if (get_bool()) nop();\n    else {\n        nop();\n        // TEST: this path diverges\n        return;\n    }\n\n    // TEST: code generation properly continues from the if_true block\n    nop();\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -49,5 +49,5 @@ end:                                              ; preds = %then
 !15 = distinct !DILexicalBlock(scope: !9, file: !2, line: 8, column: 10)
 !16 = !DILocation(line: 11, column: 9, scope: !15)
 !17 = !DILocation(line: 15, column: 5, scope: !9)
-!18 = !DILocation(line: 16, column: 5, scope: !9)
+!18 = !DILocation(line: 16, column: 1, scope: !9)
 

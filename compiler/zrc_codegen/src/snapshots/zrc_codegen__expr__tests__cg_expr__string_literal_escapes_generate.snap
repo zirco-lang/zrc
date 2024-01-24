@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/expr.rs
-description: "fn test() {\n    // TEST: should properly generate \\xNN for each escape\n    let x = \"\\n\\r\\t\\\\\\\"\\x41\\0\";\n\n    return;\n}\n"
+description: "fn test() {\n    // TEST: should properly generate \\xNN for each escape\n    let x = \"\\n\\r\\t\\\\\\\"\\x41\\0\";\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -38,5 +38,5 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !11 = !DIDerivedType(tag: DW_TAG_pointer_type, name: "\22i8\22", baseType: !12, dwarfAddressSpace: 0)
 !12 = !DIBasicType(name: "u8")
 !13 = !DILocation(line: 3, column: 9, scope: !9)
-!14 = !DILocation(line: 5, column: 5, scope: !9)
+!14 = !DILocation(line: 4, column: 1, scope: !9)
 

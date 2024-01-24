@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/expr.rs
-description: "fn take_int(x: i32);\n\nfn test() {\n    let x: *i32;\n\n    // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).\n    // %let_x needs to be GEP'd into and the value `i32` at idx 4 must be loaded.\n    take_int(x[4 as usize]);\n\n    return;\n}\n"
+description: "fn take_int(x: i32);\n\nfn test() {\n    let x: *i32;\n\n    // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).\n    // %let_x needs to be GEP'd into and the value `i32` at idx 4 must be loaded.\n    take_int(x[4 as usize]);\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -43,5 +43,5 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !13 = !DILocation(line: 4, column: 9, scope: !9)
 !14 = !DILocation(line: 8, column: 14, scope: !9)
 !15 = !DILocation(line: 8, column: 16, scope: !9)
-!16 = !DILocation(line: 10, column: 5, scope: !9)
+!16 = !DILocation(line: 9, column: 1, scope: !9)
 

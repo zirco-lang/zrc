@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/expr.rs
-description: "fn test() {\n    let a = 0b10_10;\n    let b = 0x1F_A4;\n    return;\n}\n"
+description: "fn test() {\n    let a = 0b10_10;\n    let b = 0x1F_A4;\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -40,5 +40,5 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !12 = !DILocalVariable(name: "b", scope: !9, file: !2, line: 3, type: !11)
 !13 = !DILocation(line: 2, column: 9, scope: !9)
 !14 = !DILocation(line: 3, column: 9, scope: !9)
-!15 = !DILocation(line: 4, column: 5, scope: !9)
+!15 = !DILocation(line: 4, column: 1, scope: !9)
 

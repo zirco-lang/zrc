@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/stmt.rs
-description: "fn get_int() -> i32;\n\nfn test() {\n    // TEST: the proper while loop structure is created\n    for (let i = 0; i < get_int(); i += 1) {\n        // TEST: break jumps to the `end` block\n        if (i > get_int()) break;\n        else {\n            // TEST: continue jumps to the latch block\n            if (i < get_int()) continue;\n            else {}\n        }\n\n        // TEST: the loop jumps to the latch block which jumps back to the\n        // header\n    }\n\n    return;\n}\n"
+description: "fn get_int() -> i32;\n\nfn test() {\n    // TEST: the proper while loop structure is created\n    for (let i = 0; i < get_int(); i += 1) {\n        // TEST: break jumps to the `end` block\n        if (i > get_int()) break;\n        else {\n            // TEST: continue jumps to the latch block\n            if (i < get_int()) continue;\n            else {}\n        }\n\n        // TEST: the loop jumps to the latch block which jumps back to the\n        // header\n    }\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -86,7 +86,7 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !17 = !DILocation(line: 7, column: 17, scope: !16)
 !18 = !DILocation(line: 5, column: 36, scope: !9)
 !19 = !DILocation(line: 5, column: 41, scope: !9)
-!20 = !DILocation(line: 18, column: 5, scope: !9)
+!20 = !DILocation(line: 17, column: 1, scope: !9)
 !21 = !DILocation(line: 7, column: 28, scope: !22)
 !22 = distinct !DILexicalBlock(scope: !16, file: !2, line: 7, column: 28)
 !23 = !DILocation(line: 10, column: 17, scope: !24)
