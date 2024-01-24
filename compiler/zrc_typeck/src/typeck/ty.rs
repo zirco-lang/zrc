@@ -5,7 +5,7 @@ use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
 use zrc_parser::ast::ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind};
 use zrc_utils::span::Spannable;
 
-use super::Scope;
+use super::TypeScope;
 use crate::tast::ty::Type as TastType;
 
 /// Resolve an identifier to its corresponding [`tast::ty::Type`].
@@ -14,13 +14,13 @@ use crate::tast::ty::Type as TastType;
 /// Errors if the identifier is not found in the type scope or a key is
 /// double-defined.
 pub fn resolve_type<'input>(
-    scope: &Scope<'input>,
+    type_scope: &TypeScope<'input>,
     ty: ParserType<'input>,
 ) -> Result<TastType<'input>, Diagnostic> {
     let span = ty.0.span();
     Ok(match ty.0.into_value() {
         ParserTypeKind::Identifier(x) => {
-            if let Some(ty) = scope.get_type(x) {
+            if let Some(ty) = type_scope.resolve(x) {
                 ty.clone()
             } else {
                 return Err(Diagnostic(
@@ -30,13 +30,13 @@ pub fn resolve_type<'input>(
             }
         }
         ParserTypeKind::Ptr(pointee_ty) => {
-            TastType::Ptr(Box::new(resolve_type(scope, *pointee_ty)?))
+            TastType::Ptr(Box::new(resolve_type(type_scope, *pointee_ty)?))
         }
         ParserTypeKind::Struct(members) => {
-            TastType::Struct(resolve_key_type_mapping(scope, members)?)
+            TastType::Struct(resolve_key_type_mapping(type_scope, members)?)
         }
         ParserTypeKind::Union(members) => {
-            TastType::Union(resolve_key_type_mapping(scope, members)?)
+            TastType::Union(resolve_key_type_mapping(type_scope, members)?)
         }
     })
 }
@@ -49,7 +49,7 @@ pub fn resolve_type<'input>(
 /// Errors if a key is not unique or is unresolvable.
 #[allow(clippy::type_complexity)]
 pub(super) fn resolve_key_type_mapping<'input>(
-    scope: &Scope<'input>,
+    type_scope: &TypeScope<'input>,
     members: KeyTypeMapping<'input>,
 ) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {
     let mut map: IndexMap<&'input str, TastType> = IndexMap::new();
@@ -63,14 +63,13 @@ pub(super) fn resolve_key_type_mapping<'input>(
                 DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).in_span(span),
             ));
         }
-        map.insert(key.value(), resolve_type(scope, ast_type)?);
+        map.insert(key.value(), resolve_type(type_scope, ast_type)?);
     }
     Ok(map)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
 
     use zrc_parser::ast::ty::KeyTypeMapping;
     use zrc_utils::{span::Span, spanned};
@@ -81,7 +80,7 @@ mod tests {
     fn pointers_and_identifiers_resolve_as_expected() {
         assert_eq!(
             resolve_type(
-                &Scope::from_scopes(HashMap::new(), HashMap::from([("i32", TastType::I32)])),
+                &TypeScope::from([("i32", TastType::I32)]),
                 ParserType::build_ptr(
                     Span::from_positions(0, 4),
                     ParserType::build_ident(spanned!(1, "i32", 4)),
@@ -94,7 +93,10 @@ mod tests {
     #[test]
     fn invalid_types_produce_error() {
         assert_eq!(
-            resolve_type(&Scope::new(), ParserType::build_ident(spanned!(0, "x", 1))),
+            resolve_type(
+                &TypeScope::new_empty(),
+                ParserType::build_ident(spanned!(0, "x", 1))
+            ),
             Err(Diagnostic(
                 Severity::Error,
                 spanned!(0, DiagnosticKind::UnableToResolveType("x".to_string()), 1)
@@ -107,7 +109,7 @@ mod tests {
         // struct { x: i32, y: i32 }
         assert_eq!(
             resolve_type(
-                &Scope::default(),
+                &TypeScope::default(),
                 ParserType(spanned!(
                     0,
                     ParserTypeKind::Struct(KeyTypeMapping(spanned!(
@@ -147,7 +149,7 @@ mod tests {
         // struct { x: i32, x: i32 }
         assert_eq!(
             resolve_type(
-                &Scope::default(),
+                &TypeScope::default(),
                 ParserType::build_struct_from_contents(
                     Span::from_positions(0, 25),
                     KeyTypeMapping(spanned!(

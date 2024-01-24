@@ -152,7 +152,9 @@ pub fn cg_init_fn<'ctx>(
         false,
     );
 
-    let fn_val = module.add_function(name, fn_type, None);
+    let fn_val = module
+        .get_function(name)
+        .unwrap_or_else(|| module.add_function(name, fn_type, None));
     fn_val.set_subprogram(fn_subprogram);
 
     (fn_val, fn_subprogram)

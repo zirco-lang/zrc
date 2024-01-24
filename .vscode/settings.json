@@ -18,6 +18,8 @@
         "Spannable",
         "srem",
         "structptr",
+        "subscope",
+        "Subscopes",
         "tast",
         "trunc",
         "typeck",

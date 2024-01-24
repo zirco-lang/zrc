@@ -196,6 +196,10 @@ pub enum DiagnosticKind {
     CannotDeclareVoid,
     #[error("invalid pointer arithmetic operation `{0}`")]
     InvalidPointerArithmeticOperation(String),
+    #[error("declaration of type `{1}` conflicts with previous declaration with type `{0}`")]
+    ConflictingFunctionDeclarations(String, String),
+    #[error("function {0} has multiple implementations in this unit")]
+    ConflictingImplementations(String),
 }
 /// Format and display the 'source window' -- the lines of span within str with
 /// the underline where the span lies.

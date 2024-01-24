@@ -12,7 +12,10 @@ use inkwell::{
     },
     AddressSpace,
 };
-use zrc_typeck::{tast::ty::Type, typeck::BlockReturnType};
+use zrc_typeck::{
+    tast::ty::{Fn, Type},
+    typeck::BlockReturnType,
+};
 
 /// Create a pointer to an [`AnyTypeEnum`] instance.
 ///
@@ -99,7 +102,7 @@ pub fn llvm_int_type<'ctx>(
                 &target_machine.get_target_data(),
                 Some(AddressSpace::default()),
             ),
-            Type::Void | Type::Ptr(_) | Type::Fn(_, _) | Type::Struct(_) | Type::Union(_) => {
+            Type::Void | Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
                 panic!("not an integer type")
             }
         },
@@ -142,7 +145,7 @@ pub fn llvm_basic_type<'ctx>(
             let (ty, dbg_ty) = create_ptr(dbg_builder, pointee_ty, pointee_dbg_ty);
             (ty.as_basic_type_enum(), dbg_ty.as_type())
         }
-        Type::Fn(_, _) => panic!("function is not a basic type"),
+        Type::Fn(_) => panic!("function is not a basic type"),
         Type::Struct(fields) => (
             ctx.struct_type(
                 &fields
@@ -266,24 +269,24 @@ pub fn llvm_type<'ctx>(
                 .as_type(),
         ),
 
-        Type::Fn(args, ret) => {
+        Type::Fn(Fn { arguments, returns }) => {
             let (ret, ret_dbg) = llvm_type(
                 file,
                 dbg_builder,
                 ctx,
                 target_machine,
-                match &**ret {
+                match &**returns {
                     BlockReturnType::Return(x) => x,
                     BlockReturnType::Void => &Type::Void,
                 },
             );
-            let is_variadic = args.is_variadic();
+            let is_variadic = arguments.is_variadic();
             let (fn_ty, _, fn_dbg_ty) = create_fn(
                 dbg_builder,
                 file,
                 ret,
                 ret_dbg,
-                &args
+                &arguments
                     .as_arguments()
                     .iter()
                     .map(|arg| {
@@ -292,7 +295,7 @@ pub fn llvm_type<'ctx>(
                             .into()
                     })
                     .collect::<Vec<_>>(),
-                &args
+                &arguments
                     .as_arguments()
                     .iter()
                     .map(|arg| {

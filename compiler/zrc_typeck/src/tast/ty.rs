@@ -12,6 +12,28 @@ use indexmap::IndexMap;
 use super::stmt::ArgumentDeclarationList;
 use crate::typeck::BlockReturnType;
 
+/// Data attached to a [`Type::Fn`]
+#[derive(Debug, Clone, PartialEq)]
+pub struct Fn<'input> {
+    /// The function's arguments
+    pub arguments: ArgumentDeclarationList<'input>,
+    /// The function's return type
+    pub returns: Box<BlockReturnType<'input>>,
+}
+impl<'input> Display for Fn<'input> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "(fn({}){})",
+            self.arguments,
+            match &*self.returns {
+                BlockReturnType::Return(ret) => format!(" -> {ret}"),
+                BlockReturnType::Void => String::new(),
+            }
+        )
+    }
+}
+
 /// The possible Zirco types
 #[derive(PartialEq, Debug, Clone)]
 pub enum Type<'input> {
@@ -45,10 +67,7 @@ pub enum Type<'input> {
     /// `*T`
     Ptr(Box<Type<'input>>),
     /// `fn(A, B) -> T`
-    Fn(
-        ArgumentDeclarationList<'input>,
-        Box<BlockReturnType<'input>>,
-    ),
+    Fn(Fn<'input>),
     /// Struct type literals. Ordered by declaration order.
     Struct(IndexMap<&'input str, Type<'input>>),
     /// Union type literals. Ordered by declaration order.
@@ -71,15 +90,7 @@ impl<'input> Display for Type<'input> {
             Self::Bool => write!(f, "bool"),
             Self::Ptr(pointee_ty) => write!(f, "*({pointee_ty})"),
             Self::Void => write!(f, "void"),
-            Self::Fn(args, brt) => write!(
-                f,
-                "(fn({}){})",
-                args,
-                match &**brt {
-                    BlockReturnType::Return(ret) => format!(" -> {ret}"),
-                    BlockReturnType::Void => String::new(),
-                }
-            ),
+            Self::Fn(fn_data) => write!(f, "{fn_data}"),
             Self::Struct(fields) => write!(
                 f,
                 "(struct {{ {} }})",
