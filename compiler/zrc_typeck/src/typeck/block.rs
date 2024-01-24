@@ -7,7 +7,11 @@ use zrc_parser::ast::stmt::{
 };
 use zrc_utils::span::{Span, Spannable, Spanned};
 
-use super::{resolve_type, type_expr, GlobalScope, Scope};
+use super::{
+    resolve_type,
+    scope::{GlobalScope, Scope},
+    type_expr,
+};
 use crate::tast::{
     self,
     expr::TypedExpr,
@@ -15,7 +19,7 @@ use crate::tast::{
         ArgumentDeclaration as TastArgumentDeclaration, LetDeclaration as TastLetDeclaration,
         TypedDeclaration, TypedStmt, TypedStmtKind,
     },
-    ty::{Fn, Type as TastType},
+    ty::{Fn, FunctionDeclarationGlobalMetadata, Type as TastType},
 };
 
 /// Describes whether a block returns void or a type.
@@ -331,7 +335,7 @@ pub fn process_declaration<'input>(
 
             global_scope.declarations.insert(
                 name.into_value(),
-                super::FunctionDeclarationGlobalMetadata {
+                FunctionDeclarationGlobalMetadata {
                     fn_type,
                     has_implementation: body.is_some() || has_existing_implementation,
                 },
@@ -1006,20 +1010,21 @@ mod tests {
     use zrc_utils::spanned;
 
     use super::*;
-    use crate::typeck::{FunctionDeclarationGlobalMetadata, TypeScope, ValueScope};
+    use crate::tast::ty::FunctionDeclarationGlobalMetadata;
+    use crate::typeck::scope::{TypeCtx, ValueCtx};
 
     #[test]
     fn re_declaration_works_as_expected() {
         assert!(process_declaration(
             &mut GlobalScope {
-                global_values: ValueScope::from([(
+                global_values: ValueCtx::from([(
                     "get_true",
                     TastType::Fn(Fn {
                         arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
                         returns: Box::new(BlockReturnType::Return(TastType::Bool))
                     })
                 )]),
-                types: TypeScope::from([("bool", TastType::Bool)]),
+                types: TypeCtx::from([("bool", TastType::Bool)]),
                 declarations: HashMap::from([(
                     "get_true",
                     FunctionDeclarationGlobalMetadata {

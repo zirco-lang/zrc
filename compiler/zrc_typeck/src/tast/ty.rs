@@ -34,11 +34,21 @@ impl<'input> Display for Fn<'input> {
     }
 }
 
+/// Auxillary data attached to a [`Fn`] in the [`crate::typeck::scope::GlobalScope`]
+#[derive(Debug)]
+pub struct FunctionDeclarationGlobalMetadata<'input> {
+    /// The corresponding [`Fn`] we wrap
+    pub fn_type: Fn<'input>,
+    /// If a declaration exists to implement this function
+    /// (Only one may exist)
+    pub has_implementation: bool,
+}
+
 /// The possible Zirco types
 #[derive(PartialEq, Debug, Clone)]
 pub enum Type<'input> {
     // WHENEVER ADDING NEW PRIMITIVES HERE, ADD THEM TO THE TYPE SCOPE IN
-    // [`zrc_typeck::typeck::Scope::default`].
+    // [`zrc_typeck::typeck::scope::TypeScope::new`].
     /// `i8`
     I8,
     /// `u8`

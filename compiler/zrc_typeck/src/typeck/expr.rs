@@ -4,7 +4,7 @@ use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
 use zrc_parser::ast::expr::{Arithmetic, Assignment, BinaryBitwise, Expr, ExprKind};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
-use super::Scope;
+use super::scope::Scope;
 use crate::{
     tast::{
         expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
@@ -797,7 +797,7 @@ mod tests {
 
     mod expr {
         use super::*;
-        use crate::typeck::GlobalScope;
+        use crate::typeck::scope::GlobalScope;
 
         #[test]
         fn sizeof_expr_works_as_expected() {
