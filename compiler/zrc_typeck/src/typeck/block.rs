@@ -606,6 +606,62 @@ pub fn type_block<'input>(
                                     },
                                 )))
                             }
+                            StmtKind::DoWhileStmt(body, cond) => {
+                                let cond_span = cond.0.span();
+                                let body_span = body.0.span();
+                                let typed_cond = type_expr(&scope, cond)?;
+
+                                if typed_cond.inferred_type != TastType::Bool {
+                                    return Err(Diagnostic(
+                                        Severity::Error,
+                                        cond_span.containing(DiagnosticKind::ExpectedGot {
+                                            expected: "bool".to_string(),
+                                            got: typed_cond.inferred_type.to_string(),
+                                        }),
+                                    ));
+                                }
+
+                                let (typed_body, body_return_actuality) = type_block(
+                                    &scope,
+                                    coerce_stmt_into_block(*body),
+                                    true,
+                                    // return ability of a sub-block is determined by this match:
+                                    match return_ability.clone() {
+                                        BlockReturnAbility::MustNotReturn => {
+                                            BlockReturnAbility::MustNotReturn
+                                        }
+                                        BlockReturnAbility::MustReturn(x)
+                                        | BlockReturnAbility::MayReturn(x) => {
+                                            BlockReturnAbility::MayReturn(x)
+                                        }
+                                    },
+                                )?;
+
+                                Ok(Some((
+                                    TypedStmt(
+                                        TypedStmtKind::DoWhileStmt(
+                                            typed_body.in_span(body_span),
+                                            typed_cond,
+                                        )
+                                        .in_span(stmt_span),
+                                    ),
+                                    match body_return_actuality {
+                                        BlockReturnActuality::DoesNotReturn => {
+                                            BlockReturnActuality::DoesNotReturn
+                                        }
+
+                                        // In a `do..while` loop, there is a GUARENTEE that the
+                                        // body will run at least once. For this reason,
+                                        // we map WillReturn to WillReturn unlike `for` and `while`.
+                                        BlockReturnActuality::MightReturn => {
+                                            BlockReturnActuality::MightReturn
+                                        }
+                                        BlockReturnActuality::WillReturn => {
+                                            BlockReturnActuality::WillReturn
+                                        }
+                                    },
+                                )))
+                            }
                             StmtKind::ForStmt {
                                 init,
                                 cond,

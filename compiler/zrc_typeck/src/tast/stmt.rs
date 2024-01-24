@@ -48,6 +48,8 @@ pub enum TypedStmtKind<'input> {
     ),
     /// `while (x) y`
     WhileStmt(TypedExpr<'input>, Spanned<Vec<TypedStmt<'input>>>),
+    /// `do x while (y)`
+    DoWhileStmt(Spanned<Vec<TypedStmt<'input>>>, TypedExpr<'input>),
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
@@ -128,6 +130,20 @@ impl<'input> Display for TypedStmtKind<'input> {
             Self::WhileStmt(cond, body) => write!(
                 f,
                 "while ({cond}) {{\n{}\n}}",
+                body.value()
+                    .iter()
+                    .map(|stmt| stmt
+                        .to_string()
+                        .split('\n')
+                        .map(|x| format!("    {x}"))
+                        .collect::<Vec<_>>()
+                        .join("\n"))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            ),
+            Self::DoWhileStmt(body, cond) => write!(
+                f,
+                "do {{\n{}\n}} while ({cond})",
                 body.value()
                     .iter()
                     .map(|stmt| stmt

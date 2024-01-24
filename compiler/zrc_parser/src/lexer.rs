@@ -390,6 +390,9 @@ pub enum Tok<'input> {
     /// The keyword `while`
     #[token("while")]
     While,
+    /// The keyword `do`
+    #[token("do")]
+    Do,
     /// The keyword `for`
     #[token("for")]
     For,
@@ -530,6 +533,7 @@ impl<'input> Display for Tok<'input> {
                 Self::LessEq => "<=".to_string(),
                 Self::Identifier(i) => (*i).to_string(),
                 Self::Ellipsis => "...".to_string(),
+                Self::Do => "do".to_string(),
             }
         )
     }
@@ -673,7 +677,7 @@ mod tests {
     fn all_tokens_lex_and_display_correctly() {
         let input = concat!(
             "+ - * / % == != > >= < <= && || ! & | ^ ~ << >> = += -= *= /= %= &= |= ^= <<= >>= ; ,",
-            " . : :: ? ( ) [ ] { } true false if else while for break continue return let fn as",
+            " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
             r#" struct union sizeof type -> "str" 7_000 0xF_A 0b1_0 abc"#
         );
         let tokens: Vec<Tok> = vec![
@@ -725,6 +729,7 @@ mod tests {
             Tok::If,
             Tok::Else,
             Tok::While,
+            Tok::Do,
             Tok::For,
             Tok::Break,
             Tok::Continue,
