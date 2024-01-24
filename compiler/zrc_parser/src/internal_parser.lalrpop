@@ -32,6 +32,7 @@ CommaSeparated<T>: Vec<T> = {
     }
 };
 
+#[inline]
 CommaSeparatedWithoutTrailing<T>: Vec<T> = {
     <e:T> <mut v:("," <T>)*> => {
         let mut new = vec![e];
@@ -55,6 +56,7 @@ OpenStmt: StmtKind<'input> = {
     "if" "(" <a:Expr> ")" <b:SpannedStmt<ClosedStmt>> "else" <c:SpannedStmt<OpenStmt>> => 
         StmtKind::IfStmt(a, Box::new(b), Some(Box::new(c))),
     "while" "(" <a:Expr> ")" <b:SpannedStmt<OpenStmt>> => StmtKind::WhileStmt(a, Box::new(b)),
+    "do" <b:SpannedStmt<OpenStmt>> "while" "(" <a:Expr> ")" ";" => StmtKind::DoWhileStmt(Box::new(b), a),
     "for" "(" <a:Spanned<LetDeclaration>> <b:Expr?> ";" <c:Expr?> ")" <d:SpannedStmt<OpenStmt>> => StmtKind::ForStmt {
         init: Some(Box::new(a)),
         cond: b,
@@ -75,6 +77,7 @@ ClosedStmt: StmtKind<'input> = {
     "if" "(" <a:Expr> ")" <b:SpannedStmt<ClosedStmt>> "else" <c:SpannedStmt<ClosedStmt>> =>
         StmtKind::IfStmt(a, Box::new(b), Some(Box::new(c))),
     "while" "(" <a:Expr> ")" <b:SpannedStmt<ClosedStmt>> => StmtKind::WhileStmt(a, Box::new(b)),
+    "do" <b:SpannedStmt<ClosedStmt>> "while" "(" <a:Expr> ")" ";" => StmtKind::DoWhileStmt(Box::new(b), a),
     "for" "(" <a:Spanned<LetDeclaration>> <b:Expr?> ";" <c:Expr?> ")" <d:SpannedStmt<ClosedStmt>> => StmtKind::ForStmt {
         init: Some(Box::new(a)),
         cond: b,
@@ -146,7 +149,7 @@ StructOrUnionDeclaration: Declaration<'input> = {
 
 ArgumentDeclarationList: ArgumentDeclarationList<'input> = {
     <CommaSeparated<Spanned<ArgumentDeclaration>>> => ArgumentDeclarationList::NonVariadic(<>),
-    <CommaSeparated<Spanned<ArgumentDeclaration>>> "," "..." => ArgumentDeclarationList::Variadic(<>),
+    <CommaSeparatedWithoutTrailing<Spanned<ArgumentDeclaration>>> "," "..." => ArgumentDeclarationList::Variadic(<>),
 };
 
 ArgumentDeclaration: ArgumentDeclaration<'input> = {
@@ -388,6 +391,7 @@ extern {
         "if" => lexer::Tok::If,
         "else" => lexer::Tok::Else,
         "while" => lexer::Tok::While,
+        "do" => lexer::Tok::Do,
         "for" => lexer::Tok::For,
         "break" => lexer::Tok::Break,
         "continue" => lexer::Tok::Continue,

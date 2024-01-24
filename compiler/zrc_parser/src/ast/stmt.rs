@@ -30,6 +30,8 @@ pub enum StmtKind<'input> {
     IfStmt(Expr<'input>, Box<Stmt<'input>>, Option<Box<Stmt<'input>>>),
     /// `while (x) y`
     WhileStmt(Expr<'input>, Box<Stmt<'input>>),
+    /// `do x while (y)`
+    DoWhileStmt(Box<Stmt<'input>>, Expr<'input>),
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
@@ -67,6 +69,7 @@ impl<'input> Display for StmtKind<'input> {
                 write!(f, "if ({cond}) {if_true} else {if_false}")
             }
             Self::WhileStmt(cond, body) => write!(f, "while ({cond}) {body}"),
+            Self::DoWhileStmt(body, cond) => write!(f, "do {body} while ({cond})"),
             Self::ForStmt {
                 init,
                 cond,

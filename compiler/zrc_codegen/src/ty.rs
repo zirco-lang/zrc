@@ -88,6 +88,7 @@ pub fn create_fn<'ctx>(
 pub fn llvm_int_type<'ctx>(
     dbg_builder: &DebugInfoBuilder<'ctx>,
     ctx: &'ctx Context,
+    target_machine: &TargetMachine,
     ty: &Type,
 ) -> (IntType<'ctx>, DIBasicType<'ctx>) {
     (
@@ -97,6 +98,10 @@ pub fn llvm_int_type<'ctx>(
             Type::I16 | Type::U16 => ctx.i16_type(),
             Type::I32 | Type::U32 => ctx.i32_type(),
             Type::I64 | Type::U64 => ctx.i64_type(),
+            Type::Usize | Type::Isize => ctx.ptr_sized_int_type(
+                &target_machine.get_target_data(),
+                Some(AddressSpace::default()),
+            ),
             Type::Void | Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
                 panic!("not an integer type")
             }
@@ -128,8 +133,10 @@ pub fn llvm_basic_type<'ctx>(
         | Type::I32
         | Type::U32
         | Type::I64
-        | Type::U64 => {
-            let (ty, dbg_ty) = llvm_int_type(dbg_builder, ctx, ty);
+        | Type::U64
+        | Type::Usize
+        | Type::Isize => {
+            let (ty, dbg_ty) = llvm_int_type(dbg_builder, ctx, target_machine, ty);
             (ty.as_basic_type_enum(), dbg_ty.as_type())
         }
         Type::Void => panic!("void is not a basic type"),
@@ -245,6 +252,8 @@ pub fn llvm_type<'ctx>(
         | Type::U32
         | Type::I64
         | Type::U64
+        | Type::Usize
+        | Type::Isize
         | Type::Ptr(_)
         | Type::Struct(_)
         | Type::Union(_) => {
