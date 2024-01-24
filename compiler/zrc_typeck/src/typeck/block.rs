@@ -73,7 +73,8 @@ pub enum BlockReturnAbility<'input> {
     MustReturn(BlockReturnType<'input>),
 }
 impl<'input> BlockReturnAbility<'input> {
-    /// Determine the [`BlockReturnAbility`] of a sub-scope. `MustReturn` become`MayReturn`.
+    /// Determine the [`BlockReturnAbility`] of a sub-scope. `MustReturn`
+    /// become`MayReturn`.
     #[must_use]
     pub fn demote(self) -> Self {
         match self {
@@ -105,8 +106,8 @@ pub enum BlockReturnActuality {
     AlwaysReturns,
 }
 impl BlockReturnActuality {
-    /// Determine the [`BlockReturnActuality`] if a code path is not always guaranteed to execute.
-    /// `AlwaysReturns` becomes `SometimesReturns`.
+    /// Determine the [`BlockReturnActuality`] if a code path is not always
+    /// guaranteed to execute. `AlwaysReturns` becomes `SometimesReturns`.
     #[must_use]
     pub const fn demote(self) -> Self {
         match self {
@@ -115,9 +116,10 @@ impl BlockReturnActuality {
         }
     }
 
-    /// Take two [`BlockReturnActuality`] instances corresponding to two different code paths: one
-    /// or the other may execute (not neither and not both). Determine the [`BlockReturnActuality`]
-    /// of this compound statement.
+    /// Take two [`BlockReturnActuality`] instances corresponding to two
+    /// different code paths: one or the other may execute (not neither and
+    /// not both). Determine the [`BlockReturnActuality`] of this compound
+    /// statement.
     ///
     /// Never + Never => Never
     /// Never + Sometimes => Sometimes
