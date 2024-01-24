@@ -72,6 +72,16 @@ pub enum BlockReturnAbility<'input> {
     /// Any sub-blocks of this block MAY return. At least one MUST return.
     MustReturn(BlockReturnType<'input>),
 }
+impl<'input> BlockReturnAbility<'input> {
+    /// Determine the [`BlockReturnAbility`] of a sub-scope. `MustReturn` become`MayReturn`.
+    #[must_use]
+    pub fn demote(self) -> Self {
+        match self {
+            Self::MustNotReturn => Self::MustNotReturn,
+            Self::MayReturn(x) | Self::MustReturn(x) => Self::MayReturn(x),
+        }
+    }
+}
 
 /// Describes if a block labeled [MAY return](BlockReturnAbility::MayReturn)
 /// actually returns.
@@ -80,19 +90,59 @@ pub enum BlockReturnAbility<'input> {
 /// return](BlockReturnAbility::MustReturn) when a block contains a nested block
 /// (because the outer block must have at least *one* path which is guaranteed
 /// to return)
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 #[allow(clippy::module_name_repetitions)]
 pub enum BlockReturnActuality {
     /// The block is guaranteed to never return on any path.
-    DoesNotReturn,
+    NeverReturns,
 
     /// The block will return on some paths but not all. In some cases, this may
     /// be selected even if the block will always return, as it is sometimes
     /// unknown.
-    MightReturn,
+    SometimesReturns,
 
     /// The block is guaranteed to return on any path.
-    WillReturn,
+    AlwaysReturns,
+}
+impl BlockReturnActuality {
+    /// Determine the [`BlockReturnActuality`] if a code path is not always guaranteed to execute.
+    /// `AlwaysReturns` becomes `SometimesReturns`.
+    #[must_use]
+    pub const fn demote(self) -> Self {
+        match self {
+            Self::NeverReturns => Self::NeverReturns,
+            Self::SometimesReturns | Self::AlwaysReturns => Self::SometimesReturns,
+        }
+    }
+
+    /// Take two [`BlockReturnActuality`] instances corresponding to two different code paths: one
+    /// or the other may execute (not neither and not both). Determine the [`BlockReturnActuality`]
+    /// of this compound statement.
+    ///
+    /// Never + Never => Never
+    /// Never + Sometimes => Sometimes
+    /// Never + Always => Sometimes
+    /// Sometimes + Sometimes => Sometimes
+    /// Sometimes + Always => Sometimes
+    /// Always + Always => Always
+    #[must_use]
+    #[allow(clippy::min_ident_chars)]
+    pub const fn join(a: Self, b: Self) -> Self {
+        match (a, b) {
+            (Self::NeverReturns, Self::NeverReturns) => Self::NeverReturns,
+
+            (
+                Self::NeverReturns | Self::SometimesReturns,
+                Self::SometimesReturns | Self::AlwaysReturns,
+            )
+            | (
+                Self::SometimesReturns | Self::AlwaysReturns,
+                Self::NeverReturns | Self::SometimesReturns,
+            ) => Self::SometimesReturns,
+
+            (Self::AlwaysReturns, Self::AlwaysReturns) => Self::AlwaysReturns,
+        }
+    }
 }
 
 /// Convert a single [AST statement](Stmt) like `x;` to a block statement `{ x;
@@ -440,7 +490,7 @@ pub fn type_block<'input, 'gs>(
                             StmtKind::EmptyStmt => Ok(None),
                             StmtKind::BreakStmt if can_use_break_continue => Ok(Some((
                                 TypedStmt(TypedStmtKind::BreakStmt.in_span(stmt_span)),
-                                BlockReturnActuality::DoesNotReturn,
+                                BlockReturnActuality::NeverReturns,
                             ))),
                             StmtKind::BreakStmt => {
                                 Err(DiagnosticKind::CannotUseBreakOutsideOfLoop.error_in(stmt_span))
@@ -448,7 +498,7 @@ pub fn type_block<'input, 'gs>(
 
                             StmtKind::ContinueStmt if can_use_break_continue => Ok(Some((
                                 TypedStmt(TypedStmtKind::ContinueStmt.in_span(stmt_span)),
-                                BlockReturnActuality::DoesNotReturn,
+                                BlockReturnActuality::NeverReturns,
                             ))),
                             StmtKind::ContinueStmt => {
                                 Err(DiagnosticKind::CannotUseContinueOutsideOfLoop
@@ -463,9 +513,9 @@ pub fn type_block<'input, 'gs>(
                                     )?)
                                     .in_span(stmt_span),
                                 ),
-                                BlockReturnActuality::DoesNotReturn, /* because expressions
-                                                                      * can't
-                                                                      * return */
+                                BlockReturnActuality::NeverReturns, /* because expressions
+                                                                     * can't
+                                                                     * return */
                             ))),
 
                             StmtKind::IfStmt(cond, then, then_else) => {
@@ -492,16 +542,7 @@ pub fn type_block<'input, 'gs>(
                                     &scope,
                                     coerce_stmt_into_block(*then),
                                     can_use_break_continue,
-                                    // return ability of a sub-block is determined by this match:
-                                    match return_ability.clone() {
-                                        BlockReturnAbility::MustNotReturn => {
-                                            BlockReturnAbility::MustNotReturn
-                                        }
-                                        BlockReturnAbility::MustReturn(x)
-                                        | BlockReturnAbility::MayReturn(x) => {
-                                            BlockReturnAbility::MayReturn(x)
-                                        }
-                                    },
+                                    return_ability.clone().demote(),
                                 )?;
 
                                 let (typed_then_else, then_else_return_actuality) = then_else
@@ -511,17 +552,7 @@ pub fn type_block<'input, 'gs>(
                                             &scope,
                                             coerce_stmt_into_block(*then_else),
                                             can_use_break_continue,
-                                            // return ability of a sub-block is determined by this
-                                            // match:
-                                            match return_ability.clone() {
-                                                BlockReturnAbility::MustNotReturn => {
-                                                    BlockReturnAbility::MustNotReturn
-                                                }
-                                                BlockReturnAbility::MustReturn(x)
-                                                | BlockReturnAbility::MayReturn(x) => {
-                                                    BlockReturnAbility::MayReturn(x)
-                                                }
-                                            },
+                                            return_ability.clone().demote(),
                                         )
                                     })
                                     .transpose()?
@@ -542,32 +573,11 @@ pub fn type_block<'input, 'gs>(
                                         )
                                         .in_span(stmt_span),
                                     ),
-                                    match (
+                                    BlockReturnActuality::join(
                                         then_return_actuality,
                                         then_else_return_actuality
-                                            .unwrap_or(BlockReturnActuality::DoesNotReturn),
-                                    ) {
-                                        (
-                                            BlockReturnActuality::DoesNotReturn,
-                                            BlockReturnActuality::DoesNotReturn,
-                                        ) => BlockReturnActuality::DoesNotReturn,
-                                        (
-                                            BlockReturnActuality::DoesNotReturn,
-                                            BlockReturnActuality::WillReturn,
-                                        )
-                                        | (
-                                            BlockReturnActuality::WillReturn,
-                                            BlockReturnActuality::DoesNotReturn,
-                                        )
-                                        | (BlockReturnActuality::MightReturn, _)
-                                        | (_, BlockReturnActuality::MightReturn) => {
-                                            BlockReturnActuality::MightReturn
-                                        }
-                                        (
-                                            BlockReturnActuality::WillReturn,
-                                            BlockReturnActuality::WillReturn,
-                                        ) => BlockReturnActuality::WillReturn,
-                                    },
+                                            .unwrap_or(BlockReturnActuality::NeverReturns),
+                                    ),
                                 )))
                             }
                             StmtKind::WhileStmt(cond, body) => {
@@ -591,16 +601,7 @@ pub fn type_block<'input, 'gs>(
                                     &scope,
                                     coerce_stmt_into_block(*body),
                                     true,
-                                    // return ability of a sub-block is determined by this match:
-                                    match return_ability.clone() {
-                                        BlockReturnAbility::MustNotReturn => {
-                                            BlockReturnAbility::MustNotReturn
-                                        }
-                                        BlockReturnAbility::MustReturn(x)
-                                        | BlockReturnAbility::MayReturn(x) => {
-                                            BlockReturnAbility::MayReturn(x)
-                                        }
-                                    },
+                                    return_ability.clone().demote(),
                                 )?;
 
                                 Ok(Some((
@@ -611,18 +612,7 @@ pub fn type_block<'input, 'gs>(
                                         )
                                         .in_span(stmt_span),
                                     ),
-                                    match body_return_actuality {
-                                        BlockReturnActuality::DoesNotReturn => {
-                                            BlockReturnActuality::DoesNotReturn
-                                        }
-
-                                        // in case the loop does not run at all or runs infinitely,
-                                        // WillReturn counts too
-                                        BlockReturnActuality::MightReturn
-                                        | BlockReturnActuality::WillReturn => {
-                                            BlockReturnActuality::MightReturn
-                                        }
-                                    },
+                                    body_return_actuality.demote(),
                                 )))
                             }
                             StmtKind::DoWhileStmt(body, cond) => {
@@ -642,16 +632,7 @@ pub fn type_block<'input, 'gs>(
                                     &scope,
                                     coerce_stmt_into_block(*body),
                                     true,
-                                    // return ability of a sub-block is determined by this match:
-                                    match return_ability.clone() {
-                                        BlockReturnAbility::MustNotReturn => {
-                                            BlockReturnAbility::MustNotReturn
-                                        }
-                                        BlockReturnAbility::MustReturn(x)
-                                        | BlockReturnAbility::MayReturn(x) => {
-                                            BlockReturnAbility::MayReturn(x)
-                                        }
-                                    },
+                                    return_ability.clone().demote(),
                                 )?;
 
                                 Ok(Some((
@@ -662,21 +643,9 @@ pub fn type_block<'input, 'gs>(
                                         )
                                         .in_span(stmt_span),
                                     ),
-                                    match body_return_actuality {
-                                        BlockReturnActuality::DoesNotReturn => {
-                                            BlockReturnActuality::DoesNotReturn
-                                        }
-
-                                        // In a `do..while` loop, there is a GUARENTEE that the
-                                        // body will run at least once. For this reason,
-                                        // we map WillReturn to WillReturn unlike `for` and `while`.
-                                        BlockReturnActuality::MightReturn => {
-                                            BlockReturnActuality::MightReturn
-                                        }
-                                        BlockReturnActuality::WillReturn => {
-                                            BlockReturnActuality::WillReturn
-                                        }
-                                    },
+                                    // Unlike `while`, a `do..while` loop is guaranteed to run at
+                                    // least once. For this reason, we do not need to `demote` it.
+                                    body_return_actuality,
                                 )))
                             }
                             StmtKind::ForStmt {
@@ -730,16 +699,7 @@ pub fn type_block<'input, 'gs>(
                                     &loop_scope,
                                     body_as_block,
                                     true,
-                                    // return ability of a sub-block is determined by this match:
-                                    match return_ability.clone() {
-                                        BlockReturnAbility::MustNotReturn => {
-                                            BlockReturnAbility::MustNotReturn
-                                        }
-                                        BlockReturnAbility::MustReturn(x)
-                                        | BlockReturnAbility::MayReturn(x) => {
-                                            BlockReturnAbility::MayReturn(x)
-                                        }
-                                    },
+                                    return_ability.clone().demote(),
                                 )?;
 
                                 Ok(Some((
@@ -752,18 +712,7 @@ pub fn type_block<'input, 'gs>(
                                         }
                                         .in_span(stmt_span),
                                     ),
-                                    match body_return_actuality {
-                                        BlockReturnActuality::DoesNotReturn => {
-                                            BlockReturnActuality::DoesNotReturn
-                                        }
-
-                                        // in case the loop does not run at all or runs infinitely,
-                                        // WillReturn counts too
-                                        BlockReturnActuality::MightReturn
-                                        | BlockReturnActuality::WillReturn => {
-                                            BlockReturnActuality::MightReturn
-                                        }
-                                    },
+                                    body_return_actuality.demote(),
                                 )))
                             }
 
@@ -772,16 +721,7 @@ pub fn type_block<'input, 'gs>(
                                     &scope,
                                     body.in_span(stmt_span),
                                     can_use_break_continue,
-                                    // return ability of a sub-block is determined by this match:
-                                    match return_ability.clone() {
-                                        BlockReturnAbility::MustNotReturn => {
-                                            BlockReturnAbility::MustNotReturn
-                                        }
-                                        BlockReturnAbility::MustReturn(x)
-                                        | BlockReturnAbility::MayReturn(x) => {
-                                            BlockReturnAbility::MayReturn(x)
-                                        }
-                                    },
+                                    return_ability.clone().demote(),
                                 )?;
                                 Ok(Some((
                                     TypedStmt(
@@ -796,7 +736,7 @@ pub fn type_block<'input, 'gs>(
                                     TypedStmtKind::ExprStmt(type_expr(&scope, expr)?)
                                         .in_span(stmt_span),
                                 ),
-                                BlockReturnActuality::DoesNotReturn,
+                                BlockReturnActuality::NeverReturns,
                             ))),
                             StmtKind::ReturnStmt(value) => {
                                 let value_span = value.as_ref().map(|inner| inner.0.span());
@@ -817,7 +757,7 @@ pub fn type_block<'input, 'gs>(
                                         TypedStmt(
                                             TypedStmtKind::ReturnStmt(None).in_span(stmt_span),
                                         ),
-                                        BlockReturnActuality::WillReturn,
+                                        BlockReturnActuality::AlwaysReturns,
                                     ))),
 
                                     // return; in fn with required return type
@@ -868,7 +808,7 @@ pub fn type_block<'input, 'gs>(
                                                     }))
                                                     .in_span(stmt_span),
                                                 ),
-                                                BlockReturnActuality::WillReturn,
+                                                BlockReturnActuality::AlwaysReturns,
                                             )))
                                         } else {
                                             Err(Diagnostic(
@@ -897,53 +837,53 @@ pub fn type_block<'input, 'gs>(
     let might_return = return_actualities.iter().any(|x| {
         matches!(
             x,
-            BlockReturnActuality::MightReturn | BlockReturnActuality::WillReturn
+            BlockReturnActuality::SometimesReturns | BlockReturnActuality::AlwaysReturns
         )
     });
     let will_return = return_actualities
         .iter()
-        .any(|x| matches!(x, BlockReturnActuality::WillReturn));
+        .any(|x| matches!(x, BlockReturnActuality::AlwaysReturns));
 
     let return_actuality = match (might_return, will_return) {
-        (_, true) => BlockReturnActuality::WillReturn,
-        (true, false) => BlockReturnActuality::MightReturn,
-        (false, false) => BlockReturnActuality::DoesNotReturn,
+        (_, true) => BlockReturnActuality::AlwaysReturns,
+        (true, false) => BlockReturnActuality::SometimesReturns,
+        (false, false) => BlockReturnActuality::NeverReturns,
     };
 
     match (return_ability, return_actuality) {
         (
             BlockReturnAbility::MustNotReturn | BlockReturnAbility::MayReturn(_),
-            BlockReturnActuality::DoesNotReturn,
-        ) => Ok(BlockReturnActuality::DoesNotReturn),
+            BlockReturnActuality::NeverReturns,
+        ) => Ok(BlockReturnActuality::NeverReturns),
 
-        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::MightReturn) => {
-            Ok(BlockReturnActuality::MightReturn)
+        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::SometimesReturns) => {
+            Ok(BlockReturnActuality::SometimesReturns)
         }
 
         (
             BlockReturnAbility::MustReturn(_) | BlockReturnAbility::MayReturn(_),
-            BlockReturnActuality::WillReturn,
-        ) => Ok(BlockReturnActuality::WillReturn),
+            BlockReturnActuality::AlwaysReturns,
+        ) => Ok(BlockReturnActuality::AlwaysReturns),
 
         (
             BlockReturnAbility::MustReturn(BlockReturnType::Void),
-            BlockReturnActuality::MightReturn | BlockReturnActuality::DoesNotReturn,
+            BlockReturnActuality::SometimesReturns | BlockReturnActuality::NeverReturns,
         ) => {
             tast_block.push(TypedStmt(TypedStmtKind::ReturnStmt(None).in_span(
                 Span::from_positions(input_block_span.end() - 1, input_block_span.end()),
             )));
 
-            Ok(BlockReturnActuality::WillReturn)
+            Ok(BlockReturnActuality::AlwaysReturns)
         }
 
         (
             BlockReturnAbility::MustReturn(_),
-            BlockReturnActuality::MightReturn | BlockReturnActuality::DoesNotReturn,
+            BlockReturnActuality::SometimesReturns | BlockReturnActuality::NeverReturns,
         ) => Err(DiagnosticKind::ExpectedABlockToReturn.error_in(input_block_span)),
 
         (
             BlockReturnAbility::MustNotReturn,
-            BlockReturnActuality::MightReturn | BlockReturnActuality::WillReturn,
+            BlockReturnActuality::SometimesReturns | BlockReturnActuality::AlwaysReturns,
         ) => {
             panic!(concat!(
                 "block must not return, but a sub-block may return",
