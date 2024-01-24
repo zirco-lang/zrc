@@ -1,6 +1,6 @@
 //! for expressions
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpanExt};
 use zrc_parser::ast::expr::{Arithmetic, Assignment, BinaryBitwise, Expr, ExprKind};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
@@ -66,12 +66,7 @@ fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, Diagnostic> {
             inferred_type: expr.inferred_type,
             kind: PlaceKind::Dot(x, y).in_span(kind_span),
         },
-        _ => {
-            return Err(Diagnostic(
-                Severity::Error,
-                span.containing(DiagnosticKind::NotAnLvalue(stringified)),
-            ))
-        }
+        _ => return Err(span.error(DiagnosticKind::NotAnLvalue(stringified))),
     })
 }
 
@@ -84,13 +79,7 @@ fn expect_identical_types<'a, 'input>(
     if lhs == rhs {
         Ok(())
     } else {
-        Err(Diagnostic(
-            Severity::Error,
-            span.containing(DiagnosticKind::ExpectedSameType(
-                lhs.to_string(),
-                rhs.to_string(),
-            )),
-        ))
+        Err(DiagnosticKind::ExpectedSameType(lhs.to_string(), rhs.to_string()).error_in(span))
     }
 }
 
@@ -105,13 +94,11 @@ fn expect(
     if condition {
         Ok(())
     } else {
-        Err(Diagnostic(
-            Severity::Error,
-            span.containing(DiagnosticKind::ExpectedGot {
-                expected: expected_str,
-                got: got_str,
-            }),
-        ))
+        Err(DiagnosticKind::ExpectedGot {
+            expected: expected_str,
+            got: got_str,
+        }
+        .error_in(span))
     }
 }
 
@@ -171,13 +158,11 @@ pub fn type_expr<'input>(
             let value_t = type_expr(scope, value)?;
 
             if place_t.inferred_type != value_t.inferred_type {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::InvalidAssignmentRightHandSideType {
-                        expected: place_t.inferred_type.to_string(),
-                        got: value_t.inferred_type.to_string(),
-                    }),
-                ));
+                return Err(DiagnosticKind::InvalidAssignmentRightHandSideType {
+                    expected: place_t.inferred_type.to_string(),
+                    got: value_t.inferred_type.to_string(),
+                }
+                .error_in(expr_span));
             }
 
             TypedExpr {
@@ -241,12 +226,10 @@ pub fn type_expr<'input>(
                     kind: TypedExprKind::UnaryDereference(Box::new(x_ty)).in_span(expr_span),
                 }
             } else {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::CannotDereferenceNonPointer(
-                        x_ty.inferred_type.to_string(),
-                    )),
-                ));
+                return Err(DiagnosticKind::CannotDereferenceNonPointer(
+                    x_ty.inferred_type.to_string(),
+                )
+                .error_in(expr_span));
             }
         }
 
@@ -268,12 +251,10 @@ pub fn type_expr<'input>(
                         .in_span(expr_span),
                 }
             } else {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::CannotIndexIntoNonPointer(
-                        ptr_t.inferred_type.to_string(),
-                    )),
-                ));
+                return Err(DiagnosticKind::CannotIndexIntoNonPointer(
+                    ptr_t.inferred_type.to_string(),
+                )
+                .error_in(expr_span));
             }
         }
 
@@ -290,21 +271,17 @@ pub fn type_expr<'input>(
                             .in_span(expr_span),
                     }
                 } else {
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        expr_span.containing(DiagnosticKind::StructOrUnionDoesNotHaveMember(
-                            obj_t.to_string(),
-                            key.into_value().to_string(),
-                        )),
-                    ));
+                    return Err(DiagnosticKind::StructOrUnionDoesNotHaveMember(
+                        obj_t.to_string(),
+                        key.into_value().to_string(),
+                    )
+                    .error_in(expr_span));
                 }
             } else {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::StructMemberAccessOnNonStruct(
-                        obj_t.to_string(),
-                    )),
-                ));
+                return Err(
+                    DiagnosticKind::StructMemberAccessOnNonStruct(obj_t.to_string())
+                        .error_in(expr_span),
+                );
             }
         }
         ExprKind::Arrow(obj, key) => {
@@ -324,12 +301,10 @@ pub fn type_expr<'input>(
                     )),
                 )?
             } else {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::CannotDereferenceNonPointer(
-                        obj_t.to_string(),
-                    )),
-                ));
+                return Err(
+                    DiagnosticKind::CannotDereferenceNonPointer(obj_t.to_string())
+                        .error_in(expr_span),
+                );
             }
         }
         ExprKind::Call(f, args) => {
@@ -348,26 +323,21 @@ pub fn type_expr<'input>(
                     returns: ret_type,
                 }) => {
                     if arg_types.len() != args_t.len() {
-                        return Err(Diagnostic(
-                            Severity::Error,
-                            expr_span.containing(DiagnosticKind::FunctionArgumentCountMismatch {
-                                expected: arg_types.len().to_string(),
-                                got: args_t.len().to_string(),
-                            }),
-                        ));
+                        return Err(DiagnosticKind::FunctionArgumentCountMismatch {
+                            expected: arg_types.len().to_string(),
+                            got: args_t.len().to_string(),
+                        }
+                        .error_in(expr_span));
                     }
 
                     for (i, (arg_type, arg_t)) in arg_types.iter().zip(args_t.iter()).enumerate() {
                         if *arg_type.ty.value() != arg_t.inferred_type {
-                            return Err(Diagnostic(
-                                Severity::Error,
-                                args.value()[i].0.span().containing(
-                                    DiagnosticKind::FunctionArgumentTypeMismatch {
-                                        n: i,
-                                        expected: arg_type.to_string(),
-                                        got: arg_t.inferred_type.to_string(),
-                                    },
-                                ),
+                            return Err(args.value()[i].0.span().error(
+                                DiagnosticKind::FunctionArgumentTypeMismatch {
+                                    n: i,
+                                    expected: arg_type.to_string(),
+                                    got: arg_t.inferred_type.to_string(),
+                                },
                             ));
                         }
                     }
@@ -383,28 +353,23 @@ pub fn type_expr<'input>(
                     returns: ret_type,
                 }) => {
                     if beginning_arg_types.len() > args_t.len() {
-                        return Err(Diagnostic(
-                            Severity::Error,
-                            expr_span.containing(DiagnosticKind::FunctionArgumentCountMismatch {
-                                expected: format!("at least {}", beginning_arg_types.len()),
-                                got: args_t.len().to_string(),
-                            }),
-                        ));
+                        return Err(DiagnosticKind::FunctionArgumentCountMismatch {
+                            expected: format!("at least {}", beginning_arg_types.len()),
+                            got: args_t.len().to_string(),
+                        }
+                        .error_in(expr_span));
                     }
 
                     for (i, (arg_type, arg_t)) in
                         beginning_arg_types.iter().zip(args_t.iter()).enumerate()
                     {
                         if *arg_type.ty.value() != arg_t.inferred_type {
-                            return Err(Diagnostic(
-                                Severity::Error,
-                                args.value()[i].0.span().containing(
-                                    DiagnosticKind::FunctionArgumentTypeMismatch {
-                                        n: i,
-                                        expected: arg_type.to_string(),
-                                        got: arg_t.inferred_type.to_string(),
-                                    },
-                                ),
+                            return Err(args.value()[i].0.span().error(
+                                DiagnosticKind::FunctionArgumentTypeMismatch {
+                                    n: i,
+                                    expected: arg_type.to_string(),
+                                    got: arg_t.inferred_type.to_string(),
+                                },
                             ));
                         }
                     }
@@ -417,10 +382,9 @@ pub fn type_expr<'input>(
                     }
                 }
                 _ => {
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        expr_span.containing(DiagnosticKind::CannotCallNonFunction(ft.to_string())),
-                    ));
+                    return Err(
+                        DiagnosticKind::CannotCallNonFunction(ft.to_string()).error_in(expr_span)
+                    );
                 }
             }
         }
@@ -496,13 +460,11 @@ pub fn type_expr<'input>(
             {
                 // bool == bool is valid
             } else {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::EqualityOperators(
-                        lhs_t.inferred_type.to_string(),
-                        rhs_t.inferred_type.to_string(),
-                    )),
-                ));
+                return Err(DiagnosticKind::EqualityOperators(
+                    lhs_t.inferred_type.to_string(),
+                    rhs_t.inferred_type.to_string(),
+                )
+                .error_in(expr_span));
             }
 
             TypedExpr {
@@ -562,12 +524,10 @@ pub fn type_expr<'input>(
                     op,
                     Arithmetic::Division | Arithmetic::Multiplication | Arithmetic::Modulo
                 ) {
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        lhs_span.containing(DiagnosticKind::InvalidPointerArithmeticOperation(
-                            op.to_string(),
-                        )),
-                    ));
+                    return Err(
+                        DiagnosticKind::InvalidPointerArithmeticOperation(op.to_string())
+                            .error_in(lhs_span),
+                    );
                 }
 
                 expect(
@@ -607,24 +567,20 @@ pub fn type_expr<'input>(
                 if x_t.inferred_type.is_integer() || resolved_ty.is_integer() {
                     // *T -> int or int -> *T cast is valid
                 } else {
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        expr_span.containing(DiagnosticKind::InvalidCast(
-                            x_t.inferred_type.to_string(),
-                            resolved_ty.to_string(),
-                        )),
-                    ));
+                    return Err(DiagnosticKind::InvalidCast(
+                        x_t.inferred_type.to_string(),
+                        resolved_ty.to_string(),
+                    )
+                    .error_in(expr_span));
                 }
             } else if x_t.inferred_type == TastType::Bool && resolved_ty.is_integer() {
                 // bool -> int cast is valid
             } else {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::InvalidCast(
-                        x_t.inferred_type.to_string(),
-                        resolved_ty.to_string(),
-                    )),
-                ));
+                return Err(DiagnosticKind::InvalidCast(
+                    x_t.inferred_type.to_string(),
+                    resolved_ty.to_string(),
+                )
+                .error_in(expr_span));
             }
 
             TypedExpr {
@@ -665,10 +621,7 @@ pub fn type_expr<'input>(
         },
         ExprKind::Identifier(i) => {
             let ty = scope.values.resolve(i).ok_or_else(|| {
-                Diagnostic(
-                    Severity::Error,
-                    expr_span.containing(DiagnosticKind::UnableToResolveIdentifier(i.to_string())),
-                )
+                DiagnosticKind::UnableToResolveIdentifier(i.to_string()).error_in(expr_span)
             })?;
             TypedExpr {
                 inferred_type: ty.clone(),
@@ -684,6 +637,7 @@ pub fn type_expr<'input>(
 
 #[cfg(test)]
 mod tests {
+    use zrc_diagnostics::Severity;
     use zrc_parser::lexer::NumberLiteral;
     use zrc_utils::{span::Spannable, spanned};
 

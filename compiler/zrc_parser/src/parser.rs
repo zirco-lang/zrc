@@ -21,7 +21,7 @@
 //! ```
 
 use lalrpop_util::ParseError;
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpannedExt};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{
@@ -39,61 +39,36 @@ fn parser_error_to_diagnostic(
     error: ParseError<usize, lexer::Tok, Spanned<LexicalError>>,
 ) -> Diagnostic {
     match error {
-        ParseError::InvalidToken { location } => Diagnostic(
-            Severity::Error,
-            Span::from_positions(location, location).containing(DiagnosticKind::InvalidToken),
-        ),
+        ParseError::InvalidToken { location } => {
+            DiagnosticKind::InvalidToken.error_in(Span::from_positions(location, location))
+        }
 
-        ParseError::UnrecognizedEof { location, expected } => Diagnostic(
-            Severity::Error,
-            Span::from_positions(location - 1, location)
-                .containing(DiagnosticKind::UnexpectedEof(expected)),
-        ),
+        ParseError::UnrecognizedEof { location, expected } => {
+            DiagnosticKind::UnexpectedEof(expected)
+                .error_in(Span::from_positions(location - 1, location))
+        }
 
         ParseError::UnrecognizedToken {
             token: (start, token, end),
             expected,
-        } => Diagnostic(
-            Severity::Error,
-            Span::from_positions(start, end).containing(DiagnosticKind::UnrecognizedToken(
-                token.to_string(),
-                expected,
-            )),
-        ),
+        } => DiagnosticKind::UnrecognizedToken(token.to_string(), expected)
+            .error_in(Span::from_positions(start, end)),
 
         ParseError::ExtraToken {
             token: (start, token, end),
-        } => Diagnostic(
-            Severity::Error,
-            Span::from_positions(start, end)
-                .containing(DiagnosticKind::ExtraToken(token.to_string())),
-        ),
-
-        ParseError::User { error } => {
-            let span = error.span();
-            match error.into_value() {
-                LexicalError::UnknownToken(token) => Diagnostic(
-                    Severity::Error,
-                    span.containing(DiagnosticKind::UnknownToken(token.to_string())),
-                ),
-                LexicalError::UnterminatedBlockComment => Diagnostic(
-                    Severity::Error,
-                    span.containing(DiagnosticKind::UnterminatedBlockComment),
-                ),
-                LexicalError::UnterminatedStringLiteral => Diagnostic(
-                    Severity::Error,
-                    span.containing(DiagnosticKind::UnterminatedStringLiteral),
-                ),
-                LexicalError::UnknownEscapeSequence => Diagnostic(
-                    Severity::Error,
-                    span.containing(DiagnosticKind::UnknownEscapeSequence),
-                ),
-                LexicalError::JavascriptUserDetected(expected) => Diagnostic(
-                    Severity::Error,
-                    span.containing(DiagnosticKind::JavascriptUserDetected(expected)),
-                ),
-            }
+        } => {
+            DiagnosticKind::ExtraToken(token.to_string()).error_in(Span::from_positions(start, end))
         }
+
+        ParseError::User { error } => error.error(|error| match error {
+            LexicalError::UnknownToken(token) => DiagnosticKind::UnknownToken(token.to_string()),
+            LexicalError::UnterminatedBlockComment => DiagnosticKind::UnterminatedBlockComment,
+            LexicalError::UnterminatedStringLiteral => DiagnosticKind::UnterminatedStringLiteral,
+            LexicalError::UnknownEscapeSequence => DiagnosticKind::UnknownEscapeSequence,
+            LexicalError::JavascriptUserDetected(expected) => {
+                DiagnosticKind::JavascriptUserDetected(expected)
+            }
+        }),
     }
 }
 

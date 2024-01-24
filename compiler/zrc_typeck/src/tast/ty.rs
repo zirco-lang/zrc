@@ -34,7 +34,8 @@ impl<'input> Display for Fn<'input> {
     }
 }
 
-/// Auxillary data attached to a [`Fn`] in the [`crate::typeck::scope::GlobalScope`]
+/// Auxillary data attached to a [`Fn`] in the
+/// [`crate::typeck::scope::GlobalScope`]
 #[derive(Debug)]
 pub struct FunctionDeclarationGlobalMetadata<'input> {
     /// The corresponding [`Fn`] we wrap

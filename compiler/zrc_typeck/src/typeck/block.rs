@@ -1,6 +1,6 @@
 //! for blocks
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity, SpannedExt};
 use zrc_parser::ast::stmt::{
     ArgumentDeclarationList, Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration,
     Stmt, StmtKind,
@@ -127,12 +127,9 @@ fn process_let_declaration<'input>(
 
                 if scope.values.has(let_declaration.name.value()) {
                     // TODO: In the future we may allow shadowing but currently no
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        let_declaration
-                            .name
-                            .map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
-                    ));
+                    return Err(let_declaration.name.error(|identifier| {
+                        DiagnosticKind::IdentifierAlreadyInUse(identifier.to_string())
+                    }));
                 }
 
                 let typed_expr = let_declaration
@@ -147,10 +144,7 @@ fn process_let_declaration<'input>(
 
                 let result_decl = match (typed_expr, resolved_ty) {
                     (None, None) => {
-                        return Err(Diagnostic(
-                            Severity::Error,
-                            let_decl_span.containing(DiagnosticKind::NoTypeNoValue),
-                        ));
+                        return Err(DiagnosticKind::NoTypeNoValue.error_in(let_decl_span));
                     }
 
                     // Explicitly typed with no value
@@ -194,24 +188,17 @@ fn process_let_declaration<'input>(
                                 }),
                             }
                         } else {
-                            return Err(Diagnostic(
-                                Severity::Error,
-                                let_decl_span.containing(
-                                    DiagnosticKind::InvalidAssignmentRightHandSideType {
-                                        expected: resolved_ty.to_string(),
-                                        got: inferred_type.to_string(),
-                                    },
-                                ),
-                            ));
+                            return Err(DiagnosticKind::InvalidAssignmentRightHandSideType {
+                                expected: resolved_ty.to_string(),
+                                got: inferred_type.to_string(),
+                            }
+                            .error_in(let_decl_span));
                         }
                     }
                 };
 
                 if result_decl.ty == TastType::Void {
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        let_decl_span.containing(DiagnosticKind::CannotDeclareVoid),
-                    ));
+                    return Err(DiagnosticKind::CannotDeclareVoid.error_in(let_decl_span));
                 }
 
                 scope
@@ -241,10 +228,7 @@ pub fn process_declaration<'input>(
             body: Some(_),
             ..
         } if matches!(parameters.value(), ArgumentDeclarationList::Variadic(_)) => {
-            return Err(Diagnostic(
-                Severity::Error,
-                parameters.map(|_| DiagnosticKind::VariadicFunctionMustBeExternal),
-            ));
+            return Err(parameters.error(|_| DiagnosticKind::VariadicFunctionMustBeExternal));
         }
 
         AstDeclaration::FunctionDeclaration {
@@ -287,47 +271,41 @@ pub fn process_declaration<'input>(
                 returns: Box::new(resolved_return_type.clone()),
             };
 
-            let has_existing_implementation = if let Some(ty) =
-                global_scope.global_values.resolve(name.value())
-            {
-                if let TastType::Fn(_) = ty {
-                    // if a function has already been declared with this name...
+            let has_existing_implementation =
+                if let Some(ty) = global_scope.global_values.resolve(name.value()) {
+                    if let TastType::Fn(_) = ty {
+                        // if a function has already been declared with this name...
 
-                    let canonical = global_scope.declarations.get(name.value()).expect(
-                        "global_scope.declarations was not populated with function properly",
-                    );
+                        let canonical = global_scope.declarations.get(name.value()).expect(
+                            "global_scope.declarations was not populated with function properly",
+                        );
 
-                    // TODO: store and reference previous declaration's span in the error
-                    if canonical.fn_type != fn_type {
-                        return Err(Diagnostic(
-                            Severity::Error,
-                            name.map(|_| {
+                        // TODO: store and reference previous declaration's span in the error
+                        if canonical.fn_type != fn_type {
+                            return Err(name.error(|_| {
                                 DiagnosticKind::ConflictingFunctionDeclarations(
                                     canonical.fn_type.to_string(),
                                     fn_type.to_string(),
                                 )
-                            }),
-                        ));
-                    }
+                            }));
+                        }
 
-                    // TODO: store and reference previous declaration's span in the error
-                    if body.is_some() && canonical.has_implementation {
-                        return Err(Diagnostic(
-                            Severity::Error,
-                            name.map(|x| DiagnosticKind::ConflictingImplementations(x.to_string())),
-                        ));
-                    }
+                        // TODO: store and reference previous declaration's span in the error
+                        if body.is_some() && canonical.has_implementation {
+                            return Err(name.error(|name| {
+                                DiagnosticKind::ConflictingImplementations(name.to_string())
+                            }));
+                        }
 
-                    canonical.has_implementation
+                        canonical.has_implementation
+                    } else {
+                        return Err(
+                            name.error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string()))
+                        );
+                    }
                 } else {
-                    return Err(Diagnostic(
-                        Severity::Error,
-                        name.map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
-                    ));
-                }
-            } else {
-                false
-            };
+                    false
+                };
 
             global_scope
                 .global_values
@@ -388,10 +366,7 @@ pub fn process_declaration<'input>(
         }
         AstDeclaration::TypeAliasDeclaration { name, ty } => {
             if global_scope.types.has(name.value()) {
-                return Err(Diagnostic(
-                    Severity::Error,
-                    name.map(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())),
-                ));
+                return Err(name.error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())));
             }
 
             let resolved_ty = resolve_type(&global_scope.types, ty)?;
@@ -467,20 +442,18 @@ pub fn type_block<'input, 'gs>(
                                 TypedStmt(TypedStmtKind::BreakStmt.in_span(stmt_span)),
                                 BlockReturnActuality::DoesNotReturn,
                             ))),
-                            StmtKind::BreakStmt => Err(Diagnostic(
-                                Severity::Error,
-                                stmt_span.containing(DiagnosticKind::CannotUseBreakOutsideOfLoop),
-                            )),
+                            StmtKind::BreakStmt => {
+                                Err(DiagnosticKind::CannotUseBreakOutsideOfLoop.error_in(stmt_span))
+                            }
 
                             StmtKind::ContinueStmt if can_use_break_continue => Ok(Some((
                                 TypedStmt(TypedStmtKind::ContinueStmt.in_span(stmt_span)),
                                 BlockReturnActuality::DoesNotReturn,
                             ))),
-                            StmtKind::ContinueStmt => Err(Diagnostic(
-                                Severity::Error,
-                                stmt_span
-                                    .containing(DiagnosticKind::CannotUseContinueOutsideOfLoop),
-                            )),
+                            StmtKind::ContinueStmt => {
+                                Err(DiagnosticKind::CannotUseContinueOutsideOfLoop
+                                    .error_in(stmt_span))
+                            }
 
                             StmtKind::DeclarationList(declarations) => Ok(Some((
                                 TypedStmt(
@@ -508,13 +481,11 @@ pub fn type_block<'input, 'gs>(
                                 let typed_cond = type_expr(&scope, cond)?;
 
                                 if typed_cond.inferred_type != TastType::Bool {
-                                    return Err(Diagnostic(
-                                        Severity::Error,
-                                        cond_span.containing(DiagnosticKind::ExpectedGot {
-                                            expected: "bool".to_string(),
-                                            got: typed_cond.inferred_type.to_string(),
-                                        }),
-                                    ));
+                                    return Err(DiagnosticKind::ExpectedGot {
+                                        expected: "bool".to_string(),
+                                        got: typed_cond.inferred_type.to_string(),
+                                    }
+                                    .error_in(cond_span));
                                 }
 
                                 let (typed_then, then_return_actuality) = type_block(
@@ -609,13 +580,11 @@ pub fn type_block<'input, 'gs>(
                                 let typed_cond = type_expr(&scope, cond)?;
 
                                 if typed_cond.inferred_type != TastType::Bool {
-                                    return Err(Diagnostic(
-                                        Severity::Error,
-                                        cond_span.containing(DiagnosticKind::ExpectedGot {
-                                            expected: "bool".to_string(),
-                                            got: typed_cond.inferred_type.to_string(),
-                                        }),
-                                    ));
+                                    return Err(DiagnosticKind::ExpectedGot {
+                                        expected: "bool".to_string(),
+                                        got: typed_cond.inferred_type.to_string(),
+                                    }
+                                    .error_in(cond_span));
                                 }
 
                                 let (typed_body, body_return_actuality) = type_block(
@@ -662,13 +631,11 @@ pub fn type_block<'input, 'gs>(
                                 let typed_cond = type_expr(&scope, cond)?;
 
                                 if typed_cond.inferred_type != TastType::Bool {
-                                    return Err(Diagnostic(
-                                        Severity::Error,
-                                        cond_span.containing(DiagnosticKind::ExpectedGot {
-                                            expected: "bool".to_string(),
-                                            got: typed_cond.inferred_type.to_string(),
-                                        }),
-                                    ));
+                                    return Err(DiagnosticKind::ExpectedGot {
+                                        expected: "bool".to_string(),
+                                        got: typed_cond.inferred_type.to_string(),
+                                    }
+                                    .error_in(cond_span));
                                 }
 
                                 let (typed_body, body_return_actuality) = type_block(
@@ -837,10 +804,9 @@ pub fn type_block<'input, 'gs>(
                                     value.map(|expr| type_expr(&scope, expr)).transpose()?;
                                 match (resolved_value, return_ability.clone()) {
                                     // expects no return
-                                    (_, BlockReturnAbility::MustNotReturn) => Err(Diagnostic(
-                                        Severity::Error,
-                                        stmt_span.containing(DiagnosticKind::CannotReturnHere),
-                                    )),
+                                    (_, BlockReturnAbility::MustNotReturn) => {
+                                        Err(DiagnosticKind::CannotReturnHere.error_in(stmt_span))
+                                    }
 
                                     // return; in void fn
                                     (
@@ -863,26 +829,22 @@ pub fn type_block<'input, 'gs>(
                                         | BlockReturnAbility::MustReturn(BlockReturnType::Return(
                                             return_ty,
                                         )),
-                                    ) => Err(Diagnostic(
-                                        Severity::Error,
-                                        stmt_span.containing(DiagnosticKind::ExpectedGot {
-                                            expected: return_ty.to_string(),
-                                            got: "void".to_string(),
-                                        }),
-                                    )),
+                                    ) => Err(DiagnosticKind::ExpectedGot {
+                                        expected: return_ty.to_string(),
+                                        got: "void".to_string(),
+                                    }
+                                    .error_in(stmt_span)),
 
                                     // return x; in fn expecting to return void
                                     (
                                         Some(TypedExpr { inferred_type, .. }),
                                         BlockReturnAbility::MustReturn(BlockReturnType::Void)
                                         | BlockReturnAbility::MayReturn(BlockReturnType::Void),
-                                    ) => Err(Diagnostic(
-                                        Severity::Error,
-                                        stmt_span.containing(DiagnosticKind::ExpectedGot {
-                                            expected: "void".to_string(),
-                                            got: inferred_type.to_string(),
-                                        }),
-                                    )),
+                                    ) => Err(DiagnosticKind::ExpectedGot {
+                                        expected: "void".to_string(),
+                                        got: inferred_type.to_string(),
+                                    }
+                                    .error_in(stmt_span)),
 
                                     // return x; in fn expecting to return x
                                     (
@@ -978,10 +940,7 @@ pub fn type_block<'input, 'gs>(
         (
             BlockReturnAbility::MustReturn(_),
             BlockReturnActuality::MightReturn | BlockReturnActuality::DoesNotReturn,
-        ) => Err(Diagnostic(
-            Severity::Error,
-            input_block_span.containing(DiagnosticKind::ExpectedABlockToReturn),
-        )),
+        ) => Err(DiagnosticKind::ExpectedABlockToReturn.error_in(input_block_span)),
         (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => {
             panic!(concat!(
                 "block must not return, but a sub-block may return",
@@ -1010,8 +969,10 @@ mod tests {
     use zrc_utils::spanned;
 
     use super::*;
-    use crate::tast::ty::FunctionDeclarationGlobalMetadata;
-    use crate::typeck::scope::{TypeCtx, ValueCtx};
+    use crate::{
+        tast::ty::FunctionDeclarationGlobalMetadata,
+        typeck::scope::{TypeCtx, ValueCtx},
+    };
 
     #[test]
     fn re_declaration_works_as_expected() {

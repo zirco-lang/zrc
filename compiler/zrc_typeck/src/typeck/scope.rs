@@ -1,8 +1,8 @@
 //! Scopes and other global typeck state
 
-use crate::tast::ty::{FunctionDeclarationGlobalMetadata, Type as TastType};
-
 use std::collections::HashMap;
+
+use crate::tast::ty::{FunctionDeclarationGlobalMetadata, Type as TastType};
 
 /// Represents a typing scope: a scope that contains the mapping from a type's
 /// name to its internal [`TastType`] representation.
