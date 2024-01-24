@@ -910,23 +910,21 @@ pub fn type_block<'input, 'gs>(
         (false, false) => BlockReturnActuality::DoesNotReturn,
     };
 
-    #[allow(clippy::match_same_arms)] // for clarity
     match (return_ability, return_actuality) {
-        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::DoesNotReturn) => {
-            Ok((tast_block, BlockReturnActuality::DoesNotReturn))
-        }
-        (BlockReturnAbility::MustReturn(_), BlockReturnActuality::WillReturn) => {
-            Ok((tast_block, BlockReturnActuality::WillReturn))
-        }
-        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::WillReturn) => {
-            Ok((tast_block, BlockReturnActuality::WillReturn))
-        }
+        (
+            BlockReturnAbility::MustNotReturn | BlockReturnAbility::MayReturn(_),
+            BlockReturnActuality::DoesNotReturn,
+        ) => Ok(BlockReturnActuality::DoesNotReturn),
+
         (BlockReturnAbility::MayReturn(_), BlockReturnActuality::MightReturn) => {
-            Ok((tast_block, BlockReturnActuality::MightReturn))
+            Ok(BlockReturnActuality::MightReturn)
         }
-        (BlockReturnAbility::MayReturn(_), BlockReturnActuality::DoesNotReturn) => {
-            Ok((tast_block, BlockReturnActuality::DoesNotReturn))
-        }
+
+        (
+            BlockReturnAbility::MustReturn(_) | BlockReturnAbility::MayReturn(_),
+            BlockReturnActuality::WillReturn,
+        ) => Ok(BlockReturnActuality::WillReturn),
+
         (
             BlockReturnAbility::MustReturn(BlockReturnType::Void),
             BlockReturnActuality::MightReturn | BlockReturnActuality::DoesNotReturn,
@@ -935,25 +933,25 @@ pub fn type_block<'input, 'gs>(
                 Span::from_positions(input_block_span.end() - 1, input_block_span.end()),
             )));
 
-            Ok((tast_block, BlockReturnActuality::WillReturn))
+            Ok(BlockReturnActuality::WillReturn)
         }
+
         (
             BlockReturnAbility::MustReturn(_),
             BlockReturnActuality::MightReturn | BlockReturnActuality::DoesNotReturn,
         ) => Err(DiagnosticKind::ExpectedABlockToReturn.error_in(input_block_span)),
-        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::MightReturn) => {
-            panic!(concat!(
-                "block must not return, but a sub-block may return",
-                " -- this should have been caught when checking that block"
-            ));
-        }
-        (BlockReturnAbility::MustNotReturn, BlockReturnActuality::WillReturn) => {
+
+        (
+            BlockReturnAbility::MustNotReturn,
+            BlockReturnActuality::MightReturn | BlockReturnActuality::WillReturn,
+        ) => {
             panic!(concat!(
                 "block must not return, but a sub-block may return",
                 " -- this should have been caught when checking that block"
             ));
         }
     }
+    .map(|actuality| (tast_block, actuality))
 }
 
 #[cfg(test)]
