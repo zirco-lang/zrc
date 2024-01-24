@@ -1,13 +1,13 @@
 //! Zirco programming language type checker
 
 mod block;
+mod declaration;
 mod expr;
 mod scope;
 mod ty;
 
-pub use block::{
-    process_declaration, type_block, BlockReturnAbility, BlockReturnActuality, BlockReturnType,
-};
+pub use block::{type_block, BlockReturnAbility, BlockReturnActuality, BlockReturnType};
+pub use declaration::process_declaration;
 pub use expr::type_expr;
 pub use ty::resolve_type;
 use zrc_parser::ast::stmt::Declaration as AstDeclaration;
