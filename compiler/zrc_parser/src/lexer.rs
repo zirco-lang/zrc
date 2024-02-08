@@ -243,8 +243,12 @@ pub enum Tok<'input> {
 
     // === COMPARISON OPERATORS ===
     // Silly little error we raise if JavaScript-like equality operators are used
-    #[token("===", |_lex| { Err::<Tok,InternalLexicalError>(InternalLexicalError::JavascriptUserDetected("==")) })]
-    #[token("!==", |_lex| { Err::<Tok,InternalLexicalError>(InternalLexicalError::JavascriptUserDetected("!=")) })]
+    #[token("===", |_lex| {
+        Err::<Tok,InternalLexicalError>(InternalLexicalError::JavascriptUserDetected("=="))
+    })]
+    #[token("!==", |_lex| {
+        Err::<Tok,InternalLexicalError>(InternalLexicalError::JavascriptUserDetected("!="))
+    })]
     /// The token `==`
     #[token("==")]
     EqEq,
