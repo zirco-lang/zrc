@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 lalrpop-util = { version = "0.20.0" }
-logos = "0.13.0"
+logos = "0.14.0"
 zrc_diagnostics = { version = "0.1.0", path = "../zrc_diagnostics" }
 zrc_utils = { version = "0.1.0", path = "../zrc_utils" }
 

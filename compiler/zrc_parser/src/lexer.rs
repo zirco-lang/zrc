@@ -84,7 +84,7 @@ pub enum LexicalError<'input> {
 /// A lexer callback helper to obtain the currently matched token slice.
 fn lexer_slice<'input, T: Logos<'input>>(
     lex: &Lexer<'input, T>,
-) -> &'input <<T as Logos<'input>>::Source as logos::Source>::Slice {
+) -> <<T as Logos<'input>>::Source as logos::Source>::Slice<'input> {
     lex.slice()
 }
 
@@ -243,8 +243,12 @@ pub enum Tok<'input> {
 
     // === COMPARISON OPERATORS ===
     // Silly little error we raise if JavaScript-like equality operators are used
-    #[token("===", |_lex| Err(InternalLexicalError::JavascriptUserDetected("==")))]
-    #[token("!==", |_lex| Err(InternalLexicalError::JavascriptUserDetected("!=")))]
+    #[token("===", |_lex| {
+        Err::<Tok,InternalLexicalError>(InternalLexicalError::JavascriptUserDetected("=="))
+    })]
+    #[token("!==", |_lex| {
+        Err::<Tok,InternalLexicalError>(InternalLexicalError::JavascriptUserDetected("!="))
+    })]
     /// The token `==`
     #[token("==")]
     EqEq,
