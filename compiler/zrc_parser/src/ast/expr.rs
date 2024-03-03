@@ -2,7 +2,7 @@
 //!
 //! The main thing within this module you will need is the [`Expr`] struct.
 
-use std::{fmt::Display, string::ToString};
+use std::fmt::Display;
 
 use zrc_utils::{
     span::{Span, Spannable, Spanned},

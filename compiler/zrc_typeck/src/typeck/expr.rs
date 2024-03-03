@@ -639,7 +639,7 @@ pub fn type_expr<'input>(
 mod tests {
     use zrc_diagnostics::Severity;
     use zrc_parser::lexer::NumberLiteral;
-    use zrc_utils::{span::Spannable, spanned};
+    use zrc_utils::spanned;
 
     use super::*;
 
@@ -678,8 +678,6 @@ mod tests {
     }
 
     mod desugar_assignment {
-        use zrc_parser::ast::expr::Arithmetic;
-
         use super::*;
 
         #[test]

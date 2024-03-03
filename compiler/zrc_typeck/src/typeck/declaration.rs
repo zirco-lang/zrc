@@ -309,13 +309,7 @@ mod tests {
     use zrc_utils::spanned;
 
     use super::*;
-    use crate::{
-        tast::ty::FunctionDeclarationGlobalMetadata,
-        typeck::{
-            declaration::process_declaration,
-            scope::{TypeCtx, ValueCtx},
-        },
-    };
+    use crate::typeck::scope::{TypeCtx, ValueCtx};
 
     #[test]
     fn re_declaration_works_as_expected() {
