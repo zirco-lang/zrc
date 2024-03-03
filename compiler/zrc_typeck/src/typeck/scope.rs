@@ -8,7 +8,7 @@ use crate::tast::ty::{FunctionDeclarationGlobalMetadata, Type as TastType};
 /// name to its internal [`TastType`] representation.
 #[derive(Debug, Clone)]
 pub struct TypeCtx<'input> {
-    /// Mappings from type name to its [TastType]
+    /// Mappings from type name to its [`TastType`]
     mappings: HashMap<&'input str, TastType<'input>>,
 }
 impl<'input> TypeCtx<'input> {
@@ -89,7 +89,7 @@ where
 
 #[derive(Debug, Clone)]
 pub struct ValueCtx<'input> {
-    /// Mappings from identifier to its contained data [TastType]
+    /// Mappings from identifier to its contained data [`TastType`]
     mappings: HashMap<&'input str, TastType<'input>>,
 }
 impl<'input> ValueCtx<'input> {

@@ -1,6 +1,6 @@
 //! Statement representation for the Zirco [TAST](super)
 
-use std::{fmt::Display, string::ToString};
+use std::fmt::Display;
 
 use zrc_utils::span::Spanned;
 

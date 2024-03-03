@@ -66,7 +66,6 @@ pub(super) fn resolve_key_type_mapping<'input>(
 #[cfg(test)]
 mod tests {
     use zrc_diagnostics::Severity;
-    use zrc_parser::ast::ty::KeyTypeMapping;
     use zrc_utils::{span::Span, spanned};
 
     use super::*;
