@@ -31,7 +31,7 @@
 //!
 //! For more information, read the documentation of [`ZircoLexer`].
 
-use std::{fmt::Display, string::ToString};
+use std::fmt::Display;
 
 use logos::{Lexer, Logos};
 use zrc_utils::span::{Span, Spanned};
