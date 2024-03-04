@@ -24,8 +24,9 @@ use zrc_utils::{line_finder::LineLookup, span::Spanned};
 
 use super::stmt::cg_block;
 use crate::{
+    ctx::CgContext,
     ty::{create_fn, llvm_basic_type, llvm_type},
-    CgContext, CgScope,
+    CgScope,
 };
 
 /// Initialize the LLVM [`FunctionValue`] for a given function prototype

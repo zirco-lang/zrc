@@ -18,8 +18,9 @@ use zrc_utils::span::Spannable;
 
 use super::CgScope;
 use crate::{
+    ctx::CgContext,
     ty::{llvm_basic_type, llvm_int_type, llvm_type},
-    BasicBlockAnd, BasicBlockExt, CgContext,
+    BasicBlockAnd, BasicBlockExt,
 };
 
 /// Resolve a place to its pointer

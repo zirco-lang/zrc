@@ -69,17 +69,9 @@ macro_rules! unpack {
 
 use std::collections::HashMap;
 
-use inkwell::{
-    basic_block::BasicBlock,
-    builder::Builder,
-    context::Context,
-    debug_info::DebugInfoBuilder,
-    module::Module,
-    targets::TargetMachine,
-    values::{FunctionValue, PointerValue},
-};
-use zrc_utils::line_finder::LineLookup;
+use inkwell::{basic_block::BasicBlock, targets::TargetMachine, values::PointerValue};
 
+mod ctx;
 mod expr;
 mod program;
 mod stmt;
@@ -159,26 +151,4 @@ impl<'ctx> BasicBlockExt<'ctx> for BasicBlock<'ctx> {
     fn and<T>(self, value: T) -> BasicBlockAnd<'ctx, T> {
         BasicBlockAnd { bb: self, value }
     }
-}
-
-/// Common LLVM structures passed onto most code generation functions
-#[derive(Debug, Clone, Copy)]
-struct CgContext<'ctx, 'a> {
-    /// The LLVM context
-    ctx: &'ctx Context,
-    /// The LLVM target machine
-    target_machine: &'a TargetMachine,
-    /// The LLVM builder used to build instructions
-    builder: &'a Builder<'ctx>,
-    /// The lookup for lines in the source file
-    line_lookup: &'a LineLookup,
-    /// The LLVM builder for debug info
-    dbg_builder: &'a DebugInfoBuilder<'ctx>,
-    /// The LLVM compile unit for debug info
-    compilation_unit: &'a inkwell::debug_info::DICompileUnit<'ctx>,
-    /// The LLVM module we are building in
-    #[allow(dead_code)]
-    module: &'a Module<'ctx>,
-    /// The LLVM function we are building in
-    fn_value: FunctionValue<'ctx>,
 }
