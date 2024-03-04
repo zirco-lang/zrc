@@ -182,8 +182,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     let then_end = then.end();
                     let then_else_end = then_else.end();
 
-                    let BasicBlockAnd { value: cond, .. } =
-                        cg_expr(cg, bb, &scope, lexical_block, cond);
+                    let cond = cg_expr(cg, bb, &scope, lexical_block, cond).into_value();
 
                     let then_bb = cg.ctx.append_basic_block(cg.fn_value, "then");
                     let then_else_bb = cg.ctx.append_basic_block(cg.fn_value, "then_else");
@@ -284,8 +283,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                 ),
 
                 TypedStmtKind::ReturnStmt(Some(expr)) => {
-                    let BasicBlockAnd { value: expr, .. } =
-                        cg_expr(cg, bb, &scope, lexical_block, expr);
+                    let expr = cg_expr(cg, bb, &scope, lexical_block, expr).into_value();
 
                     cg.builder
                         .build_return(Some(&expr))
@@ -390,10 +388,10 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                             header
                         },
                         |cond| {
-                            let BasicBlockAnd {
-                                bb: header,
-                                value: cond,
-                            } = cg_expr(cg, header, &scope, lexical_block, cond);
+                            let mut header = header;
+
+                            let cond =
+                                unpack!(header = cg_expr(cg, header, &scope, lexical_block, cond));
 
                             cg.builder
                                 .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -449,7 +447,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     // `break` => exit
                     // `continue` => header
 
-                    let header = cg.ctx.append_basic_block(cg.fn_value, "header");
+                    let mut header = cg.ctx.append_basic_block(cg.fn_value, "header");
 
                     let body_bb = cg.ctx.append_basic_block(cg.fn_value, "body");
 
@@ -461,8 +459,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
 
                     cg.builder.position_at_end(header);
 
-                    let BasicBlockAnd { value: cond, .. } =
-                        cg_expr(cg, header, &scope, lexical_block, cond);
+                    let cond = unpack!(header = cg_expr(cg, header, &scope, lexical_block, cond));
 
                     cg.builder
                         .build_conditional_branch(cond.into_int_value(), body_bb, exit)
