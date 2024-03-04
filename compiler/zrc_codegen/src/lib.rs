@@ -51,7 +51,8 @@
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
 // Ordering matters! Declared here so other modules have access
-/// Convenience macro to unpack a `BasicBlockAnd` -- assigns to the provided `bb` and yields the value
+/// Convenience macro to unpack a `BasicBlockAnd` -- assigns to the provided
+/// `bb` and yields the value
 macro_rules! unpack {
     ($bb:ident = $call:expr) => {
         match $call {
@@ -145,10 +146,12 @@ impl<'ctx, T> BasicBlockAnd<'ctx, T> {
         self.value
     }
 }
-/// Extends Inkwell [`BasicBlock`]s with a method to easily produce a [`BasicBlockAnd`] value
+/// Extends Inkwell [`BasicBlock`]s with a method to easily produce a
+/// [`BasicBlockAnd`] value
 trait BasicBlockExt<'ctx> {
-    /// Wrap a [`BasicBlock`] and a value into a [`BasicBlockAnd`] instance, to allow easier composition of functions
-    /// which return basic blocks along with some other value
+    /// Wrap a [`BasicBlock`] and a value into a [`BasicBlockAnd`] instance, to
+    /// allow easier composition of functions which return basic blocks
+    /// along with some other value
     fn and<T>(self, value: T) -> BasicBlockAnd<'ctx, T>;
 }
 impl<'ctx> BasicBlockExt<'ctx> for BasicBlock<'ctx> {
