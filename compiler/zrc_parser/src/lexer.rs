@@ -34,7 +34,7 @@
 use std::fmt::Display;
 
 use logos::{Lexer, Logos};
-use zrc_utils::span::{Span, Spanned};
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 /// The error enum passed to the internal logos [`Lexer`]. Will be converted to
 /// a [`LexicalError`] later on by [`ZircoLexer`].
@@ -627,7 +627,8 @@ impl Display for StringTok<'_> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ZrcString<'input>(pub Vec<StringTok<'input>>);
 impl<'input> ZrcString<'input> {
-    /// Convert a [`ZrcString`] into a [`String`] for its REAL byte representation
+    /// Convert a [`ZrcString`] into a [`String`] for its REAL byte
+    /// representation
     ///
     /// See also: [`StringTok::as_byte`]
     #[must_use]
@@ -671,25 +672,27 @@ impl<'input> Iterator for ZircoLexer<'input> {
         let logos_span = self.lex.span();
         let span = Span::from_positions(logos_span.start, logos_span.end);
 
-        match token {
-            Err(InternalLexicalError::NoMatchingRule) => {
-                let slice = self.lex.slice();
-                Some(span.containing(Err(LexicalError::UnknownToken(slice))))
-            }
-            Err(InternalLexicalError::UnterminatedBlockComment) => {
-                Some(span.containing(Err(LexicalError::UnterminatedBlockComment)))
-            }
-            Err(InternalLexicalError::UnterminatedStringLiteral) => {
-                Some(span.containing(Err(LexicalError::UnterminatedStringLiteral)))
-            }
-            Err(InternalLexicalError::UnknownEscapeSequence(span)) => {
-                Some(span.containing(Err(LexicalError::UnknownEscapeSequence)))
-            }
-            Err(InternalLexicalError::JavascriptUserDetected(expected)) => {
-                Some(span.containing(Err(LexicalError::JavascriptUserDetected(expected))))
-            }
-            Ok(tok) => Some(span.containing(Ok(tok))),
-        }
+        Some(
+            token
+                .map_err(|err| match err {
+                    InternalLexicalError::NoMatchingRule => {
+                        LexicalError::UnknownToken(self.lex.slice())
+                    }
+                    InternalLexicalError::UnterminatedBlockComment => {
+                        LexicalError::UnterminatedBlockComment
+                    }
+                    InternalLexicalError::UnterminatedStringLiteral => {
+                        LexicalError::UnterminatedStringLiteral
+                    }
+                    InternalLexicalError::UnknownEscapeSequence(_) => {
+                        LexicalError::UnknownEscapeSequence
+                    }
+                    InternalLexicalError::JavascriptUserDetected(expected) => {
+                        LexicalError::JavascriptUserDetected(expected)
+                    }
+                })
+                .in_span(span),
+        )
     }
 }
 
