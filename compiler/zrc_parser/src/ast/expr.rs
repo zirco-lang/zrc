@@ -245,7 +245,7 @@ pub enum ExprKind<'input> {
     /// Any string literal.
     StringLiteral(Vec<StringTok<'input>>),
     /// Any char literal
-    CharLiteral(Vec<StringTok<'input>>),
+    CharLiteral(StringTok<'input>),
     /// Any identifier.
     Identifier(&'input str),
     /// Any boolean literal.
@@ -261,11 +261,7 @@ impl<'input> Display for ExprKind<'input> {
                 "\"{}\"",
                 str.iter().map(ToString::to_string).collect::<String>()
             ),
-            Self::CharLiteral(str) => write!(
-                f,
-                "'{}'",
-                str.iter().map(ToString::to_string).collect::<String>()
-            ),
+            Self::CharLiteral(str) => write!(f, "'{str}'",),
             Self::Identifier(i) => write!(f, "{i}"),
             Self::BooleanLiteral(value) => write!(f, "{value}"),
             Self::Assignment(operator, place, value) => write!(f, "{place} {operator} {value}"),
@@ -571,7 +567,7 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn build_char(lit: Spanned<Vec<StringTok<'input>>>) -> Self {
+    pub fn build_char(lit: Spanned<StringTok<'input>>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),

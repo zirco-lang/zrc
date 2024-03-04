@@ -192,18 +192,12 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                     .as_basic_value_enum(),
             )
         }
-        TypedExprKind::CharLiteral(str) => {
-            let [ch] = str.as_slice() else {
-                panic!("Char literal must be exactly one character")
-            };
-
-            bb.and(
-                cg.ctx
-                    .i8_type()
-                    .const_int(ch.as_byte().into(), false)
-                    .as_basic_value_enum(),
-            )
-        }
+        TypedExprKind::CharLiteral(ch) => bb.and(
+            cg.ctx
+                .i8_type()
+                .const_int(ch.as_byte().into(), false)
+                .as_basic_value_enum(),
+        ),
 
         TypedExprKind::BooleanLiteral(value) => bb.and(
             cg.ctx
