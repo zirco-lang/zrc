@@ -8,7 +8,7 @@ source_filename = "test.zr"
 
 declare i1 @get_bool()
 
-define void @test() !dbg !3 {
+define {} @test() !dbg !3 {
 entry:
   br label %body, !dbg !8
 
@@ -21,7 +21,7 @@ header:                                           ; preds = %body
   br i1 %call1, label %body, label %exit, !dbg !13
 
 exit:                                             ; preds = %header
-  ret void, !dbg !14
+  ret {} zeroinitializer, !dbg !14
 }
 
 !llvm.module.flags = !{!0}
@@ -33,7 +33,7 @@ exit:                                             ; preds = %header
 !3 = distinct !DISubprogram(name: "test", linkageName: "test", scope: null, file: !2, line: 3, type: !4, scopeLine: 3, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !7)
 !4 = !DISubroutineType(types: !5)
 !5 = !{!6}
-!6 = !DIBasicType(name: "void")
+!6 = !DICompositeType(tag: DW_TAG_structure_type, name: "(struct {  })", scope: !2, file: !2, elements: !7)
 !7 = !{}
 !8 = !DILocation(line: 5, column: 5, scope: !9)
 !9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 3, column: 11)
@@ -42,4 +42,3 @@ exit:                                             ; preds = %header
 !12 = distinct !DILexicalBlock(scope: !9, file: !2, line: 5, column: 8)
 !13 = !DILocation(line: 7, column: 14, scope: !9)
 !14 = !DILocation(line: 8, column: 1, scope: !9)
-

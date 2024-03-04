@@ -42,7 +42,7 @@ pub fn cg_init_extern_fn<'ctx>(
     module: &Module<'ctx>,
     target_machine: &TargetMachine,
     name: &str,
-    ret: Option<Type>,
+    ret: &Type,
     args: &[&Type],
     is_variadic: bool,
 ) -> FunctionValue<'ctx> {
@@ -51,7 +51,7 @@ pub fn cg_init_extern_fn<'ctx>(
         dbg_builder,
         ctx,
         target_machine,
-        &ret.unwrap_or(Type::Void),
+        ret,
     );
     let (arg_types, arg_dbg_types): (Vec<_>, Vec<_>) = args
         .iter()
@@ -96,7 +96,7 @@ pub fn cg_init_fn<'ctx>(
     target_machine: &TargetMachine,
     name: &str,
     line_no: u32,
-    ret: Option<Type>,
+    ret: &Type,
     args: &[&Type],
     is_variadic: bool,
 ) -> (FunctionValue<'ctx>, DISubprogram<'ctx>) {
@@ -105,7 +105,7 @@ pub fn cg_init_fn<'ctx>(
         dbg_builder,
         ctx,
         target_machine,
-        &ret.unwrap_or(Type::Void),
+        ret,
     );
     let (arg_types, arg_dbg_types): (Vec<_>, Vec<_>) = args
         .iter()
@@ -243,7 +243,7 @@ fn cg_program<'ctx>(
                     target_machine,
                     name.value(),
                     line_lookup.lookup_from_index(span.start()).line,
-                    return_type.map(zrc_utils::span::Spanned::into_value),
+                    return_type.value(),
                     parameters
                         .value()
                         .as_arguments()
@@ -381,7 +381,7 @@ fn cg_program<'ctx>(
                     &module,
                     target_machine,
                     name.value(),
-                    return_type.map(zrc_utils::span::Spanned::into_value),
+                    return_type.value(),
                     parameters
                         .value()
                         .as_arguments()

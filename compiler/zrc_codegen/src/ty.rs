@@ -12,10 +12,7 @@ use inkwell::{
     },
     AddressSpace,
 };
-use zrc_typeck::{
-    tast::ty::{Fn, Type},
-    typeck::BlockReturnType,
-};
+use zrc_typeck::tast::ty::{Fn, Type};
 
 /// Create a pointer to an [`AnyTypeEnum`] instance.
 ///
@@ -102,7 +99,7 @@ pub fn llvm_int_type<'ctx>(
                 &target_machine.get_target_data(),
                 Some(AddressSpace::default()),
             ),
-            Type::Void | Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
+            Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
                 panic!("not an integer type")
             }
         },
@@ -139,7 +136,6 @@ pub fn llvm_basic_type<'ctx>(
             let (ty, dbg_ty) = llvm_int_type(dbg_builder, ctx, target_machine, ty);
             (ty.as_basic_type_enum(), dbg_ty.as_type())
         }
-        Type::Void => panic!("void is not a basic type"),
         Type::Ptr(x) => {
             let (pointee_ty, pointee_dbg_ty) = llvm_type(file, dbg_builder, ctx, target_machine, x);
             let (ty, dbg_ty) = create_ptr(dbg_builder, pointee_ty, pointee_dbg_ty);
@@ -261,25 +257,8 @@ pub fn llvm_type<'ctx>(
             (ty.as_any_type_enum(), dbg_ty)
         }
 
-        Type::Void => (
-            ctx.void_type().as_any_type_enum(),
-            dbg_builder
-                .create_basic_type("void", 0, 0, 0)
-                .expect("basic type should be valid")
-                .as_type(),
-        ),
-
         Type::Fn(Fn { arguments, returns }) => {
-            let (ret, ret_dbg) = llvm_type(
-                file,
-                dbg_builder,
-                ctx,
-                target_machine,
-                match &**returns {
-                    BlockReturnType::Return(x) => x,
-                    BlockReturnType::Void => &Type::Void,
-                },
-            );
+            let (ret, ret_dbg) = llvm_type(file, dbg_builder, ctx, target_machine, returns);
             let is_variadic = arguments.is_variadic();
             let (fn_ty, _, fn_dbg_ty) = create_fn(
                 dbg_builder,
