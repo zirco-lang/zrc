@@ -12,5 +12,5 @@ zrc_utils = { version = "0.1.0", path = "../zrc_utils" }
 
 [dev-dependencies]
 indoc = "2.0.4"
-insta = { version = "1.36.0", features = ["yaml"] }
+insta = { version = "1.36.1", features = ["yaml"] }
 zrc_parser = { path = "../zrc_parser" }
