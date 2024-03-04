@@ -381,7 +381,7 @@ extern {
         "[" => lexer::Tok::LeftBracket,
         "]" => lexer::Tok::RightBracket,
 
-        STRING => lexer::Tok::StringLiteral(<Vec<lexer::StringTok<'input>>>),
+        STRING => lexer::Tok::StringLiteral(<lexer::ZrcString<'input>>),
         CHAR => lexer::Tok::CharLiteral(<lexer::StringTok<'input>>),
         NUMBER => lexer::Tok::NumberLiteral(<lexer::NumberLiteral<'input>>),
         IDENTIFIER => lexer::Tok::Identifier(<&'input str>),

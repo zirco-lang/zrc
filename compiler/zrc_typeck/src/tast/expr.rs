@@ -2,6 +2,7 @@
 
 use std::fmt::Display;
 
+use zrc_parser::lexer::ZrcString;
 pub use zrc_parser::{
     ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical},
     lexer::{NumberLiteral, StringTok},
@@ -126,7 +127,7 @@ pub enum TypedExprKind<'input> {
     /// Any numeric literal.
     NumberLiteral(NumberLiteral<'input>),
     /// Any string literal.
-    StringLiteral(Vec<StringTok<'input>>),
+    StringLiteral(ZrcString<'input>),
     /// Any char literal
     CharLiteral(StringTok<'input>),
     /// Any identifier.
@@ -138,11 +139,7 @@ impl<'input> Display for TypedExprKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NumberLiteral(n) => write!(f, "{n}"),
-            Self::StringLiteral(str) => write!(
-                f,
-                "\"{}\"",
-                str.iter().map(ToString::to_string).collect::<String>()
-            ),
+            Self::StringLiteral(str) => write!(f, "\"{str}\"",),
             Self::CharLiteral(str) => write!(f, "\'{str}\'"),
             Self::Identifier(i) => write!(f, "{i}"),
             Self::BooleanLiteral(value) => write!(f, "{value}"),

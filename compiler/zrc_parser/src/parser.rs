@@ -368,7 +368,7 @@ mod tests {
 
         mod literals {
             use super::*;
-            use crate::lexer::StringTok;
+            use crate::lexer::{StringTok, ZrcString};
 
             #[test]
             fn number_literals_parse_as_expected() {
@@ -384,7 +384,7 @@ mod tests {
                     parse_expr("\"x\""),
                     Ok(Expr::build_string(spanned!(
                         0,
-                        vec![StringTok::Text("x")],
+                        ZrcString(vec![StringTok::Text("x")]),
                         3
                     )))
                 );

@@ -10,7 +10,7 @@ use inkwell::{
 use zrc_typeck::tast::{
     expr::{
         Arithmetic, BinaryBitwise, Comparison, Equality, Logical, NumberLiteral, Place, PlaceKind,
-        StringTok, TypedExpr, TypedExprKind,
+        TypedExpr, TypedExprKind,
     },
     ty::Type,
 };
@@ -182,16 +182,12 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             )
         }
 
-        TypedExprKind::StringLiteral(str) => {
-            let formatted_contents = str.iter().map(StringTok::as_byte).collect::<String>();
-
-            bb.and(
-                cg.builder
-                    .build_global_string_ptr(&formatted_contents, "str")
-                    .expect("string should have built successfully")
-                    .as_basic_value_enum(),
-            )
-        }
+        TypedExprKind::StringLiteral(str) => bb.and(
+            cg.builder
+                .build_global_string_ptr(&str.as_bytes(), "str")
+                .expect("string should have built successfully")
+                .as_basic_value_enum(),
+        ),
         TypedExprKind::CharLiteral(ch) => bb.and(
             cg.ctx
                 .i8_type()

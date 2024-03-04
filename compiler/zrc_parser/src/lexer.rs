@@ -450,11 +450,11 @@ pub enum Tok<'input> {
     })]
     CharLiteral(StringTok<'input>),
     /// Any string literal
-    #[regex(r#""([^"\\]|\\.)*""#, lex_string_contents)]
+    #[regex(r#""([^"\\]|\\.)*""#, |lex| lex_string_contents(lex).map(ZrcString))]
     #[regex(r#""([^"\\]|\\.)*"#, |_lex| {
         Err(InternalLexicalError::UnterminatedStringLiteral)
     })]
-    StringLiteral(Vec<StringTok<'input>>),
+    StringLiteral(ZrcString<'input>),
     /// Any number literal
     // FIXME: Do not accept multiple decimal points like "123.456.789"
     #[regex(r"[0-9][0-9\._]*", |lex| NumberLiteral::Decimal(lex.slice()))]
@@ -510,10 +510,7 @@ impl<'input> Display for Tok<'input> {
                 Self::SmallArrow => "->".to_string(),
                 Self::Star => "*".to_string(),
                 Self::StarAssign => "*=".to_string(),
-                Self::StringLiteral(str) => format!(
-                    "\"{}\"",
-                    str.iter().map(ToString::to_string).collect::<String>()
-                ),
+                Self::StringLiteral(str) => format!("\"{str}\"",),
                 Self::CharLiteral(ch) => format!("'{ch}'",),
                 Self::Struct => "struct".to_string(),
                 Self::Union => "union".to_string(),
@@ -623,6 +620,28 @@ impl Display for StringTok<'_> {
             Self::EscapedDoubleQuote => write!(f, "\\\""),
             Self::Text(text) => write!(f, "{text}"),
         }
+    }
+}
+
+/// A representation of a string literal in the source code
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ZrcString<'input>(pub Vec<StringTok<'input>>);
+impl<'input> ZrcString<'input> {
+    /// Convert a [`ZrcString`] into a [`String`] for its REAL byte representation
+    ///
+    /// See also: [`StringTok::as_byte`]
+    #[must_use]
+    pub fn as_bytes(&self) -> String {
+        self.0.iter().map(StringTok::as_byte).collect()
+    }
+}
+impl Display for ZrcString<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.0.iter().map(ToString::to_string).collect::<String>()
+        )
     }
 }
 
@@ -779,7 +798,7 @@ mod tests {
             Tok::SizeOf,
             Tok::Type,
             Tok::SmallArrow,
-            Tok::StringLiteral(vec![StringTok::Text("str")]),
+            Tok::StringLiteral(ZrcString(vec![StringTok::Text("str")])),
             Tok::NumberLiteral(NumberLiteral::Decimal("7_000")),
             Tok::NumberLiteral(NumberLiteral::Hexadecimal("F_A")),
             Tok::NumberLiteral(NumberLiteral::Binary("1_0")),
