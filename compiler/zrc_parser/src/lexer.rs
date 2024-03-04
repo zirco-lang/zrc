@@ -543,6 +543,8 @@ impl<'input> Display for Tok<'input> {
     }
 }
 
+/// The compiler's representation of a string literal in Zirco
+
 /// Enum representing the lexed contents of a string literal
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
 pub enum StringTok<'input> {
@@ -577,6 +579,35 @@ pub enum StringTok<'input> {
     /// Any other text fragment
     #[regex(r"[^\\]+", lexer_slice)]
     Text(&'input str),
+}
+impl<'input> StringTok<'input> {
+    /// Convert a [`StringTok`] into its literal [`char`] representation
+    ///
+    /// # Panics
+    /// Panics if the [`StringTok`] is invalid
+    #[must_use]
+    pub fn as_byte(&self) -> char {
+        match self {
+            StringTok::EscapedBackslash => '\\',
+            StringTok::EscapedCr => '\r',
+            StringTok::EscapedNewline => '\n',
+            StringTok::EscapedTab => '\t',
+            StringTok::EscapedNull => '\0',
+            StringTok::EscapedHexByte(byte) => {
+                char::from_u32(byte.parse::<u32>().expect("invalid byte")).expect("invalid char")
+            }
+            StringTok::EscapedDoubleQuote => '"',
+            StringTok::Text(text) => {
+                assert!(
+                    text.len() == 1,
+                    "Char literal must be exactly one character"
+                );
+                text.chars()
+                    .next()
+                    .expect("char literal should have a first character")
+            }
+        }
+    }
 }
 impl Display for StringTok<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -183,25 +183,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::StringLiteral(str) => {
-            let formatted_contents = str
-                .iter()
-                .map(|x| match x {
-                    StringTok::EscapedBackslash => "\\".to_string(),
-                    StringTok::EscapedCr => "\r".to_string(),
-                    StringTok::EscapedNewline => "\n".to_string(),
-                    StringTok::EscapedTab => "\t".to_string(),
-                    StringTok::EscapedNull => "\0".to_string(),
-                    StringTok::EscapedHexByte(byte) => {
-                        format!(
-                            "{}",
-                            char::from_u32(byte.parse::<u32>().expect("invalid byte"))
-                                .expect("invalid char")
-                        )
-                    }
-                    StringTok::EscapedDoubleQuote => "\"".to_string(),
-                    StringTok::Text(text) => (*text).to_string(),
-                })
-                .collect::<String>();
+            let formatted_contents = str.iter().map(StringTok::as_byte).collect::<String>();
 
             bb.and(
                 cg.builder
@@ -215,34 +197,10 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 panic!("Char literal must be exactly one character")
             };
 
-            #[allow(clippy::as_conversions)]
             bb.and(
                 cg.ctx
                     .i8_type()
-                    .const_int(
-                        match ch {
-                            StringTok::EscapedBackslash => '\\',
-                            StringTok::EscapedCr => '\r',
-                            StringTok::EscapedNewline => '\n',
-                            StringTok::EscapedTab => '\t',
-                            StringTok::EscapedNull => '\0',
-                            StringTok::EscapedHexByte(byte) => {
-                                char::from_u32(byte.parse::<u32>().expect("invalid byte"))
-                                    .expect("invalid char")
-                            }
-                            StringTok::EscapedDoubleQuote => '"',
-                            StringTok::Text(text) => {
-                                assert!(
-                                    text.len() == 1,
-                                    "Char literal must be exactly one character"
-                                );
-                                text.chars()
-                                    .next()
-                                    .expect("char literal should have a first character")
-                            }
-                        } as u64,
-                        false,
-                    )
+                    .const_int(ch.as_byte().into(), false)
                     .as_basic_value_enum(),
             )
         }
