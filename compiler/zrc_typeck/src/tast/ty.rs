@@ -10,7 +10,6 @@ use std::fmt::Display;
 use indexmap::IndexMap;
 
 use super::stmt::ArgumentDeclarationList;
-use crate::typeck::BlockReturnType;
 
 /// Data attached to a [`Type::Fn`]
 #[derive(Debug, Clone, PartialEq)]
@@ -18,19 +17,11 @@ pub struct Fn<'input> {
     /// The function's arguments
     pub arguments: ArgumentDeclarationList<'input>,
     /// The function's return type
-    pub returns: Box<BlockReturnType<'input>>,
+    pub returns: Box<Type<'input>>,
 }
 impl<'input> Display for Fn<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "(fn({}){})",
-            self.arguments,
-            match &*self.returns {
-                BlockReturnType::Return(ret) => format!(" -> {ret}"),
-                BlockReturnType::Void => String::new(),
-            }
-        )
+        write!(f, "(fn({}) -> {})", self.arguments, self.returns)
     }
 }
 
@@ -70,8 +61,6 @@ pub enum Type<'input> {
     Usize,
     /// `isize`
     Isize,
-    /// `void`, only producible by calling a void function (`fn()`)
-    Void,
     /// `bool`
     Bool, /* TODO: need an "any Int" type that implicitly casts to all int types but becomes
            * i32 when assigned to a value */
@@ -100,7 +89,6 @@ impl<'input> Display for Type<'input> {
             Self::Isize => write!(f, "isize"),
             Self::Bool => write!(f, "bool"),
             Self::Ptr(pointee_ty) => write!(f, "*({pointee_ty})"),
-            Self::Void => write!(f, "void"),
             Self::Fn(fn_data) => write!(f, "{fn_data}"),
             Self::Struct(fields) => write!(
                 f,
@@ -177,5 +165,11 @@ impl<'input> Type<'input> {
             Type::Union(x) => Some(x),
             _ => None,
         }
+    }
+
+    /// Get the unit type
+    #[must_use]
+    pub fn unit() -> Self {
+        Type::Struct(IndexMap::new())
     }
 }

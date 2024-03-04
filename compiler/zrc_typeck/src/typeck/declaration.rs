@@ -9,7 +9,7 @@ use zrc_utils::span::{Spannable, Spanned};
 use super::{
     resolve_type,
     scope::{GlobalScope, Scope},
-    type_block, type_expr, BlockReturnAbility, BlockReturnType,
+    type_block, type_expr, BlockReturnAbility,
 };
 use crate::tast::{
     self,
@@ -111,10 +111,6 @@ pub fn process_let_declaration<'input>(
                     }
                 };
 
-                if result_decl.ty == TastType::Void {
-                    return Err(DiagnosticKind::CannotDeclareVoid.error_in(let_decl_span));
-                }
-
                 scope
                     .values
                     .insert(result_decl.name.value(), result_decl.ty.clone());
@@ -155,11 +151,15 @@ pub fn process_declaration<'input>(
             return_type,
             body,
         } => {
+            let return_type_span = return_type
+                .as_ref()
+                .map_or_else(|| name.span(), |ty| ty.0.span());
+
             let resolved_return_type = return_type
                 .clone()
                 .map(|ty| resolve_type(&global_scope.types, ty))
                 .transpose()?
-                .map_or(BlockReturnType::Void, BlockReturnType::Return);
+                .unwrap_or_else(TastType::unit);
 
             let (ArgumentDeclarationList::NonVariadic(inner_params)
             | ArgumentDeclarationList::Variadic(inner_params)) = parameters.value();
@@ -250,13 +250,7 @@ pub fn process_declaration<'input>(
                     }
                 }
                 .in_span(parameters.span()),
-                return_type: resolved_return_type
-                    .clone()
-                    .into_option()
-                    .map(|existing_type| {
-                        existing_type
-                            .in_span(return_type.expect("already unwrapped before").0.span())
-                    }),
+                return_type: resolved_return_type.clone().in_span(return_type_span),
                 body: if let Some(body) = body {
                     let mut function_scope = global_scope.create_subscope();
                     for param in resolved_parameters {
@@ -303,7 +297,10 @@ mod tests {
     use tast::stmt::ArgumentDeclarationList as TastArgumentDeclarationList;
     use zrc_parser::ast::{
         expr::{Expr, ExprKind},
-        stmt::{ArgumentDeclarationList as AstArgumentDeclarationList, Stmt, StmtKind},
+        stmt::{
+            ArgumentDeclarationList as AstArgumentDeclarationList, Declaration as AstDeclaration,
+            Stmt, StmtKind,
+        },
         ty::{Type, TypeKind},
     };
     use zrc_utils::spanned;
@@ -319,7 +316,7 @@ mod tests {
                     "get_true",
                     TastType::Fn(Fn {
                         arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
-                        returns: Box::new(BlockReturnType::Return(TastType::Bool))
+                        returns: Box::new(TastType::Bool)
                     })
                 )]),
                 types: TypeCtx::from([("bool", TastType::Bool)]),
@@ -328,7 +325,7 @@ mod tests {
                     FunctionDeclarationGlobalMetadata {
                         fn_type: Fn {
                             arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
-                            returns: Box::new(BlockReturnType::Return(TastType::Bool))
+                            returns: Box::new(TastType::Bool)
                         },
                         has_implementation: false
                     }

@@ -71,7 +71,8 @@ pub enum TypedStmtKind<'input> {
     ContinueStmt,
     /// `break;`
     BreakStmt,
-    /// `return;` or `return x;`
+    /// `return;` or `return x;`. `return;` is the same as a `return
+    /// CONST_UNIT;`
     ReturnStmt(Option<TypedExpr<'input>>),
     /// A let declaration
     DeclarationList(Vec<Spanned<LetDeclaration<'input>>>),
@@ -223,9 +224,8 @@ pub enum TypedDeclaration<'input> {
         name: Spanned<&'input str>,
         /// The parameters of the function.
         parameters: Spanned<ArgumentDeclarationList<'input>>,
-        /// The return type of the function. If set to [`None`], the function is
-        /// void.
-        return_type: Option<Spanned<Type<'input>>>,
+        /// The return type of the function.
+        return_type: Spanned<Type<'input>>,
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
         body: Option<Spanned<Vec<TypedStmt<'input>>>>,
@@ -237,11 +237,11 @@ impl<'input> Display for TypedDeclaration<'input> {
             Self::FunctionDeclaration {
                 name,
                 parameters,
-                return_type: Some(return_ty),
+                return_type,
                 body: Some(body),
             } => write!(
                 f,
-                "fn {name}({parameters}) -> {return_ty} {{\n{}\n}}",
+                "fn {name}({parameters}) -> {return_type} {{\n{}\n}}",
                 body.value()
                     .iter()
                     .map(|stmt| stmt
@@ -256,34 +256,9 @@ impl<'input> Display for TypedDeclaration<'input> {
             Self::FunctionDeclaration {
                 name,
                 parameters,
-                return_type: Some(return_ty),
+                return_type,
                 body: None,
-            } => write!(f, "fn {name}({parameters}) -> {return_ty};"),
-            Self::FunctionDeclaration {
-                name,
-                parameters,
-                return_type: None,
-                body: Some(body),
-            } => write!(
-                f,
-                "fn {name}({parameters}) {{\n{}\n}}",
-                body.value()
-                    .iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<String>>()
-                    .join("\n")
-            ),
-            Self::FunctionDeclaration {
-                name,
-                parameters,
-                return_type: None,
-                body: None,
-            } => write!(f, "fn {name}({parameters});"),
+            } => write!(f, "fn {name}({parameters}) -> {return_type};"),
         }
     }
 }

@@ -6,43 +6,9 @@ use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{declaration::process_let_declaration, scope::Scope, type_expr};
 use crate::tast::{
-    expr::TypedExpr,
     stmt::{TypedStmt, TypedStmtKind},
     ty::Type as TastType,
 };
-
-/// Describes whether a block returns void or a type.
-#[derive(Debug, Clone, PartialEq)]
-#[allow(clippy::module_name_repetitions)]
-pub enum BlockReturnType<'input> {
-    /// The function/block returns void (`fn()`)
-    Void,
-    /// The function/block returns T (`fn() -> T`)
-    Return(TastType<'input>),
-}
-
-impl<'input> BlockReturnType<'input> {
-    /// Converts this [`BlockReturnType`] into None for void and Some(t) for
-    /// Return(t).
-    #[must_use]
-    #[allow(clippy::missing_const_for_fn)] // I think clippy's high.
-    pub fn into_option(self) -> Option<TastType<'input>> {
-        match self {
-            Self::Void => None,
-            Self::Return(return_type) => Some(return_type),
-        }
-    }
-
-    /// Converts this [`BlockReturnType`] to a [`TastType`]
-    #[must_use]
-    #[allow(clippy::missing_const_for_fn)] // I think clippy's high.
-    pub fn into_tast_type(self) -> TastType<'input> {
-        match self {
-            Self::Void => TastType::Void,
-            Self::Return(return_type) => return_type,
-        }
-    }
-}
 
 /// Describes if a block MAY, MUST, or MUST NOT return.
 #[derive(Debug, Clone, PartialEq)]
@@ -54,12 +20,12 @@ pub enum BlockReturnAbility<'input> {
     /// The block MAY return, but it is not required.
     ///
     /// Any sub-blocks of this block MAY return.
-    MayReturn(BlockReturnType<'input>),
+    MayReturn(TastType<'input>),
 
     /// The block MUST return.
     ///
     /// Any sub-blocks of this block MAY return. At least one MUST return.
-    MustReturn(BlockReturnType<'input>),
+    MustReturn(TastType<'input>),
 }
 impl<'input> BlockReturnAbility<'input> {
     /// Determine the [`BlockReturnAbility`] of a sub-scope. `MustReturn`
@@ -460,86 +426,40 @@ pub fn type_block<'input, 'gs>(
                                 BlockReturnActuality::NeverReturns,
                             ))),
                             StmtKind::ReturnStmt(value) => {
-                                let value_span = value.as_ref().map(|inner| inner.0.span());
                                 let resolved_value =
                                     value.map(|expr| type_expr(&scope, expr)).transpose()?;
+
+                                let inferred_return_type = resolved_value
+                                    .clone()
+                                    .map_or_else(TastType::unit, |x| x.inferred_type);
+
                                 match (resolved_value, return_ability.clone()) {
                                     // expects no return
                                     (_, BlockReturnAbility::MustNotReturn) => {
                                         Err(DiagnosticKind::CannotReturnHere.error_in(stmt_span))
                                     }
 
-                                    // return; in void fn
-                                    (
-                                        None,
-                                        BlockReturnAbility::MayReturn(BlockReturnType::Void)
-                                        | BlockReturnAbility::MustReturn(BlockReturnType::Void),
-                                    ) => Ok(Some((
-                                        TypedStmt(
-                                            TypedStmtKind::ReturnStmt(None).in_span(stmt_span),
-                                        ),
-                                        BlockReturnActuality::AlwaysReturns,
-                                    ))),
-
-                                    // return; in fn with required return type
-                                    (
-                                        None,
-                                        BlockReturnAbility::MayReturn(BlockReturnType::Return(
-                                            return_ty,
-                                        ))
-                                        | BlockReturnAbility::MustReturn(BlockReturnType::Return(
-                                            return_ty,
-                                        )),
-                                    ) => Err(DiagnosticKind::ExpectedGot {
-                                        expected: return_ty.to_string(),
-                                        got: "void".to_string(),
-                                    }
-                                    .error_in(stmt_span)),
-
-                                    // return x; in fn expecting to return void
-                                    (
-                                        Some(TypedExpr { inferred_type, .. }),
-                                        BlockReturnAbility::MustReturn(BlockReturnType::Void)
-                                        | BlockReturnAbility::MayReturn(BlockReturnType::Void),
-                                    ) => Err(DiagnosticKind::ExpectedGot {
-                                        expected: "void".to_string(),
-                                        got: inferred_type.to_string(),
-                                    }
-                                    .error_in(stmt_span)),
-
                                     // return x; in fn expecting to return x
                                     (
-                                        Some(TypedExpr {
-                                            inferred_type,
-                                            kind,
-                                        }),
-                                        BlockReturnAbility::MustReturn(BlockReturnType::Return(
-                                            return_ty,
-                                        ))
-                                        | BlockReturnAbility::MayReturn(BlockReturnType::Return(
-                                            return_ty,
-                                        )),
+                                        return_value,
+                                        BlockReturnAbility::MustReturn(return_ty)
+                                        | BlockReturnAbility::MayReturn(return_ty),
                                     ) => {
-                                        if inferred_type == return_ty {
+                                        if inferred_return_type == return_ty {
                                             Ok(Some((
                                                 TypedStmt(
-                                                    TypedStmtKind::ReturnStmt(Some(TypedExpr {
-                                                        inferred_type,
-                                                        kind,
-                                                    }))
-                                                    .in_span(stmt_span),
+                                                    TypedStmtKind::ReturnStmt(return_value)
+                                                        .in_span(stmt_span),
                                                 ),
                                                 BlockReturnActuality::AlwaysReturns,
                                             )))
                                         } else {
                                             Err(Diagnostic(
                                                 Severity::Error,
-                                                value_span
-                                                    .expect("value should exist if we unwrapped it")
-                                                    .containing(DiagnosticKind::ExpectedGot {
-                                                        expected: return_ty.to_string(),
-                                                        got: inferred_type.to_string(),
-                                                    }),
+                                                stmt_span.containing(DiagnosticKind::ExpectedGot {
+                                                    expected: return_ty.to_string(),
+                                                    got: inferred_return_type.to_string(),
+                                                }),
                                             ))
                                         }
                                     }
@@ -586,10 +506,11 @@ pub fn type_block<'input, 'gs>(
             BlockReturnActuality::AlwaysReturns,
         ) => Ok(BlockReturnActuality::AlwaysReturns),
 
+        // implicitly add a `return;`
         (
-            BlockReturnAbility::MustReturn(BlockReturnType::Void),
+            BlockReturnAbility::MustReturn(return_ty),
             BlockReturnActuality::SometimesReturns | BlockReturnActuality::NeverReturns,
-        ) => {
+        ) if return_ty == TastType::unit() => {
             tast_block.push(TypedStmt(TypedStmtKind::ReturnStmt(None).in_span(
                 Span::from_positions(input_block_span.end() - 1, input_block_span.end()),
             )));

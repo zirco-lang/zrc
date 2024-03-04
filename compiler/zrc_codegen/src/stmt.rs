@@ -7,6 +7,7 @@ use inkwell::{
 use zrc_typeck::tast::{
     expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
     stmt::{LetDeclaration, TypedStmt, TypedStmtKind},
+    ty::Type,
 };
 use zrc_utils::span::{Span, Spannable, Spanned};
 
@@ -294,8 +295,16 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                 }
 
                 TypedStmtKind::ReturnStmt(None) => {
+                    let unit_type = llvm_basic_type(
+                        cg.compilation_unit.get_file(),
+                        cg.dbg_builder,
+                        cg.ctx,
+                        cg.target_machine,
+                        &Type::unit(),
+                    );
+
                     cg.builder
-                        .build_return(None)
+                        .build_return(Some(&unit_type.0.const_zero()))
                         .expect("return should generate successfully");
 
                     None

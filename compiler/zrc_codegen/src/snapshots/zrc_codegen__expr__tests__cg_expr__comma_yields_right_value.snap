@@ -6,15 +6,15 @@ expression: resulting_ir
 ; ModuleID = 'test.zr'
 source_filename = "test.zr"
 
-declare void @f()
+declare {} @f()
 
 declare i32 @g()
 
 define i32 @test() !dbg !3 {
 entry:
-  call void @f(), !dbg !8
-  %call = call i32 @g(), !dbg !11
-  ret i32 %call, !dbg !11
+  %call = call {} @f(), !dbg !8
+  %call1 = call i32 @g(), !dbg !11
+  ret i32 %call1, !dbg !11
 }
 
 !llvm.module.flags = !{!0}
@@ -32,4 +32,3 @@ entry:
 !9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 4, column: 18)
 !10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 4, column: 18)
 !11 = !DILocation(line: 6, column: 17, scope: !9)
-

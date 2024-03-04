@@ -343,7 +343,7 @@ pub fn type_expr<'input>(
                     }
 
                     TypedExpr {
-                        inferred_type: ret_type.into_option().unwrap_or(TastType::Void),
+                        inferred_type: *ret_type,
                         kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_t)
                             .in_span(expr_span),
                     }
@@ -376,7 +376,7 @@ pub fn type_expr<'input>(
 
                     // the rest may be any, so we don't need to check them
                     TypedExpr {
-                        inferred_type: ret_type.into_option().unwrap_or(TastType::Void),
+                        inferred_type: *ret_type,
                         kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_t)
                             .in_span(expr_span),
                     }
