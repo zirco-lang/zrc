@@ -20,12 +20,12 @@ use zrc_typeck::tast::{
     stmt::{ArgumentDeclaration, TypedDeclaration},
     ty::Type,
 };
-use zrc_utils::span::Spanned;
+use zrc_utils::{line_finder::LineLookup, span::Spanned};
 
 use super::stmt::cg_block;
 use crate::{
     ty::{create_fn, llvm_basic_type, llvm_type},
-    CgContext, CgLineLookup, CgScope,
+    CgContext, CgScope,
 };
 
 /// Initialize the LLVM [`FunctionValue`] for a given function prototype
@@ -187,7 +187,7 @@ fn cg_program<'ctx>(
     debug_level: DWARFEmissionKind,
     parent_directory: &str,
     file_name: &str,
-    line_lookup: &CgLineLookup,
+    line_lookup: &LineLookup,
     program: Vec<Spanned<TypedDeclaration<'_>>>,
 ) -> Module<'ctx> {
     let builder = ctx.create_builder();
@@ -460,7 +460,7 @@ pub fn cg_program_to_string(
         debug_level,
         parent_directory,
         file_name,
-        &CgLineLookup::new(source),
+        &LineLookup::new(source),
         program,
     );
 
@@ -514,7 +514,7 @@ pub fn cg_program_to_buffer(
         debug_level,
         parent_directory,
         file_name,
-        &CgLineLookup::new(source),
+        &LineLookup::new(source),
         program,
     );
 

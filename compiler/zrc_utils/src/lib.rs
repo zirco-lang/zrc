@@ -43,4 +43,5 @@
 )]
 #![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
 
+pub mod line_finder;
 pub mod span;
