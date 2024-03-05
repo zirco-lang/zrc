@@ -24,7 +24,7 @@ use crate::{
 };
 
 /// Get a [`NumberLiteral`]'s [`StringRadix`]
-pub const fn number_literal_radix(n: &NumberLiteral) -> StringRadix {
+const fn number_literal_radix(n: &NumberLiteral) -> StringRadix {
     match n {
         NumberLiteral::Decimal(_) => StringRadix::Decimal,
         NumberLiteral::Binary(_) => StringRadix::Binary,
@@ -32,14 +32,14 @@ pub const fn number_literal_radix(n: &NumberLiteral) -> StringRadix {
     }
 }
 /// Get the [`IntPredicate`] for an [`Equality`] operation
-pub const fn int_predicate_for_equality(op: &Equality) -> IntPredicate {
+const fn int_predicate_for_equality(op: &Equality) -> IntPredicate {
     match op {
         Equality::Eq => IntPredicate::EQ,
         Equality::Neq => IntPredicate::NE,
     }
 }
 /// Get the [`IntPredicate`] for a [`Comparison`] operation
-pub const fn int_predicate_for_comparison(op: &Comparison, signed: bool) -> IntPredicate {
+const fn int_predicate_for_comparison(op: &Comparison, signed: bool) -> IntPredicate {
     match (op, signed) {
         (Comparison::Lt, true) => IntPredicate::SLT,
         (Comparison::Lt, false) => IntPredicate::ULT,
