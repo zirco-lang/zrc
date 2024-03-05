@@ -1,11 +1,7 @@
 //! Resolution from [`Type`] instances to LLVM types.
 
 use inkwell::{
-    context::Context,
-    debug_info::{
-        AsDIScope, DIBasicType, DIDerivedType, DIFile, DISubroutineType, DIType, DebugInfoBuilder,
-    },
-    targets::TargetMachine,
+    debug_info::{AsDIScope, DIBasicType, DIDerivedType, DISubroutineType, DIType},
     types::{
         AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType,
         IntType, PointerType,
@@ -14,12 +10,14 @@ use inkwell::{
 };
 use zrc_typeck::tast::ty::{Fn, Type};
 
+use crate::ctx::AsCompilationUnitCtx;
+
 /// Create a pointer to an [`AnyTypeEnum`] instance.
 ///
 /// # Panics
 /// Panics if `ty` is [`AnyTypeEnum::VoidType`].
-fn create_ptr<'ctx>(
-    dbg_builder: &DebugInfoBuilder<'ctx>,
+fn create_ptr<'ctx: 'a, 'a>(
+    ctx: &impl AsCompilationUnitCtx<'ctx, 'a>,
     ty: AnyTypeEnum<'ctx>,
     dbg_ty: DIType<'ctx>,
 ) -> (PointerType<'ctx>, DIDerivedType<'ctx>) {
@@ -34,7 +32,13 @@ fn create_ptr<'ctx>(
             AnyTypeEnum::VoidType(_) => panic!("cannot create a pointer to void"),
             AnyTypeEnum::FunctionType(x) => x.ptr_type(AddressSpace::default()),
         },
-        dbg_builder.create_pointer_type(&ty.to_string(), dbg_ty, 0, 0, AddressSpace::default()),
+        ctx.dbg_builder().create_pointer_type(
+            &ty.to_string(),
+            dbg_ty,
+            0,
+            0,
+            AddressSpace::default(),
+        ),
     )
 }
 /// Create a function pointer from a prototype.
@@ -46,9 +50,8 @@ fn create_ptr<'ctx>(
 /// # Panics
 /// Panics if `ty` is [`AnyTypeEnum::FunctionType`].
 #[must_use]
-pub fn create_fn<'ctx>(
-    dbg_builder: &DebugInfoBuilder<'ctx>,
-    file: DIFile<'ctx>,
+pub fn create_fn<'ctx: 'a, 'a>(
+    ctx: &impl AsCompilationUnitCtx<'ctx, 'a>,
     ty: AnyTypeEnum<'ctx>,
     dbg_ty: DIType<'ctx>,
     args: &[BasicMetadataTypeEnum<'ctx>],
@@ -70,8 +73,13 @@ pub fn create_fn<'ctx>(
             AnyTypeEnum::VoidType(x) => x.fn_type(args, is_variadic),
             AnyTypeEnum::FunctionType(_) => panic!("fn is not a valid return type for a function"),
         },
-        dbg_builder.create_subroutine_type(file, Some(dbg_ty), dbg_args, 0),
-        dbg_builder
+        ctx.dbg_builder().create_subroutine_type(
+            ctx.compilation_unit().get_file(),
+            Some(dbg_ty),
+            dbg_args,
+            0,
+        ),
+        ctx.dbg_builder()
             .create_basic_type(&ty.to_string(), 0, 0, 0)
             .expect("basic type should be valid"),
     )
@@ -82,28 +90,26 @@ pub fn create_fn<'ctx>(
 /// # Panics
 /// Panics if `ty` is not an integer type
 #[allow(clippy::needless_pass_by_value)]
-pub fn llvm_int_type<'ctx>(
-    dbg_builder: &DebugInfoBuilder<'ctx>,
-    ctx: &'ctx Context,
-    target_machine: &TargetMachine,
+pub fn llvm_int_type<'ctx: 'a, 'a>(
+    ctx: &impl AsCompilationUnitCtx<'ctx, 'a>,
     ty: &Type,
 ) -> (IntType<'ctx>, DIBasicType<'ctx>) {
     (
         match ty {
-            Type::Bool => ctx.bool_type(),
-            Type::I8 | Type::U8 => ctx.i8_type(),
-            Type::I16 | Type::U16 => ctx.i16_type(),
-            Type::I32 | Type::U32 => ctx.i32_type(),
-            Type::I64 | Type::U64 => ctx.i64_type(),
-            Type::Usize | Type::Isize => ctx.ptr_sized_int_type(
-                &target_machine.get_target_data(),
+            Type::Bool => ctx.ctx().bool_type(),
+            Type::I8 | Type::U8 => ctx.ctx().i8_type(),
+            Type::I16 | Type::U16 => ctx.ctx().i16_type(),
+            Type::I32 | Type::U32 => ctx.ctx().i32_type(),
+            Type::I64 | Type::U64 => ctx.ctx().i64_type(),
+            Type::Usize | Type::Isize => ctx.ctx().ptr_sized_int_type(
+                &ctx.target_machine().get_target_data(),
                 Some(AddressSpace::default()),
             ),
             Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
                 panic!("not an integer type")
             }
         },
-        dbg_builder
+        ctx.dbg_builder()
             .create_basic_type(&ty.to_string(), 0, 0, 0)
             .expect("basic type should be valid"),
     )
@@ -114,11 +120,8 @@ pub fn llvm_int_type<'ctx>(
 /// # Panics
 /// Panics if `ty` is not a basic type
 #[allow(clippy::too_many_lines)]
-pub fn llvm_basic_type<'ctx>(
-    file: DIFile<'ctx>,
-    dbg_builder: &DebugInfoBuilder<'ctx>,
-    ctx: &'ctx Context,
-    target_machine: &TargetMachine,
+pub fn llvm_basic_type<'ctx: 'a, 'a>(
+    ctx: &impl AsCompilationUnitCtx<'ctx, 'a>,
     ty: &Type,
 ) -> (BasicTypeEnum<'ctx>, DIType<'ctx>) {
     match ty {
@@ -133,31 +136,30 @@ pub fn llvm_basic_type<'ctx>(
         | Type::U64
         | Type::Usize
         | Type::Isize => {
-            let (ty, dbg_ty) = llvm_int_type(dbg_builder, ctx, target_machine, ty);
+            let (ty, dbg_ty) = llvm_int_type(ctx, ty);
             (ty.as_basic_type_enum(), dbg_ty.as_type())
         }
         Type::Ptr(x) => {
-            let (pointee_ty, pointee_dbg_ty) = llvm_type(file, dbg_builder, ctx, target_machine, x);
-            let (ty, dbg_ty) = create_ptr(dbg_builder, pointee_ty, pointee_dbg_ty);
+            let (pointee_ty, pointee_dbg_ty) = llvm_type(ctx, x);
+            let (ty, dbg_ty) = create_ptr(ctx, pointee_ty, pointee_dbg_ty);
             (ty.as_basic_type_enum(), dbg_ty.as_type())
         }
         Type::Fn(_) => panic!("function is not a basic type"),
         Type::Struct(fields) => (
-            ctx.struct_type(
-                &fields
-                    .into_iter()
-                    .map(|(_, key_ty)| {
-                        llvm_basic_type(file, dbg_builder, ctx, target_machine, key_ty).0
-                    })
-                    .collect::<Vec<_>>(),
-                false,
-            )
-            .as_basic_type_enum(),
-            dbg_builder
+            ctx.ctx()
+                .struct_type(
+                    &fields
+                        .into_iter()
+                        .map(|(_, key_ty)| llvm_basic_type(ctx, key_ty).0)
+                        .collect::<Vec<_>>(),
+                    false,
+                )
+                .as_basic_type_enum(),
+            ctx.dbg_builder()
                 .create_struct_type(
-                    file.as_debug_info_scope(),
+                    ctx.compilation_unit().get_file().as_debug_info_scope(),
                     &ty.to_string(),
-                    file,
+                    ctx.compilation_unit().get_file(),
                     0,
                     0,
                     0,
@@ -166,18 +168,17 @@ pub fn llvm_basic_type<'ctx>(
                     &fields
                         .into_iter()
                         .map(|(key, key_ty)| {
-                            dbg_builder
+                            ctx.dbg_builder()
                                 .create_member_type(
-                                    file.as_debug_info_scope(),
+                                    ctx.compilation_unit().get_file().as_debug_info_scope(),
                                     key,
-                                    file,
+                                    ctx.compilation_unit().get_file(),
                                     0,
                                     0,
                                     0,
                                     0,
                                     0,
-                                    llvm_basic_type(file, dbg_builder, ctx, target_machine, key_ty)
-                                        .1,
+                                    llvm_basic_type(ctx, key_ty).1,
                                 )
                                 .as_type()
                         })
@@ -193,33 +194,31 @@ pub fn llvm_basic_type<'ctx>(
             let largest_field = fields
                 .into_iter()
                 .map(|(_, ty)| {
-                    let ty = llvm_basic_type(file, dbg_builder, ctx, target_machine, ty).0;
-                    let size = target_machine.get_target_data().get_bit_size(&ty);
+                    let ty = llvm_basic_type(ctx, ty).0;
+                    let size = ctx.target_machine().get_target_data().get_bit_size(&ty);
                     (ty, size)
                 })
                 .max_by_key(|(_, size)| *size)
                 .unwrap_or_else(|| {
                     // this is basically `never`
-                    let ty = ctx.struct_type(&[], false).as_basic_type_enum();
-                    (ty, target_machine.get_target_data().get_bit_size(&ty))
+                    let ty = ctx.ctx().struct_type(&[], false).as_basic_type_enum();
+                    (ty, ctx.target_machine().get_target_data().get_bit_size(&ty))
                 });
 
             (
                 largest_field.0,
-                dbg_builder
+                ctx.dbg_builder()
                     .create_union_type(
-                        file.as_debug_info_scope(),
+                        ctx.compilation_unit().get_file().as_debug_info_scope(),
                         &ty.to_string(),
-                        file,
+                        ctx.compilation_unit().get_file(),
                         0,
                         0,
                         0,
                         0,
                         &fields
                             .into_iter()
-                            .map(|(_, ty)| {
-                                llvm_basic_type(file, dbg_builder, ctx, target_machine, ty).1
-                            })
+                            .map(|(_, ty)| llvm_basic_type(ctx, ty).1)
                             .collect::<Vec<_>>(),
                         0,
                         "",
@@ -231,11 +230,8 @@ pub fn llvm_basic_type<'ctx>(
 }
 
 /// Resolve a [`Type`] to a LLVM [`AnyTypeEnum`]
-pub fn llvm_type<'ctx>(
-    file: DIFile<'ctx>,
-    dbg_builder: &DebugInfoBuilder<'ctx>,
-    ctx: &'ctx Context,
-    target_machine: &TargetMachine,
+pub fn llvm_type<'ctx: 'a, 'a>(
+    ctx: &impl AsCompilationUnitCtx<'ctx, 'a>,
     ty: &Type,
 ) -> (AnyTypeEnum<'ctx>, DIType<'ctx>) {
     match ty {
@@ -253,33 +249,26 @@ pub fn llvm_type<'ctx>(
         | Type::Ptr(_)
         | Type::Struct(_)
         | Type::Union(_) => {
-            let (ty, dbg_ty) = llvm_basic_type(file, dbg_builder, ctx, target_machine, ty);
+            let (ty, dbg_ty) = llvm_basic_type(ctx, ty);
             (ty.as_any_type_enum(), dbg_ty)
         }
 
         Type::Fn(Fn { arguments, returns }) => {
-            let (ret, ret_dbg) = llvm_type(file, dbg_builder, ctx, target_machine, returns);
+            let (ret, ret_dbg) = llvm_type(ctx, returns);
             let is_variadic = arguments.is_variadic();
             let (fn_ty, _, fn_dbg_ty) = create_fn(
-                dbg_builder,
-                file,
+                ctx,
                 ret,
                 ret_dbg,
                 &arguments
                     .as_arguments()
                     .iter()
-                    .map(|arg| {
-                        llvm_basic_type(file, dbg_builder, ctx, target_machine, arg.ty.value())
-                            .0
-                            .into()
-                    })
+                    .map(|arg| llvm_basic_type(ctx, arg.ty.value()).0.into())
                     .collect::<Vec<_>>(),
                 &arguments
                     .as_arguments()
                     .iter()
-                    .map(|arg| {
-                        llvm_basic_type(file, dbg_builder, ctx, target_machine, arg.ty.value()).1
-                    })
+                    .map(|arg| llvm_basic_type(ctx, arg.ty.value()).1)
                     .collect::<Vec<_>>(),
                 is_variadic,
             );

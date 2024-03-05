@@ -11,7 +11,7 @@ use zrc_typeck::tast::{
 };
 use zrc_utils::span::{Span, Spannable, Spanned};
 
-use crate::{ctx::CgContext, expr::cg_expr, ty::llvm_basic_type, BasicBlockAnd, CgScope};
+use crate::{ctx::FunctionCtx, expr::cg_expr, ty::llvm_basic_type, BasicBlockAnd, CgScope};
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
 /// instructions. It is passed to [`cg_block`] to allow it to properly handle
@@ -33,7 +33,7 @@ pub(crate) struct LoopBreakaway<'ctx> {
 /// Panics if an internal code generation error is encountered.
 #[allow(clippy::too_many_arguments)]
 fn cg_let_declaration<'ctx, 'input, 'a>(
-    cg: CgContext<'ctx, 'a>,
+    cg: FunctionCtx<'ctx, 'a>,
     mut bb: BasicBlock<'ctx>,
     scope: &'a mut CgScope<'input, 'ctx>,
     dbg_scope: DILexicalBlock<'ctx>,
@@ -73,13 +73,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
             }
         }
 
-        let (ty, dbg_ty) = llvm_basic_type(
-            cg.compilation_unit.get_file(),
-            cg.dbg_builder,
-            cg.ctx,
-            cg.target_machine,
-            &let_declaration.ty,
-        );
+        let (ty, dbg_ty) = llvm_basic_type(&cg, &let_declaration.ty);
 
         let ptr = entry_block_builder
             .build_alloca(ty, &format!("let_{}", let_declaration.name))
@@ -137,7 +131,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
     clippy::redundant_pub_crate
 )]
 pub(crate) fn cg_block<'ctx, 'input, 'a>(
-    cg: CgContext<'ctx, 'a>,
+    cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     parent_scope: &'a CgScope<'input, 'ctx>,
     parent_lexical_block: DILexicalBlock<'ctx>,
@@ -293,13 +287,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                 }
 
                 TypedStmtKind::ReturnStmt(None) => {
-                    let unit_type = llvm_basic_type(
-                        cg.compilation_unit.get_file(),
-                        cg.dbg_builder,
-                        cg.ctx,
-                        cg.target_machine,
-                        &Type::unit(),
-                    );
+                    let unit_type = llvm_basic_type(&cg, &Type::unit());
 
                     cg.builder
                         .build_return(Some(&unit_type.0.const_zero()))
