@@ -30,13 +30,11 @@ impl<'input> Display for LetDeclaration<'input> {
 
 /// A zirco statement after typeck
 #[derive(Debug, Clone, PartialEq)]
-#[allow(clippy::module_name_repetitions)]
 pub struct TypedStmt<'input>(pub Spanned<TypedStmtKind<'input>>);
 
 /// The enum representing all of the different kinds of statements in Zirco
 /// after type checking
 #[derive(Debug, Clone, PartialEq)]
-#[allow(clippy::module_name_repetitions)]
 pub enum TypedStmtKind<'input> {
     // all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here
     // (basically if (x) y has become if (x) {y})

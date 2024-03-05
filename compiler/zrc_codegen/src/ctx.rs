@@ -1,4 +1,5 @@
-//! Structures used internally within the code generator for context and state management
+//! Structures used internally within the code generator for context and state
+//! management
 
 use inkwell::{
     builder::Builder,
@@ -11,7 +12,7 @@ use inkwell::{
 use zrc_utils::line_finder::LineLookup;
 
 /// Trait for any context with at least the fields of [`CompilationUnitCtx`]
-#[allow(clippy::module_name_repetitions, dead_code)]
+#[allow(dead_code)]
 pub trait AsCompilationUnitCtx<'ctx, 'a> {
     /// The LLVM context
     fn ctx(&self) -> &'ctx Context;
@@ -31,7 +32,6 @@ pub trait AsCompilationUnitCtx<'ctx, 'a> {
 
 /// LLVM structures common to a single compilation unit (file)
 #[derive(Debug, Clone, Copy)]
-#[allow(clippy::module_name_repetitions)]
 pub struct CompilationUnitCtx<'ctx, 'a> {
     /// The LLVM context
     pub ctx: &'ctx Context,
@@ -74,7 +74,6 @@ impl<'ctx, 'a> AsCompilationUnitCtx<'ctx, 'a> for CompilationUnitCtx<'ctx, 'a> {
 
 /// Common LLVM structures passed onto most code generation functions
 #[derive(Debug, Clone, Copy)]
-#[allow(clippy::module_name_repetitions)]
 pub struct FunctionCtx<'ctx, 'a> {
     // == FROM CompilationUnitCtx ==
     /// The LLVM context
@@ -119,7 +118,8 @@ impl<'ctx, 'a> AsCompilationUnitCtx<'ctx, 'a> for FunctionCtx<'ctx, 'a> {
     }
 }
 impl<'ctx, 'a> FunctionCtx<'ctx, 'a> {
-    /// Create a function context from a [`CompilationUnitCtx`] and [`FunctionValue`]
+    /// Create a function context from a [`CompilationUnitCtx`] and
+    /// [`FunctionValue`]
     pub const fn from_unit_and_fn(
         unit: CompilationUnitCtx<'ctx, 'a>,
         fn_value: FunctionValue<'ctx>,

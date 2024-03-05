@@ -192,7 +192,6 @@ impl<'input> Display for Expr<'input> {
 /// This enum represents all the different kinds of expressions in Zirco. It is
 /// used by the parser to represent the AST in the expression position.
 #[derive(PartialEq, Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub enum ExprKind<'input> {
     /// `a, b`
     Comma(Box<Expr<'input>>, Box<Expr<'input>>),

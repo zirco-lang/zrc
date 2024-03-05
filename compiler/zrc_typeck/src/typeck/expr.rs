@@ -135,7 +135,6 @@ fn expect_is_unsigned_integer(ty: &TastType, span: Span) -> Result<(), Diagnosti
 /// # Errors
 /// Errors if a type checker error is encountered.
 #[allow(clippy::too_many_lines)] // FIXME: make this fn shorter
-#[allow(clippy::module_name_repetitions)]
 pub fn type_expr<'input>(
     scope: &Scope<'input, '_>,
     expr: Expr<'input>,

@@ -647,7 +647,6 @@ impl Display for ZrcString<'_> {
 }
 
 /// A lexer for the Zirco programming language
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct ZircoLexer<'input> {
     /// The internal [`Lexer`] we wrap

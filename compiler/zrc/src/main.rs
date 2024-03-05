@@ -43,7 +43,11 @@
     unused_qualifications,
     clippy::unwrap_used
 )]
-#![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
+#![allow(
+    clippy::multiple_crate_versions,
+    clippy::cargo_common_metadata,
+    clippy::module_name_repetitions
+)]
 
 use std::{
     fmt::{Display, Write},

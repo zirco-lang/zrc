@@ -55,7 +55,6 @@ impl<'input> Display for PlaceKind<'input> {
 /// An [expression kind](TypedExprKind) with its yielded [result
 /// type](super::ty::Type) attached to it.
 #[derive(PartialEq, Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub struct TypedExpr<'input> {
     /// The inferred [`Type`] of this node
     pub inferred_type: Type<'input>,

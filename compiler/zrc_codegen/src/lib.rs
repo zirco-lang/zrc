@@ -48,7 +48,11 @@
     clippy::print_stderr,
     clippy::print_stdout
 )]
-#![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
+#![allow(
+    clippy::multiple_crate_versions,
+    clippy::cargo_common_metadata,
+    clippy::module_name_repetitions
+)]
 
 // Ordering matters! Declared here so other modules have access
 /// Convenience macro to unpack a `BasicBlockAnd` -- assigns to the provided
