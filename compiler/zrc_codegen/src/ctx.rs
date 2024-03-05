@@ -4,12 +4,14 @@
 use inkwell::{
     builder::Builder,
     context::Context,
-    debug_info::{DICompileUnit, DebugInfoBuilder},
+    debug_info::{DICompileUnit, DILexicalBlock, DebugInfoBuilder},
     module::Module,
     targets::TargetMachine,
     values::FunctionValue,
 };
 use zrc_utils::line_finder::LineLookup;
+
+use crate::CgScope;
 
 /// Trait for any context with at least the fields of [`CompilationUnitCtx`]
 #[allow(dead_code)]
@@ -133,6 +135,81 @@ impl<'ctx, 'a> FunctionCtx<'ctx, 'a> {
             compilation_unit: unit.compilation_unit,
             module: unit.module,
             fn_value,
+        }
+    }
+}
+
+/// An extension of [`FunctionCtx`] containing values found in an individual
+/// lexical block (except `bb`, as this is mutated often)
+#[derive(Debug, Clone, Copy)]
+pub struct BlockCtx<'ctx, 'input, 'a> {
+    // == FROM CompilationUnitCtx ==
+    /// The LLVM context
+    pub ctx: &'ctx Context,
+    /// The LLVM target machine
+    pub target_machine: &'a TargetMachine,
+    /// The LLVM builder used to build instructions
+    pub builder: &'a Builder<'ctx>,
+    /// The lookup for lines in the source file
+    pub line_lookup: &'a LineLookup,
+    /// The LLVM builder for debug info
+    pub dbg_builder: &'a DebugInfoBuilder<'ctx>,
+    /// The LLVM compile unit for debug info
+    pub compilation_unit: &'a DICompileUnit<'ctx>,
+    /// The LLVM module we are building in
+    pub module: &'a Module<'ctx>,
+
+    // == FROM FunctionCtx ==
+    /// The LLVM function we are building in
+    pub fn_value: FunctionValue<'ctx>,
+
+    /// The code generation type/value scope this block lives in
+    pub scope: &'a CgScope<'input, 'ctx>,
+    /// The LLVM [`DILexicalBlock`] we're currently in
+    pub dbg_scope: DILexicalBlock<'ctx>,
+}
+impl<'ctx, 'input, 'a> AsCompilationUnitCtx<'ctx, 'a> for BlockCtx<'ctx, 'input, 'a> {
+    fn ctx(&self) -> &'ctx Context {
+        self.ctx
+    }
+    fn target_machine(&self) -> &'a TargetMachine {
+        self.target_machine
+    }
+    fn builder(&self) -> &'a Builder<'ctx> {
+        self.builder
+    }
+    fn line_lookup(&self) -> &'a LineLookup {
+        self.line_lookup
+    }
+    fn dbg_builder(&self) -> &'a DebugInfoBuilder<'ctx> {
+        self.dbg_builder
+    }
+    fn compilation_unit(&self) -> &'a DICompileUnit<'ctx> {
+        self.compilation_unit
+    }
+    fn module(&self) -> &'a Module<'ctx> {
+        self.module
+    }
+}
+impl<'ctx, 'input, 'a> BlockCtx<'ctx, 'input, 'a> {
+    /// Create a new [`BlockCtx`] from a [`FunctionCtx`] and needed block
+    /// scoping parameters
+    pub const fn new(
+        function_ctx: FunctionCtx<'ctx, 'a>,
+        scope: &'a CgScope<'input, 'ctx>,
+        dbg_scope: DILexicalBlock<'ctx>,
+    ) -> Self {
+        Self {
+            ctx: function_ctx.ctx,
+            target_machine: function_ctx.target_machine,
+            builder: function_ctx.builder,
+            line_lookup: function_ctx.line_lookup,
+            dbg_builder: function_ctx.dbg_builder,
+            compilation_unit: function_ctx.compilation_unit,
+            module: function_ctx.module,
+            fn_value: function_ctx.fn_value,
+            scope,
+            dbg_scope,
         }
     }
 }

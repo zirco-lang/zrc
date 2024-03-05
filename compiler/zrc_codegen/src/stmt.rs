@@ -11,7 +11,12 @@ use zrc_typeck::tast::{
 };
 use zrc_utils::span::{Span, Spannable, Spanned};
 
-use crate::{ctx::FunctionCtx, expr::cg_expr, ty::llvm_basic_type, BasicBlockAnd, CgScope};
+use crate::{
+    ctx::{BlockCtx, FunctionCtx},
+    expr::cg_expr,
+    ty::llvm_basic_type,
+    BasicBlockAnd, CgScope,
+};
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
 /// instructions. It is passed to [`cg_block`] to allow it to properly handle
@@ -96,11 +101,11 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
             .insert_declare_at_end(ptr, Some(decl), None, debug_location, first_bb);
 
         if let Some(value) = let_declaration.value {
+            let expr_cg = BlockCtx::new(cg, scope, dbg_scope);
+
             bb = cg_expr(
-                cg,
+                expr_cg,
                 bb,
-                scope,
-                dbg_scope,
                 TypedExpr {
                     inferred_type: let_declaration.ty.clone(),
                     kind: value.kind.span().containing(TypedExprKind::Assignment(
@@ -165,10 +170,14 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
 
             match stmt.0.into_value() {
                 TypedStmtKind::ExprStmt(expr) => {
-                    Some(cg_expr(cg, bb, &scope, lexical_block, expr).bb)
+                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+
+                    Some(cg_expr(expr_cg, bb, expr).bb)
                 }
 
                 TypedStmtKind::IfStmt(cond, then, then_else) => {
+                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+
                     let then_else = then_else.unwrap_or_else(|| {
                         vec![].in_span(Span::from_positions(then.end(), then.end()))
                     });
@@ -176,7 +185,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     let then_end = then.end();
                     let then_else_end = then_else.end();
 
-                    let cond = cg_expr(cg, bb, &scope, lexical_block, cond).into_value();
+                    let cond = cg_expr(expr_cg, bb, cond).into_value();
 
                     let then_bb = cg.ctx.append_basic_block(cg.fn_value, "then");
                     let then_else_bb = cg.ctx.append_basic_block(cg.fn_value, "then_else");
@@ -277,7 +286,9 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                 ),
 
                 TypedStmtKind::ReturnStmt(Some(expr)) => {
-                    let expr = cg_expr(cg, bb, &scope, lexical_block, expr).into_value();
+                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+
+                    let expr = cg_expr(expr_cg, bb, expr).into_value();
 
                     cg.builder
                         .build_return(Some(&expr))
@@ -354,6 +365,8 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         cg_let_declaration(cg, bb, &mut scope, lexical_block, *init);
                     }
 
+                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+
                     let header = cg.ctx.append_basic_block(cg.fn_value, "header");
                     let body_bb = cg.ctx.append_basic_block(cg.fn_value, "body");
                     let latch = cg.ctx.append_basic_block(cg.fn_value, "latch");
@@ -378,8 +391,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         |cond| {
                             let mut header = header;
 
-                            let cond =
-                                unpack!(header = cg_expr(cg, header, &scope, lexical_block, cond));
+                            let cond = unpack!(header = cg_expr(expr_cg, header, cond));
 
                             cg.builder
                                 .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -413,7 +425,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     // Latch runs post and then breaks right back to the header.
                     cg.builder.position_at_end(latch);
                     if let Some(post) = post {
-                        cg_expr(cg, latch, &scope, lexical_block, post);
+                        cg_expr(expr_cg, latch, post);
                     }
 
                     cg.builder
@@ -426,6 +438,8 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                 }
 
                 TypedStmtKind::WhileStmt(cond, body) => {
+                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+
                     // While loops are similar to for loops but much simpler.
                     // The preheader simply just breaks to the header.
                     // The header checks the condition and breaks to the exit or the body.
@@ -447,7 +461,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
 
                     cg.builder.position_at_end(header);
 
-                    let cond = unpack!(header = cg_expr(cg, header, &scope, lexical_block, cond));
+                    let cond = unpack!(header = cg_expr(expr_cg, header, cond));
 
                     cg.builder
                         .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -479,6 +493,8 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                 }
 
                 TypedStmtKind::DoWhileStmt(body, cond) => {
+                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+
                     // `do..while` loops are slightly different from `while` loops.
                     // the preheader breaks directly to the *body* and forces it to run at
                     // least once. the body can then later break to the header which checks the
@@ -520,8 +536,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
 
                     cg.builder.position_at_end(header);
 
-                    let BasicBlockAnd { value: cond, .. } =
-                        cg_expr(cg, header, &scope, lexical_block, cond);
+                    let BasicBlockAnd { value: cond, .. } = cg_expr(expr_cg, header, cond);
 
                     cg.builder
                         .build_conditional_branch(cond.into_int_value(), body_start, exit)

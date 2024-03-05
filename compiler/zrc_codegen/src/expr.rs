@@ -3,7 +3,7 @@
 use inkwell::{
     basic_block::BasicBlock,
     builder::BuilderError,
-    debug_info::{AsDIScope, DILexicalBlock},
+    debug_info::AsDIScope,
     types::{BasicType, StringRadix},
     values::{BasicValue, BasicValueEnum, IntValue, PointerValue},
     IntPredicate,
@@ -17,9 +17,8 @@ use zrc_typeck::tast::{
 };
 use zrc_utils::span::Spannable;
 
-use super::CgScope;
 use crate::{
-    ctx::FunctionCtx,
+    ctx::BlockCtx,
     ty::{llvm_basic_type, llvm_int_type, llvm_type},
     BasicBlockAnd, BasicBlockExt,
 };
@@ -54,7 +53,7 @@ const fn int_predicate_for_comparison(op: &Comparison, signed: bool) -> IntPredi
 }
 /// Build the required instruction for a [`BinaryBitwise`] operation
 pub fn build_binary_bitwise<'ctx>(
-    cg: FunctionCtx<'ctx, '_>,
+    cg: BlockCtx<'ctx, '_, '_>,
     op: &BinaryBitwise,
     lhs: IntValue<'ctx>,
     rhs: IntValue<'ctx>,
@@ -72,7 +71,7 @@ pub fn build_binary_bitwise<'ctx>(
 }
 /// Build the required instruction for an [`Arithmetic`] operation
 pub fn build_arithmetic<'ctx>(
-    cg: FunctionCtx<'ctx, '_>,
+    cg: BlockCtx<'ctx, '_, '_>,
     op: &Arithmetic,
     lhs: IntValue<'ctx>,
     rhs: IntValue<'ctx>,
@@ -95,11 +94,9 @@ pub fn build_arithmetic<'ctx>(
 
 /// Resolve a place to its pointer
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
-fn cg_place<'ctx, 'a>(
-    cg: FunctionCtx<'ctx, 'a>,
+fn cg_place<'ctx>(
+    cg: BlockCtx<'ctx, '_, '_>,
     mut bb: BasicBlock<'ctx>,
-    scope: &'a CgScope<'_, 'ctx>,
-    dbg_scope: DILexicalBlock<'ctx>,
     place: Place,
 ) -> BasicBlockAnd<'ctx, PointerValue<'ctx>> {
     let place_span = place.kind.span();
@@ -108,14 +105,15 @@ fn cg_place<'ctx, 'a>(
         cg.ctx,
         line_and_col.line,
         line_and_col.col,
-        dbg_scope.as_debug_info_scope(),
+        cg.dbg_scope.as_debug_info_scope(),
         None,
     );
     cg.builder.set_current_debug_location(debug_location);
 
     match place.kind.into_value() {
         PlaceKind::Variable(x) => {
-            let reg = scope
+            let reg = cg
+                .scope
                 .get(x)
                 .expect("identifier that passed typeck should exist in the CgScope");
 
@@ -123,14 +121,14 @@ fn cg_place<'ctx, 'a>(
         }
 
         PlaceKind::Deref(x) => {
-            let value = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *x));
+            let value = unpack!(bb = cg_expr(cg, bb, *x));
 
             bb.and(value.into_pointer_value())
         }
 
         PlaceKind::Index(ptr, idx) => {
-            let ptr = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *ptr));
-            let idx = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *idx));
+            let ptr = unpack!(bb = cg_expr(cg, bb, *ptr));
+            let idx = unpack!(bb = cg_expr(cg, bb, *idx));
 
             // SAFETY: If indices are used incorrectly this may segfault
             // TODO: Is this actually safely used?
@@ -156,7 +154,7 @@ fn cg_place<'ctx, 'a>(
                     .position(|(got_key, _)| *got_key == prop.into_value())
                     .expect("invalid struct field");
 
-                let x = unpack!(bb = cg_place(cg, bb, scope, dbg_scope, *x));
+                let x = unpack!(bb = cg_place(cg, bb, *x));
 
                 let reg = cg
                     .builder
@@ -176,7 +174,7 @@ fn cg_place<'ctx, 'a>(
                 // All we need to do is cast the pointer, but there's no `bitcast` anymore,
                 // so just return it and it'll take on the correct type
 
-                let value = unpack!(bb = cg_place(cg, bb, scope, dbg_scope, *x));
+                let value = unpack!(bb = cg_place(cg, bb, *x));
 
                 bb.and(value)
             }
@@ -192,11 +190,9 @@ fn cg_place<'ctx, 'a>(
     clippy::match_same_arms,
     clippy::too_many_arguments
 )]
-pub(crate) fn cg_expr<'ctx, 'a>(
-    cg: FunctionCtx<'ctx, 'a>,
+pub(crate) fn cg_expr<'ctx>(
+    cg: BlockCtx<'ctx, '_, '_>,
     mut bb: BasicBlock<'ctx>,
-    scope: &'a CgScope<'_, 'ctx>,
-    dbg_scope: DILexicalBlock<'ctx>,
     expr: TypedExpr,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
     let expr_span = expr.kind.span();
@@ -205,7 +201,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         cg.ctx,
         line_and_col.line,
         line_and_col.col,
-        dbg_scope.as_debug_info_scope(),
+        cg.dbg_scope.as_debug_info_scope(),
         None,
     );
     cg.builder.set_current_debug_location(debug_location);
@@ -244,8 +240,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         ),
 
         TypedExprKind::Comma(lhs, rhs) => {
-            let _ = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *lhs));
-            cg_expr(cg, bb, scope, dbg_scope, *rhs)
+            let _ = unpack!(bb = cg_expr(cg, bb, *lhs));
+            cg_expr(cg, bb, *rhs)
         }
 
         TypedExprKind::Identifier(id) => {
@@ -253,8 +249,6 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 bb = cg_place(
                     cg,
                     bb,
-                    scope,
-                    dbg_scope,
                     Place {
                         inferred_type: expr.inferred_type.clone(),
                         kind: PlaceKind::Variable(id).in_span(expr_span),
@@ -271,8 +265,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Assignment(place, value) => {
-            let value = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *value));
-            let place = unpack!(bb = cg_place(cg, bb, scope, dbg_scope, *place));
+            let value = unpack!(bb = cg_expr(cg, bb, *value));
+            let place = unpack!(bb = cg_place(cg, bb, *place));
 
             cg.builder
                 .build_store(place, value)
@@ -282,8 +276,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::BinaryBitwise(op, lhs, rhs) => {
-            let lhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *lhs));
-            let rhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *rhs));
+            let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
+            let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
 
             let reg = build_binary_bitwise(
                 cg,
@@ -298,8 +292,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Equality(op, lhs, rhs) => {
-            let lhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *lhs));
-            let rhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *rhs));
+            let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
+            let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
 
             let reg = cg
                 .builder
@@ -315,8 +309,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Comparison(op, lhs, rhs) => {
-            let lhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *lhs));
-            let rhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *rhs));
+            let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
+            let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
 
             let reg = cg
                 .builder
@@ -333,8 +327,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
         TypedExprKind::Arithmetic(op, lhs, rhs) => {
             let lhs_ty = lhs.inferred_type.clone();
-            let lhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *lhs));
-            let rhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *rhs));
+            let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
+            let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
 
             if let Type::Ptr(pointee) = lhs_ty {
                 // Most languages make incrementing a pointer increase the address by the size
@@ -390,8 +384,8 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::Logical(op, lhs, rhs) => {
-            let lhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *lhs));
-            let rhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *rhs));
+            let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
+            let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
 
             let reg = match op {
                 Logical::And => {
@@ -409,7 +403,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryNot(x) => {
-            let value = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *x));
+            let value = unpack!(bb = cg_expr(cg, bb, *x));
 
             let reg = cg
                 .builder
@@ -420,7 +414,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryBitwiseNot(x) => {
-            let value = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *x));
+            let value = unpack!(bb = cg_expr(cg, bb, *x));
 
             let reg = cg
                 .builder
@@ -431,7 +425,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryMinus(x) => {
-            let value = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *x));
+            let value = unpack!(bb = cg_expr(cg, bb, *x));
 
             let reg = cg
                 .builder
@@ -442,13 +436,13 @@ pub(crate) fn cg_expr<'ctx, 'a>(
         }
 
         TypedExprKind::UnaryAddressOf(x) => {
-            let value = unpack!(bb = cg_place(cg, bb, scope, dbg_scope, *x));
+            let value = unpack!(bb = cg_place(cg, bb, *x));
 
             bb.and(value.as_basic_value_enum())
         }
 
         TypedExprKind::UnaryDereference(ptr) => {
-            let ptr = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *ptr));
+            let ptr = unpack!(bb = cg_expr(cg, bb, *ptr));
 
             let reg = cg
                 .builder
@@ -467,8 +461,6 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 bb = cg_place(
                     cg,
                     bb,
-                    scope,
-                    dbg_scope,
                     Place {
                         inferred_type: expr.inferred_type.clone(),
                         kind: PlaceKind::Index(ptr, idx).in_span(expr_span),
@@ -489,8 +481,6 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 bb = cg_place(
                     cg,
                     bb,
-                    scope,
-                    dbg_scope,
                     Place {
                         inferred_type: expr.inferred_type.clone(),
                         kind: PlaceKind::Dot(place, key).in_span(expr_span),
@@ -510,13 +500,13 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let llvm_f_type = llvm_type(&cg, &f.inferred_type).0.into_function_type();
 
             // will always be a function pointer
-            let f_ptr = unpack!(bb = cg_place(cg, bb, scope, dbg_scope, *f));
+            let f_ptr = unpack!(bb = cg_place(cg, bb, *f));
 
             let mut bb = bb;
             let old_args = args;
             let mut args = vec![];
             for arg in old_args {
-                let new_arg = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, arg));
+                let new_arg = unpack!(bb = cg_expr(cg, bb, arg));
                 args.push(new_arg.into());
             }
 
@@ -532,7 +522,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             })
         }
         TypedExprKind::Ternary(cond, lhs, rhs) => {
-            let cond = cg_expr(cg, bb, scope, dbg_scope, *cond).into_value();
+            let cond = cg_expr(cg, bb, *cond).into_value();
 
             // If lhs and rhs are registers, the code generated will look like:
             //   entry:
@@ -571,13 +561,13 @@ pub(crate) fn cg_expr<'ctx, 'a>(
                 .expect("conditional branch should have been created successfully");
 
             cg.builder.position_at_end(if_true_bb);
-            let if_true = unpack!(if_true_bb = cg_expr(cg, if_true_bb, scope, dbg_scope, *lhs));
+            let if_true = unpack!(if_true_bb = cg_expr(cg, if_true_bb, *lhs));
             cg.builder
                 .build_unconditional_branch(end_bb)
                 .expect("unconditional branch should have been created successfully");
 
             cg.builder.position_at_end(if_false_bb);
-            let if_false = unpack!(if_false_bb = cg_expr(cg, if_false_bb, scope, dbg_scope, *rhs));
+            let if_false = unpack!(if_false_bb = cg_expr(cg, if_false_bb, *rhs));
             cg.builder
                 .build_unconditional_branch(end_bb)
                 .expect("unconditional branch should have been created successfully");
@@ -605,7 +595,7 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
             let x_ty_is_signed_integer = x.inferred_type.is_signed_integer();
 
-            let x = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *x));
+            let x = unpack!(bb = cg_expr(cg, bb, *x));
 
             let reg = match (
                 x.get_type().is_pointer_type(),
