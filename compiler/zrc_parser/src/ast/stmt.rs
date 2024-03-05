@@ -68,7 +68,7 @@ impl<'input> Display for StmtKind<'input> {
                 write!(f, "if ({cond}) {if_true} else {if_false}")
             }
             Self::WhileStmt(cond, body) => write!(f, "while ({cond}) {body}"),
-            Self::DoWhileStmt(body, cond) => write!(f, "do {body} while ({cond})"),
+            Self::DoWhileStmt(body, cond) => write!(f, "do {body} while ({cond});"),
             Self::ForStmt {
                 init,
                 cond,
@@ -266,5 +266,50 @@ pub struct ArgumentDeclaration<'input> {
 impl<'input> Display for ArgumentDeclaration<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.name, self.ty)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn statements_stringify_to_their_canonical_form() {
+        // A list of sample statements in "canonical form."
+        // These are parsed then stringified again, and tested for equality.
+
+        let test_cases = vec![
+            "return;",
+            "break;",
+            "continue;",
+            "return (4);",
+            "((f)((x)));",
+            "{}",
+            ";",
+            "if ((true)) {;}",
+            "if ((true)) {;} else {;}",
+            "while ((true)) {;}",
+            "do {;} while ((true));",
+            "for (; ; ) {;}",
+            "for (let x = (4); ; ) {;}",
+            "for (let x = (4), y = (5); ; ) {;}",
+            "for (let x = (4); (true); ) {;}",
+            "let x;",
+            "let x = (4);",
+            "let x: i32;",
+            "let x: i32 = (4);",
+            "{let x = (4);}",
+        ];
+
+        for input in test_cases {
+            assert_eq!(
+                crate::parser::parse_stmt_list(input)
+                    .expect("test cases should have parsed correctly")
+                    .into_value()
+                    .into_iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join("; "),
+                input
+            );
+        }
     }
 }

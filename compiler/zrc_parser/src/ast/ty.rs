@@ -89,3 +89,28 @@ impl<'input> Type<'input> {
         Self(TypeKind::Ptr(Box::new(ty)).in_span(span))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn types_stringify_to_their_canonical_form() {
+        // A list of sample types in "canonical form."
+        // These are parsed then stringified again, and tested for equality.
+
+        let test_cases = vec![
+            "i32",
+            "*i32",
+            "struct { a: i32, b: i32 }",
+            "union { a: i32, b: i32 }",
+        ];
+
+        for input in test_cases {
+            assert_eq!(
+                crate::parser::parse_type(input)
+                    .expect("test cases should have parsed correctly")
+                    .to_string(),
+                input
+            );
+        }
+    }
+}

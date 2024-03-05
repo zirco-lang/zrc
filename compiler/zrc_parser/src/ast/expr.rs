@@ -589,3 +589,69 @@ impl<'input> Expr<'input> {
         ))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn expressions_stringify_to_their_canonical_form() {
+        // A list of sample expressions in "canonical form."
+        // These are parsed then stringified again, and tested for equality.
+
+        let test_cases = vec![
+            "((1), (2))",
+            "((a) = (b))",
+            "((a) += (b))",
+            "((a) -= (b))",
+            "((a) *= (b))",
+            "((a) /= (b))",
+            "((a) %= (b))",
+            "((a) &= (b))",
+            "((a) |= (b))",
+            "((a) ^= (b))",
+            "((a) <<= (b))",
+            "((a) >>= (b))",
+            "((a) << (b))",
+            "((a) >> (b))",
+            "((a) && (b))",
+            "((a) || (b))",
+            "((a) == (b))",
+            "((a) != (b))",
+            "((a) > (b))",
+            "((a) >= (b))",
+            "((a) < (b))",
+            "((a) <= (b))",
+            "((a) + (b))",
+            "((a) - (b))",
+            "((a) * (b))",
+            "((a) / (b))",
+            "((a) % (b))",
+            "(!(a))",
+            "(~(a))",
+            "(-(a))",
+            "(&(a))",
+            "(*(a))",
+            "((a)[(b)])",
+            "((a).b)",
+            "((a)->b)",
+            "((a)((b), (c)))",
+            "((a) ? (b) : (c))",
+            "((a) as T)",
+            "(sizeof T)",
+            "(sizeof((expr)))",
+            "(1)",
+            "(\"a\")",
+            "('a')",
+            "(a)",
+            "(true)",
+        ];
+
+        for input in test_cases {
+            assert_eq!(
+                crate::parser::parse_expr(input)
+                    .expect("test cases should have parsed correctly")
+                    .to_string(),
+                input
+            );
+        }
+    }
+}
