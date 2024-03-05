@@ -15,21 +15,38 @@ use crate::CgScope;
 
 /// Trait for any context with at least the fields of [`CompilationUnitCtx`]
 #[allow(dead_code)]
-pub trait AsCompilationUnitCtx<'ctx, 'a> {
+pub trait AsCompilationUnitCtx<'ctx: 'a, 'a> {
+    /// Convert some specific context to a [`CompilationUnitCtx`]
+    fn as_unit_ctx(&self) -> CompilationUnitCtx<'ctx, 'a>;
+
     /// The LLVM context
-    fn ctx(&self) -> &'ctx Context;
+    fn ctx(&self) -> &'ctx Context {
+        self.as_unit_ctx().ctx
+    }
     /// The LLVM target machine
-    fn target_machine(&self) -> &'a TargetMachine;
+    fn target_machine(&self) -> &'a TargetMachine {
+        self.as_unit_ctx().target_machine
+    }
     /// The LLVM builder used to build instructions
-    fn builder(&self) -> &'a Builder<'ctx>;
+    fn builder(&self) -> &'a Builder<'ctx> {
+        self.as_unit_ctx().builder
+    }
     /// The lookup for lines in the source file
-    fn line_lookup(&self) -> &'a LineLookup;
+    fn line_lookup(&self) -> &'a LineLookup {
+        self.as_unit_ctx().line_lookup
+    }
     /// The LLVM builder for debug info
-    fn dbg_builder(&self) -> &'a DebugInfoBuilder<'ctx>;
+    fn dbg_builder(&self) -> &'a DebugInfoBuilder<'ctx> {
+        self.as_unit_ctx().dbg_builder
+    }
     /// The LLVM compile unit for debug info
-    fn compilation_unit(&self) -> &'a DICompileUnit<'ctx>;
+    fn compilation_unit(&self) -> &'a DICompileUnit<'ctx> {
+        self.as_unit_ctx().compilation_unit
+    }
     /// The LLVM module we are building in
-    fn module(&self) -> &'a Module<'ctx>;
+    fn module(&self) -> &'a Module<'ctx> {
+        self.as_unit_ctx().module
+    }
 }
 
 /// LLVM structures common to a single compilation unit (file)
@@ -51,26 +68,8 @@ pub struct CompilationUnitCtx<'ctx, 'a> {
     pub module: &'a Module<'ctx>,
 }
 impl<'ctx, 'a> AsCompilationUnitCtx<'ctx, 'a> for CompilationUnitCtx<'ctx, 'a> {
-    fn ctx(&self) -> &'ctx Context {
-        self.ctx
-    }
-    fn target_machine(&self) -> &'a TargetMachine {
-        self.target_machine
-    }
-    fn builder(&self) -> &'a Builder<'ctx> {
-        self.builder
-    }
-    fn line_lookup(&self) -> &'a LineLookup {
-        self.line_lookup
-    }
-    fn dbg_builder(&self) -> &'a DebugInfoBuilder<'ctx> {
-        self.dbg_builder
-    }
-    fn compilation_unit(&self) -> &'a DICompileUnit<'ctx> {
-        self.compilation_unit
-    }
-    fn module(&self) -> &'a Module<'ctx> {
-        self.module
+    fn as_unit_ctx(&self) -> CompilationUnitCtx<'ctx, 'a> {
+        *self
     }
 }
 
@@ -97,26 +96,16 @@ pub struct FunctionCtx<'ctx, 'a> {
     pub fn_value: FunctionValue<'ctx>,
 }
 impl<'ctx, 'a> AsCompilationUnitCtx<'ctx, 'a> for FunctionCtx<'ctx, 'a> {
-    fn ctx(&self) -> &'ctx Context {
-        self.ctx
-    }
-    fn target_machine(&self) -> &'a TargetMachine {
-        self.target_machine
-    }
-    fn builder(&self) -> &'a Builder<'ctx> {
-        self.builder
-    }
-    fn line_lookup(&self) -> &'a LineLookup {
-        self.line_lookup
-    }
-    fn dbg_builder(&self) -> &'a DebugInfoBuilder<'ctx> {
-        self.dbg_builder
-    }
-    fn compilation_unit(&self) -> &'a DICompileUnit<'ctx> {
-        self.compilation_unit
-    }
-    fn module(&self) -> &'a Module<'ctx> {
-        self.module
+    fn as_unit_ctx(&self) -> CompilationUnitCtx<'ctx, 'a> {
+        CompilationUnitCtx {
+            ctx: self.ctx,
+            target_machine: self.target_machine,
+            builder: self.builder,
+            line_lookup: self.line_lookup,
+            dbg_builder: self.dbg_builder,
+            compilation_unit: self.compilation_unit,
+            module: self.module,
+        }
     }
 }
 impl<'ctx, 'a> FunctionCtx<'ctx, 'a> {
@@ -169,26 +158,16 @@ pub struct BlockCtx<'ctx, 'input, 'a> {
     pub dbg_scope: DILexicalBlock<'ctx>,
 }
 impl<'ctx, 'input, 'a> AsCompilationUnitCtx<'ctx, 'a> for BlockCtx<'ctx, 'input, 'a> {
-    fn ctx(&self) -> &'ctx Context {
-        self.ctx
-    }
-    fn target_machine(&self) -> &'a TargetMachine {
-        self.target_machine
-    }
-    fn builder(&self) -> &'a Builder<'ctx> {
-        self.builder
-    }
-    fn line_lookup(&self) -> &'a LineLookup {
-        self.line_lookup
-    }
-    fn dbg_builder(&self) -> &'a DebugInfoBuilder<'ctx> {
-        self.dbg_builder
-    }
-    fn compilation_unit(&self) -> &'a DICompileUnit<'ctx> {
-        self.compilation_unit
-    }
-    fn module(&self) -> &'a Module<'ctx> {
-        self.module
+    fn as_unit_ctx(&self) -> CompilationUnitCtx<'ctx, 'a> {
+        CompilationUnitCtx {
+            ctx: self.ctx,
+            target_machine: self.target_machine,
+            builder: self.builder,
+            line_lookup: self.line_lookup,
+            dbg_builder: self.dbg_builder,
+            compilation_unit: self.compilation_unit,
+            module: self.module,
+        }
     }
 }
 impl<'ctx, 'input, 'a> BlockCtx<'ctx, 'input, 'a> {
