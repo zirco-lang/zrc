@@ -198,6 +198,15 @@ pub enum NumberLiteral<'input> {
     /// A binary number literal
     Binary(&'input str),
 }
+impl<'input> NumberLiteral<'input> {
+    /// Get the text content of this [`NumberLiteral`]
+    #[must_use]
+    pub const fn text_content(&self) -> &'input str {
+        match self {
+            Self::Decimal(n) | Self::Hexadecimal(n) | Self::Binary(n) => n,
+        }
+    }
+}
 impl Display for NumberLiteral<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

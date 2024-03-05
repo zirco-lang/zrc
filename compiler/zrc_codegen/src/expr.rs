@@ -23,6 +23,35 @@ use crate::{
     BasicBlockAnd, BasicBlockExt,
 };
 
+/// Get a [`NumberLiteral`]'s [`StringRadix`]
+pub const fn number_literal_radix(n: &NumberLiteral) -> StringRadix {
+    match n {
+        NumberLiteral::Decimal(_) => StringRadix::Decimal,
+        NumberLiteral::Binary(_) => StringRadix::Binary,
+        NumberLiteral::Hexadecimal(_) => StringRadix::Hexadecimal,
+    }
+}
+/// Get the [`IntPredicate`] for an [`Equality`] operation
+pub const fn int_predicate_for_equality(op: &Equality) -> IntPredicate {
+    match op {
+        Equality::Eq => IntPredicate::EQ,
+        Equality::Neq => IntPredicate::NE,
+    }
+}
+/// Get the [`IntPredicate`] for a [`Comparison`] operation
+pub const fn int_predicate_for_comparison(op: &Comparison, signed: bool) -> IntPredicate {
+    match (op, signed) {
+        (Comparison::Lt, true) => IntPredicate::SLT,
+        (Comparison::Lt, false) => IntPredicate::ULT,
+        (Comparison::Gt, true) => IntPredicate::SGT,
+        (Comparison::Gt, false) => IntPredicate::UGT,
+        (Comparison::Lte, true) => IntPredicate::SLE,
+        (Comparison::Lte, false) => IntPredicate::ULE,
+        (Comparison::Gte, true) => IntPredicate::SGE,
+        (Comparison::Gte, false) => IntPredicate::UGE,
+    }
+}
+
 /// Resolve a place to its pointer
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn cg_place<'ctx, 'a>(
@@ -142,23 +171,12 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
     match expr.kind.into_value() {
         TypedExprKind::NumberLiteral(n) => {
-            let no_underscores = match n {
-                NumberLiteral::Decimal(x) => x.replace('_', ""),
-                NumberLiteral::Binary(x) => x.replace('_', ""),
-                NumberLiteral::Hexadecimal(x) => x.replace('_', ""),
-            };
+            let no_underscores = n.text_content().replace('_', "");
 
             bb.and(
                 llvm_int_type(&cg, &expr.inferred_type)
                     .0
-                    .const_int_from_string(
-                        &no_underscores,
-                        match n {
-                            NumberLiteral::Decimal(_) => StringRadix::Decimal,
-                            NumberLiteral::Binary(_) => StringRadix::Binary,
-                            NumberLiteral::Hexadecimal(_) => StringRadix::Hexadecimal,
-                        },
-                    )
+                    .const_int_from_string(&no_underscores, number_literal_radix(&n))
                     .expect("number literal should have parsed correctly")
                     .as_basic_value_enum(),
             )
@@ -259,14 +277,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let lhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *lhs));
             let rhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *rhs));
 
-            let op = match op {
-                Equality::Eq => IntPredicate::EQ,
-                Equality::Neq => IntPredicate::NE,
-            };
-
             let reg = cg
                 .builder
-                .build_int_compare(op, lhs.into_int_value(), rhs.into_int_value(), "cmp")
+                .build_int_compare(
+                    int_predicate_for_equality(&op),
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "cmp",
+                )
                 .expect("equality comparison should have compiled successfully");
 
             bb.and(reg.as_basic_value_enum())
@@ -276,20 +294,14 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let lhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *lhs));
             let rhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *rhs));
 
-            let op = match (op, expr.inferred_type.is_signed_integer()) {
-                (Comparison::Lt, true) => IntPredicate::SLT,
-                (Comparison::Lt, false) => IntPredicate::ULT,
-                (Comparison::Gt, true) => IntPredicate::SGT,
-                (Comparison::Gt, false) => IntPredicate::UGT,
-                (Comparison::Lte, true) => IntPredicate::SLE,
-                (Comparison::Lte, false) => IntPredicate::ULE,
-                (Comparison::Gte, true) => IntPredicate::SGE,
-                (Comparison::Gte, false) => IntPredicate::UGE,
-            };
-
             let reg = cg
                 .builder
-                .build_int_compare(op, lhs.into_int_value(), rhs.into_int_value(), "cmp")
+                .build_int_compare(
+                    int_predicate_for_comparison(&op, expr.inferred_type.is_signed_integer()),
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    "cmp",
+                )
                 .expect("comparison should have compiled successfully");
 
             bb.and(reg.as_basic_value_enum())
