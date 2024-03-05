@@ -2,9 +2,10 @@
 
 use inkwell::{
     basic_block::BasicBlock,
+    builder::BuilderError,
     debug_info::{AsDIScope, DILexicalBlock},
     types::{BasicType, StringRadix},
-    values::{BasicValue, BasicValueEnum, PointerValue},
+    values::{BasicValue, BasicValueEnum, IntValue, PointerValue},
     IntPredicate,
 };
 use zrc_typeck::tast::{
@@ -49,6 +50,46 @@ const fn int_predicate_for_comparison(op: &Comparison, signed: bool) -> IntPredi
         (Comparison::Lte, false) => IntPredicate::ULE,
         (Comparison::Gte, true) => IntPredicate::SGE,
         (Comparison::Gte, false) => IntPredicate::UGE,
+    }
+}
+/// Build the required instruction for a [`BinaryBitwise`] operation
+pub fn build_binary_bitwise<'ctx>(
+    cg: FunctionCtx<'ctx, '_>,
+    op: &BinaryBitwise,
+    lhs: IntValue<'ctx>,
+    rhs: IntValue<'ctx>,
+    result_is_signed: bool,
+) -> Result<IntValue<'ctx>, BuilderError> {
+    match op {
+        BinaryBitwise::And => cg.builder.build_and(lhs, rhs, "and"),
+        BinaryBitwise::Or => cg.builder.build_or(lhs, rhs, "or"),
+        BinaryBitwise::Xor => cg.builder.build_xor(lhs, rhs, "xor"),
+        BinaryBitwise::Shl => cg.builder.build_left_shift(lhs, rhs, "shl"),
+        BinaryBitwise::Shr => cg
+            .builder
+            .build_right_shift(lhs, rhs, result_is_signed, "shr"),
+    }
+}
+/// Build the required instruction for an [`Arithmetic`] operation
+pub fn build_arithmetic<'ctx>(
+    cg: FunctionCtx<'ctx, '_>,
+    op: &Arithmetic,
+    lhs: IntValue<'ctx>,
+    rhs: IntValue<'ctx>,
+    result_is_signed: bool,
+) -> Result<IntValue<'ctx>, BuilderError> {
+    match op {
+        Arithmetic::Addition => cg.builder.build_int_add(lhs, rhs, "add"),
+        Arithmetic::Subtraction => cg.builder.build_int_sub(lhs, rhs, "sub"),
+        Arithmetic::Multiplication => cg.builder.build_int_mul(lhs, rhs, "mul"),
+
+        Arithmetic::Division if result_is_signed => {
+            cg.builder.build_int_signed_div(lhs, rhs, "div")
+        }
+        Arithmetic::Division => cg.builder.build_int_unsigned_div(lhs, rhs, "div"),
+
+        Arithmetic::Modulo if result_is_signed => cg.builder.build_int_signed_rem(lhs, rhs, "rem"),
+        Arithmetic::Modulo => cg.builder.build_int_unsigned_rem(lhs, rhs, "rem"),
     }
 }
 
@@ -244,30 +285,13 @@ pub(crate) fn cg_expr<'ctx, 'a>(
             let lhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *lhs));
             let rhs = unpack!(bb = cg_expr(cg, bb, scope, dbg_scope, *rhs));
 
-            let reg = match op {
-                BinaryBitwise::And => {
-                    cg.builder
-                        .build_and(lhs.into_int_value(), rhs.into_int_value(), "and")
-                }
-                BinaryBitwise::Or => {
-                    cg.builder
-                        .build_or(lhs.into_int_value(), rhs.into_int_value(), "or")
-                }
-                BinaryBitwise::Xor => {
-                    cg.builder
-                        .build_xor(lhs.into_int_value(), rhs.into_int_value(), "xor")
-                }
-                BinaryBitwise::Shl => {
-                    cg.builder
-                        .build_left_shift(lhs.into_int_value(), rhs.into_int_value(), "shl")
-                }
-                BinaryBitwise::Shr => cg.builder.build_right_shift(
-                    lhs.into_int_value(),
-                    rhs.into_int_value(),
-                    expr.inferred_type.is_signed_integer(),
-                    "shr",
-                ),
-            }
+            let reg = build_binary_bitwise(
+                cg,
+                &op,
+                lhs.into_int_value(),
+                rhs.into_int_value(),
+                expr.inferred_type.is_signed_integer(),
+            )
             .expect("binary bitwise operation should have compiled successfully");
 
             bb.and(reg.as_basic_value_enum())
@@ -352,40 +376,13 @@ pub(crate) fn cg_expr<'ctx, 'a>(
 
                 bb.and(reg.as_basic_value_enum())
             } else {
-                let reg = match (op, expr.inferred_type.is_signed_integer()) {
-                    (Arithmetic::Addition, _) => {
-                        cg.builder
-                            .build_int_add(lhs.into_int_value(), rhs.into_int_value(), "add")
-                    }
-                    (Arithmetic::Subtraction, _) => {
-                        cg.builder
-                            .build_int_sub(lhs.into_int_value(), rhs.into_int_value(), "sub")
-                    }
-                    (Arithmetic::Multiplication, _) => {
-                        cg.builder
-                            .build_int_mul(lhs.into_int_value(), rhs.into_int_value(), "mul")
-                    }
-                    (Arithmetic::Division, true) => cg.builder.build_int_signed_div(
-                        lhs.into_int_value(),
-                        rhs.into_int_value(),
-                        "div",
-                    ),
-                    (Arithmetic::Division, false) => cg.builder.build_int_unsigned_div(
-                        lhs.into_int_value(),
-                        rhs.into_int_value(),
-                        "div",
-                    ),
-                    (Arithmetic::Modulo, true) => cg.builder.build_int_signed_rem(
-                        lhs.into_int_value(),
-                        rhs.into_int_value(),
-                        "rem",
-                    ),
-                    (Arithmetic::Modulo, false) => cg.builder.build_int_unsigned_rem(
-                        lhs.into_int_value(),
-                        rhs.into_int_value(),
-                        "rem",
-                    ),
-                }
+                let reg = build_arithmetic(
+                    cg,
+                    &op,
+                    lhs.into_int_value(),
+                    rhs.into_int_value(),
+                    expr.inferred_type.is_signed_integer(),
+                )
                 .expect("arithmetic operation should have compiled successfully");
 
                 bb.and(reg.as_basic_value_enum())
