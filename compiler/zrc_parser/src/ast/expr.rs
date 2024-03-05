@@ -10,7 +10,7 @@ use zrc_utils::{
 };
 
 use super::ty::Type;
-use crate::lexer::{NumberLiteral, StringTok};
+use crate::lexer::{NumberLiteral, StringTok, ZrcString};
 
 /// Arithmetic operators
 ///
@@ -192,7 +192,6 @@ impl<'input> Display for Expr<'input> {
 /// This enum represents all the different kinds of expressions in Zirco. It is
 /// used by the parser to represent the AST in the expression position.
 #[derive(PartialEq, Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub enum ExprKind<'input> {
     /// `a, b`
     Comma(Box<Expr<'input>>, Box<Expr<'input>>),
@@ -243,9 +242,9 @@ pub enum ExprKind<'input> {
     /// Any numeric literal.
     NumberLiteral(NumberLiteral<'input>),
     /// Any string literal.
-    StringLiteral(Vec<StringTok<'input>>),
+    StringLiteral(ZrcString<'input>),
     /// Any char literal
-    CharLiteral(Vec<StringTok<'input>>),
+    CharLiteral(StringTok<'input>),
     /// Any identifier.
     Identifier(&'input str),
     /// Any boolean literal.
@@ -256,16 +255,8 @@ impl<'input> Display for ExprKind<'input> {
         write!(f, "(")?;
         match self {
             Self::NumberLiteral(n) => write!(f, "{n}"),
-            Self::StringLiteral(str) => write!(
-                f,
-                "\"{}\"",
-                str.iter().map(ToString::to_string).collect::<String>()
-            ),
-            Self::CharLiteral(str) => write!(
-                f,
-                "'{}'",
-                str.iter().map(ToString::to_string).collect::<String>()
-            ),
+            Self::StringLiteral(str) => write!(f, "\"{str}\"",),
+            Self::CharLiteral(str) => write!(f, "'{str}'",),
             Self::Identifier(i) => write!(f, "{i}"),
             Self::BooleanLiteral(value) => write!(f, "{value}"),
             Self::Assignment(operator, place, value) => write!(f, "{place} {operator} {value}"),
@@ -562,7 +553,7 @@ impl<'input> Expr<'input> {
         Self::build_number(lit.map(NumberLiteral::Binary))
     }
     #[must_use]
-    pub fn build_string(lit: Spanned<Vec<StringTok<'input>>>) -> Self {
+    pub fn build_string(lit: Spanned<ZrcString<'input>>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),
@@ -571,7 +562,7 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn build_char(lit: Spanned<Vec<StringTok<'input>>>) -> Self {
+    pub fn build_char(lit: Spanned<StringTok<'input>>) -> Self {
         let span = lit.span();
         Self(spanned!(
             span.start(),

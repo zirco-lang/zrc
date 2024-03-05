@@ -12,7 +12,6 @@ use crate::tast::{
 
 /// Describes if a block MAY, MUST, or MUST NOT return.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(clippy::module_name_repetitions)]
 pub enum BlockReturnAbility<'input> {
     /// The block MUST NOT return at any point.
     MustNotReturn,
@@ -47,7 +46,6 @@ impl<'input> BlockReturnAbility<'input> {
 /// (because the outer block must have at least *one* path which is guaranteed
 /// to return)
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
-#[allow(clippy::module_name_repetitions)]
 pub enum BlockReturnActuality {
     /// The block is guaranteed to never return on any path.
     NeverReturns,
@@ -153,7 +151,6 @@ fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
 // TODO: Maybe the TAST should attach the BlockReturnActuality in each BlockStmt itself and preserve
 // it on sub-blocks in the TAST (this may be helpful in control flow analysis)
 #[allow(clippy::too_many_lines)]
-#[allow(clippy::module_name_repetitions)]
 pub fn type_block<'input, 'gs>(
     parent_scope: &Scope<'input, 'gs>,
     input_block: Spanned<Vec<Stmt<'input>>>,

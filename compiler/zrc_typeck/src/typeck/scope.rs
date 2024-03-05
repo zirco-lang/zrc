@@ -149,7 +149,6 @@ where
 /// function or block scope, which can resolve (but not mutate) the global data.
 // Cloning this would be an error, so it does not derive [Clone].
 #[derive(Debug)]
-#[allow(clippy::module_name_repetitions)]
 pub struct GlobalScope<'input> {
     /// Maps every type name to its representation
     pub types: TypeCtx<'input>,

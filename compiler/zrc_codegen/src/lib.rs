@@ -48,7 +48,11 @@
     clippy::print_stderr,
     clippy::print_stdout
 )]
-#![allow(clippy::multiple_crate_versions, clippy::cargo_common_metadata)]
+#![allow(
+    clippy::multiple_crate_versions,
+    clippy::cargo_common_metadata,
+    clippy::module_name_repetitions
+)]
 
 // Ordering matters! Declared here so other modules have access
 /// Convenience macro to unpack a `BasicBlockAnd` -- assigns to the provided
@@ -67,18 +71,11 @@ macro_rules! unpack {
     };
 }
 
-use std::{cmp::Ordering, collections::HashMap};
+use std::collections::HashMap;
 
-use inkwell::{
-    basic_block::BasicBlock,
-    builder::Builder,
-    context::Context,
-    debug_info::DebugInfoBuilder,
-    module::Module,
-    targets::TargetMachine,
-    values::{FunctionValue, PointerValue},
-};
+use inkwell::{basic_block::BasicBlock, targets::TargetMachine, values::PointerValue};
 
+mod ctx;
 mod expr;
 mod program;
 mod stmt;
@@ -157,86 +154,5 @@ trait BasicBlockExt<'ctx> {
 impl<'ctx> BasicBlockExt<'ctx> for BasicBlock<'ctx> {
     fn and<T>(self, value: T) -> BasicBlockAnd<'ctx, T> {
         BasicBlockAnd { bb: self, value }
-    }
-}
-
-/// Common LLVM structures passed onto most code generation functions
-#[derive(Debug, Clone, Copy)]
-struct CgContext<'ctx, 'a> {
-    /// The LLVM context
-    ctx: &'ctx Context,
-    /// The LLVM target machine
-    target_machine: &'a TargetMachine,
-    /// The LLVM builder used to build instructions
-    builder: &'a Builder<'ctx>,
-    /// The lookup for lines in the source file
-    line_lookup: &'a CgLineLookup,
-    /// The LLVM builder for debug info
-    dbg_builder: &'a DebugInfoBuilder<'ctx>,
-    /// The LLVM compile unit for debug info
-    compilation_unit: &'a inkwell::debug_info::DICompileUnit<'ctx>,
-    /// The LLVM module we are building in
-    #[allow(dead_code)]
-    module: &'a Module<'ctx>,
-    /// The LLVM function we are building in
-    fn_value: FunctionValue<'ctx>,
-}
-
-/// Wrapper around a line and column
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct LineAndCol {
-    /// The 1-indexed line number
-    line: u32,
-    /// The 1-indexed column number
-    // REVIEW: Is it truly 1-indexed? If it's 0, LLVM will treat it as "no column known"
-    col: u32,
-}
-
-/// Simple tool to lookup the line and column of a location in the source file
-#[derive(Debug)]
-struct CgLineLookup {
-    /// The spans of each line in the input
-    line_spans: Vec<(usize, usize)>,
-}
-
-impl CgLineLookup {
-    /// Creates a new [`CgLineLookup`] over a string
-    pub fn new(input: &str) -> Self {
-        let mut line_start = 0;
-        let mut line_spans = vec![];
-        for line in input.split('\n') {
-            let line_end = line_start + line.len() + "\n".len();
-            // TODO: this assumes lines terminate with \n, not \r\n.
-            line_spans.push((line_start, line_end - 1));
-            line_start = line_end;
-        }
-
-        Self { line_spans }
-    }
-
-    /// Look up the `1`-indexed line number from an offset in the string
-    pub fn lookup_from_index(&self, index: usize) -> LineAndCol {
-        let line = self
-            .line_spans
-            .binary_search_by(|(line_start, line_end)| {
-                if *line_end < index {
-                    return Ordering::Less;
-                }
-                if *line_start > index {
-                    return Ordering::Greater;
-                }
-
-                Ordering::Equal
-            })
-            .expect("line should be present");
-
-        LineAndCol {
-            line: u32::try_from(line)
-                .expect("there should probably never be more than u32::MAX lines in a file")
-                + 1,
-            col: u32::try_from(index - self.line_spans[line].0)
-                .expect("there should probably never be more than u32::MAX columns in a line")
-                + 1,
-        }
     }
 }

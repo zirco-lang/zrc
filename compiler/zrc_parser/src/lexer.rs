@@ -34,7 +34,7 @@
 use std::fmt::Display;
 
 use logos::{Lexer, Logos};
-use zrc_utils::span::{Span, Spanned};
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 /// The error enum passed to the internal logos [`Lexer`]. Will be converted to
 /// a [`LexicalError`] later on by [`ZircoLexer`].
@@ -197,6 +197,15 @@ pub enum NumberLiteral<'input> {
     Hexadecimal(&'input str),
     /// A binary number literal
     Binary(&'input str),
+}
+impl<'input> NumberLiteral<'input> {
+    /// Get the text content of this [`NumberLiteral`]
+    #[must_use]
+    pub const fn text_content(&self) -> &'input str {
+        match self {
+            Self::Decimal(n) | Self::Hexadecimal(n) | Self::Binary(n) => n,
+        }
+    }
 }
 impl Display for NumberLiteral<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -439,17 +448,22 @@ pub enum Tok<'input> {
 
     // === SPECIAL ===
     /// Any character literal
-    #[regex(r"'([^'\\]|\\.)*'", lex_string_contents)]
-    #[regex(r"'([^'\\]|\\.)*", |_lex| {
+    #[regex(r"'([^'\\]|\\.)'", |lex| {
+        lex_string_contents(lex).map(|contents| {
+            assert!(contents.len() == 1, "Char literal must be exactly one character");
+            contents[0].clone()
+        })
+    })]
+    #[regex(r"'([^'\\]|\\.)", |_lex| {
         Err(InternalLexicalError::UnterminatedStringLiteral)
     })]
-    CharLiteral(Vec<StringTok<'input>>),
+    CharLiteral(StringTok<'input>),
     /// Any string literal
-    #[regex(r#""([^"\\]|\\.)*""#, lex_string_contents)]
+    #[regex(r#""([^"\\]|\\.)*""#, |lex| lex_string_contents(lex).map(ZrcString))]
     #[regex(r#""([^"\\]|\\.)*"#, |_lex| {
         Err(InternalLexicalError::UnterminatedStringLiteral)
     })]
-    StringLiteral(Vec<StringTok<'input>>),
+    StringLiteral(ZrcString<'input>),
     /// Any number literal
     // FIXME: Do not accept multiple decimal points like "123.456.789"
     #[regex(r"[0-9][0-9\._]*", |lex| NumberLiteral::Decimal(lex.slice()))]
@@ -505,14 +519,8 @@ impl<'input> Display for Tok<'input> {
                 Self::SmallArrow => "->".to_string(),
                 Self::Star => "*".to_string(),
                 Self::StarAssign => "*=".to_string(),
-                Self::StringLiteral(str) => format!(
-                    "\"{}\"",
-                    str.iter().map(ToString::to_string).collect::<String>()
-                ),
-                Self::CharLiteral(ch) => format!(
-                    "'{}'",
-                    ch.iter().map(ToString::to_string).collect::<String>()
-                ),
+                Self::StringLiteral(str) => format!("\"{str}\"",),
+                Self::CharLiteral(ch) => format!("'{ch}'",),
                 Self::Struct => "struct".to_string(),
                 Self::Union => "union".to_string(),
                 Self::SizeOf => "sizeof".to_string(),
@@ -542,6 +550,8 @@ impl<'input> Display for Tok<'input> {
         )
     }
 }
+
+/// The compiler's representation of a string literal in Zirco
 
 /// Enum representing the lexed contents of a string literal
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
@@ -578,6 +588,35 @@ pub enum StringTok<'input> {
     #[regex(r"[^\\]+", lexer_slice)]
     Text(&'input str),
 }
+impl<'input> StringTok<'input> {
+    /// Convert a [`StringTok`] into its literal [`char`] representation
+    ///
+    /// # Panics
+    /// Panics if the [`StringTok`] is invalid
+    #[must_use]
+    pub fn as_byte(&self) -> char {
+        match self {
+            StringTok::EscapedBackslash => '\\',
+            StringTok::EscapedCr => '\r',
+            StringTok::EscapedNewline => '\n',
+            StringTok::EscapedTab => '\t',
+            StringTok::EscapedNull => '\0',
+            StringTok::EscapedHexByte(byte) => {
+                char::from_u32(byte.parse::<u32>().expect("invalid byte")).expect("invalid char")
+            }
+            StringTok::EscapedDoubleQuote => '"',
+            StringTok::Text(text) => {
+                assert!(
+                    text.len() == 1,
+                    "Char literal must be exactly one character"
+                );
+                text.chars()
+                    .next()
+                    .expect("char literal should have a first character")
+            }
+        }
+    }
+}
 impl Display for StringTok<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -593,8 +632,30 @@ impl Display for StringTok<'_> {
     }
 }
 
+/// A representation of a string literal in the source code
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ZrcString<'input>(pub Vec<StringTok<'input>>);
+impl<'input> ZrcString<'input> {
+    /// Convert a [`ZrcString`] into a [`String`] for its REAL byte
+    /// representation
+    ///
+    /// See also: [`StringTok::as_byte`]
+    #[must_use]
+    pub fn as_bytes(&self) -> String {
+        self.0.iter().map(StringTok::as_byte).collect()
+    }
+}
+impl Display for ZrcString<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.0.iter().map(ToString::to_string).collect::<String>()
+        )
+    }
+}
+
 /// A lexer for the Zirco programming language
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct ZircoLexer<'input> {
     /// The internal [`Lexer`] we wrap
@@ -619,25 +680,27 @@ impl<'input> Iterator for ZircoLexer<'input> {
         let logos_span = self.lex.span();
         let span = Span::from_positions(logos_span.start, logos_span.end);
 
-        match token {
-            Err(InternalLexicalError::NoMatchingRule) => {
-                let slice = self.lex.slice();
-                Some(span.containing(Err(LexicalError::UnknownToken(slice))))
-            }
-            Err(InternalLexicalError::UnterminatedBlockComment) => {
-                Some(span.containing(Err(LexicalError::UnterminatedBlockComment)))
-            }
-            Err(InternalLexicalError::UnterminatedStringLiteral) => {
-                Some(span.containing(Err(LexicalError::UnterminatedStringLiteral)))
-            }
-            Err(InternalLexicalError::UnknownEscapeSequence(span)) => {
-                Some(span.containing(Err(LexicalError::UnknownEscapeSequence)))
-            }
-            Err(InternalLexicalError::JavascriptUserDetected(expected)) => {
-                Some(span.containing(Err(LexicalError::JavascriptUserDetected(expected))))
-            }
-            Ok(tok) => Some(span.containing(Ok(tok))),
-        }
+        Some(
+            token
+                .map_err(|err| match err {
+                    InternalLexicalError::NoMatchingRule => {
+                        LexicalError::UnknownToken(self.lex.slice())
+                    }
+                    InternalLexicalError::UnterminatedBlockComment => {
+                        LexicalError::UnterminatedBlockComment
+                    }
+                    InternalLexicalError::UnterminatedStringLiteral => {
+                        LexicalError::UnterminatedStringLiteral
+                    }
+                    InternalLexicalError::UnknownEscapeSequence(_) => {
+                        LexicalError::UnknownEscapeSequence
+                    }
+                    InternalLexicalError::JavascriptUserDetected(expected) => {
+                        LexicalError::JavascriptUserDetected(expected)
+                    }
+                })
+                .in_span(span),
+        )
     }
 }
 
@@ -746,7 +809,7 @@ mod tests {
             Tok::SizeOf,
             Tok::Type,
             Tok::SmallArrow,
-            Tok::StringLiteral(vec![StringTok::Text("str")]),
+            Tok::StringLiteral(ZrcString(vec![StringTok::Text("str")])),
             Tok::NumberLiteral(NumberLiteral::Decimal("7_000")),
             Tok::NumberLiteral(NumberLiteral::Hexadecimal("F_A")),
             Tok::NumberLiteral(NumberLiteral::Binary("1_0")),

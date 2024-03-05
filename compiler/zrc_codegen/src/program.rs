@@ -2,10 +2,7 @@
 
 use inkwell::{
     context::Context,
-    debug_info::{
-        AsDIScope, DICompileUnit, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage,
-        DebugInfoBuilder,
-    },
+    debug_info::{AsDIScope, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage},
     memory_buffer::MemoryBuffer,
     module::{FlagBehavior, Module},
     passes::{PassManager, PassManagerBuilder},
@@ -20,12 +17,13 @@ use zrc_typeck::tast::{
     stmt::{ArgumentDeclaration, TypedDeclaration},
     ty::Type,
 };
-use zrc_utils::span::Spanned;
+use zrc_utils::{line_finder::LineLookup, span::Spanned};
 
 use super::stmt::cg_block;
 use crate::{
+    ctx::{CompilationUnitCtx, FunctionCtx},
     ty::{create_fn, llvm_basic_type, llvm_type},
-    CgContext, CgLineLookup, CgScope,
+    CgScope,
 };
 
 /// Initialize the LLVM [`FunctionValue`] for a given function prototype
@@ -36,33 +34,17 @@ use crate::{
 /// (probably correct) behavior.
 #[allow(clippy::too_many_arguments)]
 pub fn cg_init_extern_fn<'ctx>(
-    ctx: &'ctx Context,
-    dbg_builder: &DebugInfoBuilder<'ctx>,
-    compilation_unit: &DICompileUnit<'ctx>,
-    module: &Module<'ctx>,
-    target_machine: &TargetMachine,
+    unit: &CompilationUnitCtx<'ctx, '_>,
     name: &str,
     ret: &Type,
     args: &[&Type],
     is_variadic: bool,
 ) -> FunctionValue<'ctx> {
-    let (ret_type, ret_dbg_type) = llvm_type(
-        compilation_unit.get_file(),
-        dbg_builder,
-        ctx,
-        target_machine,
-        ret,
-    );
+    let (ret_type, ret_dbg_type) = llvm_type(unit, ret);
     let (arg_types, arg_dbg_types): (Vec<_>, Vec<_>) = args
         .iter()
         .map(|ty| {
-            let (ty, dbg_ty) = llvm_basic_type(
-                compilation_unit.get_file(),
-                dbg_builder,
-                ctx,
-                target_machine,
-                ty,
-            );
+            let (ty, dbg_ty) = llvm_basic_type(unit, ty);
             (
                 <BasicTypeEnum as Into<BasicMetadataTypeEnum>>::into(ty),
                 dbg_ty,
@@ -71,8 +53,7 @@ pub fn cg_init_extern_fn<'ctx>(
         .unzip();
 
     let (fn_type, _, _) = create_fn(
-        dbg_builder,
-        compilation_unit.get_file(),
+        unit,
         ret_type.as_any_type_enum(),
         ret_dbg_type,
         arg_types.as_slice(),
@@ -80,7 +61,7 @@ pub fn cg_init_extern_fn<'ctx>(
         is_variadic,
     );
 
-    let fn_val = module.add_function(name, fn_type, None);
+    let fn_val = unit.module.add_function(name, fn_type, None);
 
     fn_val
 }
@@ -89,34 +70,18 @@ pub fn cg_init_extern_fn<'ctx>(
 /// *definitions* with their debugging information.
 #[allow(clippy::too_many_arguments)]
 pub fn cg_init_fn<'ctx>(
-    ctx: &'ctx Context,
-    dbg_builder: &DebugInfoBuilder<'ctx>,
-    compilation_unit: &DICompileUnit<'ctx>,
-    module: &Module<'ctx>,
-    target_machine: &TargetMachine,
+    unit: &CompilationUnitCtx<'ctx, '_>,
     name: &str,
     line_no: u32,
     ret: &Type,
     args: &[&Type],
     is_variadic: bool,
 ) -> (FunctionValue<'ctx>, DISubprogram<'ctx>) {
-    let (ret_type, ret_dbg_type) = llvm_type(
-        compilation_unit.get_file(),
-        dbg_builder,
-        ctx,
-        target_machine,
-        ret,
-    );
+    let (ret_type, ret_dbg_type) = llvm_type(unit, ret);
     let (arg_types, arg_dbg_types): (Vec<_>, Vec<_>) = args
         .iter()
         .map(|ty| {
-            let (ty, dbg_ty) = llvm_basic_type(
-                compilation_unit.get_file(),
-                dbg_builder,
-                ctx,
-                target_machine,
-                ty,
-            );
+            let (ty, dbg_ty) = llvm_basic_type(unit, ty);
             (
                 <BasicTypeEnum as Into<BasicMetadataTypeEnum>>::into(ty),
                 dbg_ty,
@@ -125,8 +90,7 @@ pub fn cg_init_fn<'ctx>(
         .unzip();
 
     let (fn_type, fn_dbg_subroutine, _fn_dbg_type) = create_fn(
-        dbg_builder,
-        compilation_unit.get_file(),
+        unit,
         ret_type.as_any_type_enum(),
         ret_dbg_type,
         arg_types.as_slice(),
@@ -134,11 +98,11 @@ pub fn cg_init_fn<'ctx>(
         is_variadic,
     );
 
-    let fn_subprogram = dbg_builder.create_function(
-        compilation_unit.as_debug_info_scope(),
+    let fn_subprogram = unit.dbg_builder.create_function(
+        unit.compilation_unit.as_debug_info_scope(),
         name,
         None,
-        compilation_unit.get_file(),
+        unit.compilation_unit.get_file(),
         line_no,
         fn_dbg_subroutine,
         // REVIEW: Are these values correct? They're the only values that seem to prevent invalid
@@ -152,9 +116,10 @@ pub fn cg_init_fn<'ctx>(
         false,
     );
 
-    let fn_val = module
+    let fn_val = unit
+        .module
         .get_function(name)
-        .unwrap_or_else(|| module.add_function(name, fn_type, None));
+        .unwrap_or_else(|| unit.module.add_function(name, fn_type, None));
     fn_val.set_subprogram(fn_subprogram);
 
     (fn_val, fn_subprogram)
@@ -187,7 +152,7 @@ fn cg_program<'ctx>(
     debug_level: DWARFEmissionKind,
     parent_directory: &str,
     file_name: &str,
-    line_lookup: &CgLineLookup,
+    line_lookup: &LineLookup,
     program: Vec<Spanned<TypedDeclaration<'_>>>,
 ) -> Module<'ctx> {
     let builder = ctx.create_builder();
@@ -221,6 +186,16 @@ fn cg_program<'ctx>(
         "",
     );
 
+    let unit = CompilationUnitCtx {
+        builder: &builder,
+        compilation_unit: &compilation_unit,
+        ctx,
+        dbg_builder: &dbg_builder,
+        line_lookup,
+        module: &module,
+        target_machine,
+    };
+
     let mut global_scope = CgScope::new();
 
     for declaration in program {
@@ -236,11 +211,7 @@ fn cg_program<'ctx>(
                 let body_span = body.span();
 
                 let (fn_value, fn_subprogram) = cg_init_fn(
-                    ctx,
-                    &dbg_builder,
-                    &compilation_unit,
-                    &module,
-                    target_machine,
+                    &unit,
                     name.value(),
                     line_lookup.lookup_from_index(span.start()).line,
                     return_type.value(),
@@ -289,13 +260,7 @@ fn cg_program<'ctx>(
                         builder.position_at_end(entry);
                     }
 
-                    let (ty, dbg_ty) = llvm_basic_type(
-                        compilation_unit.get_file(),
-                        &dbg_builder,
-                        ctx,
-                        target_machine,
-                        ty.value(),
-                    );
+                    let (ty, dbg_ty) = llvm_basic_type(&unit, ty.value());
 
                     let alloc = builder
                         .build_alloca(ty, &format!("arg_{name}"))
@@ -349,16 +314,7 @@ fn cg_program<'ctx>(
                 }
 
                 cg_block(
-                    CgContext {
-                        ctx,
-                        target_machine,
-                        builder: &builder,
-                        dbg_builder: &dbg_builder,
-                        compilation_unit: &compilation_unit,
-                        module: &module,
-                        fn_value,
-                        line_lookup,
-                    },
+                    FunctionCtx::from_unit_and_fn(unit, fn_value),
                     entry,
                     &fn_scope,
                     lexical_block,
@@ -375,11 +331,7 @@ fn cg_program<'ctx>(
                 body: None,
             } => {
                 let fn_value = cg_init_extern_fn(
-                    ctx,
-                    &dbg_builder,
-                    &compilation_unit,
-                    &module,
-                    target_machine,
+                    &unit,
                     name.value(),
                     return_type.value(),
                     parameters
@@ -460,7 +412,7 @@ pub fn cg_program_to_string(
         debug_level,
         parent_directory,
         file_name,
-        &CgLineLookup::new(source),
+        &LineLookup::new(source),
         program,
     );
 
@@ -514,7 +466,7 @@ pub fn cg_program_to_buffer(
         debug_level,
         parent_directory,
         file_name,
-        &CgLineLookup::new(source),
+        &LineLookup::new(source),
         program,
     );
 

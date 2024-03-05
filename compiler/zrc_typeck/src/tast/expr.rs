@@ -2,6 +2,7 @@
 
 use std::fmt::Display;
 
+use zrc_parser::lexer::ZrcString;
 pub use zrc_parser::{
     ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical},
     lexer::{NumberLiteral, StringTok},
@@ -54,7 +55,6 @@ impl<'input> Display for PlaceKind<'input> {
 /// An [expression kind](TypedExprKind) with its yielded [result
 /// type](super::ty::Type) attached to it.
 #[derive(PartialEq, Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub struct TypedExpr<'input> {
     /// The inferred [`Type`] of this node
     pub inferred_type: Type<'input>,
@@ -126,9 +126,9 @@ pub enum TypedExprKind<'input> {
     /// Any numeric literal.
     NumberLiteral(NumberLiteral<'input>),
     /// Any string literal.
-    StringLiteral(Vec<StringTok<'input>>),
+    StringLiteral(ZrcString<'input>),
     /// Any char literal
-    CharLiteral(Vec<StringTok<'input>>),
+    CharLiteral(StringTok<'input>),
     /// Any identifier.
     Identifier(&'input str),
     /// Any boolean literal.
@@ -138,16 +138,8 @@ impl<'input> Display for TypedExprKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NumberLiteral(n) => write!(f, "{n}"),
-            Self::StringLiteral(str) => write!(
-                f,
-                "\"{}\"",
-                str.iter().map(ToString::to_string).collect::<String>()
-            ),
-            Self::CharLiteral(str) => write!(
-                f,
-                "\'{}\'",
-                str.iter().map(ToString::to_string).collect::<String>()
-            ),
+            Self::StringLiteral(str) => write!(f, "\"{str}\"",),
+            Self::CharLiteral(str) => write!(f, "\'{str}\'"),
             Self::Identifier(i) => write!(f, "{i}"),
             Self::BooleanLiteral(value) => write!(f, "{value}"),
             Self::Assignment(place, value) => write!(f, "{place} = {value}"),

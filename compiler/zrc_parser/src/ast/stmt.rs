@@ -24,7 +24,6 @@ impl<'input> Display for Stmt<'input> {
 /// This enum represents all the different kinds of statements in Zirco. It is
 /// used by the parser to represent the AST in the statement position.
 #[derive(PartialEq, Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
 pub enum StmtKind<'input> {
     /// `if (x) y` or `if (x) y else z`
     IfStmt(Expr<'input>, Box<Stmt<'input>>, Option<Box<Stmt<'input>>>),

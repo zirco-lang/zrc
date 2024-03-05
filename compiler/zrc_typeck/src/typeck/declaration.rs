@@ -27,7 +27,6 @@ use crate::tast::{
 ///
 /// # Errors
 /// Errors with type checker errors.
-#[allow(clippy::module_name_repetitions)]
 pub fn process_let_declaration<'input>(
     scope: &mut Scope<'input, '_>,
     declarations: Vec<Spanned<AstLetDeclaration<'input>>>,
@@ -127,11 +126,7 @@ pub fn process_let_declaration<'input>(
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
-#[allow(
-    clippy::too_many_lines,
-    clippy::missing_panics_doc,
-    clippy::module_name_repetitions
-)]
+#[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
 pub fn process_declaration<'input>(
     global_scope: &mut GlobalScope<'input>,
     declaration: AstDeclaration<'input>,
