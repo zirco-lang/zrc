@@ -312,4 +312,27 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn functions_stringify_to_their_canonical_form() {
+        let test_case = indoc::indoc! {"
+            fn add(a: i32, b: i32) -> bool;
+            fn add(a: i32, b: i32) -> i32 {
+                return ((a) + (b));
+            }
+            fn no_return_extern();
+            fn no_return() {
+
+            }"};
+
+        assert_eq!(
+            crate::parser::parse_program(test_case)
+                .expect("test cases should have parsed correctly")
+                .into_iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+            test_case
+        );
+    }
 }
