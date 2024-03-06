@@ -46,7 +46,7 @@ fn desugar_assignment<'input>(
 /// Validate an expr into a place
 fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, Diagnostic> {
     let kind_span = expr.kind.span();
-    let stringified = expr.to_string();
+    let stringified = expr.inferred_type.to_string();
 
     #[allow(clippy::wildcard_enum_match_arm)]
     Ok(match expr.kind.into_value() {
@@ -271,16 +271,16 @@ pub fn type_expr<'input>(
                     }
                 } else {
                     return Err(DiagnosticKind::StructOrUnionDoesNotHaveMember(
-                        obj_t.to_string(),
+                        obj_t.inferred_type.to_string(),
                         key.into_value().to_string(),
                     )
                     .error_in(expr_span));
                 }
             } else {
-                return Err(
-                    DiagnosticKind::StructMemberAccessOnNonStruct(obj_t.to_string())
-                        .error_in(expr_span),
-                );
+                return Err(DiagnosticKind::StructMemberAccessOnNonStruct(
+                    obj_t.inferred_type.to_string(),
+                )
+                .error_in(expr_span));
             }
         }
         ExprKind::Arrow(obj, key) => {
@@ -300,10 +300,10 @@ pub fn type_expr<'input>(
                     )),
                 )?
             } else {
-                return Err(
-                    DiagnosticKind::CannotDereferenceNonPointer(obj_t.to_string())
-                        .error_in(expr_span),
-                );
+                return Err(DiagnosticKind::CannotDereferenceNonPointer(
+                    obj_t.inferred_type.to_string(),
+                )
+                .error_in(expr_span));
             }
         }
         ExprKind::Call(f, args) => {
@@ -381,9 +381,10 @@ pub fn type_expr<'input>(
                     }
                 }
                 _ => {
-                    return Err(
-                        DiagnosticKind::CannotCallNonFunction(ft.to_string()).error_in(expr_span)
-                    );
+                    return Err(DiagnosticKind::CannotCallNonFunction(
+                        ft.inferred_type.to_string(),
+                    )
+                    .error_in(expr_span));
                 }
             }
         }
