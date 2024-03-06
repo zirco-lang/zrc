@@ -951,6 +951,24 @@ mod tests {
         }
 
         #[test]
+        fn equality_operators_generate() {
+            cg_snapshot_test!(indoc! {"
+                fn get_bool() -> bool;
+
+                fn test() {
+                    let a = get_bool();
+                    let b = get_bool();
+
+                    // TEST: should create an `icmp eq` instruction
+                    let eq = a == b;
+
+                    // TEST: should create an `icmp ne` instruction
+                    let ne = a != b;
+                }
+            "});
+        }
+
+        #[test]
         fn logical_operators_generate() {
             cg_snapshot_test!(indoc! {"
                 fn get_bool() -> bool;

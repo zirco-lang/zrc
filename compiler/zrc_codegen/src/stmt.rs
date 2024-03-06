@@ -573,6 +573,15 @@ mod tests {
     mod cg_block {
         use super::*;
 
+        #[test]
+        fn function_parameters_are_properly_generated() {
+            cg_snapshot_test!(indoc! {"
+                fn id(x: i32) -> i32 {
+                    return x;
+                }
+            "});
+        }
+
         mod conditionals {
             use super::*;
 
