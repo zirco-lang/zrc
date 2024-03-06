@@ -645,7 +645,10 @@ mod tests {
     use zrc_utils::spanned;
 
     use super::*;
-    use crate::typeck::scope::{GlobalScope, ValueCtx};
+    use crate::{
+        tast::stmt::ArgumentDeclaration,
+        typeck::scope::{GlobalScope, ValueCtx},
+    };
 
     #[test]
     fn expect_identical_types_produces_proper_diagnostic() {
@@ -773,7 +776,10 @@ mod tests {
                 (
                     "sink",
                     TastType::Fn(Fn {
-                        arguments: ArgumentDeclarationList::Variadic(vec![]),
+                        arguments: ArgumentDeclarationList::Variadic(vec![ArgumentDeclaration {
+                            name: spanned!(0, "i8", 3),
+                            ty: spanned!(0, TastType::I8, 3),
+                        }]),
                         returns: Box::new(TastType::unit()),
                     }),
                 ),
