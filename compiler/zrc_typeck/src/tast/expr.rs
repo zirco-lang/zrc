@@ -1,7 +1,5 @@
 //! Expression representation for the Zirco [TAST](super)
 
-use std::fmt::Display;
-
 use zrc_parser::lexer::ZrcString;
 pub use zrc_parser::{
     ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical},
@@ -18,11 +16,6 @@ pub struct Place<'input> {
     pub inferred_type: Type<'input>,
     /// The actual [`PlaceKind`] backing this expression
     pub kind: Spanned<PlaceKind<'input>>,
-}
-impl<'input> Display for Place<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}) as ({})", self.inferred_type, self.kind)
-    }
 }
 
 /// The valid left-hand-side of a [`TypedExprKind::Assignment`].
@@ -41,16 +34,6 @@ pub enum PlaceKind<'input> {
     /// `x.y`
     Dot(Box<Place<'input>>, Spanned<&'input str>),
 }
-impl<'input> Display for PlaceKind<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Deref(expr) => write!(f, "*{expr}"),
-            Self::Variable(ident) => write!(f, "{ident}"),
-            Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
-            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
-        }
-    }
-}
 
 /// An [expression kind](TypedExprKind) with its yielded [result
 /// type](super::ty::Type) attached to it.
@@ -60,11 +43,6 @@ pub struct TypedExpr<'input> {
     pub inferred_type: Type<'input>,
     /// The actual [`TypedExprKind`] backing this expression
     pub kind: Spanned<TypedExprKind<'input>>,
-}
-impl<'input> Display for TypedExpr<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "(({}) as ({}))", self.inferred_type, self.kind)
-    }
 }
 
 /// The kind of a [`TypedExpr`]
@@ -133,40 +111,4 @@ pub enum TypedExprKind<'input> {
     Identifier(&'input str),
     /// Any boolean literal.
     BooleanLiteral(bool),
-}
-impl<'input> Display for TypedExprKind<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NumberLiteral(n) => write!(f, "{n}"),
-            Self::StringLiteral(str) => write!(f, "\"{str}\"",),
-            Self::CharLiteral(str) => write!(f, "\'{str}\'"),
-            Self::Identifier(i) => write!(f, "{i}"),
-            Self::BooleanLiteral(value) => write!(f, "{value}"),
-            Self::Assignment(place, value) => write!(f, "{place} = {value}"),
-            Self::Equality(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-            Self::Comparison(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-            Self::Arithmetic(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-            Self::BinaryBitwise(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-            Self::Logical(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-            Self::Comma(lhs, rhs) => write!(f, "{lhs}, {rhs}"),
-            Self::UnaryNot(expr) => write!(f, "!{expr}"),
-            Self::UnaryBitwiseNot(expr) => write!(f, "~{expr}"),
-            Self::UnaryMinus(expr) => write!(f, "-{expr}"),
-            Self::UnaryAddressOf(expr) => write!(f, "&{expr}"),
-            Self::UnaryDereference(expr) => write!(f, "*{expr}"),
-            Self::Ternary(cond, if_true, if_false) => write!(f, "{cond} ? {if_true} : {if_false}"),
-            Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
-            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
-            Self::Cast(expr, ty) => write!(f, "{expr} as {ty}"),
-            Self::SizeOf(ty) => write!(f, "sizeof({ty})"),
-            Self::Call(expr, args) => write!(
-                f,
-                "{expr}({})",
-                args.iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
-        }
-    }
 }

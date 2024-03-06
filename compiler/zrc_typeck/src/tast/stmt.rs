@@ -19,15 +19,6 @@ pub struct LetDeclaration<'input> {
     pub value: Option<TypedExpr<'input>>,
 }
 
-impl<'input> Display for LetDeclaration<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.value {
-            Some(value) => write!(f, "{}: {} = {}", self.name.value(), self.ty, value),
-            None => write!(f, "{}: {}", self.name.value(), self.ty),
-        }
-    }
-}
-
 /// A zirco statement after typeck
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedStmt<'input>(pub Spanned<TypedStmtKind<'input>>);
@@ -75,143 +66,6 @@ pub enum TypedStmtKind<'input> {
     /// A let declaration
     DeclarationList(Vec<Spanned<LetDeclaration<'input>>>),
 }
-impl<'input> Display for TypedStmt<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.value().fmt(f)
-    }
-}
-
-impl<'input> Display for TypedStmtKind<'input> {
-    #[allow(clippy::too_many_lines)]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::IfStmt(cond, if_true, Some(if_false)) => write!(
-                f,
-                "if ({cond}) {{\n{}\n}} else {{\n{}\n}}",
-                if_true
-                    .value()
-                    .iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                if_false
-                    .value()
-                    .iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ),
-            Self::IfStmt(cond, if_true, None) => write!(
-                f,
-                "if ({cond}) {{\n{}\n}}",
-                if_true
-                    .value()
-                    .iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ),
-            Self::WhileStmt(cond, body) => write!(
-                f,
-                "while ({cond}) {{\n{}\n}}",
-                body.value()
-                    .iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ),
-            Self::DoWhileStmt(body, cond) => write!(
-                f,
-                "do {{\n{}\n}} while ({cond})",
-                body.value()
-                    .iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ),
-            Self::ForStmt {
-                init,
-                cond,
-                post,
-                body,
-            } => write!(
-                f,
-                "for ({} {}; {}) {{\n{}\n}}",
-                init.as_ref().map_or(String::new(), |x| format!(
-                    "let {};",
-                    x.iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )),
-                cond.as_ref().map_or(String::new(), ToString::to_string),
-                post.as_ref().map_or(String::new(), ToString::to_string),
-                body.value()
-                    .iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ),
-            Self::BlockStmt(stmts) => write!(
-                f,
-                "{{\n{}\n}}",
-                stmts
-                    .iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<_>>()
-                    .join("\n")
-            ),
-            Self::ExprStmt(expr) => write!(f, "{expr};"),
-            Self::ContinueStmt => write!(f, "continue;"),
-            Self::BreakStmt => write!(f, "break;"),
-            Self::ReturnStmt(Some(expr)) => write!(f, "return {expr};",),
-            Self::ReturnStmt(None) => write!(f, "return;"),
-            Self::DeclarationList(list) => write!(
-                f,
-                "let {};",
-                list.iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-        }
-    }
-}
 
 /// A struct or function declaration at the top level of a file
 #[derive(Debug, Clone, PartialEq)]
@@ -228,37 +82,6 @@ pub enum TypedDeclaration<'input> {
         /// declaration.
         body: Option<Spanned<Vec<TypedStmt<'input>>>>,
     },
-}
-impl<'input> Display for TypedDeclaration<'input> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::FunctionDeclaration {
-                name,
-                parameters,
-                return_type,
-                body: Some(body),
-            } => write!(
-                f,
-                "fn {name}({parameters}) -> {return_type} {{\n{}\n}}",
-                body.value()
-                    .iter()
-                    .map(|stmt| stmt
-                        .to_string()
-                        .split('\n')
-                        .map(|x| format!("    {x}"))
-                        .collect::<Vec<_>>()
-                        .join("\n"))
-                    .collect::<Vec<String>>()
-                    .join("\n")
-            ),
-            Self::FunctionDeclaration {
-                name,
-                parameters,
-                return_type,
-                body: None,
-            } => write!(f, "fn {name}({parameters}) -> {return_type};"),
-        }
-    }
 }
 
 /// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]

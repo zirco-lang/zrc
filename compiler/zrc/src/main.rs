@@ -211,8 +211,6 @@ enum OutputFormat {
     TastDebug,
     /// The Zirco TAST, in Rust-like format with indentation
     TastDebugPretty,
-    /// The Zirco TAST, stringified to Zirco-like code
-    Tast,
     /// Assembly
     Asm,
     /// Object file
@@ -227,7 +225,6 @@ impl Display for OutputFormat {
             Self::Ast => write!(f, "ast"),
             Self::TastDebug => write!(f, "tast-debug"),
             Self::TastDebugPretty => write!(f, "tast-debug-pretty"),
-            Self::Tast => write!(f, "tast"),
             Self::Asm => write!(f, "asm"),
             Self::Object => write!(f, "object"),
         }
@@ -429,14 +426,9 @@ fn compile(
     // display the TAST if the user wants it
     if matches!(
         emit,
-        OutputFormat::Tast | OutputFormat::TastDebug | OutputFormat::TastDebugPretty,
+        OutputFormat::TastDebug | OutputFormat::TastDebugPretty,
     ) {
         return Ok(match *emit {
-            OutputFormat::Tast => typed_ast
-                .into_iter()
-                .map(|x| x.value().to_string())
-                .collect::<Vec<_>>()
-                .join("\n"),
             OutputFormat::TastDebug => format!("{typed_ast:?}"),
             OutputFormat::TastDebugPretty => format!("{typed_ast:#?}"),
 
