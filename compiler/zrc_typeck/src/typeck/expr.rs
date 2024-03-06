@@ -637,11 +637,15 @@ pub fn type_expr<'input>(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use indexmap::IndexMap;
     use zrc_diagnostics::Severity;
     use zrc_parser::lexer::NumberLiteral;
     use zrc_utils::spanned;
 
     use super::*;
+    use crate::typeck::scope::{GlobalScope, ValueCtx};
 
     #[test]
     fn expect_identical_types_produces_proper_diagnostic() {
@@ -747,9 +751,79 @@ mod tests {
         }
     }
 
+    #[test]
+    fn various_expressions_infer_correctly() {
+        let scope = GlobalScope {
+            global_values: ValueCtx::from_mappings(HashMap::from([
+                ("i8", TastType::I8),
+                ("u8", TastType::U8),
+                ("i32", TastType::I32),
+                ("bool", TastType::Bool),
+                (
+                    "s",
+                    TastType::Struct(IndexMap::from([("i8", TastType::I8)])),
+                ),
+                (
+                    "get_bool",
+                    TastType::Fn(Fn {
+                        arguments: ArgumentDeclarationList::NonVariadic(vec![]),
+                        returns: Box::new(TastType::Bool),
+                    }),
+                ),
+                (
+                    "sink",
+                    TastType::Fn(Fn {
+                        arguments: ArgumentDeclarationList::Variadic(vec![]),
+                        returns: Box::new(TastType::unit()),
+                    }),
+                ),
+            ])),
+            ..Default::default()
+        };
+
+        let tests = [
+            ("i8, i32", TastType::I32),
+            ("i8 = i8", TastType::I8),
+            ("!bool", TastType::Bool),
+            ("~i8", TastType::I8),
+            ("-i8", TastType::I8),
+            ("&i8", TastType::Ptr(Box::new(TastType::I8))),
+            ("*&i8", TastType::I8),
+            ("(&i8)[4 as usize]", TastType::I8),
+            ("s.i8", TastType::I8),
+            ("(&s)->i8", TastType::I8),
+            ("get_bool()", TastType::Bool),
+            ("sink(i8, i32, bool)", TastType::unit()),
+            ("bool ? i8 : i8", TastType::I8),
+            ("bool && bool", TastType::Bool),
+            ("i8 == i8", TastType::Bool),
+            ("i8 >> u8", TastType::I8),
+            ("i8 > i8", TastType::Bool),
+            ("i8 + i8", TastType::I8),
+            ("i8 as i32", TastType::I32),
+            ("sizeof(7)", TastType::Usize),
+            ("sizeof struct {}", TastType::Usize),
+            ("\"hello\"", TastType::Ptr(Box::new(TastType::U8))),
+            ("'a'", TastType::U8),
+            ("true", TastType::Bool),
+            ("4", TastType::I32),
+        ];
+
+        for (input, expected_type) in tests {
+            assert_eq!(
+                type_expr(
+                    &scope.create_subscope(),
+                    zrc_parser::parser::parse_expr(input).expect("parsing should succeed")
+                )
+                .expect("type checking should succeed")
+                .inferred_type,
+                expected_type
+            );
+        }
+    }
+
     mod expr {
         use super::*;
-        use crate::typeck::scope::GlobalScope;
 
         #[test]
         fn sizeof_expr_works_as_expected() {
