@@ -334,7 +334,7 @@ pub fn type_expr<'input>(
                             return Err(args.value()[i].0.span().error(
                                 DiagnosticKind::FunctionArgumentTypeMismatch {
                                     n: i,
-                                    expected: arg_type.to_string(),
+                                    expected: arg_type.ty.to_string(),
                                     got: arg_t.inferred_type.to_string(),
                                 },
                             ));
@@ -366,7 +366,7 @@ pub fn type_expr<'input>(
                             return Err(args.value()[i].0.span().error(
                                 DiagnosticKind::FunctionArgumentTypeMismatch {
                                     n: i,
-                                    expected: arg_type.to_string(),
+                                    expected: arg_type.ty.to_string(),
                                     got: arg_t.inferred_type.to_string(),
                                 },
                             ));
@@ -775,6 +775,18 @@ mod tests {
                     }),
                 ),
                 (
+                    "id",
+                    TastType::Fn(Fn {
+                        arguments: ArgumentDeclarationList::NonVariadic(vec![
+                            ArgumentDeclaration {
+                                name: spanned!(0, "x", 1),
+                                ty: spanned!(0, TastType::I32, 3),
+                            },
+                        ]),
+                        returns: Box::new(TastType::I32),
+                    }),
+                ),
+                (
                     "sink",
                     TastType::Fn(Fn {
                         arguments: ArgumentDeclarationList::Variadic(vec![ArgumentDeclaration {
@@ -797,6 +809,10 @@ mod tests {
                     expected: "i8".to_string(),
                     got: "i32".to_string(),
                 }),
+            ),
+            (
+                "4 = i8",
+                Err(DiagnosticKind::NotAnLvalue("i32".to_string())),
             ),
             ("!bool", Ok(TastType::Bool)),
             (
@@ -858,7 +874,41 @@ mod tests {
             ),
             ("(&s)->i8", Ok(TastType::I8)),
             ("get_bool()", Ok(TastType::Bool)),
+            (
+                "get_bool(i32)",
+                Err(DiagnosticKind::FunctionArgumentCountMismatch {
+                    expected: "0".to_string(),
+                    got: "1".to_string(),
+                }),
+            ),
+            (
+                "id(i8)",
+                Err(DiagnosticKind::FunctionArgumentTypeMismatch {
+                    n: 0,
+                    expected: "i32".to_string(),
+                    got: "i8".to_string(),
+                }),
+            ),
             ("sink(i8, i32, bool)", Ok(TastType::unit())),
+            (
+                "sink()",
+                Err(DiagnosticKind::FunctionArgumentCountMismatch {
+                    expected: "at least 1".to_string(),
+                    got: "0".to_string(),
+                }),
+            ),
+            (
+                "sink(i32)",
+                Err(DiagnosticKind::FunctionArgumentTypeMismatch {
+                    n: 0,
+                    expected: "i8".to_string(),
+                    got: "i32".to_string(),
+                }),
+            ),
+            (
+                "bool()",
+                Err(DiagnosticKind::CannotCallNonFunction("bool".to_string())),
+            ),
             ("bool ? i8 : i8", Ok(TastType::I8)),
             (
                 "i8 ? i8 : i8",
@@ -966,6 +1016,13 @@ mod tests {
             ("'a'", Ok(TastType::U8)),
             ("true", Ok(TastType::Bool)),
             ("4", Ok(TastType::I32)),
+            ("i32", Ok(TastType::I32)),
+            (
+                "bogus",
+                Err(DiagnosticKind::UnableToResolveIdentifier(
+                    "bogus".to_string(),
+                )),
+            ),
         ];
 
         for (input, expected_result) in tests {
