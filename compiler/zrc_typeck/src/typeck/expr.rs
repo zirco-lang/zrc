@@ -755,6 +755,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn various_expressions_infer_correctly() {
         let scope = GlobalScope {
             global_values: ValueCtx::from_mappings(HashMap::from([
@@ -788,42 +789,194 @@ mod tests {
         };
 
         let tests = [
-            ("i8, i32", TastType::I32),
-            ("i8 = i8", TastType::I8),
-            ("!bool", TastType::Bool),
-            ("~i8", TastType::I8),
-            ("-i8", TastType::I8),
-            ("&i8", TastType::Ptr(Box::new(TastType::I8))),
-            ("*&i8", TastType::I8),
-            ("(&i8)[4 as usize]", TastType::I8),
-            ("s.i8", TastType::I8),
-            ("(&s)->i8", TastType::I8),
-            ("get_bool()", TastType::Bool),
-            ("sink(i8, i32, bool)", TastType::unit()),
-            ("bool ? i8 : i8", TastType::I8),
-            ("bool && bool", TastType::Bool),
-            ("i8 == i8", TastType::Bool),
-            ("i8 >> u8", TastType::I8),
-            ("i8 > i8", TastType::Bool),
-            ("i8 + i8", TastType::I8),
-            ("i8 as i32", TastType::I32),
-            ("sizeof(7)", TastType::Usize),
-            ("sizeof struct {}", TastType::Usize),
-            ("\"hello\"", TastType::Ptr(Box::new(TastType::U8))),
-            ("'a'", TastType::U8),
-            ("true", TastType::Bool),
-            ("4", TastType::I32),
+            ("i8, i32", Ok(TastType::I32)),
+            ("i8 = i8", Ok(TastType::I8)),
+            (
+                "i8 = i32",
+                Err(DiagnosticKind::InvalidAssignmentRightHandSideType {
+                    expected: "i8".to_string(),
+                    got: "i32".to_string(),
+                }),
+            ),
+            ("!bool", Ok(TastType::Bool)),
+            (
+                "!i8",
+                Err(DiagnosticKind::ExpectedGot {
+                    expected: "boolean".to_string(),
+                    got: "i8".to_string(),
+                }),
+            ),
+            ("~i8", Ok(TastType::I8)),
+            (
+                "~bool",
+                Err(DiagnosticKind::ExpectedGot {
+                    expected: "integer".to_string(),
+                    got: "bool".to_string(),
+                }),
+            ),
+            ("-i8", Ok(TastType::I8)),
+            (
+                "-bool",
+                Err(DiagnosticKind::ExpectedGot {
+                    expected: "signed integer".to_string(),
+                    got: "bool".to_string(),
+                }),
+            ),
+            ("&i8", Ok(TastType::Ptr(Box::new(TastType::I8)))),
+            ("*&i8", Ok(TastType::I8)),
+            (
+                "*i8",
+                Err(DiagnosticKind::CannotDereferenceNonPointer(
+                    "i8".to_string(),
+                )),
+            ),
+            ("(&i8)[4 as usize]", Ok(TastType::I8)),
+            (
+                "(&i8)['a']",
+                Err(DiagnosticKind::ExpectedGot {
+                    expected: "usize".to_string(),
+                    got: "u8".to_string(),
+                }),
+            ),
+            (
+                "i8[4 as usize]",
+                Err(DiagnosticKind::CannotIndexIntoNonPointer("i8".to_string())),
+            ),
+            ("s.i8", Ok(TastType::I8)),
+            (
+                "s.fake",
+                Err(DiagnosticKind::StructOrUnionDoesNotHaveMember(
+                    "(struct { i8: i8 })".to_string(),
+                    "fake".to_string(),
+                )),
+            ),
+            (
+                "i32.fake",
+                Err(DiagnosticKind::StructMemberAccessOnNonStruct(
+                    "i32".to_string(),
+                )),
+            ),
+            ("(&s)->i8", Ok(TastType::I8)),
+            ("get_bool()", Ok(TastType::Bool)),
+            ("sink(i8, i32, bool)", Ok(TastType::unit())),
+            ("bool ? i8 : i8", Ok(TastType::I8)),
+            (
+                "i8 ? i8 : i8",
+                Err(DiagnosticKind::ExpectedGot {
+                    expected: "boolean".to_string(),
+                    got: "i8".to_string(),
+                }),
+            ),
+            (
+                "bool ? i8 : i32",
+                Err(DiagnosticKind::ExpectedSameType(
+                    "i8".to_string(),
+                    "i32".to_string(),
+                )),
+            ),
+            ("bool && bool", Ok(TastType::Bool)),
+            (
+                "i32 && bool",
+                Err(DiagnosticKind::ExpectedGot {
+                    expected: "bool".to_string(),
+                    got: "i32".to_string(),
+                }),
+            ),
+            ("i8 == i8", Ok(TastType::Bool)),
+            ("(&i8) == (&i8)", Ok(TastType::Bool)),
+            (
+                "(&i8) == i8",
+                Err(DiagnosticKind::EqualityOperators(
+                    "*(i8)".to_string(),
+                    "i8".to_string(),
+                )),
+            ),
+            ("bool == bool", Ok(TastType::Bool)),
+            ("i8 >> u8", Ok(TastType::I8)),
+            (
+                "i8 >> i8",
+                Err(DiagnosticKind::ExpectedGot {
+                    expected: "unsigned integer".to_string(),
+                    got: "i8".to_string(),
+                }),
+            ),
+            (
+                "i8 & i32",
+                Err(DiagnosticKind::ExpectedSameType(
+                    "i8".to_string(),
+                    "i32".to_string(),
+                )),
+            ),
+            ("i8 & i8", Ok(TastType::I8)),
+            ("i8 > i8", Ok(TastType::Bool)),
+            (
+                "bool > i8",
+                Err(DiagnosticKind::ExpectedGot {
+                    expected: "integer".to_string(),
+                    got: "bool".to_string(),
+                }),
+            ),
+            (
+                "i8 > i32",
+                Err(DiagnosticKind::ExpectedSameType(
+                    "i8".to_string(),
+                    "i32".to_string(),
+                )),
+            ),
+            ("i8 + i8", Ok(TastType::I8)),
+            (
+                "i32 + i8",
+                Err(DiagnosticKind::ExpectedSameType(
+                    "i32".to_string(),
+                    "i8".to_string(),
+                )),
+            ),
+            (
+                "(&i8) / 2",
+                Err(DiagnosticKind::InvalidPointerArithmeticOperation(
+                    "/".to_string(),
+                )),
+            ),
+            (
+                "(&i8) + 2",
+                Err(DiagnosticKind::ExpectedGot {
+                    expected: "usize".to_string(),
+                    got: "i32".to_string(),
+                }),
+            ),
+            (
+                "(&i8) + (2 as usize)",
+                Ok(TastType::Ptr(Box::new(TastType::I8))),
+            ),
+            ("i8 as i32", Ok(TastType::I32)),
+            ("(&i8) as *i32", Ok(TastType::Ptr(Box::new(TastType::I32)))),
+            ("(&i8) as usize", Ok(TastType::Usize)),
+            ("0 as *i8", Ok(TastType::Ptr(Box::new(TastType::I8)))),
+            ("true as i32", Ok(TastType::I32)),
+            (
+                "s as i8",
+                Err(DiagnosticKind::InvalidCast(
+                    "(struct { i8: i8 })".to_string(),
+                    "i8".to_string(),
+                )),
+            ),
+            ("sizeof(7)", Ok(TastType::Usize)),
+            ("sizeof struct {}", Ok(TastType::Usize)),
+            ("\"hello\"", Ok(TastType::Ptr(Box::new(TastType::U8)))),
+            ("'a'", Ok(TastType::U8)),
+            ("true", Ok(TastType::Bool)),
+            ("4", Ok(TastType::I32)),
         ];
 
-        for (input, expected_type) in tests {
+        for (input, expected_result) in tests {
             assert_eq!(
                 type_expr(
                     &scope.create_subscope(),
                     zrc_parser::parser::parse_expr(input).expect("parsing should succeed")
                 )
-                .expect("type checking should succeed")
-                .inferred_type,
-                expected_type
+                .map(|result| result.inferred_type)
+                .map_err(|diagnostic| diagnostic.1.into_value()),
+                expected_result
             );
         }
     }
