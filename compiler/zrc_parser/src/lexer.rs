@@ -206,6 +206,16 @@ impl<'input> NumberLiteral<'input> {
             Self::Decimal(n) | Self::Hexadecimal(n) | Self::Binary(n) => n,
         }
     }
+
+    /// Convert a [`NumberLiteral`] into its radix (2, 10, or 16)
+    #[must_use]
+    pub const fn radix(&self) -> u32 {
+        match self {
+            Self::Decimal(_) => 10,
+            Self::Hexadecimal(_) => 16,
+            Self::Binary(_) => 2,
+        }
+    }
 }
 impl Display for NumberLiteral<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

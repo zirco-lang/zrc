@@ -204,6 +204,8 @@ pub enum DiagnosticKind {
     ConflictingFunctionDeclarations(String, String),
     #[error("function {0} has multiple implementations in this unit")]
     ConflictingImplementations(String),
+    #[error("type {0} cannot be used for number literals")]
+    InvalidNumberLiteralType(String),
 }
 impl DiagnosticKind {
     /// Create an [error] diagnostic in a given [`Span`]

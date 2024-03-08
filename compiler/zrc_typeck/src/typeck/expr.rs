@@ -134,7 +134,10 @@ fn expect_is_unsigned_integer(ty: &TastType, span: Span) -> Result<(), Diagnosti
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
-#[allow(clippy::too_many_lines)] // FIXME: make this fn shorter
+#[allow(
+    clippy::too_many_lines, // FIXME: make this fn shorter
+    clippy::missing_panics_doc
+)]
 pub fn type_expr<'input>(
     scope: &Scope<'input, '_>,
     expr: Expr<'input>,
@@ -607,10 +610,34 @@ pub fn type_expr<'input>(
             }
         }
 
-        ExprKind::NumberLiteral(n) => TypedExpr {
-            inferred_type: TastType::I32,
-            kind: TypedExprKind::NumberLiteral(n).in_span(expr_span),
-        },
+        ExprKind::NumberLiteral(n, ty) => {
+            let ty_resolved = ty
+                .map(|ty| resolve_type(scope.types, ty))
+                .transpose()?
+                .unwrap_or(TastType::I32);
+
+            if !ty_resolved.is_integer() {
+                return Err(
+                    DiagnosticKind::InvalidNumberLiteralType(ty_resolved.to_string())
+                        .error_in(expr_span),
+                );
+            }
+
+            // REVIEW: How can we make this work with integers like i128?
+            // -4u8 parses as -(4u8) so we don't need to handle negative integers here
+            // let parsed_integer = u64::from_str_radix(&n.text_content().replace('_', ""),
+            // n.radix())     .expect("Number literal should have been valid");
+
+            // TODO: Check the bounds of each number literal, instead
+            // of just panicking or overflowing at runtime (what really happens?)
+            //
+            // This is difficult because we don't know the size of `usize`/`isize` here.
+
+            TypedExpr {
+                inferred_type: ty_resolved.clone(),
+                kind: TypedExprKind::NumberLiteral(n, ty_resolved).in_span(expr_span),
+            }
+        }
         ExprKind::StringLiteral(str) => TypedExpr {
             inferred_type: TastType::Ptr(Box::new(TastType::U8)),
             kind: TypedExprKind::StringLiteral(str).in_span(expr_span),
@@ -647,7 +674,7 @@ mod tests {
     use super::*;
     use crate::{
         tast::stmt::ArgumentDeclaration,
-        typeck::scope::{GlobalScope, ValueCtx},
+        typeck::scope::{GlobalScope, TypeCtx, ValueCtx},
     };
 
     #[test]
@@ -797,6 +824,10 @@ mod tests {
                     }),
                 ),
             ])),
+            types: TypeCtx::from_defaults_and_mappings(HashMap::from([(
+                "NonIntegerType",
+                TastType::Struct(IndexMap::from([])),
+            )])),
             ..Default::default()
         };
 
@@ -1016,7 +1047,14 @@ mod tests {
             ("'a'", Ok(TastType::U8)),
             ("true", Ok(TastType::Bool)),
             ("4", Ok(TastType::I32)),
-            ("i32", Ok(TastType::I32)),
+            ("4i8", Ok(TastType::I8)),
+            ("-4i8", Ok(TastType::I8)),
+            (
+                "4 NonIntegerType",
+                Err(DiagnosticKind::InvalidNumberLiteralType(
+                    "(struct {  })".to_string(),
+                )),
+            ),
             (
                 "bogus",
                 Err(DiagnosticKind::UnableToResolveIdentifier(
@@ -1048,7 +1086,7 @@ mod tests {
                     &GlobalScope::new().create_subscope(),
                     Expr::build_sizeof_expr(
                         Span::from_positions(0, 9),
-                        Expr::build_number(spanned!(8, NumberLiteral::Decimal("1"), 9))
+                        Expr::build_number(spanned!(8, NumberLiteral::Decimal("1"), 9), None)
                     ),
                 ),
                 Ok(TypedExpr {
