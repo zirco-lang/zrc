@@ -195,18 +195,18 @@ mod tests {
                 parse_expr("1 + 1 - 1 * 1 / 1 % 1"),
                 Ok(Expr::build_sub(
                     Expr::build_add(
-                        Expr::build_number_dec(spanned!(0, "1", 1)),
-                        Expr::build_number_dec(spanned!(4, "1", 5))
+                        Expr::build_number_dec(spanned!(0, "1", 1), None),
+                        Expr::build_number_dec(spanned!(4, "1", 5), None)
                     ),
                     Expr::build_modulo(
                         Expr::build_div(
                             Expr::build_mul(
-                                Expr::build_number_dec(spanned!(8, "1", 9)),
-                                Expr::build_number_dec(spanned!(12, "1", 13))
+                                Expr::build_number_dec(spanned!(8, "1", 9), None),
+                                Expr::build_number_dec(spanned!(12, "1", 13), None)
                             ),
-                            Expr::build_number_dec(spanned!(16, "1", 17))
+                            Expr::build_number_dec(spanned!(16, "1", 17), None)
                         ),
-                        Expr::build_number_dec(spanned!(20, "1", 21))
+                        Expr::build_number_dec(spanned!(20, "1", 21), None)
                     )
                 ))
             );
@@ -218,17 +218,17 @@ mod tests {
                 parse_expr("1 & 1 | 1 ^ 1 << 1 >> 1"),
                 Ok(Expr::build_bit_or(
                     Expr::build_bit_and(
-                        Expr::build_number_dec(spanned!(0, "1", 1)),
-                        Expr::build_number_dec(spanned!(4, "1", 5))
+                        Expr::build_number_dec(spanned!(0, "1", 1), None),
+                        Expr::build_number_dec(spanned!(4, "1", 5), None)
                     ),
                     Expr::build_bit_xor(
-                        Expr::build_number_dec(spanned!(8, "1", 9)),
+                        Expr::build_number_dec(spanned!(8, "1", 9), None),
                         Expr::build_shr(
                             Expr::build_shl(
-                                Expr::build_number_dec(spanned!(12, "1", 13)),
-                                Expr::build_number_dec(spanned!(17, "1", 18))
+                                Expr::build_number_dec(spanned!(12, "1", 13), None),
+                                Expr::build_number_dec(spanned!(17, "1", 18), None)
                             ),
-                            Expr::build_number_dec(spanned!(22, "1", 23))
+                            Expr::build_number_dec(spanned!(22, "1", 23), None)
                         )
                     )
                 ))
@@ -241,10 +241,10 @@ mod tests {
                 parse_expr("1 && 1 || 1"),
                 Ok(Expr::build_logical_or(
                     Expr::build_logical_and(
-                        Expr::build_number_dec(spanned!(0, "1", 1)),
-                        Expr::build_number_dec(spanned!(5, "1", 6))
+                        Expr::build_number_dec(spanned!(0, "1", 1), None),
+                        Expr::build_number_dec(spanned!(5, "1", 6), None)
                     ),
-                    Expr::build_number_dec(spanned!(10, "1", 11))
+                    Expr::build_number_dec(spanned!(10, "1", 11), None)
                 ))
             );
         }
@@ -255,10 +255,10 @@ mod tests {
                 parse_expr("1 == 1 != 1"),
                 Ok(Expr::build_neq(
                     Expr::build_eq(
-                        Expr::build_number_dec(spanned!(0, "1", 1)),
-                        Expr::build_number_dec(spanned!(5, "1", 6))
+                        Expr::build_number_dec(spanned!(0, "1", 1), None),
+                        Expr::build_number_dec(spanned!(5, "1", 6), None)
                     ),
-                    Expr::build_number_dec(spanned!(10, "1", 11))
+                    Expr::build_number_dec(spanned!(10, "1", 11), None)
                 ))
             );
         }
@@ -271,14 +271,14 @@ mod tests {
                     Expr::build_lt(
                         Expr::build_gte(
                             Expr::build_gt(
-                                Expr::build_number_dec(spanned!(0, "1", 1)),
-                                Expr::build_number_dec(spanned!(4, "1", 5))
+                                Expr::build_number_dec(spanned!(0, "1", 1), None),
+                                Expr::build_number_dec(spanned!(4, "1", 5), None)
                             ),
-                            Expr::build_number_dec(spanned!(9, "1", 10))
+                            Expr::build_number_dec(spanned!(9, "1", 10), None)
                         ),
-                        Expr::build_number_dec(spanned!(13, "1", 14))
+                        Expr::build_number_dec(spanned!(13, "1", 14), None)
                     ),
-                    Expr::build_number_dec(spanned!(18, "1", 19))
+                    Expr::build_number_dec(spanned!(18, "1", 19), None)
                 ))
             );
         }
@@ -374,7 +374,7 @@ mod tests {
             fn number_literals_parse_as_expected() {
                 assert_eq!(
                     parse_expr("1"),
-                    Ok(Expr::build_number_dec(spanned!(0, "1", 1)))
+                    Ok(Expr::build_number_dec(spanned!(0, "1", 1), None))
                 );
             }
 

@@ -102,7 +102,7 @@ pub enum TypedExprKind<'input> {
     SizeOf(Type<'input>),
 
     /// Any numeric literal.
-    NumberLiteral(NumberLiteral<'input>),
+    NumberLiteral(NumberLiteral<'input>, Type<'input>),
     /// Any string literal.
     StringLiteral(ZrcString<'input>),
     /// Any char literal

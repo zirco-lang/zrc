@@ -316,7 +316,7 @@ Postfix: Expr<'input> = ExprPrecedenceTier<_Postfix, Primary>;
 ArgumentList: Vec<Expr<'input>> = CommaSeparated<Assignment>;
 
 Primary: Expr<'input> = {
-    Spanned<NUMBER> => Expr(<>.map(|n| ExprKind::NumberLiteral(n))),
+    Spanned<(<NUMBER> <Spanned<IDENTIFIER>?>)> => Expr(<>.map(|(n, ty)| ExprKind::NumberLiteral(n, ty.map(|t| Type(t.map(TypeKind::Identifier)))))),
     Spanned<STRING> => Expr(<>.map(|s| ExprKind::StringLiteral(s))),
     Spanned<CHAR> => Expr(<>.map(|c| ExprKind::CharLiteral(c))),
     Spanned<IDENTIFIER> => Expr(<>.map(|i| ExprKind::Identifier(i))),

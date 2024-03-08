@@ -240,7 +240,7 @@ pub enum ExprKind<'input> {
     SizeOfExpr(Box<Expr<'input>>),
 
     /// Any numeric literal.
-    NumberLiteral(NumberLiteral<'input>),
+    NumberLiteral(NumberLiteral<'input>, Option<Type<'input>>),
     /// Any string literal.
     StringLiteral(ZrcString<'input>),
     /// Any char literal
@@ -254,7 +254,8 @@ impl<'input> Display for ExprKind<'input> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(")?;
         match self {
-            Self::NumberLiteral(n) => write!(f, "{n}"),
+            Self::NumberLiteral(n, None) => write!(f, "{n}"),
+            Self::NumberLiteral(n, Some(ty)) => write!(f, "{n}{ty}"),
             Self::StringLiteral(str) => write!(f, "\"{str}\"",),
             Self::CharLiteral(str) => write!(f, "'{str}'",),
             Self::Identifier(i) => write!(f, "{i}"),
@@ -532,25 +533,29 @@ impl<'input> Expr<'input> {
 
     // These all need spans because they can't be guessed
     #[must_use]
-    pub fn build_number(lit: Spanned<NumberLiteral<'input>>) -> Self {
-        let span = lit.span();
+    pub fn build_number(
+        lit: Spanned<NumberLiteral<'input>>,
+        ty: Option<Spanned<Type<'input>>>,
+    ) -> Self {
+        let start = lit.start();
+        let end = ty.as_ref().map_or_else(|| lit.end(), Spanned::end);
         Self(spanned!(
-            span.start(),
-            ExprKind::NumberLiteral(lit.into_value()),
-            span.end()
+            start,
+            ExprKind::NumberLiteral(lit.into_value(), ty.map(Spanned::into_value)),
+            end
         ))
     }
     #[must_use]
-    pub fn build_number_dec(lit: Spanned<&'input str>) -> Self {
-        Self::build_number(lit.map(NumberLiteral::Decimal))
+    pub fn build_number_dec(lit: Spanned<&'input str>, ty: Option<Spanned<Type<'input>>>) -> Self {
+        Self::build_number(lit.map(NumberLiteral::Decimal), ty)
     }
     #[must_use]
-    pub fn build_number_hex(lit: Spanned<&'input str>) -> Self {
-        Self::build_number(lit.map(NumberLiteral::Hexadecimal))
+    pub fn build_number_hex(lit: Spanned<&'input str>, ty: Option<Spanned<Type<'input>>>) -> Self {
+        Self::build_number(lit.map(NumberLiteral::Hexadecimal), ty)
     }
     #[must_use]
-    pub fn build_number_bin(lit: Spanned<&'input str>) -> Self {
-        Self::build_number(lit.map(NumberLiteral::Binary))
+    pub fn build_number_bin(lit: Spanned<&'input str>, ty: Option<Spanned<Type<'input>>>) -> Self {
+        Self::build_number(lit.map(NumberLiteral::Binary), ty)
     }
     #[must_use]
     pub fn build_string(lit: Spanned<ZrcString<'input>>) -> Self {

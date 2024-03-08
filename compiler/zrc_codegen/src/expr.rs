@@ -207,7 +207,7 @@ pub(crate) fn cg_expr<'ctx>(
     cg.builder.set_current_debug_location(debug_location);
 
     match expr.kind.into_value() {
-        TypedExprKind::NumberLiteral(n) => {
+        TypedExprKind::NumberLiteral(n, _) => {
             let no_underscores = n.text_content().replace('_', "");
 
             bb.and(
@@ -783,6 +783,16 @@ mod tests {
     }
     mod cg_expr {
         use super::*;
+
+        #[test]
+        fn typed_integers_generate_properly() {
+            cg_snapshot_test!(indoc! {"
+                fn test() -> i8 {
+                    // TEST: returns `i8`
+                    return 4i8;
+                }
+            "});
+        }
 
         #[test]
         fn comma_yields_right_value() {

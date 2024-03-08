@@ -11,6 +11,22 @@ pub struct TypeCtx<'input> {
     /// Mappings from type name to its [`TastType`]
     mappings: HashMap<&'input str, TastType<'input>>,
 }
+/// All types namable in the global scope
+const ALL_NAMABLE_TYPES: [(&str, TastType); 11] = [
+    // all namable types
+    ("i8", TastType::I8),
+    ("u8", TastType::U8),
+    ("i16", TastType::I16),
+    ("u16", TastType::U16),
+    ("i32", TastType::I32),
+    ("u32", TastType::U32),
+    ("i64", TastType::I64),
+    ("u64", TastType::U64),
+    ("isize", TastType::Isize),
+    ("usize", TastType::Usize),
+    ("bool", TastType::Bool),
+    // void is not namable
+];
 impl<'input> TypeCtx<'input> {
     /// Create a new [`TypeScope`] containing **NOTHING** -- not even
     /// primitives.
@@ -24,21 +40,7 @@ impl<'input> TypeCtx<'input> {
     /// Create a new [`TypeScope`] containing just the primitives
     #[must_use]
     pub fn new() -> TypeCtx<'input> {
-        Self::from([
-            // all namable types
-            ("i8", TastType::I8),
-            ("u8", TastType::U8),
-            ("i16", TastType::I16),
-            ("u16", TastType::U16),
-            ("i32", TastType::I32),
-            ("u32", TastType::U32),
-            ("i64", TastType::I64),
-            ("u64", TastType::U64),
-            ("isize", TastType::Isize),
-            ("usize", TastType::Usize),
-            ("bool", TastType::Bool),
-            // void is not namable
-        ])
+        Self::from(ALL_NAMABLE_TYPES)
     }
 
     /// Create a new [`TypeScope`] from a [`HashMap`] mapping identifier [str]s
@@ -48,6 +50,17 @@ impl<'input> TypeCtx<'input> {
         mappings: HashMap<&'input str, TastType<'input>>,
     ) -> TypeCtx<'input> {
         Self { mappings }
+    }
+
+    /// Create a new [`TypeScope`] from a [`HashMap`] mapping identifier [str]s
+    /// to [`TastType`]s
+    #[must_use]
+    pub fn from_defaults_and_mappings(
+        mappings: HashMap<&'input str, TastType<'input>>,
+    ) -> TypeCtx<'input> {
+        Self {
+            mappings: ALL_NAMABLE_TYPES.iter().cloned().chain(mappings).collect(),
+        }
     }
 
     /// Determine if a type exists by a given name
