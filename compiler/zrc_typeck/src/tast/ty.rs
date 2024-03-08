@@ -88,22 +88,22 @@ impl<'input> Display for Type<'input> {
             Self::Usize => write!(f, "usize"),
             Self::Isize => write!(f, "isize"),
             Self::Bool => write!(f, "bool"),
-            Self::Ptr(pointee_ty) => write!(f, "*({pointee_ty})"),
+            Self::Ptr(pointee_ty) => write!(f, "*{pointee_ty}"),
             Self::Fn(fn_data) => write!(f, "{fn_data}"),
-            Self::Struct(fields) if fields.is_empty() => write!(f, "(struct {{}})"),
+            Self::Struct(fields) if fields.is_empty() => write!(f, "struct {{}}"),
             Self::Struct(fields) => write!(
                 f,
-                "(struct {{ {} }})",
+                "struct {{ {} }}",
                 fields
                     .iter()
                     .map(|(key, ty)| format!("{key}: {ty}"))
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Self::Union(fields) if fields.is_empty() => write!(f, "(union {{}})"),
+            Self::Union(fields) if fields.is_empty() => write!(f, "union {{}}"),
             Self::Union(fields) => write!(
                 f,
-                "(union {{ {} }})",
+                "union {{ {} }}",
                 fields
                     .iter()
                     .map(|(key, ty)| format!("{key}: {ty}"))

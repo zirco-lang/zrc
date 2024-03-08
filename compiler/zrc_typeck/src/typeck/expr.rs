@@ -893,7 +893,7 @@ mod tests {
             (
                 "s.fake",
                 Err(DiagnosticKind::StructOrUnionDoesNotHaveMember(
-                    "(struct { i8: i8 })".to_string(),
+                    "struct { i8: i8 }".to_string(),
                     "fake".to_string(),
                 )),
             ),
@@ -968,7 +968,7 @@ mod tests {
             (
                 "(&i8) == i8",
                 Err(DiagnosticKind::EqualityOperators(
-                    "*(i8)".to_string(),
+                    "*i8".to_string(),
                     "i8".to_string(),
                 )),
             ),
@@ -1037,7 +1037,7 @@ mod tests {
             (
                 "s as i8",
                 Err(DiagnosticKind::InvalidCast(
-                    "(struct { i8: i8 })".to_string(),
+                    "struct { i8: i8 }".to_string(),
                     "i8".to_string(),
                 )),
             ),
@@ -1052,7 +1052,7 @@ mod tests {
             (
                 "4 NonIntegerType",
                 Err(DiagnosticKind::InvalidNumberLiteralType(
-                    "(struct {})".to_string(),
+                    "struct {}".to_string(),
                 )),
             ),
             (
