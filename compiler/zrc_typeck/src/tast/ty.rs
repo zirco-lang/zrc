@@ -90,6 +90,7 @@ impl<'input> Display for Type<'input> {
             Self::Bool => write!(f, "bool"),
             Self::Ptr(pointee_ty) => write!(f, "*({pointee_ty})"),
             Self::Fn(fn_data) => write!(f, "{fn_data}"),
+            Self::Struct(fields) if fields.is_empty() => write!(f, "(struct {{}})"),
             Self::Struct(fields) => write!(
                 f,
                 "(struct {{ {} }})",
@@ -99,6 +100,7 @@ impl<'input> Display for Type<'input> {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Self::Union(fields) if fields.is_empty() => write!(f, "(union {{}})"),
             Self::Union(fields) => write!(
                 f,
                 "(union {{ {} }})",
