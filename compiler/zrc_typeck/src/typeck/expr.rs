@@ -1052,7 +1052,7 @@ mod tests {
             (
                 "4 NonIntegerType",
                 Err(DiagnosticKind::InvalidNumberLiteralType(
-                    "(struct {  })".to_string(),
+                    "(struct {})".to_string(),
                 )),
             ),
             (
