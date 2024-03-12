@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 ansi_term = "0.12.1"
 line-span = "0.1.5"
-thiserror = "1.0.57"
+thiserror = "1.0.58"
 zrc_utils = { version = "0.1.0", path = "../zrc_utils" }
