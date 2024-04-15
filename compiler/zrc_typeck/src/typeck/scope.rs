@@ -46,18 +46,14 @@ impl<'input> TypeCtx<'input> {
     /// Create a new [`TypeScope`] from a [`HashMap`] mapping identifier [str]s
     /// to [`TastType`]s
     #[must_use]
-    pub const fn from_mappings(
-        mappings: HashMap<&'input str, TastType<'input>>,
-    ) -> Self {
+    pub const fn from_mappings(mappings: HashMap<&'input str, TastType<'input>>) -> Self {
         Self { mappings }
     }
 
     /// Create a new [`TypeScope`] from a [`HashMap`] mapping identifier [str]s
     /// to [`TastType`]s
     #[must_use]
-    pub fn from_defaults_and_mappings(
-        mappings: HashMap<&'input str, TastType<'input>>,
-    ) -> Self {
+    pub fn from_defaults_and_mappings(mappings: HashMap<&'input str, TastType<'input>>) -> Self {
         Self {
             mappings: ALL_NAMABLE_TYPES.iter().cloned().chain(mappings).collect(),
         }
@@ -120,9 +116,7 @@ impl<'input> ValueCtx<'input> {
     /// Create a new [`ValueScope`] from a [`HashMap`] mapping identifier [str]s
     /// to data types
     #[must_use]
-    pub const fn from_mappings(
-        mappings: HashMap<&'input str, TastType<'input>>,
-    ) -> Self {
+    pub const fn from_mappings(mappings: HashMap<&'input str, TastType<'input>>) -> Self {
         Self { mappings }
     }
 
