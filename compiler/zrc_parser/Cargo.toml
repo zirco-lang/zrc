@@ -15,4 +15,4 @@ zrc_utils = { version = "0.1.0", path = "../zrc_utils" }
 lalrpop = "0.20.2"
 
 [dev-dependencies]
-indoc = "2.0.4"
+indoc = "2.0.5"
