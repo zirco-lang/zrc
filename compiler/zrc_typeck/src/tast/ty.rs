@@ -142,7 +142,7 @@ impl<'input> Type<'input> {
     /// Try to get the value we point at, or None if not a pointer.
     #[must_use]
     #[allow(clippy::wildcard_enum_match_arm)]
-    pub fn into_pointee(self) -> Option<Type<'input>> {
+    pub fn into_pointee(self) -> Option<Self> {
         match self {
             Type::Ptr(x) => Some(*x),
             _ => None,
@@ -152,7 +152,7 @@ impl<'input> Type<'input> {
     /// Try to access the struct's [`IndexMap`] if we are a struct
     #[must_use]
     #[allow(clippy::wildcard_enum_match_arm)]
-    pub fn into_struct_contents(self) -> Option<IndexMap<&'input str, Type<'input>>> {
+    pub fn into_struct_contents(self) -> Option<IndexMap<&'input str, Self>> {
         match self {
             Type::Struct(x) => Some(x),
             _ => None,
@@ -162,7 +162,7 @@ impl<'input> Type<'input> {
     /// Try to access the union's [`IndexMap`] if we are a union
     #[must_use]
     #[allow(clippy::wildcard_enum_match_arm)]
-    pub fn into_union_contents(self) -> Option<IndexMap<&'input str, Type<'input>>> {
+    pub fn into_union_contents(self) -> Option<IndexMap<&'input str, Self>> {
         match self {
             Type::Union(x) => Some(x),
             _ => None,

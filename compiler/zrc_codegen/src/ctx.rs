@@ -68,7 +68,7 @@ pub struct CompilationUnitCtx<'ctx, 'a> {
     pub module: &'a Module<'ctx>,
 }
 impl<'ctx, 'a> AsCompilationUnitCtx<'ctx, 'a> for CompilationUnitCtx<'ctx, 'a> {
-    fn as_unit_ctx(&self) -> CompilationUnitCtx<'ctx, 'a> {
+    fn as_unit_ctx(&self) -> Self {
         *self
     }
 }
