@@ -31,7 +31,7 @@ impl<'input> TypeCtx<'input> {
     /// Create a new [`TypeScope`] containing **NOTHING** -- not even
     /// primitives.
     #[must_use]
-    pub fn new_empty() -> TypeCtx<'input> {
+    pub fn new_empty() -> Self {
         Self {
             mappings: HashMap::new(),
         }
@@ -39,7 +39,7 @@ impl<'input> TypeCtx<'input> {
 
     /// Create a new [`TypeScope`] containing just the primitives
     #[must_use]
-    pub fn new() -> TypeCtx<'input> {
+    pub fn new() -> Self {
         Self::from(ALL_NAMABLE_TYPES)
     }
 
@@ -48,7 +48,7 @@ impl<'input> TypeCtx<'input> {
     #[must_use]
     pub const fn from_mappings(
         mappings: HashMap<&'input str, TastType<'input>>,
-    ) -> TypeCtx<'input> {
+    ) -> Self {
         Self { mappings }
     }
 
@@ -57,7 +57,7 @@ impl<'input> TypeCtx<'input> {
     #[must_use]
     pub fn from_defaults_and_mappings(
         mappings: HashMap<&'input str, TastType<'input>>,
-    ) -> TypeCtx<'input> {
+    ) -> Self {
         Self {
             mappings: ALL_NAMABLE_TYPES.iter().cloned().chain(mappings).collect(),
         }
@@ -111,7 +111,7 @@ impl<'input> ValueCtx<'input> {
     // accurate.
     #[allow(clippy::new_without_default)]
     #[must_use]
-    pub fn new() -> ValueCtx<'input> {
+    pub fn new() -> Self {
         Self {
             mappings: HashMap::new(),
         }
@@ -122,7 +122,7 @@ impl<'input> ValueCtx<'input> {
     #[must_use]
     pub const fn from_mappings(
         mappings: HashMap<&'input str, TastType<'input>>,
-    ) -> ValueCtx<'input> {
+    ) -> Self {
         Self { mappings }
     }
 
@@ -176,7 +176,7 @@ impl<'input> GlobalScope<'input> {
     /// Create a new [`GlobalScope`] containing nothing -- not even primitives.
     /// This is most useful for testing.
     #[must_use]
-    pub fn new_empty() -> GlobalScope<'input> {
+    pub fn new_empty() -> Self {
         GlobalScope {
             types: TypeCtx::new_empty(),
             global_values: ValueCtx::new(),
@@ -187,7 +187,7 @@ impl<'input> GlobalScope<'input> {
     /// Create a new [`GlobalScope`] with just the primitive types. This is the
     /// normal initialization method.
     #[must_use]
-    pub fn new() -> GlobalScope<'input> {
+    pub fn new() -> Self {
         GlobalScope {
             types: TypeCtx::new(),
             global_values: ValueCtx::new(),
@@ -227,7 +227,7 @@ pub struct Scope<'input, 'gs> {
 }
 impl<'input, 'gs> Scope<'input, 'gs> {
     /// Creates a new [`Scope`] from a parent [`GlobalScope`]
-    fn from_global_scope(global_scope: &'gs GlobalScope<'input>) -> Scope<'input, 'gs> {
+    fn from_global_scope(global_scope: &'gs GlobalScope<'input>) -> Self {
         Scope {
             values: global_scope.global_values.clone(),
             types: &global_scope.types,
