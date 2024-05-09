@@ -19,7 +19,7 @@ jobs:
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
             - name: Install LLVM
-              uses: KyleMayes/install-llvm-action@v1
+              uses: KyleMayes/install-llvm-action@v2
               with:
                   version: "16.0"
             - name: Set up Rust
