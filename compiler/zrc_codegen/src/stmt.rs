@@ -133,7 +133,8 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
     clippy::too_many_arguments,
     clippy::too_many_lines,
     clippy::needless_pass_by_value,
-    clippy::redundant_pub_crate
+    clippy::redundant_pub_crate,
+    clippy::ref_option
 )]
 pub(crate) fn cg_block<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,

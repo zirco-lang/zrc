@@ -122,7 +122,7 @@ impl<'input, 'ctx> CgScope<'input, 'ctx> {
     }
 }
 
-impl<'input, 'ctx> Default for CgScope<'input, 'ctx> {
+impl Default for CgScope<'_, '_> {
     fn default() -> Self {
         Self::new()
     }
@@ -137,7 +137,7 @@ struct BasicBlockAnd<'ctx, T> {
     /// Any other data the function wishes to pass
     value: T,
 }
-impl<'ctx, T> BasicBlockAnd<'ctx, T> {
+impl<T> BasicBlockAnd<'_, T> {
     /// Discard the basic block and return the value
     pub fn into_value(self) -> T {
         self.value
