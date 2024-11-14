@@ -27,7 +27,7 @@ const ALL_NAMABLE_TYPES: [(&str, TastType); 11] = [
     ("bool", TastType::Bool),
     // void is not namable
 ];
-impl TypeCtx<'_> {
+impl<'input> TypeCtx<'input> {
     /// Create a new [`TypeScope`] containing **NOTHING** -- not even
     /// primitives.
     #[must_use]
@@ -101,7 +101,7 @@ pub struct ValueCtx<'input> {
     /// Mappings from identifier to its contained data [`TastType`]
     mappings: HashMap<&'input str, TastType<'input>>,
 }
-impl ValueCtx<'_> {
+impl<'input> ValueCtx<'input> {
     /// Create a new empty [`ValueScope`].
     // Does not impl [Default] because a default would be misleading: the "empty" scope is more
     // accurate.
@@ -166,7 +166,7 @@ pub struct GlobalScope<'input> {
     /// Contains data about every global [`tast::ty::Fn`]
     pub declarations: HashMap<&'input str, FunctionDeclarationGlobalMetadata<'input>>,
 }
-impl GlobalScope<'_> {
+impl<'input> GlobalScope<'input> {
     /// Create a new [`GlobalScope`] containing nothing -- not even primitives.
     /// This is most useful for testing.
     #[must_use]

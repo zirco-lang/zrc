@@ -114,7 +114,7 @@ impl<'input> Display for Type<'input> {
     }
 }
 
-impl Type<'_> {
+impl<'input> Type<'input> {
     /// Returns `true` if this is an integer type like [`Type::I8`].
     #[must_use]
     pub const fn is_integer(&self) -> bool {

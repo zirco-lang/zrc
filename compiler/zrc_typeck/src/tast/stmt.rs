@@ -94,7 +94,7 @@ pub enum ArgumentDeclarationList<'input> {
     /// `(a, b)` without `...`
     NonVariadic(Vec<ArgumentDeclaration<'input>>),
 }
-impl ArgumentDeclarationList<'_> {
+impl<'input> ArgumentDeclarationList<'input> {
     /// Create the [`ArgumentDeclarationList`] for just `()`
     #[must_use]
     pub const fn empty() -> Self {

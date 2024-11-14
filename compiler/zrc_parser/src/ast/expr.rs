@@ -298,7 +298,7 @@ impl Display for ExprKind<'_> {
 #[allow(missing_docs)]
 #[allow(clippy::missing_docs_in_private_items)]
 #[allow(clippy::should_implement_trait)]
-impl Expr<'_> {
+impl<'input> Expr<'input> {
     #[must_use]
     pub fn build_comma(lhs: Self, rhs: Self) -> Self {
         Self(spanned!(
