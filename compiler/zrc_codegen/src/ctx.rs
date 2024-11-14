@@ -157,7 +157,7 @@ pub struct BlockCtx<'ctx, 'input, 'a> {
     /// The LLVM [`DILexicalBlock`] we're currently in
     pub dbg_scope: DILexicalBlock<'ctx>,
 }
-impl<'ctx, 'input, 'a> AsCompilationUnitCtx<'ctx, 'a> for BlockCtx<'ctx, 'input, 'a> {
+impl<'ctx, 'a> AsCompilationUnitCtx<'ctx, 'a> for BlockCtx<'ctx, '_, 'a> {
     fn as_unit_ctx(&self) -> CompilationUnitCtx<'ctx, 'a> {
         CompilationUnitCtx {
             ctx: self.ctx,

@@ -19,7 +19,7 @@ pub struct Fn<'input> {
     /// The function's return type
     pub returns: Box<Type<'input>>,
 }
-impl<'input> Display for Fn<'input> {
+impl Display for Fn<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(fn({}) -> {})", self.arguments, self.returns)
     }
@@ -74,7 +74,7 @@ pub enum Type<'input> {
     Union(IndexMap<&'input str, Type<'input>>),
 }
 
-impl<'input> Display for Type<'input> {
+impl Display for Type<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::I8 => write!(f, "i8"),

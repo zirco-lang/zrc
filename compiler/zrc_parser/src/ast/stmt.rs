@@ -13,7 +13,7 @@ use super::{expr::Expr, ty::Type};
 /// A Zirco statement
 #[derive(PartialEq, Debug, Clone)]
 pub struct Stmt<'input>(pub Spanned<StmtKind<'input>>);
-impl<'input> Display for Stmt<'input> {
+impl Display for Stmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.value().fmt(f)
     }
@@ -60,7 +60,7 @@ pub enum StmtKind<'input> {
     /// A let declaration
     DeclarationList(Spanned<Vec<Spanned<LetDeclaration<'input>>>>),
 }
-impl<'input> Display for StmtKind<'input> {
+impl Display for StmtKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::IfStmt(cond, if_true, None) => write!(f, "if ({cond}) {if_true}"),
@@ -144,7 +144,7 @@ pub enum Declaration<'input> {
         ty: Type<'input>,
     },
 }
-impl<'input> Display for Declaration<'input> {
+impl Display for Declaration<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::FunctionDeclaration {
@@ -203,14 +203,14 @@ pub enum ArgumentDeclarationList<'input> {
     /// `(a, b)` without `...`
     NonVariadic(Vec<Spanned<ArgumentDeclaration<'input>>>),
 }
-impl<'input> ArgumentDeclarationList<'input> {
+impl ArgumentDeclarationList<'_> {
     /// Create the [`ArgumentDeclarationList`] for just `()`
     #[must_use]
     pub const fn empty() -> Self {
         Self::NonVariadic(vec![])
     }
 }
-impl<'input> Display for ArgumentDeclarationList<'input> {
+impl Display for ArgumentDeclarationList<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (Self::Variadic(args) | Self::NonVariadic(args)) = self;
 
@@ -240,7 +240,7 @@ pub struct LetDeclaration<'input> {
     /// The value to associate with the new symbol.
     pub value: Option<Expr<'input>>,
 }
-impl<'input> Display for LetDeclaration<'input> {
+impl Display for LetDeclaration<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.ty {
             None => match &self.value {
@@ -263,7 +263,7 @@ pub struct ArgumentDeclaration<'input> {
     /// The type of the parameter.
     pub ty: Type<'input>,
 }
-impl<'input> Display for ArgumentDeclaration<'input> {
+impl Display for ArgumentDeclaration<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.name, self.ty)
     }

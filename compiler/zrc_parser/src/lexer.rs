@@ -484,7 +484,7 @@ pub enum Tok<'input> {
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", lexer_slice)]
     Identifier(&'input str),
 }
-impl<'input> Display for Tok<'input> {
+impl Display for Tok<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -562,7 +562,7 @@ impl<'input> Display for Tok<'input> {
 }
 
 /// The compiler's representation of a string literal in Zirco
-
+///
 /// Enum representing the lexed contents of a string literal
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
 pub enum StringTok<'input> {
@@ -598,7 +598,7 @@ pub enum StringTok<'input> {
     #[regex(r"[^\\]+", lexer_slice)]
     Text(&'input str),
 }
-impl<'input> StringTok<'input> {
+impl StringTok<'_> {
     /// Convert a [`StringTok`] into its literal [`char`] representation
     ///
     /// # Panics
@@ -645,7 +645,7 @@ impl Display for StringTok<'_> {
 /// A representation of a string literal in the source code
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ZrcString<'input>(pub Vec<StringTok<'input>>);
-impl<'input> ZrcString<'input> {
+impl ZrcString<'_> {
     /// Convert a [`ZrcString`] into a [`String`] for its REAL byte
     /// representation
     ///

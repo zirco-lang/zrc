@@ -13,7 +13,7 @@ use zrc_utils::{
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Type<'input>(pub Spanned<TypeKind<'input>>);
-impl<'input> Display for Type<'input> {
+impl Display for Type<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.value().fmt(f)
     }
@@ -47,7 +47,7 @@ pub enum TypeKind<'input> {
     /// A direct union type
     Union(KeyTypeMapping<'input>),
 }
-impl<'input> Display for TypeKind<'input> {
+impl Display for TypeKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Identifier(i) => write!(f, "{i}"),

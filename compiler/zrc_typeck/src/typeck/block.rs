@@ -26,7 +26,7 @@ pub enum BlockReturnAbility<'input> {
     /// Any sub-blocks of this block MAY return. At least one MUST return.
     MustReturn(TastType<'input>),
 }
-impl<'input> BlockReturnAbility<'input> {
+impl BlockReturnAbility<'_> {
     /// Determine the [`BlockReturnAbility`] of a sub-scope. `MustReturn`
     /// become`MayReturn`.
     #[must_use]

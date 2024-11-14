@@ -181,7 +181,7 @@ impl Display for Comparison {
 #[derive(PartialEq, Debug, Clone)]
 pub struct Expr<'input>(pub Spanned<ExprKind<'input>>);
 
-impl<'input> Display for Expr<'input> {
+impl Display for Expr<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.value().fmt(f)
     }
@@ -250,7 +250,7 @@ pub enum ExprKind<'input> {
     /// Any boolean literal.
     BooleanLiteral(bool),
 }
-impl<'input> Display for ExprKind<'input> {
+impl Display for ExprKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(")?;
         match self {

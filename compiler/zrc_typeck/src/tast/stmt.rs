@@ -126,7 +126,7 @@ impl<'input> ArgumentDeclarationList<'input> {
         }
     }
 }
-impl<'input> Display for ArgumentDeclarationList<'input> {
+impl Display for ArgumentDeclarationList<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (Self::Variadic(args) | Self::NonVariadic(args)) = self;
 
@@ -153,7 +153,7 @@ pub struct ArgumentDeclaration<'input> {
     /// The type of the parameter.
     pub ty: Spanned<Type<'input>>,
 }
-impl<'input> Display for ArgumentDeclaration<'input> {
+impl Display for ArgumentDeclaration<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.name, self.ty)
     }
