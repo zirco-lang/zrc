@@ -63,7 +63,7 @@ impl Display for TypeKind<'_> {
 #[allow(missing_docs)]
 #[allow(clippy::missing_docs_in_private_items)]
 #[allow(clippy::should_implement_trait)]
-impl<'input> Type<'input> {
+impl Type<'_> {
     #[must_use]
     pub fn build_ident(ident: Spanned<&'input str>) -> Self {
         let span = ident.span();

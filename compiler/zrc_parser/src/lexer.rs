@@ -198,7 +198,7 @@ pub enum NumberLiteral<'input> {
     /// A binary number literal
     Binary(&'input str),
 }
-impl<'input> NumberLiteral<'input> {
+impl NumberLiteral<'_> {
     /// Get the text content of this [`NumberLiteral`]
     #[must_use]
     pub const fn text_content(&self) -> &'input str {
@@ -672,7 +672,7 @@ pub struct ZircoLexer<'input> {
     lex: Lexer<'input, Tok<'input>>,
 }
 
-impl<'input> ZircoLexer<'input> {
+impl ZircoLexer<'_> {
     /// Create a new [`ZircoLexer`] given an input string
     #[must_use]
     pub fn new(input: &'input str) -> Self {
