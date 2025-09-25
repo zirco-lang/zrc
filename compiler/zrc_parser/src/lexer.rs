@@ -595,7 +595,7 @@ pub enum StringTok<'input> {
     EscapedDoubleQuote,
 
     /// Any other text fragment
-    #[regex(r"[^\\]+", lexer_slice)]
+    #[regex(r"[^\\]", lexer_slice)]
     Text(&'input str),
 }
 impl StringTok<'_> {
@@ -819,7 +819,11 @@ mod tests {
             Tok::SizeOf,
             Tok::Type,
             Tok::SmallArrow,
-            Tok::StringLiteral(ZrcString(vec![StringTok::Text("str")])),
+            Tok::StringLiteral(ZrcString(vec![
+                StringTok::Text("s"),
+                StringTok::Text("t"),
+                StringTok::Text("r"),
+            ])),
             Tok::NumberLiteral(NumberLiteral::Decimal("7_000")),
             Tok::NumberLiteral(NumberLiteral::Hexadecimal("F_A")),
             Tok::NumberLiteral(NumberLiteral::Binary("1_0")),
