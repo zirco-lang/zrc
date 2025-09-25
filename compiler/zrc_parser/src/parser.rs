@@ -101,7 +101,7 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input program.
-pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration>>, Diagnostic> {
+pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration<'_>>>, Diagnostic> {
     internal_parser::ProgramParser::new()
         .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
         .map_err(parser_error_to_diagnostic)
@@ -125,7 +125,7 @@ pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration>>, Diagnosti
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input statement list.
-pub fn parse_stmt_list(input: &str) -> Result<Spanned<Vec<Stmt>>, Diagnostic> {
+pub fn parse_stmt_list(input: &str) -> Result<Spanned<Vec<Stmt<'_>>>, Diagnostic> {
     internal_parser::StmtListParser::new()
         .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
         .map(|stmt_list| stmt_list.in_span(Span::from_positions(0, input.len())))
@@ -149,7 +149,7 @@ pub fn parse_stmt_list(input: &str) -> Result<Spanned<Vec<Stmt>>, Diagnostic> {
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input expression.
-pub fn parse_type(input: &str) -> Result<Type, Diagnostic> {
+pub fn parse_type(input: &str) -> Result<Type<'_>, Diagnostic> {
     internal_parser::TypeParser::new()
         .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
         .map_err(parser_error_to_diagnostic)
@@ -172,7 +172,7 @@ pub fn parse_type(input: &str) -> Result<Type, Diagnostic> {
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input expression.
-pub fn parse_expr(input: &str) -> Result<Expr, Diagnostic> {
+pub fn parse_expr(input: &str) -> Result<Expr<'_>, Diagnostic> {
     internal_parser::ExprParser::new()
         .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
         .map_err(parser_error_to_diagnostic)

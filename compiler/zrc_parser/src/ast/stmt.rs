@@ -78,14 +78,17 @@ impl Display for StmtKind<'_> {
                 write!(
                     f,
                     "for ({} {}; {}) {body}",
-                    init.as_ref().map_or(";".to_string(), |x| format!(
-                        "let {};",
-                        x.value()
-                            .iter()
-                            .map(ToString::to_string)
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )),
+                    init.as_ref().map_or_else(
+                        || ";".to_string(),
+                        |x| format!(
+                            "let {};",
+                            x.value()
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
+                    ),
                     cond.as_ref().map_or(String::new(), ToString::to_string),
                     post.as_ref().map_or(String::new(), ToString::to_string),
                 )

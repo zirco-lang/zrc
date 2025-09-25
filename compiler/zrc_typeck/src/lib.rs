@@ -31,7 +31,7 @@
     clippy::same_name_method,
     clippy::semicolon_inside_block,
     clippy::unseparated_literal_suffix,
-    clippy::string_to_string,
+    clippy::implicit_clone,
     clippy::todo,
     clippy::undocumented_unsafe_blocks,
     clippy::unimplemented,
@@ -55,7 +55,8 @@
 #![allow(
     clippy::multiple_crate_versions,
     clippy::cargo_common_metadata,
-    clippy::module_name_repetitions
+    clippy::module_name_repetitions,
+    clippy::doc_comment_double_space_linebreaks
 )]
 
 pub mod tast;
