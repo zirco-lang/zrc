@@ -294,7 +294,7 @@ fn main() -> anyhow::Result<()> {
 
     let directory_name: String;
     let file_name: String;
-    let mut input: Box<dyn std::io::Read + 'static> = if path.clone().into_os_string() == "-" {
+    let mut input: Box<dyn std::io::Read + 'static> = if path.as_os_str() == "-" {
         directory_name = "/dev".to_string();
         file_name = "stdin".to_string();
         Box::new(std::io::stdin())
@@ -356,22 +356,21 @@ fn main() -> anyhow::Result<()> {
     match result {
         Err(diagnostic) => eprintln!("{}", diagnostic.print(&content)),
         Ok(x) => {
-            let mut output: Box<dyn std::io::Write> =
-                if cli.out_file.clone().into_os_string() == "-" {
-                    Box::new(std::io::stdout())
-                } else {
-                    match std::fs::OpenOptions::new()
-                        .write(true)
-                        .truncate(true)
-                        .create(true)
-                        .open(cli.out_file)
-                    {
-                        Ok(file) => Box::new(file),
-                        Err(err) => {
-                            bail!(err);
-                        }
+            let mut output: Box<dyn std::io::Write> = if cli.out_file.as_os_str() == "-" {
+                Box::new(std::io::stdout())
+            } else {
+                match std::fs::OpenOptions::new()
+                    .write(true)
+                    .truncate(true)
+                    .create(true)
+                    .open(cli.out_file)
+                {
+                    Ok(file) => Box::new(file),
+                    Err(err) => {
+                        bail!(err);
                     }
-                };
+                }
+            };
 
             output
                 .write_all(&x)
