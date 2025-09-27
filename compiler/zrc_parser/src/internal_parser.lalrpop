@@ -98,6 +98,8 @@ SimpleStmt: StmtKind<'input> = {
     "{" <l:StmtList?> "}" => StmtKind::BlockStmt(l.unwrap_or(Vec::new())),
     <FlowStmt>,
     <Spanned<LetDeclaration>> => StmtKind::DeclarationList(<>),
+    "goto" <Spanned<IDENTIFIER>> ";" => StmtKind::GotoStmt(<>),
+    <Spanned<IDENTIFIER>> ":" => StmtKind::LabelStmt(<>),
 };
 
 // For declarations at the global scope
@@ -394,6 +396,7 @@ extern {
         "do" => lexer::Tok::Do,
         "for" => lexer::Tok::For,
         "break" => lexer::Tok::Break,
+        "goto" => lexer::Tok::Goto,
         "continue" => lexer::Tok::Continue,
         "return" => lexer::Tok::Return,
         "let" => lexer::Tok::Let,

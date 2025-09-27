@@ -1,6 +1,6 @@
 //! Scopes and other global typeck state
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::tast::ty::{FunctionDeclarationGlobalMetadata, Type as TastType};
 
@@ -218,6 +218,9 @@ pub struct Scope<'input, 'gs> {
     /// Maps every type name from the parent [`GlobalScope`] to its
     /// representation
     pub types: &'gs TypeCtx<'input>,
+
+    /// List of valid goto labels
+    pub labels: HashSet<&'input str>,
 }
 impl<'input, 'gs> Scope<'input, 'gs> {
     /// Creates a new [`Scope`] from a parent [`GlobalScope`]
@@ -225,6 +228,7 @@ impl<'input, 'gs> Scope<'input, 'gs> {
         Scope {
             values: global_scope.global_values.clone(),
             types: &global_scope.types,
+            labels: HashSet::new(),
         }
     }
 }

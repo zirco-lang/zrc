@@ -172,6 +172,37 @@ pub fn type_block<'input, 'gs>(
                     || -> Result<Option<(TypedStmt<'_>, BlockReturnActuality)>, Diagnostic> {
                         match stmt.0.into_value() {
                             StmtKind::EmptyStmt => Ok(None),
+                            StmtKind::LabelStmt(label) => {
+                                let span = label.span();
+                                let label = label.into_value();
+                                if scope.labels.contains(label) {
+                                    Err(DiagnosticKind::LabelAlreadyInUse(label.to_string())
+                                        .error_in(span))
+                                } else {
+                                    scope.labels.insert(label);
+                                    Ok(Some((
+                                        TypedStmt(
+                                            TypedStmtKind::LabelStmt(label).in_span(stmt_span),
+                                        ),
+                                        BlockReturnActuality::NeverReturns,
+                                    )))
+                                }
+                            }
+                            StmtKind::GotoStmt(label) => {
+                                let span = label.span();
+                                let label = label.into_value();
+                                if scope.labels.contains(label) {
+                                    Ok(Some((
+                                        TypedStmt(
+                                            TypedStmtKind::GotoStmt(label).in_span(stmt_span),
+                                        ),
+                                        BlockReturnActuality::NeverReturns,
+                                    )))
+                                } else {
+                                    Err(DiagnosticKind::UnableToResolveLabel(label.to_string())
+                                        .error_in(span))
+                                }
+                            }
                             StmtKind::BreakStmt if can_use_break_continue => Ok(Some((
                                 TypedStmt(TypedStmtKind::BreakStmt.in_span(stmt_span)),
                                 BlockReturnActuality::NeverReturns,

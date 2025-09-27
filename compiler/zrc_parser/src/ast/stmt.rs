@@ -49,6 +49,10 @@ pub enum StmtKind<'input> {
     BlockStmt(Vec<Stmt<'input>>),
     /// `x;`
     ExprStmt(Expr<'input>),
+    /// `x:`
+    LabelStmt(Spanned<&'input str>),
+    /// `goto x;`
+    GotoStmt(Spanned<&'input str>),
     /// `;`
     EmptyStmt,
     /// `continue;`
@@ -102,6 +106,8 @@ impl Display for StmtKind<'_> {
                 write!(f, "}}")
             }
             Self::ExprStmt(expr) => write!(f, "{expr};"),
+            Self::LabelStmt(l) => write!(f, "{l}:"),
+            Self::GotoStmt(l) => write!(f, "goto {l};"),
             Self::EmptyStmt => write!(f, ";"),
             Self::ContinueStmt => write!(f, "continue;"),
             Self::BreakStmt => write!(f, "break;"),
@@ -300,6 +306,8 @@ mod tests {
             "let x: i32;",
             "let x: i32 = (4);",
             "{let x = (4);}",
+            "l:",
+            "goto l;",
         ];
 
         for input in test_cases {

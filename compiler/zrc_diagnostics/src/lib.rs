@@ -147,6 +147,8 @@ pub enum DiagnosticKind {
     UnableToResolveType(String),
     #[error("unable to resolve identifier `{0}`")]
     UnableToResolveIdentifier(String),
+    #[error("unable to resolve label `{0}`")]
+    UnableToResolveLabel(String),
     #[error("`{0}` is not a valid lvalue for assignment or address-of")]
     NotAnLvalue(String),
     #[error("expected `{expected}` on right hand side of assignment, got `{got}`")]
@@ -183,6 +185,8 @@ pub enum DiagnosticKind {
     InvalidCast(String, String),
     #[error("identifier `{0}` already in use")]
     IdentifierAlreadyInUse(String),
+    #[error("label `{0}` already in use")]
+    LabelAlreadyInUse(String),
     #[error("no explicit variable type present and no value to infer from")]
     NoTypeNoValue,
     #[error("cannot use `break` outside of loop")]

@@ -449,6 +449,9 @@ pub enum Tok<'input> {
     /// The keyword `type`
     #[token("type")]
     Type,
+    /// The keyword `goto`
+    #[token("goto")]
+    Goto,
     /// The operator `->`
     #[token("->")]
     SmallArrow,
@@ -503,6 +506,7 @@ impl Display for Tok<'_> {
                 Self::Fn => "fn".to_string(),
                 Self::For => "for".to_string(),
                 Self::If => "if".to_string(),
+                Self::Goto => "goto".to_string(),
                 Self::LeftBrace => "{".to_string(),
                 Self::LeftBracket => "[".to_string(),
                 Self::LeftParen => "(".to_string(),
@@ -755,7 +759,7 @@ mod tests {
         let input = concat!(
             "+ - * / % == != > >= < <= && || ! & | ^ ~ << >> = += -= *= /= %= &= |= ^= <<= >>= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
-            r#" struct union sizeof type -> "str" 7_000 0xF_A 0b1_0 abc"#
+            r#" struct union sizeof type goto -> "str" 7_000 0xF_A 0b1_0 abc"#
         );
         let tokens: Vec<Tok> = vec![
             Tok::Plus,
@@ -818,6 +822,7 @@ mod tests {
             Tok::Union,
             Tok::SizeOf,
             Tok::Type,
+            Tok::Goto,
             Tok::SmallArrow,
             Tok::StringLiteral(ZrcString(vec![
                 StringTok::Text("s"),

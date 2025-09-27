@@ -60,6 +60,10 @@ pub enum TypedStmtKind<'input> {
     ContinueStmt,
     /// `break;`
     BreakStmt,
+    /// `x:`
+    LabelStmt(&'input str),
+    /// `goto x;`
+    GotoStmt(&'input str),
     /// `return;` or `return x;`. `return;` is the same as a `return
     /// CONST_UNIT;`
     ReturnStmt(Option<TypedExpr<'input>>),

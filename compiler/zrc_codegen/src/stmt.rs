@@ -176,6 +176,8 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     Some(cg_expr(expr_cg, bb, expr).bb)
                 }
 
+                TypedStmtKind::GotoStmt(_) | TypedStmtKind::LabelStmt(_) => todo!(), // TODO
+
                 TypedStmtKind::IfStmt(cond, then, then_else) => {
                     let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
 
