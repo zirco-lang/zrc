@@ -170,6 +170,8 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
             cg.builder.set_current_debug_location(debug_location);
 
             match stmt.0.into_value() {
+                TypedStmtKind::SwitchCase { .. } => todo!(), // TODO
+
                 TypedStmtKind::ExprStmt(expr) => {
                     let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
 

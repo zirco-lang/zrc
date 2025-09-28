@@ -178,7 +178,7 @@ impl Display for Comparison {
 }
 
 /// A Zirco expression
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Expr<'input>(pub Spanned<ExprKind<'input>>);
 
 impl Display for Expr<'_> {
@@ -191,7 +191,7 @@ impl Display for Expr<'_> {
 ///
 /// This enum represents all the different kinds of expressions in Zirco. It is
 /// used by the parser to represent the AST in the expression position.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum ExprKind<'input> {
     /// `a, b`
     Comma(Box<Expr<'input>>, Box<Expr<'input>>),

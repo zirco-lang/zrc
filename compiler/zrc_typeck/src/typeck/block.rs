@@ -1,7 +1,10 @@
 //! for blocks
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
-use zrc_parser::ast::stmt::{Stmt, StmtKind};
+use zrc_parser::ast::{
+    expr::{Expr, ExprKind},
+    stmt::{Stmt, StmtKind},
+};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{declaration::process_let_declaration, scope::Scope, type_expr};
@@ -113,6 +116,13 @@ fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
     })
 }
 
+fn has_unique_elements<T>(slice: &[T]) -> bool
+where
+    T: PartialEq,
+{
+    (1..slice.len()).any(|i| slice[i..].contains(&slice[i - 1]))
+}
+
 /// Type check a block of [AST statement](Stmt)s and return a block of [TAST
 /// statement](TypedStmt)s.
 ///
@@ -187,6 +197,82 @@ pub fn type_block<'input, 'gs>(
                             StmtKind::ContinueStmt => {
                                 Err(DiagnosticKind::CannotUseContinueOutsideOfLoop
                                     .error_in(stmt_span))
+                            }
+
+                            StmtKind::SwitchCase {
+                                matches,
+                                over: cases,
+                            } => {
+                                let mut cases = cases.clone();
+                                let matches = type_expr(&scope, matches)?;
+
+                                // The last entry in over MUST be the default case
+                                let maybe_default_case = cases.pop();
+                                let Some(maybe_default_case) = maybe_default_case else {
+                                    return Err(DiagnosticKind::SwitchCaseMissingTerminalDefault
+                                        .error_in(stmt_span));
+                                };
+
+                                let ExprKind::Identifier("default") =
+                                    maybe_default_case.value().0 .0.value()
+                                else {
+                                    return Err(DiagnosticKind::SwitchCaseMissingTerminalDefault
+                                        .error_in(stmt_span));
+                                };
+
+                                let default_stmt = type_block(
+                                    &scope,
+                                    coerce_stmt_into_block(maybe_default_case.value().1.clone()),
+                                    false,
+                                    return_ability.clone().demote(),
+                                )?
+                                .0;
+
+                                if !has_unique_elements(
+                                    &(cases
+                                        .clone()
+                                        .into_iter()
+                                        .map(move |x| x.into_value().0)
+                                        .collect::<Vec<_>>()),
+                                ) {
+                                    return Err(DiagnosticKind::MultipleCases.error_in(stmt_span));
+                                }
+
+                                let cases = cases
+                                    .into_iter()
+                                    .map(|case| {
+                                        let (trigger, exec) = case.into_value();
+                                        let exec = type_block(
+                                            &scope,
+                                            coerce_stmt_into_block(exec),
+                                            false,
+                                            return_ability.clone().demote(),
+                                        )?;
+
+                                        Ok::<(Expr<'input>, Vec<TypedStmt<'_>>), Diagnostic>((
+                                            trigger, exec.0,
+                                        ))
+                                    })
+                                    .collect::<Result<Vec<_>, _>>()?;
+
+                                Ok(Some((
+                                    TypedStmt(
+                                        (TypedStmtKind::SwitchCase {
+                                            cond: matches,
+                                            default_stmt,
+                                            cases,
+                                        })
+                                        .in_span(stmt_span),
+                                    ),
+                                    BlockReturnActuality::SometimesReturns,
+                                )))
+
+                                /* let (typed_then, then_return_actuality) = type_block(
+                                  &scope,
+                                  coerce_stmt_into_block(*then),
+                                  can_use_break_continue,
+                                  return_ability.clone().demote(),
+                                )?; */
                             }
 
                             StmtKind::DeclarationList(declarations) => Ok(Some((

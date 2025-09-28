@@ -59,6 +59,13 @@ pub enum StmtKind<'input> {
     ReturnStmt(Option<Expr<'input>>),
     /// A let declaration
     DeclarationList(Spanned<Vec<Spanned<LetDeclaration<'input>>>>),
+    /// A switch case
+    SwitchCase {
+        /// The value to be matched over
+        matches: Expr<'input>,
+        /// The list of value => stmt pairs
+        over: Vec<Spanned<(Expr<'input>, Stmt<'input>)>>,
+    },
 }
 impl Display for StmtKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -118,6 +125,7 @@ impl Display for StmtKind<'_> {
                         .join(", ")
                 )
             }
+            Self::SwitchCase { .. } => todo!(), // TODO
         }
     }
 }

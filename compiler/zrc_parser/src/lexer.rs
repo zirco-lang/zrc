@@ -449,9 +449,15 @@ pub enum Tok<'input> {
     /// The keyword `type`
     #[token("type")]
     Type,
+    /// The keyword `switch`
+    #[token("switch")]
+    Switch,
     /// The operator `->`
     #[token("->")]
     SmallArrow,
+    /// The operator `=>`
+    #[token("=>")]
+    FatArrow,
     /// The `...` for variadic functions
     #[token("...")]
     Ellipsis,
@@ -503,6 +509,7 @@ impl Display for Tok<'_> {
                 Self::Fn => "fn".to_string(),
                 Self::For => "for".to_string(),
                 Self::If => "if".to_string(),
+                Self::Switch => "switch".to_string(),
                 Self::LeftBrace => "{".to_string(),
                 Self::LeftBracket => "[".to_string(),
                 Self::LeftParen => "(".to_string(),
@@ -534,6 +541,7 @@ impl Display for Tok<'_> {
                 Self::Struct => "struct".to_string(),
                 Self::Union => "union".to_string(),
                 Self::SizeOf => "sizeof".to_string(),
+                Self::FatArrow => "=>".to_string(),
                 Self::Type => "type".to_string(),
                 Self::True => "true".to_string(),
                 Self::While => "while".to_string(),
@@ -755,7 +763,7 @@ mod tests {
         let input = concat!(
             "+ - * / % == != > >= < <= && || ! & | ^ ~ << >> = += -= *= /= %= &= |= ^= <<= >>= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
-            r#" struct union sizeof type -> "str" 7_000 0xF_A 0b1_0 abc"#
+            r#" struct union sizeof type switch -> => "str" 7_000 0xF_A 0b1_0 abc"#
         );
         let tokens: Vec<Tok> = vec![
             Tok::Plus,
@@ -818,7 +826,9 @@ mod tests {
             Tok::Union,
             Tok::SizeOf,
             Tok::Type,
+            Tok::Switch,
             Tok::SmallArrow,
+            Tok::FatArrow,
             Tok::StringLiteral(ZrcString(vec![
                 StringTok::Text("s"),
                 StringTok::Text("t"),
