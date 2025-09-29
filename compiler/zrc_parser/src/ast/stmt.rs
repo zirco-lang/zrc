@@ -19,6 +19,43 @@ impl Display for Stmt<'_> {
     }
 }
 
+/// Represents the trigger (portion before the `=>`) in a [`SwitchCase`].
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum SwitchTrigger<'input> {
+    /// An expression used, e.g. `2 => ...`
+    Expr(Expr<'input>),
+    /// The `default` keyword was used
+    Default,
+}
+impl Display for SwitchTrigger<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Expr(expr) => write!(f, "{expr}"),
+            Self::Default => write!(f, "default"),
+        }
+    }
+}
+impl<'input> SwitchTrigger<'input> {
+    /// Extract the [`Expr`] from the [`SwitchTrigger::Expr`] variant, or
+    /// [None].
+    #[must_use]
+    pub fn into_expr_value(self) -> Option<Expr<'input>> {
+        match self {
+            Self::Expr(x) => Some(x),
+            Self::Default => None,
+        }
+    }
+}
+
+/// Represents a matcher within a `switch` statement.
+#[derive(PartialEq, Debug, Clone)]
+pub struct SwitchCase<'input>(pub SwitchTrigger<'input>, pub Stmt<'input>);
+impl Display for SwitchCase<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} => {}", self.0, self.1)
+    }
+}
+
 /// The enum representing all the different kinds of statements in Zirco
 ///
 /// This enum represents all the different kinds of statements in Zirco. It is
@@ -59,6 +96,13 @@ pub enum StmtKind<'input> {
     ReturnStmt(Option<Expr<'input>>),
     /// A let declaration
     DeclarationList(Spanned<Vec<Spanned<LetDeclaration<'input>>>>),
+    /// A switch case
+    SwitchCase {
+        /// The value to be matched over
+        scrutinee: Expr<'input>,
+        /// The list of value => stmt pairs
+        cases: Vec<Spanned<SwitchCase<'input>>>,
+    },
 }
 impl Display for StmtKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -118,6 +162,15 @@ impl Display for StmtKind<'_> {
                         .join(", ")
                 )
             }
+            Self::SwitchCase { scrutinee, cases } => write!(
+                f,
+                "switch ({scrutinee}) {{ {} }}",
+                cases
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
         }
     }
 }
@@ -233,7 +286,7 @@ impl Display for ArgumentDeclarationList<'_> {
 }
 
 /// A declaration created with `let`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LetDeclaration<'input> {
     /// The name of the identifier.
     pub name: Spanned<&'input str>,
@@ -300,6 +353,7 @@ mod tests {
             "let x: i32;",
             "let x: i32 = (4);",
             "{let x = (4);}",
+            "switch ((7)) { (4) => (false); default => {(12);} }",
         ];
 
         for input in test_cases {

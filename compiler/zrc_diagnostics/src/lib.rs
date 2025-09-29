@@ -207,6 +207,10 @@ pub enum DiagnosticKind {
     ConflictingImplementations(String),
     #[error("type {0} cannot be used for number literals")]
     InvalidNumberLiteralType(String),
+    #[error("a switch case statement must always end in a default block")]
+    SwitchCaseMissingTerminalDefault,
+    #[error("multiple case statements are matching for the same value")]
+    MultipleCases,
 }
 impl DiagnosticKind {
     /// Create an [error] diagnostic in a given [`Span`]

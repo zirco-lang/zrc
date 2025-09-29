@@ -96,8 +96,17 @@ SimpleStmt: StmtKind<'input> = {
     <Expr> ";" => StmtKind::ExprStmt(<>),
     ";" => StmtKind::EmptyStmt,
     "{" <l:StmtList?> "}" => StmtKind::BlockStmt(l.unwrap_or(Vec::new())),
+    "switch" "(" <scrutinee:Expr> ")" "{" <cases:Spanned<SwitchCase>*> "}" => StmtKind::SwitchCase {
+        scrutinee,
+        cases,
+    },
     <FlowStmt>,
     <Spanned<LetDeclaration>> => StmtKind::DeclarationList(<>),
+};
+
+SwitchCase: SwitchCase<'input> = {
+    <e:Expr> "=>" <s:Stmt> => SwitchCase(SwitchTrigger::Expr(e), s),
+    "default" "=>" <s:Stmt> => SwitchCase(SwitchTrigger::Default, s),
 };
 
 // For declarations at the global scope
@@ -403,7 +412,10 @@ extern {
         "union" => lexer::Tok::Union,
         "sizeof" => lexer::Tok::SizeOf,
         "type" => lexer::Tok::Type,
+        "switch" => lexer::Tok::Switch,
+        "default" => lexer::Tok::Default,
         "->" => lexer::Tok::SmallArrow,
+        "=>" => lexer::Tok::FatArrow,
         "..." => lexer::Tok::Ellipsis,
     }
 }

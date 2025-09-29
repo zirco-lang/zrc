@@ -157,7 +157,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
     block
         .into_value()
         .into_iter()
-        .try_fold(bb, |bb, stmt| -> Option<BasicBlock> {
+        .try_fold(bb, |mut bb, stmt| -> Option<BasicBlock> {
             let stmt_span = stmt.0.span();
             let stmt_line_col = cg.line_lookup.lookup_from_index(stmt_span.start());
             let debug_location = cg.dbg_builder.create_debug_location(
@@ -170,6 +170,76 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
             cg.builder.set_current_debug_location(debug_location);
 
             match stmt.0.into_value() {
+                TypedStmtKind::SwitchCase {
+                    scrutinee,
+                    default,
+                    cases,
+                } => {
+                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+
+                    let scrutinee = unpack!(bb = cg_expr(expr_cg, bb, scrutinee));
+
+                    let default_bb = cg.ctx.append_basic_block(cg.fn_value, "default");
+                    let return_bb = cg.ctx.append_basic_block(cg.fn_value, "post");
+
+                    let cases: Vec<_> = cases
+                        .into_iter()
+                        .map(|(trigger, stmt)| {
+                            (
+                                cg.ctx.append_basic_block(cg.fn_value, "case"),
+                                unpack!(bb = cg_expr(expr_cg, bb, trigger)),
+                                stmt,
+                            )
+                        })
+                        .collect();
+
+                    cg.builder
+                        .build_switch(
+                            scrutinee.into_int_value(),
+                            default_bb,
+                            &cases
+                                .iter()
+                                .map(|(bb, val, _)| (val.into_int_value(), *bb))
+                                .collect::<Vec<_>>(),
+                        )
+                        .expect("switch should generate successfully");
+
+                    cg.builder.position_at_end(default_bb);
+                    cg_block(
+                        cg,
+                        default_bb,
+                        &scope,
+                        lexical_block,
+                        default.in_span(stmt_span),
+                        breakaway,
+                    );
+                    cg.builder
+                        .build_unconditional_branch(return_bb)
+                        .expect("br should generate successfully");
+
+                    for (case_bb, _, stmt) in cases {
+                        cg.builder.position_at_end(case_bb);
+                        let case_bb = cg_block(
+                            cg,
+                            case_bb,
+                            &scope,
+                            lexical_block,
+                            stmt.in_span(stmt_span),
+                            breakaway,
+                        );
+
+                        if case_bb.is_some() {
+                            cg.builder
+                                .build_unconditional_branch(return_bb)
+                                .expect("br should generate successfully");
+                        }
+                    }
+
+                    cg.builder.position_at_end(return_bb);
+
+                    Some(return_bb)
+                }
+
                 TypedStmtKind::ExprStmt(expr) => {
                     let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
 
@@ -703,6 +773,35 @@ mod tests {
                         do {
                             get_bool(); // for fake side effects
                         } while (get_bool());
+                    }
+                "});
+            }
+
+            #[test]
+            fn switch_statements_generate_as_expected() {
+                cg_snapshot_test!(indoc! {"
+                    fn get_bool() -> bool;
+                    fn when_true();
+                    fn when_false_a();
+                    fn when_false_b();
+                    fn when_default(x: i32);
+                    fn post();
+
+
+                    fn test() {
+                        // TEST: the proper `switch` structure is created
+                        switch (get_bool()) {
+                            true => when_true();
+                            false => {
+                                when_false_a();
+                                when_false_b();
+                            }
+                            default => {
+                                let x = 2 + 2;
+                                when_default(x);
+                            }
+                        }
+                        post();
                     }
                 "});
             }
