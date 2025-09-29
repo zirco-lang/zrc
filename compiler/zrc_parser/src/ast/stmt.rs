@@ -33,7 +33,8 @@ impl Display for SwitchTrigger<'_> {
     }
 }
 impl<'input> SwitchTrigger<'input> {
-    /// Extract the [`Expr`] from the [`SwitchTrigger::Expr`] variant, or [None].
+    /// Extract the [`Expr`] from the [`SwitchTrigger::Expr`] variant, or
+    /// [None].
     pub fn into_expr_value(self) -> Option<Expr<'input>> {
         match self {
             Self::Expr(x) => Some(x),
