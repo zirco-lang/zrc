@@ -19,6 +19,33 @@ impl Display for Stmt<'_> {
     }
 }
 
+#[derive(PartialEq, Debug, Clone)]
+pub enum SwitchTrigger<'input> {
+    Expr(Expr<'input>),
+    Default,
+}
+impl Display for SwitchTrigger<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!() // TODO
+    }
+}
+impl<'input> SwitchTrigger<'input> {
+    pub fn into_expr_value(self) -> Option<Expr<'input>> {
+        match self {
+            Self::Expr(x) => Some(x),
+            Self::Default => None,
+        }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct SwitchCase<'input>(pub SwitchTrigger<'input>, pub Stmt<'input>);
+impl Display for SwitchCase<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!() // TODO
+    }
+}
+
 /// The enum representing all the different kinds of statements in Zirco
 ///
 /// This enum represents all the different kinds of statements in Zirco. It is
@@ -64,7 +91,7 @@ pub enum StmtKind<'input> {
         /// The value to be matched over
         scrutinee: Expr<'input>,
         /// The list of value => stmt pairs
-        cases: Vec<Spanned<(Expr<'input>, Stmt<'input>)>>,
+        cases: Vec<Spanned<SwitchCase<'input>>>,
     },
 }
 impl Display for StmtKind<'_> {

@@ -452,6 +452,9 @@ pub enum Tok<'input> {
     /// The keyword `switch`
     #[token("switch")]
     Switch,
+    /// The keyword `default`
+    #[token("default")]
+    Default,
     /// The operator `->`
     #[token("->")]
     SmallArrow,
@@ -527,6 +530,7 @@ impl Display for Tok<'_> {
                 Self::PlusAssign => "+=".to_string(),
                 Self::QuestionMark => "?".to_string(),
                 Self::Return => "return".to_string(),
+                Self::Default => "default".to_string(),
                 Self::RightBrace => "}".to_string(),
                 Self::RightBracket => "]".to_string(),
                 Self::RightParen => ")".to_string(),
@@ -763,7 +767,7 @@ mod tests {
         let input = concat!(
             "+ - * / % == != > >= < <= && || ! & | ^ ~ << >> = += -= *= /= %= &= |= ^= <<= >>= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
-            r#" struct union sizeof type switch -> => "str" 7_000 0xF_A 0b1_0 abc"#
+            r#" struct union sizeof type switch default -> => "str" 7_000 0xF_A 0b1_0 abc"#
         );
         let tokens: Vec<Tok> = vec![
             Tok::Plus,
@@ -827,6 +831,7 @@ mod tests {
             Tok::SizeOf,
             Tok::Type,
             Tok::Switch,
+            Tok::Default,
             Tok::SmallArrow,
             Tok::FatArrow,
             Tok::StringLiteral(ZrcString(vec![

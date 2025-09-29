@@ -3,7 +3,7 @@
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
 use zrc_parser::ast::{
     expr::ExprKind,
-    stmt::{Stmt, StmtKind},
+    stmt::{Stmt, StmtKind, SwitchCase, SwitchTrigger},
 };
 use zrc_utils::span::{Span, Spannable, Spanned};
 
@@ -211,8 +211,8 @@ pub fn type_block<'input, 'gs>(
                                         .error_in(stmt_span));
                                 };
 
-                                let ExprKind::Identifier("default") =
-                                    maybe_default_case.value().0 .0.value()
+                                let SwitchCase(SwitchTrigger::Default, default_stmt) =
+                                    maybe_default_case.value()
                                 else {
                                     return Err(DiagnosticKind::SwitchCaseMissingTerminalDefault
                                         .error_in(stmt_span));
@@ -220,7 +220,7 @@ pub fn type_block<'input, 'gs>(
 
                                 let default_stmt = type_block(
                                     &scope,
-                                    coerce_stmt_into_block(maybe_default_case.value().1.clone()),
+                                    coerce_stmt_into_block(default_stmt.clone()),
                                     false,
                                     return_ability.clone().demote(),
                                 )?
@@ -239,9 +239,9 @@ pub fn type_block<'input, 'gs>(
                                 let cases = cases
                                     .into_iter()
                                     .map(|case| {
-                                        let (trigger, exec) = case.into_value();
+                                        let SwitchCase(trigger, exec) = case.into_value();
 
-                                        let trigger = type_expr(&scope, trigger)?;
+                                        let trigger = type_expr(&scope, trigger.into_expr_value().expect("This cannot be a default because the default was popped and deduplicated prior"))?;
 
                                         let exec = type_block(
                                             &scope,
@@ -267,13 +267,6 @@ pub fn type_block<'input, 'gs>(
                                     ),
                                     BlockReturnActuality::SometimesReturns,
                                 )))
-
-                                /* let (typed_then, then_return_actuality) = type_block(
-                                  &scope,
-                                  coerce_stmt_into_block(*then),
-                                  can_use_break_continue,
-                                  return_ability.clone().demote(),
-                                )?; */
                             }
 
                             StmtKind::DeclarationList(declarations) => Ok(Some((
