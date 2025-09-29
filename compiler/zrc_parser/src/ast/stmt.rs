@@ -19,8 +19,8 @@ impl Display for Stmt<'_> {
     }
 }
 
-/// Represents the trigger (portion before the `=>`) in a [SwitchCase].
-#[derive(PartialEq, Debug, Clone)]
+/// Represents the trigger (portion before the `=>`) in a [`SwitchCase`].
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum SwitchTrigger<'input> {
     /// An expression used, e.g. `2 => ...`
     Expr(Expr<'input>),
@@ -35,6 +35,7 @@ impl Display for SwitchTrigger<'_> {
 impl<'input> SwitchTrigger<'input> {
     /// Extract the [`Expr`] from the [`SwitchTrigger::Expr`] variant, or
     /// [None].
+    #[must_use]
     pub fn into_expr_value(self) -> Option<Expr<'input>> {
         match self {
             Self::Expr(x) => Some(x),
@@ -274,7 +275,7 @@ impl Display for ArgumentDeclarationList<'_> {
 }
 
 /// A declaration created with `let`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LetDeclaration<'input> {
     /// The name of the identifier.
     pub name: Spanned<&'input str>,
