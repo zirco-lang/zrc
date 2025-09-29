@@ -11,6 +11,9 @@ members = [
 
 [profile.release]
 lto = true
+opt-level = 3
+debug = false
+codegen-units = 1
 
 # See https://insta.rs/docs/quickstart/#optional-faster-runs
 [profile.dev.package]
