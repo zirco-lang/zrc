@@ -222,8 +222,7 @@ pub fn type_block<'input, 'gs>(
                                     false,
                                     return_ability.clone().demote(),
                                 )?
-                                .0
-                                .remove(0);
+                                .0;
 
                                 if has_duplicates(
                                     &(cases
@@ -253,10 +252,9 @@ pub fn type_block<'input, 'gs>(
                                             false,
                                             return_ability.clone().demote(),
                                         )?
-                                        .0
-                                        .remove(0);
+                                        .0;
 
-                                        Ok::<(TypedExpr<'input>, TypedStmt<'_>), Diagnostic>((
+                                        Ok::<(TypedExpr<'input>, Vec<TypedStmt<'_>>), Diagnostic>((
                                             trigger, exec,
                                         ))
                                     })
@@ -266,7 +264,7 @@ pub fn type_block<'input, 'gs>(
                                     TypedStmt(
                                         (TypedStmtKind::SwitchCase {
                                             scrutinee,
-                                            default: Box::new(default_stmt),
+                                            default: default_stmt,
                                             cases,
                                         })
                                         .in_span(stmt_span),

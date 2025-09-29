@@ -57,9 +57,9 @@ pub enum TypedStmtKind<'input> {
         /// The value to be switched over (`x` in `switch (x) {}`)
         scrutinee: TypedExpr<'input>,
         /// The default case
-        default: Box<TypedStmt<'input>>,
+        default: Vec<TypedStmt<'input>>,
         /// The list of other cases
-        cases: Vec<(TypedExpr<'input>, TypedStmt<'input>)>,
+        cases: Vec<(TypedExpr<'input>, Vec<TypedStmt<'input>>)>,
     },
     /// `{ ... }`
     BlockStmt(Vec<TypedStmt<'input>>),

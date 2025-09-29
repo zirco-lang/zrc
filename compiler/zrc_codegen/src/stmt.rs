@@ -210,7 +210,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         default_bb,
                         &scope,
                         lexical_block,
-                        vec![*default].in_span(stmt_span),
+                        default.in_span(stmt_span),
                         breakaway,
                     );
                     cg.builder
@@ -224,7 +224,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                             case_bb,
                             &scope,
                             lexical_block,
-                            vec![stmt].in_span(stmt_span),
+                            stmt.in_span(stmt_span),
                             breakaway,
                         );
 
@@ -773,6 +773,35 @@ mod tests {
                         do {
                             get_bool(); // for fake side effects
                         } while (get_bool());
+                    }
+                "});
+            }
+
+            #[test]
+            fn switch_statements_generate_as_expected() {
+                cg_snapshot_test!(indoc! {"
+                    fn get_bool() -> bool;
+                    fn when_true();
+                    fn when_false_a();
+                    fn when_false_b();
+                    fn when_default(x: i32);
+                    fn post();
+
+
+                    fn test() {
+                        // TEST: the proper `switch` structure is created
+                        switch (get_bool()) {
+                            true => when_true();
+                            false => {
+                                when_false_a();
+                                when_false_b();
+                            }
+                            default => {
+                                let x = 2 + 2;
+                                when_default(x);
+                            }
+                        }
+                        post();
                     }
                 "});
             }
