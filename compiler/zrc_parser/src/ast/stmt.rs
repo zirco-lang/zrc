@@ -29,7 +29,10 @@ pub enum SwitchTrigger<'input> {
 }
 impl Display for SwitchTrigger<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!() // TODO
+        match self {
+            Self::Expr(e) => write!(f, "{e}"),
+            Self::Default => write!(f, "default"),
+        }
     }
 }
 impl<'input> SwitchTrigger<'input> {
@@ -49,7 +52,7 @@ impl<'input> SwitchTrigger<'input> {
 pub struct SwitchCase<'input>(pub SwitchTrigger<'input>, pub Stmt<'input>);
 impl Display for SwitchCase<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!() // TODO
+        write!(f, "{} => {}", self.0, self.1)
     }
 }
 
@@ -159,7 +162,15 @@ impl Display for StmtKind<'_> {
                         .join(", ")
                 )
             }
-            Self::SwitchCase { .. } => todo!(), // TODO
+            Self::SwitchCase { scrutinee, cases } => write!(
+                f,
+                "switch ({scrutinee}) {{ {} }}",
+                cases
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
         }
     }
 }
@@ -342,6 +353,7 @@ mod tests {
             "let x: i32;",
             "let x: i32 = (4);",
             "{let x = (4);}",
+            "switch ((7)) { (4) => (false); default => {(12);} }",
         ];
 
         for input in test_cases {
