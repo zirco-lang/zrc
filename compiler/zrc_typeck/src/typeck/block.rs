@@ -241,7 +241,12 @@ pub fn type_block<'input, 'gs>(
                                     .map(|case| {
                                         let SwitchCase(trigger, exec) = case.into_value();
 
-                                        let trigger = type_expr(&scope, trigger.into_expr_value().expect("This cannot be a default because the default was popped and deduplicated prior"))?;
+                                        let trigger = type_expr(
+                                            &scope,
+                                            trigger
+                                                .into_expr_value()
+                                                .expect("default was already popped/de-duped"),
+                                        )?;
 
                                         let exec = type_block(
                                             &scope,
