@@ -30,7 +30,7 @@ pub enum SwitchTrigger<'input> {
 impl Display for SwitchTrigger<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Expr(e) => write!(f, "{e}"),
+            Self::Expr(expr) => write!(f, "{expr}"),
             Self::Default => write!(f, "default"),
         }
     }
