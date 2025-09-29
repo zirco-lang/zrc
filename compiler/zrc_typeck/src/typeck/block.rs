@@ -1,10 +1,7 @@
 //! for blocks
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
-use zrc_parser::ast::{
-    expr::ExprKind,
-    stmt::{Stmt, StmtKind, SwitchCase, SwitchTrigger},
-};
+use zrc_parser::ast::stmt::{Stmt, StmtKind, SwitchCase, SwitchTrigger};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{declaration::process_let_declaration, scope::Scope, type_expr};
@@ -224,7 +221,8 @@ pub fn type_block<'input, 'gs>(
                                     false,
                                     return_ability.clone().demote(),
                                 )?
-                                .0;
+                                .0
+                                .remove(0);
 
                                 if has_duplicates(
                                     &(cases
@@ -253,10 +251,12 @@ pub fn type_block<'input, 'gs>(
                                             coerce_stmt_into_block(exec),
                                             false,
                                             return_ability.clone().demote(),
-                                        )?;
+                                        )?
+                                        .0
+                                        .remove(0);
 
-                                        Ok::<(TypedExpr<'input>, Vec<TypedStmt<'_>>), Diagnostic>((
-                                            trigger, exec.0,
+                                        Ok::<(TypedExpr<'input>, TypedStmt<'_>), Diagnostic>((
+                                            trigger, exec,
                                         ))
                                     })
                                     .collect::<Result<Vec<_>, _>>()?;
@@ -265,7 +265,7 @@ pub fn type_block<'input, 'gs>(
                                     TypedStmt(
                                         (TypedStmtKind::SwitchCase {
                                             scrutinee,
-                                            default: default_stmt,
+                                            default: Box::new(default_stmt),
                                             cases,
                                         })
                                         .in_span(stmt_span),

@@ -19,9 +19,12 @@ impl Display for Stmt<'_> {
     }
 }
 
+/// Represents the trigger (portion before the `=>`) in a [SwitchCase].
 #[derive(PartialEq, Debug, Clone)]
 pub enum SwitchTrigger<'input> {
+    /// An expression used, e.g. `2 => ...`
     Expr(Expr<'input>),
+    /// The `default` keyword was used
     Default,
 }
 impl Display for SwitchTrigger<'_> {
@@ -30,6 +33,7 @@ impl Display for SwitchTrigger<'_> {
     }
 }
 impl<'input> SwitchTrigger<'input> {
+    /// Extract the [`Expr`] from the [`SwitchTrigger::Expr`] variant, or [None].
     pub fn into_expr_value(self) -> Option<Expr<'input>> {
         match self {
             Self::Expr(x) => Some(x),
@@ -38,6 +42,7 @@ impl<'input> SwitchTrigger<'input> {
     }
 }
 
+/// Represents a matcher within a `switch` statement.
 #[derive(PartialEq, Debug, Clone)]
 pub struct SwitchCase<'input>(pub SwitchTrigger<'input>, pub Stmt<'input>);
 impl Display for SwitchCase<'_> {
