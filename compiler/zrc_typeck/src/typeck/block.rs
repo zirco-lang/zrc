@@ -2,13 +2,14 @@
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
 use zrc_parser::ast::{
-    expr::{Expr, ExprKind},
+    expr::ExprKind,
     stmt::{Stmt, StmtKind},
 };
 use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{declaration::process_let_declaration, scope::Scope, type_expr};
 use crate::tast::{
+    expr::TypedExpr,
     stmt::{TypedStmt, TypedStmtKind},
     ty::Type as TastType,
 };
@@ -116,7 +117,7 @@ fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
     })
 }
 
-fn has_unique_elements<T>(slice: &[T]) -> bool
+fn has_duplicates<T>(slice: &[T]) -> bool
 where
     T: PartialEq,
 {
@@ -199,12 +200,9 @@ pub fn type_block<'input, 'gs>(
                                     .error_in(stmt_span))
                             }
 
-                            StmtKind::SwitchCase {
-                                matches,
-                                over: cases,
-                            } => {
+                            StmtKind::SwitchCase { scrutinee, cases } => {
                                 let mut cases = cases.clone();
-                                let matches = type_expr(&scope, matches)?;
+                                let scrutinee = type_expr(&scope, scrutinee)?;
 
                                 // The last entry in over MUST be the default case
                                 let maybe_default_case = cases.pop();
@@ -228,7 +226,7 @@ pub fn type_block<'input, 'gs>(
                                 )?
                                 .0;
 
-                                if !has_unique_elements(
+                                if has_duplicates(
                                     &(cases
                                         .clone()
                                         .into_iter()
@@ -242,6 +240,9 @@ pub fn type_block<'input, 'gs>(
                                     .into_iter()
                                     .map(|case| {
                                         let (trigger, exec) = case.into_value();
+
+                                        let trigger = type_expr(&scope, trigger)?;
+
                                         let exec = type_block(
                                             &scope,
                                             coerce_stmt_into_block(exec),
@@ -249,7 +250,7 @@ pub fn type_block<'input, 'gs>(
                                             return_ability.clone().demote(),
                                         )?;
 
-                                        Ok::<(Expr<'input>, Vec<TypedStmt<'_>>), Diagnostic>((
+                                        Ok::<(TypedExpr<'input>, Vec<TypedStmt<'_>>), Diagnostic>((
                                             trigger, exec.0,
                                         ))
                                     })
@@ -258,8 +259,8 @@ pub fn type_block<'input, 'gs>(
                                 Ok(Some((
                                     TypedStmt(
                                         (TypedStmtKind::SwitchCase {
-                                            cond: matches,
-                                            default_stmt,
+                                            scrutinee,
+                                            default: default_stmt,
                                             cases,
                                         })
                                         .in_span(stmt_span),

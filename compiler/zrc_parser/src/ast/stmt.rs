@@ -62,9 +62,9 @@ pub enum StmtKind<'input> {
     /// A switch case
     SwitchCase {
         /// The value to be matched over
-        matches: Expr<'input>,
+        scrutinee: Expr<'input>,
         /// The list of value => stmt pairs
-        over: Vec<Spanned<(Expr<'input>, Stmt<'input>)>>,
+        cases: Vec<Spanned<(Expr<'input>, Stmt<'input>)>>,
     },
 }
 impl Display for StmtKind<'_> {

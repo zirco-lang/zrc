@@ -96,16 +96,16 @@ SimpleStmt: StmtKind<'input> = {
     <Expr> ";" => StmtKind::ExprStmt(<>),
     ";" => StmtKind::EmptyStmt,
     "{" <l:StmtList?> "}" => StmtKind::BlockStmt(l.unwrap_or(Vec::new())),
-    "switch" "(" <e:Expr> ")" "{" <cases:Spanned<SwitcherCase>*> "}" => StmtKind::SwitchCase {
-        matches: e,
-        over: cases,
+    "switch" "(" <scrutinee:Expr> ")" "{" <cases:Spanned<SwitcherCase>*> "}" => StmtKind::SwitchCase {
+        scrutinee,
+        cases,
     },
     <FlowStmt>,
     <Spanned<LetDeclaration>> => StmtKind::DeclarationList(<>),
 };
 
 SwitcherCase: (Expr<'input>, Stmt<'input>) = {
-    <over:Expr> "=>" <s:Stmt> => (over, s),
+    <e:Expr> "=>" <s:Stmt> => (e, s),
 };
 
 // For declarations at the global scope

@@ -2,7 +2,6 @@
 
 use std::fmt::Display;
 
-use zrc_parser::ast::expr::Expr;
 use zrc_utils::span::Spanned;
 
 use super::{expr::TypedExpr, ty::Type};
@@ -55,9 +54,9 @@ pub enum TypedStmtKind<'input> {
     },
     /// `switch`
     SwitchCase {
-        cond: TypedExpr<'input>,
-        default_stmt: Vec<TypedStmt<'input>>,
-        cases: Vec<(Expr<'input>, Vec<TypedStmt<'input>>)>,
+        scrutinee: TypedExpr<'input>,
+        default: Vec<TypedStmt<'input>>,
+        cases: Vec<(TypedExpr<'input>, Vec<TypedStmt<'input>>)>,
     },
     /// `{ ... }`
     BlockStmt(Vec<TypedStmt<'input>>),
