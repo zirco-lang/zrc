@@ -114,6 +114,7 @@ fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
     })
 }
 
+/// Returns whether there are duplicates in a slice.
 fn has_duplicates<T>(slice: &[T]) -> bool
 where
     T: PartialEq,
