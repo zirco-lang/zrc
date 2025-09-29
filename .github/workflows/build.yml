@@ -18,10 +18,6 @@ jobs:
                   # Make sure the actual branch is checked out when running on pull requests
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Install LLVM 16
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y llvm-16 clang-16
             - name: Set up Rust
               uses: actions-rs/toolchain@v1
               with:
