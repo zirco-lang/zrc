@@ -2,8 +2,7 @@
 //!
 //! The main thing within this module you will need is the [`Expr`] struct.
 
-use std::fmt::Display;
-
+use derive_more::Display;
 use zrc_utils::{
     span::{Span, Spannable, Spanned},
     spanned,
@@ -21,51 +20,39 @@ use crate::lexer::{NumberLiteral, StringTok, ZrcString};
 /// - The result type is the same as the operand types (or a pointer, for
 ///   pointer arithmetic)
 /// - Performs some mathematical operation
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
 pub enum Arithmetic {
     /// `+`
+    #[display("+")]
     Addition,
     /// `-`
+    #[display("-")]
     Subtraction,
     /// `*`
+    #[display("*")]
     Multiplication,
     /// `/`
+    #[display("/")]
     Division,
     /// `%`
+    #[display("%")]
     Modulo,
-}
-impl Display for Arithmetic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Addition => write!(f, "+"),
-            Self::Subtraction => write!(f, "-"),
-            Self::Multiplication => write!(f, "*"),
-            Self::Division => write!(f, "/"),
-            Self::Modulo => write!(f, "%"),
-        }
-    }
 }
 
 /// Assignment operators
 ///
 /// All possible forms of assignments with operational variations.
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
 pub enum Assignment {
     /// `=`
+    #[display("=")]
     Standard,
     /// Any form of assignment via [`Arithmetic`] operator (e.g. `+=`)
+    #[display("{_0}=")]
     Arithmetic(Arithmetic),
     /// Any form of assignment via [`BinaryBitwise`] operator (e.g. `&=`)
+    #[display("{_0}=")]
     BinaryBitwise(BinaryBitwise),
-}
-impl Display for Assignment {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Standard => write!(f, "="),
-            Self::Arithmetic(op) => write!(f, "{op}="),
-            Self::BinaryBitwise(op) => write!(f, "{op}="),
-        }
-    }
 }
 
 /// Binary bitwise operators
@@ -76,29 +63,23 @@ impl Display for Assignment {
 /// - Both operands must be the same type
 /// - The result type is the same as the operand types
 /// - Performs some bitwise operation
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
 pub enum BinaryBitwise {
     /// `&`
+    #[display("&")]
     And,
     /// `|`
+    #[display("|")]
     Or,
     /// `^`
+    #[display("^")]
     Xor,
     /// `<<`
+    #[display("<<")]
     Shl,
     /// `>>`
+    #[display(">>")]
     Shr,
-}
-impl Display for BinaryBitwise {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::And => write!(f, "&"),
-            Self::Or => write!(f, "|"),
-            Self::Xor => write!(f, "^"),
-            Self::Shl => write!(f, "<<"),
-            Self::Shr => write!(f, ">>"),
-        }
-    }
 }
 
 /// Logical operators
@@ -108,20 +89,14 @@ impl Display for BinaryBitwise {
 /// - Operates on two booleans
 /// - The result type is a boolean
 /// - Performs some logical operation
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
 pub enum Logical {
     /// `&&`
+    #[display("&&")]
     And,
     /// `||`
+    #[display("||")]
     Or,
-}
-impl Display for Logical {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::And => write!(f, "&&"),
-            Self::Or => write!(f, "||"),
-        }
-    }
 }
 
 /// Equality checks
@@ -131,20 +106,14 @@ impl Display for Logical {
 /// - Operates on two values of the same type
 /// - The result type is a boolean
 /// - Performs some equality or inequality check
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
 pub enum Equality {
     /// `==`
+    #[display("==")]
     Eq,
     /// `!=`
+    #[display("!=")]
     Neq,
-}
-impl Display for Equality {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Eq => write!(f, "=="),
-            Self::Neq => write!(f, "!="),
-        }
-    }
 }
 
 /// Comparison checks
@@ -155,142 +124,121 @@ impl Display for Equality {
 /// - Both operands must be the same type
 /// - The result type is a boolean
 /// - Performs some comparison or order check
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
 pub enum Comparison {
     /// `>`
+    #[display(">")]
     Gt,
     /// `>=`
+    #[display(">=")]
     Gte,
     /// `<`
+    #[display("<")]
     Lt,
     /// `<=`
+    #[display("<=")]
     Lte,
-}
-impl Display for Comparison {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Gt => write!(f, ">"),
-            Self::Gte => write!(f, ">="),
-            Self::Lt => write!(f, "<"),
-            Self::Lte => write!(f, "<="),
-        }
-    }
 }
 
 /// A Zirco expression
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[display("{_0}")]
 pub struct Expr<'input>(pub Spanned<ExprKind<'input>>);
-
-impl Display for Expr<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.value().fmt(f)
-    }
-}
 
 /// The enum representing the different kinds of expressions in Zirco
 ///
 /// This enum represents all the different kinds of expressions in Zirco. It is
 /// used by the parser to represent the AST in the expression position.
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[display("({_variant})")]
 pub enum ExprKind<'input> {
     /// `a, b`
+    #[display("{_0}, {_1}")]
     Comma(Box<Expr<'input>>, Box<Expr<'input>>),
 
     /// Assignment operations
+    #[display("{_1} {_0} {_2}")]
     Assignment(Assignment, Box<Expr<'input>>, Box<Expr<'input>>),
     /// Bitwise operations
+    #[display("{_1} {_0} {_2}")]
     BinaryBitwise(BinaryBitwise, Box<Expr<'input>>, Box<Expr<'input>>),
     /// Logical operations
+    #[display("{_1} {_0} {_2}")]
     Logical(Logical, Box<Expr<'input>>, Box<Expr<'input>>),
     /// Equality checks
+    #[display("{_1} {_0} {_2}")]
     Equality(Equality, Box<Expr<'input>>, Box<Expr<'input>>),
     /// Comparisons
+    #[display("{_1} {_0} {_2}")]
     Comparison(Comparison, Box<Expr<'input>>, Box<Expr<'input>>),
     /// Arithmetic operations
+    #[display("{_1} {_0} {_2}")]
     Arithmetic(Arithmetic, Box<Expr<'input>>, Box<Expr<'input>>),
 
     /// `!x`
+    #[display("!{_0}")]
     UnaryNot(Box<Expr<'input>>),
     /// `~x`
+    #[display("~{_0}")]
     UnaryBitwiseNot(Box<Expr<'input>>),
     /// `-x`
+    #[display("-{_0}")]
     UnaryMinus(Box<Expr<'input>>),
     /// `&x`
+    #[display("&{_0}")]
     UnaryAddressOf(Box<Expr<'input>>),
     /// `*x`
+    #[display("*{_0}")]
     UnaryDereference(Box<Expr<'input>>),
 
     /// `a[b]`
+    #[display("{_0}[{_1}]")]
     Index(Box<Expr<'input>>, Box<Expr<'input>>),
     /// `a.b`
+    #[display("{_0}.{_1}")]
     Dot(Box<Expr<'input>>, Spanned<&'input str>),
     /// `a->b`
+    #[display("{_0}->{_1}")]
     Arrow(Box<Expr<'input>>, Spanned<&'input str>),
     /// `a(b, c, d, ...)`
+    #[display(
+        "{_0}({})",
+        _1.value()
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<String>>()
+            .join(", "))]
     Call(Box<Expr<'input>>, Spanned<Vec<Expr<'input>>>),
 
     /// `a ? b : c`
+    #[display("{_0} ? {_1} : {_2}")]
     Ternary(Box<Expr<'input>>, Box<Expr<'input>>, Box<Expr<'input>>),
 
     /// `x as T`
+    #[display("{_0} as {_1}")]
     Cast(Box<Expr<'input>>, Type<'input>),
     /// `sizeof T`
+    #[display("sizeof {_0}")]
     SizeOfType(Type<'input>),
     /// `sizeof(expr)`
+    #[display("sizeof({_0})")]
     SizeOfExpr(Box<Expr<'input>>),
 
     /// Any numeric literal.
+    #[display("{_0}{}", _1.as_ref().map_or_else(String::new, Type::to_string))]
     NumberLiteral(NumberLiteral<'input>, Option<Type<'input>>),
     /// Any string literal.
+    #[display("\"{_0}\"")]
     StringLiteral(ZrcString<'input>),
     /// Any char literal
+    #[display("'{_0}'")]
     CharLiteral(StringTok<'input>),
     /// Any identifier.
+    #[display("{_0}")]
     Identifier(&'input str),
     /// Any boolean literal.
+    #[display("{_0}")]
     BooleanLiteral(bool),
-}
-impl Display for ExprKind<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "(")?;
-        match self {
-            Self::NumberLiteral(n, None) => write!(f, "{n}"),
-            Self::NumberLiteral(n, Some(ty)) => write!(f, "{n}{ty}"),
-            Self::StringLiteral(str) => write!(f, "\"{str}\"",),
-            Self::CharLiteral(str) => write!(f, "'{str}'",),
-            Self::Identifier(i) => write!(f, "{i}"),
-            Self::BooleanLiteral(value) => write!(f, "{value}"),
-            Self::Assignment(operator, place, value) => write!(f, "{place} {operator} {value}"),
-            Self::Equality(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-            Self::Comparison(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-            Self::Arithmetic(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-            Self::BinaryBitwise(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-            Self::Logical(operator, lhs, rhs) => write!(f, "{lhs} {operator} {rhs}"),
-            Self::Comma(lhs, rhs) => write!(f, "{lhs}, {rhs}"),
-            Self::UnaryNot(expr) => write!(f, "!{expr}"),
-            Self::UnaryBitwiseNot(expr) => write!(f, "~{expr}"),
-            Self::UnaryMinus(expr) => write!(f, "-{expr}"),
-            Self::UnaryAddressOf(expr) => write!(f, "&{expr}"),
-            Self::UnaryDereference(expr) => write!(f, "*{expr}"),
-            Self::Ternary(cond, if_true, if_false) => write!(f, "{cond} ? {if_true} : {if_false}"),
-            Self::Index(ptr, idx) => write!(f, "{ptr}[{idx}]"),
-            Self::SizeOfType(ty) => write!(f, "sizeof {ty}"),
-            Self::SizeOfExpr(expr) => write!(f, "sizeof({expr})"),
-            Self::Dot(expr, key) => write!(f, "{expr}.{key}"),
-            Self::Arrow(ptr, key) => write!(f, "{ptr}->{key}"),
-            Self::Cast(expr, ty) => write!(f, "{expr} as {ty}"),
-            Self::Call(expr, args) => write!(
-                f,
-                "{expr}({})",
-                args.value()
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
-        }?;
-        write!(f, ")")
-    }
 }
 
 // AST builder. We are able to infer the spans of many based on the start of

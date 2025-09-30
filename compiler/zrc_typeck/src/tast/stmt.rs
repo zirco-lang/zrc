@@ -2,6 +2,7 @@
 
 use std::fmt::Display;
 
+use derive_more::Display;
 use zrc_utils::span::Spanned;
 
 use super::{expr::TypedExpr, ty::Type};
@@ -155,15 +156,11 @@ impl Display for ArgumentDeclarationList<'_> {
 }
 
 /// A special form of [`LetDeclaration`] used for function parameters.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Display)]
+#[display("{name}: {ty}")]
 pub struct ArgumentDeclaration<'input> {
     /// The name of the parameter.
     pub name: Spanned<&'input str>,
     /// The type of the parameter.
     pub ty: Spanned<Type<'input>>,
-}
-impl Display for ArgumentDeclaration<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.name, self.ty)
-    }
 }

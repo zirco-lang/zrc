@@ -6,34 +6,25 @@
 
 use std::fmt::Display;
 
+use derive_more::Display;
 use zrc_utils::span::Spanned;
 
 use super::{expr::Expr, ty::Type};
 
 /// A Zirco statement
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Display)]
+#[display("{_0}")]
 pub struct Stmt<'input>(pub Spanned<StmtKind<'input>>);
-impl Display for Stmt<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.value().fmt(f)
-    }
-}
 
 /// Represents the trigger (portion before the `=>`) in a [`SwitchCase`].
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
 pub enum SwitchTrigger<'input> {
     /// An expression used, e.g. `2 => ...`
+    #[display("{_0}")]
     Expr(Expr<'input>),
     /// The `default` keyword was used
+    #[display("default")]
     Default,
-}
-impl Display for SwitchTrigger<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Expr(expr) => write!(f, "{expr}"),
-            Self::Default => write!(f, "default"),
-        }
-    }
 }
 impl<'input> SwitchTrigger<'input> {
     /// Extract the [`Expr`] from the [`SwitchTrigger::Expr`] variant, or
@@ -48,13 +39,9 @@ impl<'input> SwitchTrigger<'input> {
 }
 
 /// Represents a matcher within a `switch` statement.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Display)]
+#[display("{_0} => {_1}")]
 pub struct SwitchCase<'input>(pub SwitchTrigger<'input>, pub Stmt<'input>);
-impl Display for SwitchCase<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} => {}", self.0, self.1)
-    }
-}
 
 /// The enum representing all the different kinds of statements in Zirco
 ///
@@ -312,17 +299,13 @@ impl Display for LetDeclaration<'_> {
 }
 
 /// A special form of [`LetDeclaration`] used for function parameters.
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[display("{name}: {ty}")]
 pub struct ArgumentDeclaration<'input> {
     /// The name of the parameter.
     pub name: Spanned<&'input str>,
     /// The type of the parameter.
     pub ty: Type<'input>,
-}
-impl Display for ArgumentDeclaration<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.name, self.ty)
-    }
 }
 
 #[cfg(test)]

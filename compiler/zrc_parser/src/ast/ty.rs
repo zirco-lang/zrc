@@ -5,19 +5,16 @@
 
 use std::fmt::Display;
 
+use derive_more::Display;
 use zrc_utils::{
     span::{Span, Spannable, Spanned},
     spanned,
 };
 
 /// A valid Zirco AST type
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[display("{_0}")]
 pub struct Type<'input>(pub Spanned<TypeKind<'input>>);
-impl Display for Type<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.value().fmt(f)
-    }
-}
 
 /// The key-value pairs of a struct
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -36,26 +33,20 @@ impl Display for KeyTypeMapping<'_> {
 }
 
 /// A valid Zirco AST type
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Display)]
 pub enum TypeKind<'input> {
     /// An identifier, such as `i32`
+    #[display("{_0}")]
     Identifier(&'input str),
     /// `*T`
+    #[display("*{_0}")]
     Ptr(Box<Type<'input>>),
     /// A direct struct type
+    #[display("struct {{ {_0} }}")]
     Struct(KeyTypeMapping<'input>),
     /// A direct union type
+    #[display("union {{ {_0} }}")]
     Union(KeyTypeMapping<'input>),
-}
-impl Display for TypeKind<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Identifier(i) => write!(f, "{i}"),
-            Self::Ptr(pointee_ty) => write!(f, "*{pointee_ty}"),
-            Self::Struct(members) => write!(f, "struct {{ {members} }}"),
-            Self::Union(members) => write!(f, "union {{ {members} }}"),
-        }
-    }
 }
 
 // AST builder. We are able to infer the spans of many based on the start of

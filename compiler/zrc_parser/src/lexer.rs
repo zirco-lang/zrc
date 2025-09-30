@@ -31,8 +31,7 @@
 //!
 //! For more information, read the documentation of [`ZircoLexer`].
 
-use std::fmt::Display;
-
+use derive_more::Display;
 use logos::{Lexer, Logos};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
@@ -189,13 +188,16 @@ fn handle_block_comment_start<'input>(
 }
 
 /// A valid number literal in Zirco
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum NumberLiteral<'input> {
     /// A decimal number literal
+    #[display("{_0}")]
     Decimal(&'input str),
     /// A hexadecimal number literal
+    #[display("0x{_0}")]
     Hexadecimal(&'input str),
     /// A binary number literal
+    #[display("0b{_0}")]
     Binary(&'input str),
 }
 impl<'input> NumberLiteral<'input> {
@@ -217,20 +219,11 @@ impl<'input> NumberLiteral<'input> {
         }
     }
 }
-impl Display for NumberLiteral<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NumberLiteral::Decimal(n) => write!(f, "{n}"),
-            NumberLiteral::Hexadecimal(n) => write!(f, "0x{n}"),
-            NumberLiteral::Binary(n) => write!(f, "0b{n}"),
-        }
-    }
-}
 
 /// Enum representing all of the result tokens in the Zirco lexer
 ///
 /// Do not use `Tok::lexer` publicly. Use [`ZircoLexer`] instead.
-#[derive(Logos, Debug, Clone, PartialEq, Eq)]
+#[derive(Logos, Debug, Clone, PartialEq, Eq, Display)]
 #[logos(
     error = InternalLexicalError,
     skip r"[ \t\r\n\f]+",         // whitespace
@@ -246,18 +239,23 @@ pub enum Tok<'input> {
     // === ARITHMETIC OPERATORS ===
     /// The token `+`
     #[token("+")]
+    #[display("+")]
     Plus,
     /// The token `-`s
     #[token("-")]
+    #[display("-")]
     Minus,
     /// The token `*`
     #[token("*")]
+    #[display("*")]
     Star,
     /// The token `/`
     #[token("/")]
+    #[display("/")]
     Slash,
     /// The token `%`
     #[token("%")]
+    #[display("%")]
     Percent,
 
     // === COMPARISON OPERATORS ===
@@ -270,49 +268,63 @@ pub enum Tok<'input> {
     })]
     /// The token `==`
     #[token("==")]
+    #[display("==")]
     EqEq,
     /// The token `!=`
     #[token("!=")]
+    #[display("!=")]
     NotEq,
     /// The token `>`
     #[token(">")]
+    #[display(">")]
     Greater,
     /// The token `>=`
     #[token(">=")]
+    #[display(">=")]
     GreaterEq,
     /// The token `<`
     #[token("<")]
+    #[display("<")]
     Less,
     /// The token `<=`
     #[token("<=")]
+    #[display("<=")]
     LessEq,
 
     // === LOGICAL OPERATORS ===
     /// The token `&&`
     #[token("&&")]
+    #[display("&&")]
     LogicalAnd,
     /// The token `||`
     #[token("||")]
+    #[display("||")]
     LogicalOr,
     /// The token `!`
     #[token("!")]
+    #[display("!")]
     LogicalNot,
 
     // === BITWISE OPERATORS ===
     /// The token `&`
     #[token("&")]
+    #[display("&")]
     BitwiseAnd,
     /// The token `|`
     #[token("|")]
+    #[display("|")]
     BitwiseOr,
     /// The token `^`
     #[token("^")]
+    #[display("^")]
     BitwiseXor,
     /// The token `~`
     #[token("~")]
+    #[display("~")]
     BitwiseNot,
     /// The token `<<`
     #[token("<<")]
+    #[display("<<")]
     BitwiseLeftShift,
     // FIXME: The lexer could treat Foo<Bar>> as Foo < Bar >>, not Foo < Bar > >.
     //        This is the classic Java generics problem. This might be a Logos
@@ -320,149 +332,195 @@ pub enum Tok<'input> {
     //        into the parser -- we'll see when we get to generics.
     /// The token `>>`
     #[token(">>")]
+    #[display(">>")]
     BitwiseRightShift,
 
     // === ASSIGNMENT OPERATORS ===
     /// The token `=`
     #[token("=")]
+    #[display("=")]
     Assign,
     /// The token `+=`
     #[token("+=")]
+    #[display("+=")]
     PlusAssign,
     /// The token `-=`
     #[token("-=")]
+    #[display("-=")]
     MinusAssign,
     /// The token `*=`
     #[token("*=")]
+    #[display("*=")]
     StarAssign,
     /// The token `/=`
     #[token("/=")]
+    #[display("/=")]
     SlashAssign,
     /// The token `%=`
     #[token("%=")]
+    #[display("%=")]
     PercentAssign,
     /// The token `&=`
     #[token("&=")]
+    #[display("&=")]
     BitwiseAndAssign,
     /// The token `|=`
     #[token("|=")]
+    #[display("|=")]
     BitwiseOrAssign,
     /// The token `^=`
     #[token("^=")]
+    #[display("^=")]
     BitwiseXorAssign,
     /// The token `<<=`
     #[token("<<=")]
+    #[display("<<=")]
     BitwiseLeftShiftAssign,
     /// The token `>>=`
     #[token(">>=")]
+    #[display(">>=")]
     BitwiseRightShiftAssign,
 
     // === OTHER TOKENS ===
     /// The token `;`
     #[token(";")]
+    #[display(";")]
     Semicolon,
     /// The token `,`
     #[token(",")]
+    #[display(",")]
     Comma,
     /// The token `.`
     #[token(".")]
+    #[display(".")]
     Dot,
     /// The token `:`
     #[token(":")]
+    #[display(":")]
     Colon,
     /// The token `::`
     #[token("::")]
+    #[display("::")]
     ColonColon,
     /// The token `?`
     #[token("?")]
+    #[display("?")]
     QuestionMark,
 
     // === GROUPING ===
     /// The token `(` (left parenthesis)
     #[token("(")]
+    #[display("(")]
     LeftParen,
     /// The token `)` (right parenthesis)
     #[token(")")]
+    #[display(")")]
     RightParen,
     /// The token `[` (left square bracket)
     #[token("[")]
+    #[display("[")]
     LeftBracket,
     /// The token `]` (right square bracket)
     #[token("]")]
+    #[display("]")]
     RightBracket,
     /// The token `{` (left curly brace)
     #[token("{")]
+    #[display("{{")]
     LeftBrace,
     /// The token `}` (right curly brace)
     #[token("}")]
+    #[display("}}")]
     RightBrace,
 
     // === KEYWORDS & BUILT-INS ===
     /// The boolean `true`
     #[token("true")]
+    #[display("true")]
     True,
     /// The boolean `false`
     #[token("false")]
+    #[display("false")]
     False,
     /// The keyword `if`
     #[token("if")]
+    #[display("if")]
     If,
     /// The keyword `else`
     #[token("else")]
+    #[display("else")]
     Else,
     /// The keyword `while`
     #[token("while")]
+    #[display("while")]
     While,
     /// The keyword `do`
     #[token("do")]
+    #[display("do")]
     Do,
     /// The keyword `for`
     #[token("for")]
+    #[display("for")]
     For,
     /// The keyword `break`
     #[token("break")]
+    #[display("break")]
     Break,
     /// The keyword `continue`
     #[token("continue")]
+    #[display("continue")]
     Continue,
     /// The keyword `return`
     #[token("return")]
+    #[display("return")]
     Return,
     /// The keyword `let`
     #[token("let")]
+    #[display("let")]
     Let,
     /// The keyword `fn`
     #[token("fn")]
+    #[display("fn")]
     Fn,
     /// The keyword `as`
     #[token("as")]
+    #[display("as")]
     As,
     /// The keyword `struct`
     #[token("struct")]
+    #[display("struct")]
     Struct,
     /// The keyword `union`
     #[token("union")]
+    #[display("union")]
     Union,
     /// The keyword `sizeof`
     #[token("sizeof")]
+    #[display("sizeof")]
     SizeOf,
     /// The keyword `type`
     #[token("type")]
+    #[display("type")]
     Type,
     /// The keyword `switch`
     #[token("switch")]
+    #[display("switch")]
     Switch,
     /// The keyword `default`
     #[token("default")]
+    #[display("default")]
     Default,
     /// The operator `->`
     #[token("->")]
+    #[display("->")]
     SmallArrow,
     /// The operator `=>`
     #[token("=>")]
+    #[display("=>")]
     FatArrow,
     /// The `...` for variadic functions
     #[token("...")]
+    #[display("...")]
     Ellipsis,
 
     // === SPECIAL ===
@@ -476,138 +534,71 @@ pub enum Tok<'input> {
     #[regex(r"'([^'\\]|\\.)", |_lex| {
         Err(InternalLexicalError::UnterminatedStringLiteral)
     })]
+    #[display("'{_0}'")]
     CharLiteral(StringTok<'input>),
     /// Any string literal
     #[regex(r#""([^"\\]|\\.)*""#, |lex| lex_string_contents(lex).map(ZrcString))]
     #[regex(r#""([^"\\]|\\.)*"#, |_lex| {
         Err(InternalLexicalError::UnterminatedStringLiteral)
     })]
+    #[display("\"{_0}\"")]
     StringLiteral(ZrcString<'input>),
     /// Any number literal
     // FIXME: Do not accept multiple decimal points like "123.456.789"
     #[regex(r"[0-9][0-9\._]*", |lex| NumberLiteral::Decimal(lex.slice()))]
     #[regex(r"0x[0-9a-fA-F_]+", |lex| NumberLiteral::Hexadecimal(&lex.slice()[2..]))]
     #[regex(r"0b[01_]+", |lex| NumberLiteral::Binary(&lex.slice()[2..]))]
+    #[display("{_0}")]
     NumberLiteral(NumberLiteral<'input>),
     /// Any identifier
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", lexer_slice)]
+    #[display("{_0}")]
     Identifier(&'input str),
-}
-impl Display for Tok<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::As => "as".to_string(),
-                Self::Break => "break".to_string(),
-                Self::Assign => "=".to_string(),
-                Self::Colon => ":".to_string(),
-                Self::ColonColon => "::".to_string(),
-                Self::Comma => ",".to_string(),
-                Self::Continue => "continue".to_string(),
-                Self::Dot => ".".to_string(),
-                Self::Else => "else".to_string(),
-                Self::False => "false".to_string(),
-                Self::Fn => "fn".to_string(),
-                Self::For => "for".to_string(),
-                Self::If => "if".to_string(),
-                Self::Switch => "switch".to_string(),
-                Self::LeftBrace => "{".to_string(),
-                Self::LeftBracket => "[".to_string(),
-                Self::LeftParen => "(".to_string(),
-                Self::Let => "let".to_string(),
-                Self::LogicalAnd => "&&".to_string(),
-                Self::LogicalNot => "!".to_string(),
-                Self::LogicalOr => "||".to_string(),
-                Self::Minus => "-".to_string(),
-                Self::MinusAssign => "-=".to_string(),
-                Self::NotEq => "!=".to_string(),
-                Self::NumberLiteral(n) => (*n).to_string(),
-                Self::Percent => "%".to_string(),
-                Self::PercentAssign => "%=".to_string(),
-                Self::Plus => "+".to_string(),
-                Self::PlusAssign => "+=".to_string(),
-                Self::QuestionMark => "?".to_string(),
-                Self::Return => "return".to_string(),
-                Self::Default => "default".to_string(),
-                Self::RightBrace => "}".to_string(),
-                Self::RightBracket => "]".to_string(),
-                Self::RightParen => ")".to_string(),
-                Self::Semicolon => ";".to_string(),
-                Self::Slash => "/".to_string(),
-                Self::SlashAssign => "/=".to_string(),
-                Self::SmallArrow => "->".to_string(),
-                Self::Star => "*".to_string(),
-                Self::StarAssign => "*=".to_string(),
-                Self::StringLiteral(str) => format!("\"{str}\"",),
-                Self::CharLiteral(ch) => format!("'{ch}'",),
-                Self::Struct => "struct".to_string(),
-                Self::Union => "union".to_string(),
-                Self::SizeOf => "sizeof".to_string(),
-                Self::FatArrow => "=>".to_string(),
-                Self::Type => "type".to_string(),
-                Self::True => "true".to_string(),
-                Self::While => "while".to_string(),
-                Self::BitwiseAnd => "&".to_string(),
-                Self::BitwiseAndAssign => "&=".to_string(),
-                Self::BitwiseLeftShift => "<<".to_string(),
-                Self::BitwiseLeftShiftAssign => "<<=".to_string(),
-                Self::BitwiseNot => "~".to_string(),
-                Self::BitwiseOr => "|".to_string(),
-                Self::BitwiseOrAssign => "|=".to_string(),
-                Self::BitwiseRightShift => ">>".to_string(),
-                Self::BitwiseRightShiftAssign => ">>=".to_string(),
-                Self::BitwiseXor => "^".to_string(),
-                Self::BitwiseXorAssign => "^=".to_string(),
-                Self::EqEq => "==".to_string(),
-                Self::Greater => ">".to_string(),
-                Self::GreaterEq => ">=".to_string(),
-                Self::Less => "<".to_string(),
-                Self::LessEq => "<=".to_string(),
-                Self::Identifier(i) => (*i).to_string(),
-                Self::Ellipsis => "...".to_string(),
-                Self::Do => "do".to_string(),
-            }
-        )
-    }
 }
 
 /// The compiler's representation of a string literal in Zirco
 ///
 /// Enum representing the lexed contents of a string literal
-#[derive(Logos, Debug, Clone, PartialEq, Eq)]
+#[derive(Logos, Debug, Clone, PartialEq, Eq, Display)]
 pub enum StringTok<'input> {
     /// `\n`
     #[token("\\n")]
+    #[display("\\n")]
     EscapedNewline,
 
     /// `\r`
     #[token("\\r")]
+    #[display("\\r")]
     EscapedCr,
 
     /// `\t`
     #[token("\\t")]
+    #[display("\\t")]
     EscapedTab,
 
     /// `\0`
     #[token("\\0")]
+    #[display("\\0")]
     EscapedNull,
 
     /// `\xXX` with `XX` being a hex literal
     #[regex(r"\\x[0-9a-fA-F]{2}", escaped_byte_slice)]
+    #[display("\\x{_0}")]
     EscapedHexByte(&'input str),
 
     /// `\\`
     #[token("\\\\")]
+    #[display("\\\\")]
     EscapedBackslash,
 
     /// `\"`
     #[token("\\\"")]
+    #[display("\\\"")]
     EscapedDoubleQuote,
 
     /// Any other text fragment
     #[regex(r"[^\\]", lexer_slice)]
+    #[display("{_0}")]
     Text(&'input str),
 }
 impl StringTok<'_> {
@@ -639,23 +630,10 @@ impl StringTok<'_> {
         }
     }
 }
-impl Display for StringTok<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::EscapedNewline => write!(f, "\\n"),
-            Self::EscapedCr => write!(f, "\\r"),
-            Self::EscapedTab => write!(f, "\\t"),
-            Self::EscapedNull => write!(f, "\\0"),
-            Self::EscapedBackslash => write!(f, "\\\\"),
-            Self::EscapedHexByte(byte) => write!(f, "\\x{byte}"),
-            Self::EscapedDoubleQuote => write!(f, "\\\""),
-            Self::Text(text) => write!(f, "{text}"),
-        }
-    }
-}
 
 /// A representation of a string literal in the source code
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Display)]
+#[display("{}", self.0.iter().map(ToString::to_string).collect::<String>())]
 pub struct ZrcString<'input>(pub Vec<StringTok<'input>>);
 impl ZrcString<'_> {
     /// Convert a [`ZrcString`] into a [`String`] for its REAL byte
@@ -665,15 +643,6 @@ impl ZrcString<'_> {
     #[must_use]
     pub fn as_bytes(&self) -> String {
         self.0.iter().map(StringTok::as_byte).collect()
-    }
-}
-impl Display for ZrcString<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.0.iter().map(ToString::to_string).collect::<String>()
-        )
     }
 }
 
