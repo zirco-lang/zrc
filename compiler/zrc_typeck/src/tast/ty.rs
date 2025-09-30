@@ -7,22 +7,19 @@
 
 use std::fmt::Display;
 
+use derive_more::Display;
 use indexmap::IndexMap;
 
 use super::stmt::ArgumentDeclarationList;
 
 /// Data attached to a [`Type::Fn`]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
+#[display("(fn({arguments}) -> {returns})")]
 pub struct Fn<'input> {
     /// The function's arguments
     pub arguments: ArgumentDeclarationList<'input>,
     /// The function's return type
     pub returns: Box<Type<'input>>,
-}
-impl Display for Fn<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "(fn({}) -> {})", self.arguments, self.returns)
-    }
 }
 
 /// Auxillary data attached to a [`Fn`] in the

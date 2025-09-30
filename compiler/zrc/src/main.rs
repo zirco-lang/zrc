@@ -50,13 +50,11 @@
     clippy::doc_comment_double_space_linebreaks
 )]
 
-use std::{
-    fmt::{Display, Write},
-    path::PathBuf,
-};
+use std::{fmt::Write, path::PathBuf};
 
 use anyhow::bail;
 use clap::Parser;
+use derive_more::Display;
 use zrc_codegen::{DebugLevel, OptimizationLevel};
 
 #[doc(hidden)]
@@ -196,40 +194,34 @@ impl From<FrontendOptLevel> for OptimizationLevel {
 /// The list of possible outputs `zrc` can emit in
 ///
 /// Usually you will want to use `llvm`.
-#[derive(Clone, clap::ValueEnum, PartialEq)]
+#[derive(Clone, clap::ValueEnum, PartialEq, Display)]
 enum OutputFormat {
     /// LLVM IR
+    #[display("llvm")]
     Llvm,
     /// The Zirco AST, in Rust-like format
+    #[display("ast-debug")]
     AstDebug,
     /// The Zirco AST, in Rust-like format with indentation
+    #[display("ast-debug-pretty")]
     AstDebugPretty,
     /// The Zirco AST, stringified to Zirco code again
     ///
     /// This usually looks like your code with a bunch of parenthesis added.
+    #[display("ast")]
     Ast,
     /// The Zirco TAST, in Rust-like format
+    #[display("tast-debug")]
     TastDebug,
     /// The Zirco TAST, in Rust-like format with indentation
+    #[display("tast-debug-pretty")]
     TastDebugPretty,
     /// Assembly
+    #[display("asm")]
     Asm,
     /// Object file
+    #[display("object")]
     Object,
-}
-impl Display for OutputFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            Self::Llvm => write!(f, "llvm"),
-            Self::AstDebug => write!(f, "ast-debug"),
-            Self::AstDebugPretty => write!(f, "ast-debug-pretty"),
-            Self::Ast => write!(f, "ast"),
-            Self::TastDebug => write!(f, "tast-debug"),
-            Self::TastDebugPretty => write!(f, "tast-debug-pretty"),
-            Self::Asm => write!(f, "asm"),
-            Self::Object => write!(f, "object"),
-        }
-    }
 }
 
 #[allow(clippy::too_many_lines)]

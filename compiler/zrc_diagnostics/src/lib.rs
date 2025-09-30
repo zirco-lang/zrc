@@ -55,15 +55,17 @@
     clippy::doc_comment_double_space_linebreaks
 )]
 
-use std::{error::Error, fmt::Display};
+use std::error::Error;
 
 use ansi_term::{Color, Style};
+use derive_more::Display;
 use line_span::LineSpanExt;
 use thiserror::Error;
 use zrc_utils::span::{Span, Spannable, Spanned};
 
 /// The severity of a [`Diagnostic`].
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Display)]
+#[display("{}", self.style().paint(self.text()))]
 pub enum Severity {
     /// Error. Compilation will not continue.
     Error,
@@ -83,14 +85,10 @@ impl Severity {
         }
     }
 }
-impl Display for Severity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.style().paint(self.text()))
-    }
-}
 
 /// A diagnostic message produced by zrc
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Display)]
+#[display("{_0}: {_1}")]
 pub struct Diagnostic(pub Severity, pub Spanned<DiagnosticKind>);
 impl Diagnostic {
     /// Convert this [`Diagnostic`] to a printable string
@@ -105,11 +103,6 @@ impl Diagnostic {
     }
 }
 impl Error for Diagnostic {}
-impl Display for Diagnostic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.0, self.1)
-    }
-}
 
 /// The list of possible errors
 // These remain as Strings, not 'input str slices, to avoid circular dependencies (it's either use
