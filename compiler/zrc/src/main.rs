@@ -116,7 +116,7 @@ fn main() -> anyhow::Result<()> {
     );
 
     match result {
-        Err(diagnostic) => eprintln!("{}", diagnostic.print(&source_content)),
+        Err(diagnostic) => eprintln!("{}", diagnostic.print_with_filename(&source_content, &path)),
         Ok(x) => {
             io::open_output(&cli.out_file)?.write_all(&x)?;
         }
