@@ -140,6 +140,7 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
             (ty.as_basic_type_enum(), dbg_ty.as_type())
         }
         Type::Ptr(x) => {
+            #[allow(clippy::wildcard_enum_match_arm)]
             let (pointee_ty, pointee_dbg_ty) = match **x {
                 // Opaque types behind pointers are treated as opaque pointers
                 // We use i8 as a placeholder since we don't know the actual size
