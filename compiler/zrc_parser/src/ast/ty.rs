@@ -118,6 +118,8 @@ mod tests {
             // Nested parentheses
             ("*((i32))", "*i32"),
             ("*((struct { a: i32 }))", "*struct { a: i32 }"),
+            // Parenthesized types in struct fields
+            ("struct { x: (i32) }", "struct { x: i32 }"),
         ];
 
         for (input, expected) in test_cases {
@@ -136,19 +138,11 @@ mod tests {
     #[test]
     fn type_aliases_support_parenthesized_types() {
         // Type aliases should support parenthesized types including nested parentheses
-        let test_cases = vec![
-            "type x = (i32);",
-            "type y = ((i32));",
-            "type z = (*(i32));",
-        ];
+        let test_cases = vec!["type x = (i32);", "type y = ((i32));", "type z = (*(i32));"];
 
         for input in test_cases {
             let result = crate::parser::parse_program(input);
-            assert!(
-                result.is_ok(),
-                "Failed to parse type alias: {}",
-                input
-            );
+            assert!(result.is_ok(), "Failed to parse type alias: {}", input);
         }
     }
 }
