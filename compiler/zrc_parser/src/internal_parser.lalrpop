@@ -1,6 +1,6 @@
 // DO NOT IMPORT DIRECTLY -- USE API EXPOSED BY MODULE parser INSTEAD
 
-use zrc_utils::{span::Spanned, spanned};
+use zrc_utils::{span::{Span, Spannable, Spanned}, spanned};
 
 use super::{
     lexer,
@@ -149,6 +149,12 @@ TypeInDeclaration: Type<'input> = {
 KeyTypeMapping: KeyTypeMapping<'input> = {
     "{" <list:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <TypeInDeclaration>)>>?>> "}" => 
         KeyTypeMapping(list.map(|inner| inner.unwrap_or(Vec::new()))),
+}
+
+// The key-expr mapping of a struct construction expression, including the {}
+KeyExprMapping: KeyExprMapping<'input> = {
+    "{" <list:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Assignment>)>>?>> "}" => 
+        KeyExprMapping(list.map(|inner| inner.unwrap_or(Vec::new()))),
 }
 
 StructOrUnionDeclaration: Declaration<'input> = {
@@ -346,11 +352,12 @@ Primary: Expr<'input> = {
     Spanned<(<NUMBER> <Spanned<IDENTIFIER>?>)> => Expr(<>.map(|(n, ty)| ExprKind::NumberLiteral(n, ty.map(|t| Type(t.map(TypeKind::Identifier)))))),
     Spanned<STRING> => Expr(<>.map(|s| ExprKind::StringLiteral(s))),
     Spanned<CHAR> => Expr(<>.map(|c| ExprKind::CharLiteral(c))),
-    Spanned<IDENTIFIER> => Expr(<>.map(|i| ExprKind::Identifier(i))),
     Spanned<"true"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(true))),
     Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
     Spanned<("sizeof" <Type>)> => Expr(<>.map(|t| ExprKind::SizeOfType(t))),
     Spanned<("sizeof" "(" <Expr> ")")> => Expr(<>.map(|ex| ExprKind::SizeOfExpr(Box::new(ex)))),
+    <s:@L> <id:Spanned<IDENTIFIER>> <fields:KeyExprMapping> <e:@R> => Expr(ExprKind::Construction(Type(id.map(TypeKind::Identifier)), fields).in_span(Span::from_positions(s, e))),
+    Spanned<IDENTIFIER> => Expr(<>.map(|i| ExprKind::Identifier(i))),
     "(" <Expr> ")" => <>,
 };
 

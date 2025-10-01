@@ -105,6 +105,14 @@ pub enum DiagnosticKind {
     SwitchCaseMissingTerminalDefault,
     #[error("multiple case statements are matching for the same value")]
     MultipleCases,
+    #[error("unknown field `{field}` in `{ty}`")]
+    UnknownField { field: String, ty: String },
+    #[error("duplicate field `{field}`")]
+    DuplicateField { field: String },
+    #[error("missing field `{field}` in construction of `{ty}`")]
+    MissingField { field: String, ty: String },
+    #[error("expected `{expected}`, got `{actual}`")]
+    TypeMismatch { expected: String, actual: String },
 }
 impl DiagnosticKind {
     /// Create an [error] diagnostic in a given [`Span`]

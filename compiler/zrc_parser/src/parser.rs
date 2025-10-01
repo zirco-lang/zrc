@@ -402,6 +402,33 @@ mod tests {
                     Ok(Expr::build_bool(spanned!(0, true, 4)))
                 );
             }
+
+            #[test]
+            fn construction_syntax_parses_as_expected() {
+                // Test empty struct construction
+                let result = parse_expr("Point {}");
+                assert!(result.is_ok(), "Failed to parse: {result:?}");
+                assert_eq!(result.expect("should parse").to_string(), "(Point {  })");
+
+                // Test struct construction with fields
+                let result = parse_expr("Point { x: 1, y: 2 }");
+                assert!(result.is_ok(), "Failed to parse: {result:?}");
+
+                // Verify it stringifies correctly
+                assert_eq!(
+                    result.expect("should parse").to_string(),
+                    "(Point { x: (1), y: (2) })"
+                );
+            }
+
+            #[test]
+            fn nested_construction_parses_as_expected() {
+                let result = parse_expr("Outer { inner: Inner { x: 1 }, y: 2 }");
+                assert!(
+                    result.is_ok(),
+                    "Failed to parse nested construction: {result:?}"
+                );
+            }
         }
     }
 

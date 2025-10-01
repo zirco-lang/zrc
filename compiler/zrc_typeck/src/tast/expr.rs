@@ -98,6 +98,8 @@ pub enum TypedExprKind<'input> {
 
     /// `x as T`
     Cast(Box<TypedExpr<'input>>, Spanned<Type<'input>>),
+    /// `id { field: value, ... }`
+    Construction(Type<'input>, Vec<(Spanned<&'input str>, TypedExpr<'input>)>),
     /// `sizeof(T)`
     SizeOf(Type<'input>),
 

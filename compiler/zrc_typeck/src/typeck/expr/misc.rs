@@ -1,7 +1,10 @@
 //! type checking for misc expressions
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
-use zrc_parser::ast::{expr::Expr, ty::Type};
+use zrc_parser::ast::{
+    expr::{Expr, KeyExprMapping},
+    ty::Type,
+};
 use zrc_utils::span::{Span, Spannable};
 
 use super::{
@@ -133,6 +136,103 @@ pub fn type_expr_size_of_expr<'input>(
     Ok(TypedExpr {
         inferred_type: TastType::Usize,
         kind: TypedExprKind::SizeOf(x_ty.inferred_type).in_span(expr_span),
+    })
+}
+
+/// Typeck a struct construction expr
+pub fn type_expr_construction<'input>(
+    scope: &Scope<'input, '_>,
+    expr_span: Span,
+    ty: Type<'input>,
+    fields: KeyExprMapping<'input>,
+) -> Result<TypedExpr<'input>, Diagnostic> {
+    use indexmap::IndexMap;
+
+    let ty_span = ty.0.span();
+    let resolved_ty = resolve_type(scope.types, ty)?;
+
+    // Check that the type is a struct or union
+    let expected_fields = match &resolved_ty {
+        TastType::Struct(fields) | TastType::Union(fields) => fields,
+        TastType::I8
+        | TastType::U8
+        | TastType::I16
+        | TastType::U16
+        | TastType::I32
+        | TastType::U32
+        | TastType::I64
+        | TastType::U64
+        | TastType::Usize
+        | TastType::Isize
+        | TastType::Bool
+        | TastType::Ptr(_)
+        | TastType::Fn(_) => {
+            return Err(DiagnosticKind::TypeMismatch {
+                expected: "struct or union".to_string(),
+                actual: resolved_ty.to_string(),
+            }
+            .error_in(ty_span));
+        }
+    };
+
+    // Type check each field
+    let mut typed_fields = Vec::new();
+    let mut provided_fields = IndexMap::new();
+
+    for field_binding in fields.0.into_value() {
+        let (field_name, field_expr) = field_binding.into_value();
+        let field_name_str: &str = field_name.value();
+        let field_name_span = field_name.span();
+
+        // Check if field exists in the struct/union
+        let expected_field_type = expected_fields.get(field_name_str).ok_or_else(|| {
+            DiagnosticKind::UnknownField {
+                field: field_name_str.to_string(),
+                ty: resolved_ty.to_string(),
+            }
+            .error_in(field_name_span)
+        })?;
+
+        // Type check the field value
+        let typed_field_expr = type_expr(scope, field_expr)?;
+
+        // Check that the field value type matches the expected type
+        if &typed_field_expr.inferred_type != expected_field_type {
+            return Err(DiagnosticKind::TypeMismatch {
+                expected: expected_field_type.to_string(),
+                actual: typed_field_expr.inferred_type.to_string(),
+            }
+            .error_in(typed_field_expr.kind.span()));
+        }
+
+        // Check for duplicate fields
+        if provided_fields.contains_key(field_name_str) {
+            return Err(DiagnosticKind::DuplicateField {
+                field: field_name_str.to_string(),
+            }
+            .error_in(field_name_span));
+        }
+
+        provided_fields.insert(field_name_str, ());
+        typed_fields.push((field_name, typed_field_expr));
+    }
+
+    // Check that all required fields are provided (for structs)
+    if matches!(resolved_ty, TastType::Struct(_)) {
+        for (field_name, _) in expected_fields {
+            if !provided_fields.contains_key(*field_name) {
+                return Err(DiagnosticKind::MissingField {
+                    field: (*field_name).to_string(),
+                    ty: resolved_ty.to_string(),
+                }
+                .error_in(expr_span));
+            }
+        }
+    }
+
+    Ok(TypedExpr {
+        inferred_type: resolved_ty.clone(),
+        kind: TypedExprKind::Construction(resolved_ty, typed_fields).in_span(expr_span),
     })
 }
 

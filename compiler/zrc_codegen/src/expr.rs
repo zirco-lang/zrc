@@ -590,6 +590,55 @@ pub(crate) fn cg_expr<'ctx>(
 
             bb.and(reg)
         }
+
+        TypedExprKind::Construction(ty, fields) => {
+            // Get the LLVM struct type
+            let struct_type = llvm_basic_type(&cg, &ty).0;
+
+            // Get the field order from the type
+            let field_order = match &ty {
+                Type::Struct(type_fields) | Type::Union(type_fields) => type_fields
+                    .iter()
+                    .map(|(name, _)| *name)
+                    .collect::<Vec<_>>(),
+                Type::I8
+                | Type::U8
+                | Type::I16
+                | Type::U16
+                | Type::I32
+                | Type::U32
+                | Type::I64
+                | Type::U64
+                | Type::Usize
+                | Type::Isize
+                | Type::Bool
+                | Type::Ptr(_)
+                | Type::Fn(_) => unreachable!("Construction type should be struct or union"),
+            };
+
+            // Build the struct in the correct field order
+            let mut current_value = struct_type.into_struct_type().get_undef();
+            for (index, field_name) in field_order.iter().enumerate() {
+                // Find the corresponding field in the provided fields
+                let field_expr = fields
+                    .iter()
+                    .find(|(name, _)| name.value() == field_name)
+                    .map(|(_, expr)| expr)
+                    .expect("field should exist");
+
+                let field_value = unpack!(bb = cg_expr(cg, bb, field_expr.clone()));
+                #[allow(clippy::cast_possible_truncation)]
+                #[allow(clippy::as_conversions)]
+                let field_index = index as u32;
+                current_value = cg
+                    .builder
+                    .build_insert_value(current_value, field_value, field_index, "struct_field")
+                    .expect("insert_value should have built successfully")
+                    .into_struct_value();
+            }
+
+            bb.and(current_value.as_basic_value_enum())
+        }
     }
 }
 

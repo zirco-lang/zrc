@@ -61,6 +61,9 @@ pub fn type_expr<'input>(
             binary::type_expr_arithmetic(scope, expr_span, op, *lhs, *rhs)?
         }
         ExprKind::Cast(x, ty) => misc::type_expr_cast(scope, expr_span, *x, ty)?,
+        ExprKind::Construction(ty, fields) => {
+            misc::type_expr_construction(scope, expr_span, ty, fields)?
+        }
         ExprKind::SizeOfType(ty) => misc::type_expr_size_of_type(scope, expr_span, ty)?,
         ExprKind::SizeOfExpr(x) => misc::type_expr_size_of_expr(scope, expr_span, *x)?,
         ExprKind::NumberLiteral(n, ty) => {

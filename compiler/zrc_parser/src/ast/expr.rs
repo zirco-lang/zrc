@@ -2,6 +2,8 @@
 //!
 //! The main thing within this module you will need is the [`Expr`] struct.
 
+use std::fmt::Display;
+
 use derive_more::Display;
 use zrc_utils::{
     span::{Span, Spannable, Spanned},
@@ -10,6 +12,22 @@ use zrc_utils::{
 
 use super::ty::Type;
 use crate::lexer::{NumberLiteral, StringTok, ZrcString};
+
+/// The key-value pairs of a struct construction expression
+#[derive(PartialEq, Eq, Debug, Clone)]
+#[allow(clippy::type_complexity)]
+pub struct KeyExprMapping<'input>(pub Spanned<Vec<Spanned<(Spanned<&'input str>, Expr<'input>)>>>);
+impl Display for KeyExprMapping<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, member) in self.0.value().iter().enumerate() {
+            write!(f, "{}: {}", member.value().0.value(), member.value().1)?;
+            if i < self.0.value().len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        Ok(())
+    }
+}
 
 /// Arithmetic operators
 ///
@@ -209,6 +227,10 @@ pub enum ExprKind<'input> {
             .collect::<Vec<String>>()
             .join(", "))]
     Call(Box<Expr<'input>>, Spanned<Vec<Expr<'input>>>),
+
+    /// `id { field: value, ... }` or `(type) { field: value, ... }`
+    #[display("{_0} {{ {_1} }}")]
+    Construction(Type<'input>, KeyExprMapping<'input>),
 
     /// `a ? b : c`
     #[display("{_0} ? {_1} : {_2}")]
@@ -455,6 +477,14 @@ impl<'input> Expr<'input> {
         Self(ExprKind::Call(Box::new(f), params).in_span(span))
     }
     #[must_use]
+    pub fn build_construction(
+        span: Span,
+        ty: Type<'input>,
+        fields: KeyExprMapping<'input>,
+    ) -> Self {
+        Self(ExprKind::Construction(ty, fields).in_span(span))
+    }
+    #[must_use]
     pub fn build_ternary(cond: Self, if_true: Self, if_false: Self) -> Self {
         Self(spanned!(
             cond.0.start(),
@@ -589,6 +619,7 @@ mod tests {
             "((a)((b), (c)))",
             "((a) ? (b) : (c))",
             "((a) as T)",
+            "(Point { x: (1), y: (2) })",
             "(sizeof T)",
             "(sizeof((expr)))",
             "(1)",
