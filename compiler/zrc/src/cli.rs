@@ -106,6 +106,11 @@ pub enum OutputFormat {
     /// The Zirco TAST, in Rust-like format with indentation
     #[display("tast-debug-pretty")]
     TastDebugPretty,
+    /// The Zirco TAST, stringified to Zirco code again
+    ///
+    /// This usually looks like your code with a bunch of parenthesis added.
+    #[display("tast")]
+    Tast,
     /// Assembly
     #[display("asm")]
     Asm,

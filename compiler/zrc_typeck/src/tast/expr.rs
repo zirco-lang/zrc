@@ -1,5 +1,7 @@
 //! Expression representation for the Zirco [TAST](super)
 
+use std::fmt::Display;
+
 use zrc_parser::lexer::ZrcString;
 pub use zrc_parser::{
     ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical},
@@ -111,4 +113,66 @@ pub enum TypedExprKind<'input> {
     Identifier(&'input str),
     /// Any boolean literal.
     BooleanLiteral(bool),
+}
+
+impl Display for Place<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.kind.value())
+    }
+}
+
+impl Display for PlaceKind<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Deref(expr) => write!(f, "(*({expr}))"),
+            Self::Variable(name) => write!(f, "{name}"),
+            Self::Index(lhs, rhs) => write!(f, "({lhs})[({rhs})]"),
+            Self::Dot(place, field) => write!(f, "({place}).{field}"),
+        }
+    }
+}
+
+impl Display for TypedExpr<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({})", self.kind.value())
+    }
+}
+
+impl Display for TypedExprKind<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Comma(lhs, rhs) => write!(f, "({lhs}), ({rhs})"),
+            Self::Assignment(place, rhs) => write!(f, "({place}) = ({rhs})"),
+            Self::BinaryBitwise(op, lhs, rhs) => write!(f, "({lhs}) {op} ({rhs})"),
+            Self::Logical(op, lhs, rhs) => write!(f, "({lhs}) {op} ({rhs})"),
+            Self::Equality(op, lhs, rhs) => write!(f, "({lhs}) {op} ({rhs})"),
+            Self::Comparison(op, lhs, rhs) => write!(f, "({lhs}) {op} ({rhs})"),
+            Self::Arithmetic(op, lhs, rhs) => write!(f, "({lhs}) {op} ({rhs})"),
+            Self::UnaryNot(expr) => write!(f, "!({expr})"),
+            Self::UnaryBitwiseNot(expr) => write!(f, "~({expr})"),
+            Self::UnaryMinus(expr) => write!(f, "-({expr})"),
+            Self::UnaryAddressOf(place) => write!(f, "&({place})"),
+            Self::UnaryDereference(expr) => write!(f, "*({expr})"),
+            Self::Index(lhs, rhs) => write!(f, "({lhs})[({rhs})]"),
+            Self::Dot(place, field) => write!(f, "({place}).{field}"),
+            Self::Call(place, args) => write!(
+                f,
+                "({place})({})",
+                args.iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            Self::Ternary(cond, if_true, if_false) => {
+                write!(f, "({cond}) ? ({if_true}) : ({if_false})")
+            }
+            Self::Cast(expr, ty) => write!(f, "({expr}) as {ty}"),
+            Self::SizeOf(ty) => write!(f, "sizeof {ty}"),
+            Self::NumberLiteral(num, ty) => write!(f, "{num}{ty}"),
+            Self::StringLiteral(string) => write!(f, "\"{string}\""),
+            Self::CharLiteral(ch) => write!(f, "'{ch}'"),
+            Self::Identifier(name) => write!(f, "{name}"),
+            Self::BooleanLiteral(boolean) => write!(f, "{boolean}"),
+        }
+    }
 }

@@ -164,3 +164,203 @@ pub struct ArgumentDeclaration<'input> {
     /// The type of the parameter.
     pub ty: Spanned<Type<'input>>,
 }
+
+/// Helper function to indent all lines of a string by a given prefix
+fn indent_lines(code: &str, prefix: &str) -> String {
+    code.lines()
+        .map(|line| format!("{prefix}{line}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+impl Display for LetDeclaration<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.name.value(), self.ty)?;
+        if let Some(value) = &self.value {
+            write!(f, " = {value}")?;
+        }
+        Ok(())
+    }
+}
+
+impl Display for TypedStmt<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.value())
+    }
+}
+
+impl Display for TypedStmtKind<'_> {
+    #[allow(clippy::too_many_lines)]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::IfStmt(cond, if_true, None) => {
+                write!(
+                    f,
+                    "if ({cond}) {{\n{}\n}}",
+                    if_true
+                        .value()
+                        .iter()
+                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )
+            }
+            Self::IfStmt(cond, if_true, Some(if_false)) => {
+                write!(
+                    f,
+                    "if ({cond}) {{\n{}\n}} else {{\n{}\n}}",
+                    if_true
+                        .value()
+                        .iter()
+                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                    if_false
+                        .value()
+                        .iter()
+                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )
+            }
+            Self::WhileStmt(cond, body) => {
+                write!(
+                    f,
+                    "while ({cond}) {{\n{}\n}}",
+                    body.value()
+                        .iter()
+                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )
+            }
+            Self::DoWhileStmt(body, cond) => {
+                write!(
+                    f,
+                    "do {{\n{}\n}} while ({cond});",
+                    body.value()
+                        .iter()
+                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )
+            }
+            Self::ForStmt {
+                init,
+                cond,
+                post,
+                body,
+            } => {
+                write!(
+                    f,
+                    "for ({} {}; {}) {{\n{}\n}}",
+                    init.as_ref().map_or_else(
+                        || ";".to_string(),
+                        |x| format!(
+                            "let {};",
+                            x.iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
+                    ),
+                    cond.as_ref().map_or(String::new(), ToString::to_string),
+                    post.as_ref().map_or(String::new(), ToString::to_string),
+                    body.value()
+                        .iter()
+                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )
+            }
+            Self::SwitchCase {
+                scrutinee,
+                default,
+                cases,
+            } => {
+                write!(f, "switch ({scrutinee}) {{")?;
+                for (case_expr, case_stmts) in cases {
+                    write!(
+                        f,
+                        " {} => {{\n{}\n}}",
+                        case_expr,
+                        case_stmts
+                            .iter()
+                            .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    )?;
+                }
+                if !default.is_empty() {
+                    write!(
+                        f,
+                        " default => {{\n{}\n}}",
+                        default
+                            .iter()
+                            .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    )?;
+                }
+                write!(f, " }}")
+            }
+            Self::BlockStmt(stmts) => {
+                if stmts.is_empty() {
+                    write!(f, "{{}}")
+                } else {
+                    write!(
+                        f,
+                        "{{\n{}\n}}",
+                        stmts
+                            .iter()
+                            .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    )
+                }
+            }
+            Self::ExprStmt(expr) => write!(f, "{expr};"),
+            Self::ContinueStmt => write!(f, "continue;"),
+            Self::BreakStmt => write!(f, "break;"),
+            Self::ReturnStmt(Some(expr)) => write!(f, "return {expr};"),
+            Self::ReturnStmt(None) => write!(f, "return;"),
+            Self::DeclarationList(list) => {
+                write!(
+                    f,
+                    "let {};",
+                    list.iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+        }
+    }
+}
+
+impl Display for TypedDeclaration<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type,
+                body: Some(body),
+            } => write!(
+                f,
+                "fn {name}({parameters}) -> {return_type} {{\n{}\n}}",
+                body.value()
+                    .iter()
+                    .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            ),
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type,
+                body: None,
+            } => write!(f, "fn {name}({parameters}) -> {return_type};"),
+        }
+    }
+}
