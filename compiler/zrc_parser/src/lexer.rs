@@ -510,6 +510,10 @@ pub enum Tok<'input> {
     #[token("default")]
     #[display("default")]
     Default,
+    /// The keyword `void`
+    #[token("void")]
+    #[display("void")]
+    Void,
     /// The operator `->`
     #[token("->")]
     #[display("->")]
@@ -736,7 +740,7 @@ mod tests {
         let input = concat!(
             "+ - * / % == != > >= < <= && || ! & | ^ ~ << >> = += -= *= /= %= &= |= ^= <<= >>= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
-            r#" struct union sizeof type switch default -> => "str" 7_000 0xF_A 0b1_0 abc"#
+            r#" struct union sizeof type switch default void -> => "str" 7_000 0xF_A 0b1_0 abc"#
         );
         let tokens: Vec<Tok> = vec![
             Tok::Plus,
@@ -801,6 +805,7 @@ mod tests {
             Tok::Type,
             Tok::Switch,
             Tok::Default,
+            Tok::Void,
             Tok::SmallArrow,
             Tok::FatArrow,
             Tok::StringLiteral(ZrcString(vec![

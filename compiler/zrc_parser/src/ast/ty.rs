@@ -47,6 +47,9 @@ pub enum TypeKind<'input> {
     /// A direct union type
     #[display("union {{ {_0} }}")]
     Union(KeyTypeMapping<'input>),
+    /// The `void` keyword representing `struct{}`
+    #[display("void")]
+    Void,
 }
 
 // AST builder. We are able to infer the spans of many based on the start of
@@ -93,6 +96,7 @@ mod tests {
             "*i32",
             "struct { a: i32, b: i32 }",
             "union { a: i32, b: i32 }",
+            "void",
         ];
 
         for input in test_cases {
