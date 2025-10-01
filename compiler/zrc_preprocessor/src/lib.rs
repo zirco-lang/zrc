@@ -181,18 +181,116 @@ fn preprocess_recursive(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     #[test]
     fn preprocess_without_includes_returns_same_content() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_no_include.zr");
+        
         let content = "fn main() {\n    return 0;\n}";
-        let path = Path::new("/tmp/test.zr");
+        fs::write(&test_file, content).expect("Failed to write test file");
         
-        // Since the test file doesn't exist, we'll just test the basic flow
-        // In real usage, the file would exist
-        let result = preprocess(content, path);
+        let result = preprocess(content, &test_file).expect("Preprocessing should succeed");
         
-        // This will error because the file doesn't exist, but that's expected
-        // in a real scenario with actual files
-        assert!(result.is_err() || result.is_ok());
+        // The result should have content plus newlines
+        assert!(result.contains("fn main()"));
+        assert!(result.contains("return 0;"));
+        
+        // Cleanup
+        drop(fs::remove_file(&test_file));
+    }
+
+    #[test]
+    fn preprocess_with_include_combines_files() {
+        let temp_dir = std::env::temp_dir();
+        let included_file = temp_dir.join("included.zr");
+        let main_file = temp_dir.join("main.zr");
+        
+        // Create included file
+        let included_content = "fn helper() {\n    return 1;\n}";
+        fs::write(&included_file, included_content).expect("Failed to write included file");
+        
+        // Create main file with include
+        let main_content = "#include \"included.zr\"\nfn main() {\n    return helper();\n}";
+        fs::write(&main_file, main_content).expect("Failed to write main file");
+        
+        let result = preprocess(main_content, &main_file).expect("Preprocessing should succeed");
+        
+        // The result should contain both files' content
+        assert!(result.contains("fn helper()"));
+        assert!(result.contains("fn main()"));
+        assert!(result.contains("return 1;"));
+        assert!(result.contains("return helper();"));
+        
+        // Cleanup
+        drop(fs::remove_file(&included_file));
+        drop(fs::remove_file(&main_file));
+    }
+
+    #[test]
+    fn preprocess_detects_circular_includes() {
+        let temp_dir = std::env::temp_dir();
+        let file_a = temp_dir.join("circular_a.zr");
+        let file_b = temp_dir.join("circular_b.zr");
+        
+        // Create file A that includes B
+        fs::write(&file_a, "#include \"circular_b.zr\"").expect("Failed to write file A");
+        
+        // Create file B that includes A (circular)
+        fs::write(&file_b, "#include \"circular_a.zr\"").expect("Failed to write file B");
+        
+        let result = preprocess("#include \"circular_b.zr\"", &file_a);
+        
+        // Should error due to circular include
+        assert!(result.is_err());
+        if let Err(err) = result {
+            assert!(err.to_string().contains("circular"));
+        }
+        
+        // Cleanup
+        drop(fs::remove_file(&file_a));
+        drop(fs::remove_file(&file_b));
+    }
+
+    #[test]
+    fn preprocess_errors_on_missing_file() {
+        let temp_dir = std::env::temp_dir();
+        let main_file = temp_dir.join("missing_include.zr");
+        
+        let content = "#include \"nonexistent.zr\"";
+        fs::write(&main_file, content).expect("Failed to write main file");
+        
+        let result = preprocess(content, &main_file);
+        
+        // Should error because included file doesn't exist
+        assert!(result.is_err());
+        
+        // Cleanup
+        drop(fs::remove_file(&main_file));
+    }
+
+    #[test]
+    fn preprocess_supports_angle_bracket_syntax() {
+        let temp_dir = std::env::temp_dir();
+        let included_file = temp_dir.join("lib.zr");
+        let main_file = temp_dir.join("angle_main.zr");
+        
+        // Create included file
+        fs::write(&included_file, "fn lib_func() {}").expect("Failed to write included file");
+        
+        // Create main file with angle bracket include
+        let main_content = "#include <lib.zr>\nfn main() {}";
+        fs::write(&main_file, main_content).expect("Failed to write main file");
+        
+        let result = preprocess(main_content, &main_file).expect("Preprocessing should succeed");
+        
+        // The result should contain both files' content
+        assert!(result.contains("fn lib_func()"));
+        assert!(result.contains("fn main()"));
+        
+        // Cleanup
+        drop(fs::remove_file(&included_file));
+        drop(fs::remove_file(&main_file));
     }
 }
