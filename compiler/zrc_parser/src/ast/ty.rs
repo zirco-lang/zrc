@@ -124,13 +124,11 @@ mod tests {
 
         for (input, expected) in test_cases {
             let parsed = crate::parser::parse_type(input)
-                .unwrap_or_else(|_| panic!("Failed to parse: {}", input));
+                .unwrap_or_else(|_| panic!("Failed to parse: {input}"));
             assert_eq!(
                 parsed.to_string(),
                 expected,
-                "Input: {} should normalize to: {}",
-                input,
-                expected
+                "Input: {input} should normalize to: {expected}"
             );
         }
     }
@@ -142,7 +140,7 @@ mod tests {
 
         for input in test_cases {
             let result = crate::parser::parse_program(input);
-            assert!(result.is_ok(), "Failed to parse type alias: {}", input);
+            assert!(result.is_ok(), "Failed to parse type alias: {input}");
         }
     }
 }
