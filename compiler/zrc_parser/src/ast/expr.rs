@@ -8,7 +8,7 @@ use zrc_utils::{
     spanned,
 };
 
-use super::ty::Type;
+use super::{stmt::Stmt, ty::Type};
 use crate::lexer::{NumberLiteral, StringTok, ZrcString};
 
 /// Arithmetic operators
@@ -141,7 +141,7 @@ pub enum Comparison {
 }
 
 /// A Zirco expression
-#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[derive(PartialEq, Debug, Clone, Display)]
 #[display("{_0}")]
 pub struct Expr<'input>(pub Spanned<ExprKind<'input>>);
 
@@ -149,7 +149,7 @@ pub struct Expr<'input>(pub Spanned<ExprKind<'input>>);
 ///
 /// This enum represents all the different kinds of expressions in Zirco. It is
 /// used by the parser to represent the AST in the expression position.
-#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[derive(PartialEq, Debug, Clone, Display)]
 #[display("({_variant})")]
 pub enum ExprKind<'input> {
     /// `a, b`
@@ -223,6 +223,11 @@ pub enum ExprKind<'input> {
     /// `sizeof(expr)`
     #[display("sizeof({_0})")]
     SizeOfExpr(Box<Expr<'input>>),
+
+    /// `{ stmts...; expr }` - A block expression  
+    /// The Vec contains all statements, and the Option contains an optional trailing expression (without semicolon)
+    #[display("{{ {}{} }}", _0.iter().map(ToString::to_string).collect::<Vec<String>>().join(" "), _1.as_ref().map_or_else(String::new, |e| format!(" {e}")))]
+    Block(Vec<Stmt<'input>>, Option<Box<Expr<'input>>>),
 
     /// Any numeric literal.
     #[display("{_0}{}", _1.as_ref().map_or_else(String::new, Type::to_string))]
@@ -540,6 +545,10 @@ impl<'input> Expr<'input> {
             ExprKind::BooleanLiteral(lit.into_value()),
             span.end()
         ))
+    }
+    #[must_use]
+    pub fn build_block(span: Span, stmts: Vec<Stmt<'input>>, trailing_expr: Option<Box<Self>>) -> Self {
+        Self(ExprKind::Block(stmts, trailing_expr).in_span(span))
     }
 }
 

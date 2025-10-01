@@ -17,7 +17,7 @@ use super::{expr::Expr, ty::Type};
 pub struct Stmt<'input>(pub Spanned<StmtKind<'input>>);
 
 /// Represents the trigger (portion before the `=>`) in a [`SwitchCase`].
-#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[derive(PartialEq, Debug, Clone, Display)]
 pub enum SwitchTrigger<'input> {
     /// An expression used, e.g. `2 => ...`
     #[display("{_0}")]
@@ -239,7 +239,7 @@ impl Display for Declaration<'_> {
 /// The list of arguments on a [`Declaration::FunctionDeclaration`]
 ///
 /// May be variadic or not.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentDeclarationList<'input> {
     /// `(a, b, ...)`
     Variadic(Vec<Spanned<ArgumentDeclaration<'input>>>),
@@ -273,7 +273,7 @@ impl Display for ArgumentDeclarationList<'_> {
 }
 
 /// A declaration created with `let`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LetDeclaration<'input> {
     /// The name of the identifier.
     pub name: Spanned<&'input str>,
@@ -299,7 +299,7 @@ impl Display for LetDeclaration<'_> {
 }
 
 /// A special form of [`LetDeclaration`] used for function parameters.
-#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[derive(PartialEq, Debug, Clone, Display)]
 #[display("{name}: {ty}")]
 pub struct ArgumentDeclaration<'input> {
     /// The name of the parameter.

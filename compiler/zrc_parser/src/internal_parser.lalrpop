@@ -195,6 +195,14 @@ FlowStmt: StmtKind<'input> = {
 
 pub StmtList: Vec<Stmt<'input>> = Stmt+;
 
+// Block content for block expressions: statements followed by an optional expression without semicolon
+// The key is that Stmt always ends with something (; or } or other), so Stmt* Expr is unambiguous
+BlockContent: (Vec<Stmt<'input>>, Option<Box<Expr<'input>>>) = {
+    <s:Stmt*> <e:Expr> => (s, Some(Box::new(e))),
+    <s:Stmt+> => (s, None),
+    => (Vec::new(), None),
+};
+
 pub Expr: Expr<'input> = Comma;
 
 // Because ( <EXPR> ) should be spanned as ( @L <EXPR> @R ) not @L ( <EXPR> ) @R, Primary must
@@ -333,6 +341,7 @@ Primary: Expr<'input> = {
     Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
     Spanned<("sizeof" <Type>)> => Expr(<>.map(|t| ExprKind::SizeOfType(t))),
     Spanned<("sizeof" "(" <Expr> ")")> => Expr(<>.map(|ex| ExprKind::SizeOfExpr(Box::new(ex)))),
+    <s:@L> "{" <c:BlockContent> "}" <e:@R> => Expr::build_block(Span::from_positions(s, e), c.0, c.1),
     "(" <Expr> ")" => <>,
 };
 
