@@ -28,3 +28,33 @@ impl<'input> Display for Program<'input> {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn program_display_works() {
+        let input = indoc::indoc! {r"
+            fn main() -> i32 {
+                return 42;
+            }
+            fn helper(x: i32) -> i32 {
+                return (x) + (1);
+            }"};
+
+        let expected = indoc::indoc! {r"
+            fn main() -> i32 {
+                return (42);
+            }
+            fn helper(x: i32) -> i32 {
+                return ((x) + (1));
+            }"};
+
+        let program = crate::parser::parse_program(input)
+            .expect("test case should have parsed correctly");
+
+        assert_eq!(program.to_string(), expected);
+    }
+}
+
