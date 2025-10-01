@@ -1496,6 +1496,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "zrc_preprocessor"
+version = "0.1.0"
+dependencies = [
+ "zrc_diagnostics",
+ "zrc_utils",
+]
+
+[[package]]
 name = "zrc_typeck"
 version = "0.1.0"
 dependencies = [

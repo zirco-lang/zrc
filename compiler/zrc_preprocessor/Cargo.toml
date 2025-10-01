@@ -1,0 +1,8 @@
+[package]
+name = "zrc_preprocessor"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+zrc_diagnostics = { version = "0.1.0", path = "../zrc_diagnostics" }
+zrc_utils = { version = "0.1.0", path = "../zrc_utils" }

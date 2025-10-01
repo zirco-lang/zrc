@@ -124,6 +124,16 @@ pub enum DiagnosticKind {
     #[error("JavaScript user detected -- did you mean `{0}`?")]
     JavascriptUserDetected(&'static str),
 
+    // PREPROCESSOR ERRORS
+    #[error("preprocessor error: {0}")]
+    PreprocessorError(String),
+    #[error("circular include detected: {0}")]
+    PreprocessorCircularInclude(String),
+    #[error("invalid #include directive syntax: {0}")]
+    PreprocessorInvalidIncludeSyntax(String),
+    #[error("failed to read included file {path}: {error}")]
+    PreprocessorFileNotFound { path: String, error: String },
+
     // PARSER ERRORS
     /// Generic parser error
     #[error("invalid token")]

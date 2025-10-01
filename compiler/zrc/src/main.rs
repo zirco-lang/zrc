@@ -387,8 +387,12 @@ fn compile(
     triple: &zrc_codegen::TargetTriple,
     cpu: &str,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
+    // === PREPROCESSOR ===
+    let file_path = PathBuf::from(parent_directory).join(file_name);
+    let preprocessed_content = zrc_preprocessor::preprocess(content, &file_path)?;
+
     // === PARSER ===
-    let ast = zrc_parser::parser::parse_program(content)?;
+    let ast = zrc_parser::parser::parse_program(&preprocessed_content)?;
 
     // display the AST if the user wants it
     if matches!(
