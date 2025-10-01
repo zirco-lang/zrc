@@ -1,12 +1,12 @@
 //! Resolution from [`Type`] instances to LLVM types.
 
 use inkwell::{
+    AddressSpace,
     debug_info::{AsDIScope, DIBasicType, DIDerivedType, DISubroutineType, DIType},
     types::{
         AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType,
         IntType, PointerType,
     },
-    AddressSpace,
 };
 use zrc_typeck::tast::ty::{Fn, Type};
 

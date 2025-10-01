@@ -1,12 +1,12 @@
 //! Code generation for expressions
 
 use inkwell::{
+    IntPredicate,
     basic_block::BasicBlock,
     builder::BuilderError,
     debug_info::AsDIScope,
     types::{BasicType, StringRadix},
     values::{BasicValue, BasicValueEnum, IntValue, PointerValue},
-    IntPredicate,
 };
 use zrc_typeck::tast::{
     expr::{
@@ -18,9 +18,9 @@ use zrc_typeck::tast::{
 use zrc_utils::span::Spannable;
 
 use crate::{
+    BasicBlockAnd, BasicBlockExt,
     ctx::BlockCtx,
     ty::{llvm_basic_type, llvm_int_type, llvm_type},
-    BasicBlockAnd, BasicBlockExt,
 };
 
 /// Get a [`NumberLiteral`]'s [`StringRadix`]
