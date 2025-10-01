@@ -69,7 +69,11 @@ pub enum Type<'input> {
     Struct(IndexMap<&'input str, Type<'input>>),
     /// Union type literals. Ordered by declaration order.
     Union(IndexMap<&'input str, Type<'input>>),
-    /// An opaque/incomplete type used for forward declarations of self-referential types
+    /// An opaque/incomplete type used for forward declarations of self-referential types.
+    ///
+    /// This allows types like `type Node = struct { value: i32, next: *Node }` to work.
+    /// The opaque type represents an incomplete type definition that is being resolved.
+    /// Opaque types should only appear behind pointers, as they don't have a known size.
     Opaque(&'input str),
 }
 

@@ -421,4 +421,72 @@ mod tests {
             panic!("Expected Node to be a Struct type");
         }
     }
+
+    #[test]
+    fn doubly_linked_list_node_works() {
+        // type Node = struct { value: i32, prev: *Node, next: *Node }
+        let mut global_scope = GlobalScope::new();
+        
+        let result = process_declaration(
+            &mut global_scope,
+            AstDeclaration::TypeAliasDeclaration {
+                name: spanned!(0, "Node", 4),
+                ty: Type(spanned!(
+                    8,
+                    TypeKind::Struct(KeyTypeMapping(spanned!(
+                        15,
+                        vec![
+                            spanned!(
+                                17,
+                                (
+                                    spanned!(17, "value", 22),
+                                    Type(spanned!(24, TypeKind::Identifier("i32"), 27))
+                                ),
+                                27
+                            ),
+                            spanned!(
+                                29,
+                                (
+                                    spanned!(29, "prev", 33),
+                                    Type::build_ptr(
+                                        Span::from_positions(35, 40),
+                                        Type::build_ident(spanned!(36, "Node", 40))
+                                    )
+                                ),
+                                40
+                            ),
+                            spanned!(
+                                42,
+                                (
+                                    spanned!(42, "next", 46),
+                                    Type::build_ptr(
+                                        Span::from_positions(48, 53),
+                                        Type::build_ident(spanned!(49, "Node", 53))
+                                    )
+                                ),
+                                53
+                            )
+                        ],
+                        55
+                    ))),
+                    55
+                ))
+            }
+        );
+
+        assert!(result.is_ok());
+
+        // Verify the type was inserted correctly with multiple self-references
+        let resolved_type = global_scope.types.resolve("Node");
+        assert!(resolved_type.is_some());
+        
+        if let Some(TastType::Struct(fields)) = resolved_type {
+            assert_eq!(fields.len(), 3);
+            assert!(fields.contains_key("value"));
+            assert!(fields.contains_key("prev"));
+            assert!(fields.contains_key("next"));
+        } else {
+            panic!("Expected Node to be a Struct type");
+        }
+    }
 }
