@@ -134,7 +134,7 @@ impl Display for PlaceKind<'_> {
 
 impl Display for TypedExpr<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({})", self.kind.value())
+        write!(f, "({} as {})", self.kind.value(), self.inferred_type)
     }
 }
 
@@ -168,7 +168,7 @@ impl Display for TypedExprKind<'_> {
             }
             Self::Cast(expr, ty) => write!(f, "({expr}) as {ty}"),
             Self::SizeOf(ty) => write!(f, "sizeof {ty}"),
-            Self::NumberLiteral(num, ty) => write!(f, "{num}{ty}"),
+            Self::NumberLiteral(num, _ty) => write!(f, "{num}"),
             Self::StringLiteral(string) => write!(f, "\"{string}\""),
             Self::CharLiteral(ch) => write!(f, "'{ch}'"),
             Self::Identifier(name) => write!(f, "{name}"),
