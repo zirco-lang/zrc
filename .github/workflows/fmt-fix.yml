@@ -3,6 +3,10 @@ name: "fmt-fix"
 on:
     pull_request:
         types: [opened, synchronize, reopened]
+    workflow_run:
+        workflows: ["fmt-fix"]
+        types:
+            - completed
 
 jobs:
     fmt-fix:
