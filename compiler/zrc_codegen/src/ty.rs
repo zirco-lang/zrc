@@ -105,6 +105,9 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
                 &ctx.target_machine().get_target_data(),
                 Some(AddressSpace::default()),
             ),
+            Type::Int => {
+                panic!("{{int}} type reached code generation, should be resolved in typeck")
+            }
             Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
                 panic!("not an integer type")
             }
@@ -141,6 +144,9 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
         | Type::Isize => {
             let (ty, dbg_ty) = llvm_int_type(ctx, ty);
             (ty.as_basic_type_enum(), dbg_ty.as_type())
+        }
+        Type::Int => {
+            panic!("{{int}} type reached code generation, should be resolved in typeck")
         }
         Type::Ptr(x) => {
             let (pointee_ty, pointee_dbg_ty) = llvm_type(ctx, x);
@@ -257,6 +263,9 @@ pub fn llvm_type<'ctx: 'a, 'a>(
         | Type::Union(_) => {
             let (ty, dbg_ty) = llvm_basic_type(ctx, ty);
             (ty.as_any_type_enum(), dbg_ty)
+        }
+        Type::Int => {
+            panic!("{{int}} type reached code generation, should be resolved in typeck")
         }
 
         Type::Fn(Fn { arguments, returns }) => {

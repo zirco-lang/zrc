@@ -59,8 +59,11 @@ pub enum Type<'input> {
     /// `isize`
     Isize,
     /// `bool`
-    Bool, /* TODO: need an "any Int" type that implicitly casts to all int types but becomes
-           * i32 when assigned to a value */
+    Bool,
+    /// `{int}` - type that represents any integer literal and implicitly
+    /// coerces to any int type. Defaults to `i32` when assigned to a value
+    /// without explicit type annotation.
+    Int,
     /// `*T`
     Ptr(Box<Type<'input>>),
     /// `fn(A, B) -> T`
@@ -91,6 +94,7 @@ impl Display for Type<'_> {
             Self::Usize => write!(f, "usize"),
             Self::Isize => write!(f, "isize"),
             Self::Bool => write!(f, "bool"),
+            Self::Int => write!(f, "{{int}}"),
             Self::Ptr(pointee_ty) => write!(f, "*{pointee_ty}"),
             Self::Fn(fn_data) => write!(f, "{fn_data}"),
             Self::Struct(fields) if fields.is_empty() => write!(f, "struct {{}}"),
@@ -122,10 +126,10 @@ impl<'input> Type<'input> {
     /// Returns `true` if this is an integer type like [`Type::I8`].
     #[must_use]
     pub const fn is_integer(&self) -> bool {
-        use Type::{I8, I16, I32, I64, Isize, U8, U16, U32, U64, Usize};
+        use Type::{I8, I16, I32, I64, Int, Isize, U8, U16, U32, U64, Usize};
         matches!(
             self,
-            I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64 | Isize | Usize
+            I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64 | Isize | Usize | Int
         )
     }
 
@@ -180,7 +184,9 @@ impl<'input> Type<'input> {
     }
 
     /// Check if this type can be implicitly cast to the target type.
-    /// Currently only supports `*T` -> `*struct{}` (void pointer downcast).
+    /// Currently supports:
+    /// - `*T` -> `*struct{}` (void pointer downcast)
+    /// - `{int}` -> any integer type
     ///
     /// # Examples
     ///
@@ -195,6 +201,12 @@ impl<'input> Type<'input> {
     /// takes_void_ptr(&y);        // where y: SomeStruct
     /// takes_void_ptr(&z);        // where z: bool
     /// ```
+    ///
+    /// And allows `{int}` to implicitly cast to any integer type:
+    /// ```zirco
+    /// let x: i8 = 42;    // {int} -> i8
+    /// let y: u64 = 100;  // {int} -> u64
+    /// ```
     #[must_use]
     pub fn can_implicitly_cast_to(&self, target: &Self) -> bool {
         // Allow any pointer type to implicitly cast to void pointer (*struct{})
@@ -205,6 +217,12 @@ impl<'input> Type<'input> {
             // Target is *struct{}, allow implicit cast from any *T
             return true;
         }
+
+        // Allow {int} to implicitly cast to any concrete integer type
+        if matches!(self, Type::Int) && target.is_integer() && !matches!(target, Type::Int) {
+            return true;
+        }
+
         false
     }
 }
@@ -325,10 +343,45 @@ mod tests {
             | Type::Usize
             | Type::Isize
             | Type::Bool
+            | Type::Int
             | Type::Ptr(_)
             | Type::Fn(_)
             | Type::Union(_)
             | Type::Opaque(_) => panic!("unit should be an empty struct"),
         }
+    }
+
+    #[test]
+    fn test_int_type_implicit_cast() {
+        let int_type = Type::Int;
+
+        // {int} should implicitly cast to all concrete integer types
+        assert!(int_type.can_implicitly_cast_to(&Type::I8));
+        assert!(int_type.can_implicitly_cast_to(&Type::U8));
+        assert!(int_type.can_implicitly_cast_to(&Type::I16));
+        assert!(int_type.can_implicitly_cast_to(&Type::U16));
+        assert!(int_type.can_implicitly_cast_to(&Type::I32));
+        assert!(int_type.can_implicitly_cast_to(&Type::U32));
+        assert!(int_type.can_implicitly_cast_to(&Type::I64));
+        assert!(int_type.can_implicitly_cast_to(&Type::U64));
+        assert!(int_type.can_implicitly_cast_to(&Type::Isize));
+        assert!(int_type.can_implicitly_cast_to(&Type::Usize));
+
+        // {int} should not implicitly cast to non-integer types
+        assert!(!int_type.can_implicitly_cast_to(&Type::Bool));
+        assert!(!int_type.can_implicitly_cast_to(&Type::Ptr(Box::new(Type::I32))));
+
+        // Concrete integer types should not implicitly cast to {int}
+        assert!(!Type::I32.can_implicitly_cast_to(&int_type));
+
+        // {int} should not cast to itself
+        assert!(!int_type.can_implicitly_cast_to(&int_type));
+    }
+
+    #[test]
+    fn test_int_type_is_integer() {
+        assert!(Type::Int.is_integer());
+        assert!(!Type::Int.is_signed_integer());
+        assert!(!Type::Int.is_unsigned_integer());
     }
 }
