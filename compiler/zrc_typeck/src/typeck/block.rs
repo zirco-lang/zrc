@@ -95,6 +95,7 @@ pub fn type_block<'input, 'gs>(
                             StmtKind::SwitchCase { scrutinee, cases } => {
                                 let mut cases = cases.clone();
                                 let scrutinee = type_expr(&scope, scrutinee)?;
+                                let scrutinee_ty = scrutinee.inferred_type.clone();
 
                                 // The last entry in over MUST be the default case
                                 let maybe_default_case = cases.pop();
@@ -110,13 +111,12 @@ pub fn type_block<'input, 'gs>(
                                         .error_in(stmt_span));
                                 };
 
-                                let default_stmt = type_block(
+                                let (default_stmt, default_ra) = type_block(
                                     &scope,
                                     coerce_stmt_into_block(default_stmt.clone()),
                                     false,
                                     return_ability.clone().demote(),
-                                )?
-                                .0;
+                                )?;
 
                                 if has_duplicates(
                                     &(cases
@@ -140,19 +140,36 @@ pub fn type_block<'input, 'gs>(
                                                 .expect("default was already popped/de-duped"),
                                         )?;
 
-                                        let exec = type_block(
+                                        if trigger.inferred_type != scrutinee_ty {
+                                            return Err(DiagnosticKind::ExpectedSameType(
+                                                scrutinee_ty.to_string(),
+                                                trigger.inferred_type.to_string(),
+                                            )
+                                            .error_in(trigger.kind.span()));
+                                        }
+
+                                        let (exec, return_status) = type_block(
                                             &scope,
                                             coerce_stmt_into_block(exec),
                                             false,
                                             return_ability.clone().demote(),
-                                        )?
-                                        .0;
+                                        )?;
 
-                                        Ok::<(TypedExpr<'input>, Vec<TypedStmt<'_>>), Diagnostic>((
-                                            trigger, exec,
+                                        Ok::<
+                                            (
+                                                (TypedExpr<'input>, Vec<TypedStmt<'_>>),
+                                                BlockReturnActuality,
+                                            ),
+                                            Diagnostic,
+                                        >((
+                                            (trigger, exec),
+                                            return_status,
                                         ))
                                     })
                                     .collect::<Result<Vec<_>, _>>()?;
+
+                                let (cases, return_statuses): (Vec<_>, Vec<_>) =
+                                    cases.into_iter().unzip();
 
                                 Ok(Some((
                                     TypedStmt(
@@ -163,7 +180,10 @@ pub fn type_block<'input, 'gs>(
                                         })
                                         .in_span(stmt_span),
                                     ),
-                                    BlockReturnActuality::SometimesReturns,
+                                    BlockReturnActuality::join(
+                                        BlockReturnActuality::join_iter(return_statuses),
+                                        default_ra,
+                                    ),
                                 )))
                             }
 
@@ -509,4 +529,44 @@ pub fn type_block<'input, 'gs>(
         }
     }
     .map(|actuality| (tast_block, actuality))
+}
+
+#[cfg(test)]
+mod tests {
+    use zrc_utils::spanned;
+
+    use super::*;
+    use crate::typeck::scope::GlobalScope;
+
+    #[test]
+    fn regression_297_switch_arm_types() {
+        let gs = GlobalScope::default();
+
+        let source = "switch (1 as i32) { 3 as i8 => {} default => {} }";
+
+        let block_ast = zrc_parser::parser::parse_stmt_list(source).expect("should parse");
+
+        let tck_result = type_block(
+            &gs.create_subscope(),
+            block_ast,
+            false,
+            BlockReturnAbility::MustNotReturn,
+        );
+
+        let Err(diagnostic) = tck_result else {
+            panic!("expected type checking to fail");
+        };
+
+        assert_eq!(
+            diagnostic,
+            Diagnostic(
+                Severity::Error,
+                spanned!(
+                    20,
+                    DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string()),
+                    27
+                )
+            )
+        );
+    }
 }

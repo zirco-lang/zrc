@@ -90,4 +90,13 @@ impl BlockReturnActuality {
             (Self::AlwaysReturns, Self::AlwaysReturns) => Self::AlwaysReturns,
         }
     }
+
+    /// Join an iterator of [`BlockReturnActuality`] values.
+    #[must_use]
+    pub fn join_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = Self>,
+    {
+        iter.into_iter().fold(Self::NeverReturns, Self::join)
+    }
 }
