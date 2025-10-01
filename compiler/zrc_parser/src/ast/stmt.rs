@@ -391,4 +391,20 @@ mod tests {
             test_case
         );
     }
+
+    #[test]
+    fn global_let_declarations_parse_correctly() {
+        let test_cases = vec![
+            "let x: i32 = (42);",
+            "let y = (100);",
+            "let a = (1), b: i32 = (2);",
+        ];
+
+        for input in test_cases {
+            let parsed = crate::parser::parse_program(input)
+                .expect("global let should parse correctly");
+            assert_eq!(parsed.len(), 1);
+            assert_eq!(parsed[0].to_string(), input);
+        }
+    }
 }
