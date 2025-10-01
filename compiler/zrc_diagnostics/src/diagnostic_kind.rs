@@ -107,6 +107,8 @@ pub enum DiagnosticKind {
     MultipleCases,
     #[error("self-referential type `{0}` must be behind a pointer (e.g., `*{0}`)")]
     SelfReferentialTypeNotBehindPointer(String),
+    #[error("number literal `{0}` is out of bounds for type `{1}` (valid range: {2} to {3})")]
+    NumberLiteralOutOfBounds(String, String, String, String),
 }
 impl DiagnosticKind {
     /// Create an [error] diagnostic in a given [`Span`]
