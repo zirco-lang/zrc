@@ -187,6 +187,8 @@ pub fn type_block<'input, 'gs>(
                                 )))
                             }
 
+                            StmtKind::Match { .. } => todo!(), // TODO
+
                             StmtKind::DeclarationList(declarations) => Ok(Some((
                                 TypedStmt(
                                     TypedStmtKind::DeclarationList(process_let_declaration(
