@@ -204,6 +204,8 @@ pub enum DiagnosticKind {
     SwitchCaseMissingTerminalDefault,
     #[error("multiple case statements are matching for the same value")]
     MultipleCases,
+    #[error("type `{0}` has infinite size (self-referential types must be behind pointers)")]
+    InfiniteSizedType(String),
 }
 impl DiagnosticKind {
     /// Create an [error] diagnostic in a given [`Span`]

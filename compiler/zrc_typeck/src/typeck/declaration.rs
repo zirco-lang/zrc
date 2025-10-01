@@ -9,6 +9,7 @@ use zrc_utils::span::{Spannable, Spanned};
 use super::{
     BlockReturnAbility, resolve_type,
     scope::{GlobalScope, Scope},
+    ty::validate_no_bare_opaque_types,
     type_block, type_expr,
 };
 use crate::tast::{
@@ -281,7 +282,12 @@ pub fn process_declaration<'input>(
                 .types
                 .insert(name.value(), TastType::Opaque(name.value()));
 
-            let resolved_ty = resolve_type(&global_scope.types, ty)?;
+            let resolved_ty = resolve_type(&global_scope.types, ty.clone())?;
+
+            // Validate that opaque types only appear behind pointers
+            if let Err(kind) = validate_no_bare_opaque_types(&resolved_ty, name.value()) {
+                return Err(kind.error_in(ty.0.span()));
+            }
 
             // Replace the opaque type with the fully resolved type
             global_scope.types.insert(name.value(), resolved_ty.clone());

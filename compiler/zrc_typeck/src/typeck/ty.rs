@@ -63,6 +63,45 @@ pub(super) fn resolve_key_type_mapping<'input>(
     Ok(map)
 }
 
+/// Validate that opaque types only appear behind pointers.
+/// This prevents infinite-sized types like `type Bad = struct { x: Bad }`.
+///
+/// # Errors
+/// Returns an error if an opaque type is found outside of a pointer context.
+pub fn validate_no_bare_opaque_types<'input>(
+    ty: &TastType<'input>,
+    type_name: &'input str,
+) -> Result<(), DiagnosticKind> {
+    match ty {
+        TastType::Opaque(_) => {
+            // Bare opaque type - this is an error
+            Err(DiagnosticKind::InfiniteSizedType(type_name.to_string()))
+        }
+        TastType::Ptr(_) => {
+            // Pointers are fine - we don't recurse because opaque types behind pointers are valid
+            Ok(())
+        }
+        TastType::Struct(fields) | TastType::Union(fields) => {
+            // Check all fields
+            for (_, field_ty) in fields {
+                validate_no_bare_opaque_types(field_ty, type_name)?;
+            }
+            Ok(())
+        }
+        TastType::Fn(fn_type) => {
+            // Check return type
+            validate_no_bare_opaque_types(&fn_type.returns, type_name)?;
+            // Check argument types
+            for arg in fn_type.arguments.as_arguments() {
+                validate_no_bare_opaque_types(arg.ty.value(), type_name)?;
+            }
+            Ok(())
+        }
+        // All other types (primitives) are fine
+        _ => Ok(()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use zrc_diagnostics::Severity;
