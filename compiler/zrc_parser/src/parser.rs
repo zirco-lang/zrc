@@ -403,6 +403,25 @@ mod tests {
                 );
             }
         }
+
+        #[test]
+        fn construction_syntax_parses_as_expected() {
+            // Test basic construction
+            let result = parse_expr("Point { x: 1, y: 2 }");
+            assert!(result.is_ok(), "Failed to parse Point {{ x: 1, y: 2 }}: {:?}", result);
+            
+            // Test empty construction
+            let result = parse_expr("Empty {}");
+            assert!(result.is_ok(), "Failed to parse Empty {{}}: {:?}", result);
+            
+            // Test nested expressions
+            let result = parse_expr("S { a: x + y, b: f(z) }");
+            assert!(result.is_ok(), "Failed to parse S {{ a: x + y, b: f(z) }}: {:?}", result);
+            
+            // Test single field
+            let result = parse_expr("S { a: 1 }");
+            assert!(result.is_ok(), "Failed to parse S {{ a: 1 }}: {:?}", result);
+        }
     }
 
     mod ty {}

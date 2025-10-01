@@ -11,6 +11,22 @@ use zrc_utils::{
 use super::ty::Type;
 use crate::lexer::{NumberLiteral, StringTok, ZrcString};
 
+/// The key-value pairs of a struct or union construction
+#[derive(PartialEq, Eq, Debug, Clone)]
+#[allow(clippy::type_complexity)]
+pub struct KeyExprMapping<'input>(pub Spanned<Vec<Spanned<(Spanned<&'input str>, Expr<'input>)>>>);
+impl std::fmt::Display for KeyExprMapping<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, member) in self.0.value().iter().enumerate() {
+            write!(f, "{}: {}", member.value().0.value(), member.value().1)?;
+            if i < self.0.value().len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Arithmetic operators
 ///
 /// For an operator to be considered an arithmetic operator, it must meet the
@@ -223,6 +239,13 @@ pub enum ExprKind<'input> {
     /// `sizeof(expr)`
     #[display("sizeof({_0})")]
     SizeOfExpr(Box<Expr<'input>>),
+
+    /// `id { field: value, ... }` or `(type) { field: value, ... }`
+    #[display("{_0} {{ {_1} }}")]
+    StructConstruction(Type<'input>, KeyExprMapping<'input>),
+    /// `id { field: value, ... }` or `(type) { field: value, ... }` for unions
+    #[display("{_0} {{ {_1} }}")]
+    UnionConstruction(Type<'input>, KeyExprMapping<'input>),
 
     /// Any numeric literal.
     #[display("{_0}{}", _1.as_ref().map_or_else(String::new, Type::to_string))]
@@ -541,6 +564,16 @@ impl<'input> Expr<'input> {
             span.end()
         ))
     }
+
+    #[must_use]
+    pub fn build_struct_construction(span: Span, ty: Type<'input>, fields: KeyExprMapping<'input>) -> Self {
+        Self(ExprKind::StructConstruction(ty, fields).in_span(span))
+    }
+
+    #[must_use]
+    pub fn build_union_construction(span: Span, ty: Type<'input>, fields: KeyExprMapping<'input>) -> Self {
+        Self(ExprKind::UnionConstruction(ty, fields).in_span(span))
+    }
 }
 
 #[cfg(test)]
@@ -591,6 +624,9 @@ mod tests {
             "((a) as T)",
             "(sizeof T)",
             "(sizeof((expr)))",
+            "(Point { x: (1), y: (2) })",
+            "(MyStruct {  })",
+            "(S { a: (x) })",
             "(1)",
             "(\"a\")",
             "('a')",

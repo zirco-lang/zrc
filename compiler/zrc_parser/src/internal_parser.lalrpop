@@ -145,6 +145,11 @@ KeyTypeMapping: KeyTypeMapping<'input> = {
         KeyTypeMapping(<>.map(|inner| inner.unwrap_or(Vec::new())))
 }
 
+KeyExprMapping: KeyExprMapping<'input> = {
+    <s:@L> "{" <l:CommaSeparatedWithoutTrailing<Spanned<(<Spanned<IDENTIFIER>> ":" <Assignment>)>>?> "}" <e:@R> => 
+        KeyExprMapping(spanned!(s, l.unwrap_or(Vec::new()), e))
+}
+
 StructOrUnionDeclaration: Declaration<'input> = {
     Spanned<("struct" <Spanned<IDENTIFIER>> <KeyTypeMapping>)> => Declaration::TypeAliasDeclaration {
         name: <>.value().0,
@@ -328,11 +333,15 @@ Primary: Expr<'input> = {
     Spanned<(<NUMBER> <Spanned<IDENTIFIER>?>)> => Expr(<>.map(|(n, ty)| ExprKind::NumberLiteral(n, ty.map(|t| Type(t.map(TypeKind::Identifier)))))),
     Spanned<STRING> => Expr(<>.map(|s| ExprKind::StringLiteral(s))),
     Spanned<CHAR> => Expr(<>.map(|c| ExprKind::CharLiteral(c))),
-    Spanned<IDENTIFIER> => Expr(<>.map(|i| ExprKind::Identifier(i))),
     Spanned<"true"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(true))),
     Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
     Spanned<("sizeof" <Type>)> => Expr(<>.map(|t| ExprKind::SizeOfType(t))),
     Spanned<("sizeof" "(" <Expr> ")")> => Expr(<>.map(|ex| ExprKind::SizeOfExpr(Box::new(ex)))),
+    <s:@L> <i:Spanned<IDENTIFIER>> <k:KeyExprMapping> <e:@R> => {
+        let ty = Type(spanned!(i.start(), TypeKind::Identifier(i.into_value()), i.end()));
+        Expr(spanned!(s, ExprKind::StructConstruction(ty, k), e))
+    },
+    Spanned<IDENTIFIER> => Expr(<>.map(|i| ExprKind::Identifier(i))),
     "(" <Expr> ")" => <>,
 };
 
