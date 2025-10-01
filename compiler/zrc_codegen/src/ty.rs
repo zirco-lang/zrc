@@ -105,8 +105,11 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
                 &ctx.target_machine().get_target_data(),
                 Some(AddressSpace::default()),
             ),
-            Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) | Type::Opaque(_) => {
+            Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
                 panic!("not an integer type")
+            }
+            Type::Opaque(name) => {
+                panic!("opaque type '{name}' reached code generation, should be resolved in typeck")
             }
         },
         ctx.dbg_builder()

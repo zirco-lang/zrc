@@ -41,9 +41,31 @@ pub fn resolve_type<'input>(
 /// Resolve an identifier to its corresponding [`tast::ty::Type`], allowing
 /// opaque references to the type being defined.
 ///
+/// This function is used during type resolution for type alias declarations
+/// to allow self-referential types. When resolving a type like
+/// `struct { value: i32, next: *Node }` where `Node` is the type being defined,
+/// any reference to `Node` within the type will be replaced with
+/// <code>[TastType::Opaque]("Node")</code> as a placeholder.
+///
+/// The opaque types are later validated (must be behind pointers only) and
+/// replaced with concrete types by [`replace_opaque_with_concrete`].
+///
+/// # Parameters
+/// - `type_scope`: The type context containing all known types
+/// - `ty`: The parser type to resolve
+/// - `opaque_name`: The name of the type being defined (allowed as opaque
+///   reference)
+///
 /// # Errors
-/// Errors if the identifier is not found in the type scope or a key is
-/// double-defined.
+/// Errors if the identifier is not found in the type scope (and is not the
+/// opaque name) or a key is double-defined in struct/union types.
+///
+/// # Examples
+/// ```ignore
+/// // Resolving: struct { value: i32, next: *Node }
+/// // where opaque_name = "Node"
+/// // Result: Struct { "value": I32, "next": Ptr(Opaque("Node")) }
+/// ```
 fn resolve_type_with_opaque<'input>(
     type_scope: &TypeCtx<'input>,
     ty: ParserType<'input>,
@@ -80,17 +102,20 @@ fn resolve_type_with_opaque<'input>(
 
 /// Check if a type contains an opaque reference not behind a pointer.
 ///
+/// Returns the span of the first opaque type found that's not behind a pointer.
+///
 /// # Errors
 /// Returns an error if an opaque type is found not behind a pointer.
 #[allow(clippy::wildcard_enum_match_arm)]
 fn check_opaque_behind_pointer<'input>(
     ty: &TastType<'input>,
     opaque_name: &'input str,
-    span: Span,
+    ty_span: Span,
 ) -> Result<(), Diagnostic> {
     match ty {
         TastType::Opaque(name) if *name == opaque_name => Err(
-            DiagnosticKind::SelfReferentialTypeNotBehindPointer((*name).to_string()).error_in(span),
+            DiagnosticKind::SelfReferentialTypeNotBehindPointer((*name).to_string())
+                .error_in(ty_span),
         ),
         TastType::Ptr(_) => {
             // Anything behind a pointer is OK, even opaque types
@@ -98,7 +123,7 @@ fn check_opaque_behind_pointer<'input>(
         }
         TastType::Struct(members) | TastType::Union(members) => {
             for (_, member_ty) in members {
-                check_opaque_behind_pointer(member_ty, opaque_name, span)?;
+                check_opaque_behind_pointer(member_ty, opaque_name, ty_span)?;
             }
             Ok(())
         }
@@ -117,9 +142,9 @@ pub fn resolve_type_with_self_reference<'input>(
     ty: ParserType<'input>,
     self_name: &'input str,
 ) -> Result<TastType<'input>, Diagnostic> {
-    let span = ty.0.span();
     let resolved = resolve_type_with_opaque(type_scope, ty, self_name)?;
-    check_opaque_behind_pointer(&resolved, self_name, span)?;
+    // Note: validation happens during resolve_key_type_mapping_with_opaque for
+    // struct/union members
     Ok(replace_opaque_with_concrete(resolved, self_name))
 }
 
@@ -192,10 +217,12 @@ pub(super) fn resolve_key_type_mapping<'input>(
 }
 
 /// Resolve the types within the [`IndexMap`]s used by
-/// [`ParserTypeKind::Struct`] with opaque type support.
+/// [`ParserTypeKind::Struct`] with opaque type support. Validates that any
+/// opaque types only appear behind pointers.
 ///
 /// # Errors
-/// Errors if a key is not unique or is unresolvable.
+/// Errors if a key is not unique, is unresolvable, or contains a
+/// self-referential type not behind a pointer.
 #[allow(clippy::type_complexity)]
 fn resolve_key_type_mapping_with_opaque<'input>(
     type_scope: &TypeCtx<'input>,
@@ -212,10 +239,10 @@ fn resolve_key_type_mapping_with_opaque<'input>(
                 DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
             );
         }
-        map.insert(
-            key.value(),
-            resolve_type_with_opaque(type_scope, ast_type, opaque_name)?,
-        );
+        let resolved_type = resolve_type_with_opaque(type_scope, ast_type, opaque_name)?;
+        // Check this specific field for invalid opaque references
+        check_opaque_behind_pointer(&resolved_type, opaque_name, span)?;
+        map.insert(key.value(), resolved_type);
     }
     Ok(map)
 }
@@ -438,9 +465,9 @@ mod tests {
             Diagnostic(
                 Severity::Error,
                 spanned!(
-                    0,
+                    21,
                     DiagnosticKind::SelfReferentialTypeNotBehindPointer("Node".to_string()),
-                    33
+                    31
                 )
             )
         );

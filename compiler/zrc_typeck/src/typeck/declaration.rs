@@ -10,6 +10,7 @@ use super::{
     block::BlockReturnAbility,
     resolve_type,
     scope::{GlobalScope, Scope},
+    ty::resolve_type_with_self_reference,
     type_block, type_expr,
 };
 use crate::tast::{
@@ -278,7 +279,7 @@ pub fn process_declaration<'input>(
             }
 
             let resolved_ty =
-                super::ty::resolve_type_with_self_reference(&global_scope.types, ty, name.value())?;
+                resolve_type_with_self_reference(&global_scope.types, ty, name.value())?;
 
             global_scope.types.insert(name.value(), resolved_ty.clone());
 
