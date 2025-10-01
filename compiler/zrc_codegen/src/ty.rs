@@ -108,6 +108,9 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
             Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
                 panic!("not an integer type")
             }
+            Type::Opaque(name) => {
+                panic!("opaque type '{name}' reached code generation, should be resolved in typeck")
+            }
         },
         ctx.dbg_builder()
             .create_basic_type(&ty.to_string(), 0, 0, 0)
@@ -145,6 +148,9 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
             (ty.as_basic_type_enum(), dbg_ty.as_type())
         }
         Type::Fn(_) => panic!("function is not a basic type"),
+        Type::Opaque(name) => {
+            panic!("opaque type '{name}' reached code generation, should be resolved in typeck")
+        }
         Type::Struct(fields) => (
             ctx.ctx()
                 .struct_type(
@@ -273,6 +279,10 @@ pub fn llvm_type<'ctx: 'a, 'a>(
                 is_variadic,
             );
             (fn_ty.as_any_type_enum(), fn_dbg_ty.as_type())
+        }
+
+        Type::Opaque(name) => {
+            panic!("opaque type '{name}' reached code generation, should be resolved in typeck")
         }
     }
 }

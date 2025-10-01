@@ -105,6 +105,8 @@ pub enum DiagnosticKind {
     SwitchCaseMissingTerminalDefault,
     #[error("multiple case statements are matching for the same value")]
     MultipleCases,
+    #[error("self-referential type `{0}` must be behind a pointer (e.g., `*{0}`)")]
+    SelfReferentialTypeNotBehindPointer(String),
 }
 impl DiagnosticKind {
     /// Create an [error] diagnostic in a given [`Span`]

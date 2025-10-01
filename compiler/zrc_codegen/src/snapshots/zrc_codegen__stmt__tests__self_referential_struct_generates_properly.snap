@@ -1,0 +1,80 @@
+---
+source: compiler/zrc_codegen/src/stmt.rs
+description: "// TEST: self-referential struct types should compile to LLVM IR\n// with pointers to empty structs as placeholders\nstruct Node {\n    value: i32,\n    next: *Node\n}\n\nstruct TreeNode {\n    value: i32,\n    left: *TreeNode,\n    right: *TreeNode\n}\n\nfn create_node(val: i32) -> *Node {\n    let node: *Node;\n    return node;\n}\n\nfn main() {\n    let head: *Node;\n    let tree: TreeNode;\n    head = create_node(42);\n}\n"
+expression: resulting_ir
+snapshot_kind: text
+---
+; ModuleID = 'test.zr'
+source_filename = "test.zr"
+
+define ptr @create_node(i32 %0) !dbg !3 {
+entry:
+  %let_node = alloca ptr, align 8, !dbg !20
+  %arg_val = alloca i32, align 4, !dbg !20
+  store i32 %0, ptr %arg_val, align 4, !dbg !20
+  call void @llvm.dbg.declare(metadata ptr %arg_val, metadata !16, metadata !DIExpression()), !dbg !21
+  call void @llvm.dbg.declare(metadata ptr %let_node, metadata !17, metadata !DIExpression()), !dbg !22
+  %load = load ptr, ptr %let_node, align 8, !dbg !23
+  ret ptr %load, !dbg !23
+}
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #0
+
+define {} @main() !dbg !24 {
+entry:
+  %let_tree = alloca { i32, ptr, ptr }, align 8
+  %let_head = alloca ptr, align 8
+  call void @llvm.dbg.declare(metadata ptr %let_head, metadata !28, metadata !DIExpression()), !dbg !36
+  call void @llvm.dbg.declare(metadata ptr %let_tree, metadata !31, metadata !DIExpression()), !dbg !37
+  %call = call ptr @create_node(i32 42), !dbg !38
+  store ptr %call, ptr %let_head, align 8, !dbg !39
+  ret {} zeroinitializer, !dbg !40
+}
+
+attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc test runner", isOptimized: false, flags: "zrc --fake-args", runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false)
+!2 = !DIFile(filename: "test.zr", directory: "/fake/path")
+!3 = distinct !DISubprogram(name: "create_node", linkageName: "create_node", scope: null, file: !2, line: 14, type: !4, scopeLine: 14, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !15)
+!4 = !DISubroutineType(types: !5)
+!5 = !{!6, !10}
+!6 = !DIDerivedType(tag: DW_TAG_pointer_type, name: "\22{ i32, ptr }\22", baseType: !7, dwarfAddressSpace: 0)
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "struct { value: i32, next: *struct {} }", scope: !2, file: !2, elements: !8)
+!8 = !{!9, !11}
+!9 = !DIDerivedType(tag: DW_TAG_member, name: "value", scope: !2, file: !2, baseType: !10)
+!10 = !DIBasicType(name: "i32")
+!11 = !DIDerivedType(tag: DW_TAG_member, name: "next", scope: !2, file: !2, baseType: !12)
+!12 = !DIDerivedType(tag: DW_TAG_pointer_type, name: "\22{}\22", baseType: !13, dwarfAddressSpace: 0)
+!13 = !DICompositeType(tag: DW_TAG_structure_type, name: "struct {}", scope: !2, file: !2, elements: !14)
+!14 = !{}
+!15 = !{!16, !17}
+!16 = !DILocalVariable(name: "val", scope: !3, file: !2, line: 14, type: !10)
+!17 = !DILocalVariable(name: "node", scope: !18, file: !2, line: 15, type: !6)
+!18 = distinct !DILexicalBlock(scope: !19, file: !2, line: 14, column: 35)
+!19 = distinct !DILexicalBlock(scope: !3, file: !2, line: 14, column: 35)
+!20 = !DILocation(line: 14, column: 35, scope: !19)
+!21 = !DILocation(line: 14, column: 16, scope: !19)
+!22 = !DILocation(line: 15, column: 9, scope: !18)
+!23 = !DILocation(line: 16, column: 12, scope: !18)
+!24 = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: !2, line: 19, type: !25, scopeLine: 19, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !27)
+!25 = !DISubroutineType(types: !26)
+!26 = !{!13}
+!27 = !{!28, !31}
+!28 = !DILocalVariable(name: "head", scope: !29, file: !2, line: 20, type: !6)
+!29 = distinct !DILexicalBlock(scope: !30, file: !2, line: 19, column: 11)
+!30 = distinct !DILexicalBlock(scope: !24, file: !2, line: 19, column: 11)
+!31 = !DILocalVariable(name: "tree", scope: !29, file: !2, line: 21, type: !32)
+!32 = !DICompositeType(tag: DW_TAG_structure_type, name: "struct { value: i32, left: *struct {}, right: *struct {} }", scope: !2, file: !2, elements: !33)
+!33 = !{!9, !34, !35}
+!34 = !DIDerivedType(tag: DW_TAG_member, name: "left", scope: !2, file: !2, baseType: !12)
+!35 = !DIDerivedType(tag: DW_TAG_member, name: "right", scope: !2, file: !2, baseType: !12)
+!36 = !DILocation(line: 20, column: 9, scope: !29)
+!37 = !DILocation(line: 21, column: 9, scope: !29)
+!38 = !DILocation(line: 22, column: 24, scope: !29)
+!39 = !DILocation(line: 22, column: 5, scope: !29)
+!40 = !DILocation(line: 23, column: 1, scope: !29)

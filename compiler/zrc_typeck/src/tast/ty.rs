@@ -69,6 +69,12 @@ pub enum Type<'input> {
     Struct(IndexMap<&'input str, Type<'input>>),
     /// Union type literals. Ordered by declaration order.
     Union(IndexMap<&'input str, Type<'input>>),
+    /// Opaque type placeholder used during type resolution for self-referential
+    /// types. This is a temporary type that should be replaced with a void
+    /// pointer (`*struct{}`) after the type definition is fully resolved.
+    /// Opaque types should never appear in final TAST output or code
+    /// generation.
+    Opaque(&'input str),
 }
 
 impl Display for Type<'_> {
@@ -107,6 +113,7 @@ impl Display for Type<'_> {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Self::Opaque(name) => write!(f, "{name}"),
         }
     }
 }
