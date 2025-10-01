@@ -12,10 +12,12 @@ use zrc_typeck::tast::{
 use zrc_utils::span::{Span, Spannable, Spanned};
 
 use crate::{
-    BasicBlockAnd, CgScope,
+    bb::BasicBlockAnd,
     ctx::{BlockCtx, FunctionCtx},
     expr::cg_expr,
+    scope::CgScope,
     ty::llvm_basic_type,
+    unpack,
 };
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain

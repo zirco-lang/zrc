@@ -1,6 +1,6 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
-description: "fn test() {\n    let x = 6;\n\n    // TEST: we should simply be `store`ing to the %let_x we created\n    x = 7;\n}\n"
+source: compiler/zrc_codegen/src/expr/place.rs
+description: "fn test() {\n    let x: *i32;\n\n    // TEST: x is *i32, so %let_x is **i32 (ptr to the stack). we should load from\n    // %let_x to obtain the actual pointer. we should then store to that result\n    // value (we should never load it)\n    *x = 4;\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -8,11 +8,11 @@ source_filename = "test.zr"
 
 define {} @test() !dbg !3 {
 entry:
-  %let_x = alloca i32, align 4
-  call void @llvm.dbg.declare(metadata ptr %let_x, metadata !9, metadata !DIExpression()), !dbg !13
-  store i32 6, ptr %let_x, align 4, !dbg !13
-  store i32 7, ptr %let_x, align 4, !dbg !14
-  ret {} zeroinitializer, !dbg !15
+  %let_x = alloca ptr, align 8
+  call void @llvm.dbg.declare(metadata ptr %let_x, metadata !9, metadata !DIExpression()), !dbg !14
+  %load = load ptr, ptr %let_x, align 8, !dbg !15
+  store i32 4, ptr %load, align 4, !dbg !15
+  ret {} zeroinitializer, !dbg !16
 }
 
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
@@ -35,7 +35,8 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !9 = !DILocalVariable(name: "x", scope: !10, file: !2, line: 2, type: !12)
 !10 = distinct !DILexicalBlock(scope: !11, file: !2, line: 1, column: 11)
 !11 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 11)
-!12 = !DIBasicType(name: "i32")
-!13 = !DILocation(line: 2, column: 9, scope: !10)
-!14 = !DILocation(line: 5, column: 5, scope: !10)
-!15 = !DILocation(line: 6, column: 1, scope: !10)
+!12 = !DIDerivedType(tag: DW_TAG_pointer_type, name: "\22i32\22", baseType: !13, dwarfAddressSpace: 0)
+!13 = !DIBasicType(name: "i32")
+!14 = !DILocation(line: 2, column: 9, scope: !10)
+!15 = !DILocation(line: 7, column: 6, scope: !10)
+!16 = !DILocation(line: 8, column: 1, scope: !10)

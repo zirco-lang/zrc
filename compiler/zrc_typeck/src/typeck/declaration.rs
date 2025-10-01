@@ -7,7 +7,8 @@ use zrc_parser::ast::stmt::{
 use zrc_utils::span::{Spannable, Spanned};
 
 use super::{
-    BlockReturnAbility, resolve_type,
+    block::BlockReturnAbility,
+    resolve_type,
     scope::{GlobalScope, Scope},
     type_block, type_expr,
 };

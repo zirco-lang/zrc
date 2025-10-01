@@ -1,13 +1,16 @@
 //! Code generation for expressions
 
+pub mod place;
+
 use inkwell::{
     IntPredicate,
     basic_block::BasicBlock,
     builder::BuilderError,
     debug_info::AsDIScope,
     types::{BasicType, StringRadix},
-    values::{BasicValue, BasicValueEnum, IntValue, PointerValue},
+    values::{BasicValue, BasicValueEnum, IntValue},
 };
+use place::cg_place;
 use zrc_typeck::tast::{
     expr::{
         Arithmetic, BinaryBitwise, Comparison, Equality, Logical, NumberLiteral, Place, PlaceKind,
@@ -18,9 +21,10 @@ use zrc_typeck::tast::{
 use zrc_utils::span::Spannable;
 
 use crate::{
-    BasicBlockAnd, BasicBlockExt,
+    bb::{BasicBlockAnd, BasicBlockExt},
     ctx::BlockCtx,
     ty::{llvm_basic_type, llvm_int_type, llvm_type},
+    unpack,
 };
 
 /// Get a [`NumberLiteral`]'s [`StringRadix`]
@@ -89,97 +93,6 @@ pub fn build_arithmetic<'ctx>(
 
         Arithmetic::Modulo if result_is_signed => cg.builder.build_int_signed_rem(lhs, rhs, "rem"),
         Arithmetic::Modulo => cg.builder.build_int_unsigned_rem(lhs, rhs, "rem"),
-    }
-}
-
-/// Resolve a place to its pointer
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
-fn cg_place<'ctx>(
-    cg: BlockCtx<'ctx, '_, '_>,
-    mut bb: BasicBlock<'ctx>,
-    place: Place,
-) -> BasicBlockAnd<'ctx, PointerValue<'ctx>> {
-    let place_span = place.kind.span();
-    let line_and_col = cg.line_lookup.lookup_from_index(place_span.start());
-    let debug_location = cg.dbg_builder.create_debug_location(
-        cg.ctx,
-        line_and_col.line,
-        line_and_col.col,
-        cg.dbg_scope.as_debug_info_scope(),
-        None,
-    );
-    cg.builder.set_current_debug_location(debug_location);
-
-    match place.kind.into_value() {
-        PlaceKind::Variable(x) => {
-            let reg = cg
-                .scope
-                .get(x)
-                .expect("identifier that passed typeck should exist in the CgScope");
-
-            bb.and(reg)
-        }
-
-        PlaceKind::Deref(x) => {
-            let value = unpack!(bb = cg_expr(cg, bb, *x));
-
-            bb.and(value.into_pointer_value())
-        }
-
-        PlaceKind::Index(ptr, idx) => {
-            let ptr = unpack!(bb = cg_expr(cg, bb, *ptr));
-            let idx = unpack!(bb = cg_expr(cg, bb, *idx));
-
-            // SAFETY: If indices are used incorrectly this may segfault
-            // TODO: Is this actually safely used?
-            let reg = unsafe {
-                cg.builder.build_gep(
-                    llvm_basic_type(&cg, &place.inferred_type).0,
-                    ptr.into_pointer_value(),
-                    &[idx.into_int_value()],
-                    "gep",
-                )
-            }
-            .expect("building GEP instruction should succeed");
-
-            bb.and(reg.as_basic_value_enum().into_pointer_value())
-        }
-
-        #[allow(clippy::wildcard_enum_match_arm)]
-        PlaceKind::Dot(x, prop) => match &x.inferred_type {
-            Type::Struct(contents) => {
-                let x_ty = llvm_basic_type(&cg, &x.inferred_type).0;
-                let prop_idx = contents
-                    .iter()
-                    .position(|(got_key, _)| *got_key == prop.into_value())
-                    .expect("invalid struct field");
-
-                let x = unpack!(bb = cg_place(cg, bb, *x));
-
-                let reg = cg
-                    .builder
-                    .build_struct_gep(
-                        x_ty,
-                        x,
-                        prop_idx
-                            .try_into()
-                            .expect("got more than u32::MAX as key index? HOW?"),
-                        "gep",
-                    )
-                    .expect("building GEP instruction should succeed");
-
-                bb.and(reg.as_basic_value_enum().into_pointer_value())
-            }
-            Type::Union(_) => {
-                // All we need to do is cast the pointer, but there's no `bitcast` anymore,
-                // so just return it and it'll take on the correct type
-
-                let value = unpack!(bb = cg_place(cg, bb, *x));
-
-                bb.and(value)
-            }
-            _ => panic!("cannot access property of non-struct"),
-        },
     }
 }
 
@@ -689,114 +602,19 @@ mod tests {
 
     use crate::cg_snapshot_test;
 
-    // Remember: In all of these tests, cg_place returns a *pointer* to the data in
-    // the place.
-    mod cg_place {
-        use super::*;
-
-        #[test]
-        fn basic_identifiers_in_place_position() {
-            cg_snapshot_test!(indoc! {"
-                fn test() {
-                    let x = 6;
-
-                    // TEST: we should simply be `store`ing to the %let_x we created
-                    x = 7;
-                }
-            "});
-        }
-
-        #[test]
-        fn identifier_deref_generates_as_expected() {
-            cg_snapshot_test!(indoc! {"
-                fn test() {
-                    let x: *i32;
-
-                    // TEST: x is *i32, so %let_x is **i32 (ptr to the stack). we should load from
-                    // %let_x to obtain the actual pointer. we should then store to that result
-                    // value (we should never load it)
-                    *x = 4;
-                }
-            "});
-        }
-
-        #[test]
-        fn other_deref_generates_as_expected() {
-            cg_snapshot_test!(indoc! {"
-                fn test() {
-                    // TEST: because cg_place returns a *pointer* to the represented value, handling
-                    // *5 in a place context should return the address of *5, which is &*5 = 5.
-                    // for this reason, we should literally be `store`ing to the hardcoded address
-                    // 5, and never *loading* from it (because if we do load we may not be actually
-                    // writing to that address)
-                    // we use 5 not 0 because 0 is just 'ptr null'
-                    *(5 as *i32) = 0;
-                }
-            "});
-        }
-
-        #[test]
-        fn pointer_indexing_in_place_position() {
-            cg_snapshot_test!(indoc! {"
-                fn test() {
-                    let x: *i32;
-
-                    // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).
-                    // %let_x needs to be GEP'd into and then stored into, but we must not load
-                    // from the address.
-                    x[4 as usize] = 5;
-                }
-            "});
-        }
-
-        #[test]
-        fn struct_property_access_in_place_position() {
-            cg_snapshot_test!(indoc! {"
-                struct S { x: i32, y: i32 }
-
-                fn test() {
-                    let x: S;
-
-                    // TEST: the value must NOT be loaded! it must simply gep to obtain a pointer,
-                    // then `store` into that pointer.
-                    x.y = 4;
-                }
-            "});
-        }
-
-        #[test]
-        fn union_property_access_in_place_position() {
-            cg_snapshot_test!(indoc! {"
-                union U { x: i32, y: i8 }
-
-                fn test() {
-                    let x: U;
-
-                    // TEST: the pointer is cast and then written to as an i32
-                    x.x = 4;
-
-                    // TEST: the pointer is cast and then written to as an i8
-                    x.y = 5 as i8;
-                }
-            "});
-        }
-    }
-    mod cg_expr {
-        use super::*;
-
-        #[test]
-        fn typed_integers_generate_properly() {
-            cg_snapshot_test!(indoc! {"
+    #[test]
+    fn typed_integers_generate_properly() {
+        cg_snapshot_test!(indoc! {"
                 fn test() -> i8 {
                     // TEST: returns `i8`
                     return 4i8;
                 }
             "});
-        }
+    }
 
-        #[test]
-        fn comma_yields_right_value() {
-            cg_snapshot_test!(indoc! {"
+    #[test]
+    fn comma_yields_right_value() {
+        cg_snapshot_test!(indoc! {"
                 fn f();
                 fn g() -> i32;
 
@@ -805,11 +623,11 @@ mod tests {
                     return f(), g();
                 }
             "});
-        }
+    }
 
-        #[test]
-        fn pointer_indexing_in_expr_position() {
-            cg_snapshot_test!(indoc! {"
+    #[test]
+    fn pointer_indexing_in_expr_position() {
+        cg_snapshot_test!(indoc! {"
                 fn take_int(x: i32);
 
                 fn test() {
@@ -820,11 +638,11 @@ mod tests {
                     take_int(x[4 as usize]);
                 }
             "});
-        }
+    }
 
-        #[test]
-        fn pointer_deref_in_expr_position() {
-            cg_snapshot_test!(indoc! {"
+    #[test]
+    fn pointer_deref_in_expr_position() {
+        cg_snapshot_test!(indoc! {"
                 fn test() -> i32 {
                     let x: *i32;
 
@@ -833,11 +651,11 @@ mod tests {
                     return *x;
                 }
             "});
-        }
+    }
 
-        #[test]
-        fn struct_property_access_in_expr_position() {
-            cg_snapshot_test!(indoc! {"
+    #[test]
+    fn struct_property_access_in_expr_position() {
+        cg_snapshot_test!(indoc! {"
                 struct S { x: i32, y: i32 }
                 fn take_int(x: i32);
 
@@ -849,11 +667,11 @@ mod tests {
                     take_int(x.y);
                 }
             "});
-        }
+    }
 
-        #[test]
-        fn union_property_access_in_expr_position() {
-            cg_snapshot_test!(indoc! {"
+    #[test]
+    fn union_property_access_in_expr_position() {
+        cg_snapshot_test!(indoc! {"
                 union U { x: i32, y: i8 }
                 fn take_i32(x: i32);
                 fn take_i8(x: i8);
@@ -868,11 +686,11 @@ mod tests {
                     take_i8(x.y);
                 }
             "});
-        }
+    }
 
-        #[test]
-        fn ternary_operations_generate() {
-            cg_snapshot_test!(indoc! {"
+    #[test]
+    fn ternary_operations_generate() {
+        cg_snapshot_test!(indoc! {"
                 fn get_bool() -> bool;
                 fn get_int() -> i32;
                 fn take_int(x: i32);
@@ -882,36 +700,36 @@ mod tests {
                     take_int(num);
                 }
             "});
-        }
+    }
 
-        #[test]
-        fn string_literal_escapes_generate() {
-            cg_snapshot_test!(indoc! {r#"
+    #[test]
+    fn string_literal_escapes_generate() {
+        cg_snapshot_test!(indoc! {r#"
                 fn test() {
                     // TEST: should properly generate \xNN for each escape
                     let x = "\n\r\t\\\"\x41\0";
                 }
             "#});
-        }
+    }
 
-        /// Tests to ensure non-decimal integer literals
-        /// 1. don't panic
-        /// 2. are valid.
-        ///
-        /// <https://github.com/zirco-lang/zrc/issues/119>
-        #[test]
-        fn regression_119_special_integer_literals() {
-            cg_snapshot_test!(indoc! {"
+    /// Tests to ensure non-decimal integer literals
+    /// 1. don't panic
+    /// 2. are valid.
+    ///
+    /// <https://github.com/zirco-lang/zrc/issues/119>
+    #[test]
+    fn regression_119_special_integer_literals() {
+        cg_snapshot_test!(indoc! {"
                 fn test() {
                     let a = 0b10_10;
                     let b = 0x1F_A4;
                 }
             "});
-        }
+    }
 
-        #[test]
-        fn pointer_arithmetic_generates_proper_gep() {
-            cg_snapshot_test!(indoc! {r#"
+    #[test]
+    fn pointer_arithmetic_generates_proper_gep() {
+        cg_snapshot_test!(indoc! {r#"
                 fn test() {
                     let x: *i32;
 
@@ -921,11 +739,11 @@ mod tests {
                     let z = x - 4 as usize;
                 }
             "#});
-        }
+    }
 
-        #[test]
-        fn arithmetic_operators_generate() {
-            cg_snapshot_test!(indoc! {"
+    #[test]
+    fn arithmetic_operators_generate() {
+        cg_snapshot_test!(indoc! {"
                 fn get_int() -> i32;
                 fn get_uint() -> u32;
 
@@ -958,11 +776,11 @@ mod tests {
                     let u_rem = ux % uy;
                 }
             "});
-        }
+    }
 
-        #[test]
-        fn equality_operators_generate() {
-            cg_snapshot_test!(indoc! {"
+    #[test]
+    fn equality_operators_generate() {
+        cg_snapshot_test!(indoc! {"
                 fn get_bool() -> bool;
 
                 fn test() {
@@ -976,11 +794,11 @@ mod tests {
                     let ne = a != b;
                 }
             "});
-        }
+    }
 
-        #[test]
-        fn logical_operators_generate() {
-            cg_snapshot_test!(indoc! {"
+    #[test]
+    fn logical_operators_generate() {
+        cg_snapshot_test!(indoc! {"
                 fn get_bool() -> bool;
 
                 fn test() {
@@ -997,11 +815,11 @@ mod tests {
                     let not = !a;
                 }
             "});
-        }
+    }
 
-        #[test]
-        fn bitwise_operators_generate() {
-            cg_snapshot_test!(indoc! {"
+    #[test]
+    fn bitwise_operators_generate() {
+        cg_snapshot_test!(indoc! {"
                 fn get_int() -> i32;
                 fn get_uint() -> u32;
 
@@ -1032,6 +850,5 @@ mod tests {
                     let ashr = x >> u;
                 }
             "});
-        }
     }
 }
