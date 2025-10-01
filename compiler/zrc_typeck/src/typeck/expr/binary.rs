@@ -6,7 +6,10 @@ use zrc_utils::span::{Span, Spannable};
 
 use super::{
     super::scope::Scope,
-    helpers::{expect, expect_is_integer, expect_is_unsigned_integer},
+    helpers::{
+        expect, expect_is_integer, expect_is_unsigned_integer, resolve_binary_int_operands,
+        try_coerce_to,
+    },
     type_expr,
 };
 use crate::tast::{
@@ -54,55 +57,20 @@ pub fn type_expr_equality<'input>(
     lhs: Expr<'input>,
     rhs: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    let _lhs_span = lhs.0.span();
     let lhs_t = type_expr(scope, lhs)?;
-    let _rhs_span = rhs.0.span();
     let rhs_t = type_expr(scope, rhs)?;
 
     let (final_lhs, final_rhs) =
         if lhs_t.inferred_type.is_integer() && rhs_t.inferred_type.is_integer() {
-            if lhs_t.inferred_type == rhs_t.inferred_type {
-                // int == int is valid (same type)
-                if matches!(lhs_t.inferred_type, TastType::Int) {
-                    // Both are {int}, resolve to i32
-                    let lhs_resolved = TypedExpr {
-                        inferred_type: TastType::I32,
-                        kind: lhs_t.kind,
-                    };
-                    let rhs_resolved = TypedExpr {
-                        inferred_type: TastType::I32,
-                        kind: rhs_t.kind,
-                    };
-                    (lhs_resolved, rhs_resolved)
-                } else {
-                    (lhs_t, rhs_t)
-                }
-            } else if matches!(lhs_t.inferred_type, TastType::Int)
-                && lhs_t
-                    .inferred_type
-                    .can_implicitly_cast_to(&rhs_t.inferred_type)
-            {
-                // lhs is {int}, resolve to rhs type
-                let lhs_with_resolved_type = TypedExpr {
-                    inferred_type: rhs_t.inferred_type.clone(),
-                    kind: lhs_t.kind,
-                };
-                (lhs_with_resolved_type, rhs_t)
-            } else if matches!(rhs_t.inferred_type, TastType::Int)
-                && rhs_t
-                    .inferred_type
-                    .can_implicitly_cast_to(&lhs_t.inferred_type)
-            {
-                // rhs is {int}, resolve to lhs type
-                let rhs_with_resolved_type = TypedExpr {
-                    inferred_type: lhs_t.inferred_type.clone(),
-                    kind: rhs_t.kind,
-                };
-                (lhs_t, rhs_with_resolved_type)
+            let (_, resolved_lhs, resolved_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
+
+            // Check if types match after resolution
+            if resolved_lhs.inferred_type == resolved_rhs.inferred_type {
+                (resolved_lhs, resolved_rhs)
             } else {
                 return Err(DiagnosticKind::EqualityOperators(
-                    lhs_t.inferred_type.to_string(),
-                    rhs_t.inferred_type.to_string(),
+                    resolved_lhs.inferred_type.to_string(),
+                    resolved_rhs.inferred_type.to_string(),
                 )
                 .error_in(expr_span));
             }
@@ -155,52 +123,16 @@ pub fn type_expr_binary_bitwise<'input>(
         })
     } else {
         // otherwise these must be the same type (with {int} support)
-        let (result_type, final_lhs, final_rhs) = if lhs_t.inferred_type == rhs_t.inferred_type {
-            // Both have the same type
-            if matches!(lhs_t.inferred_type, TastType::Int) {
-                // Both are {int}, resolve to i32
-                let lhs_resolved = TypedExpr {
-                    inferred_type: TastType::I32,
-                    kind: lhs_t.kind,
-                };
-                let rhs_resolved = TypedExpr {
-                    inferred_type: TastType::I32,
-                    kind: rhs_t.kind,
-                };
-                (TastType::I32, lhs_resolved, rhs_resolved)
-            } else {
-                (lhs_t.inferred_type.clone(), lhs_t, rhs_t)
-            }
-        } else if matches!(lhs_t.inferred_type, TastType::Int)
-            && lhs_t
-                .inferred_type
-                .can_implicitly_cast_to(&rhs_t.inferred_type)
-        {
-            // lhs is {int}, resolve to rhs type
-            let lhs_with_resolved_type = TypedExpr {
-                inferred_type: rhs_t.inferred_type.clone(),
-                kind: lhs_t.kind,
-            };
-            (rhs_t.inferred_type.clone(), lhs_with_resolved_type, rhs_t)
-        } else if matches!(rhs_t.inferred_type, TastType::Int)
-            && rhs_t
-                .inferred_type
-                .can_implicitly_cast_to(&lhs_t.inferred_type)
-        {
-            // rhs is {int}, resolve to lhs type
-            let rhs_with_resolved_type = TypedExpr {
-                inferred_type: lhs_t.inferred_type.clone(),
-                kind: rhs_t.kind,
-            };
-            (lhs_t.inferred_type.clone(), lhs_t, rhs_with_resolved_type)
-        } else {
-            // Types don't match
+        let (result_type, final_lhs, final_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
+
+        // Check if types match after resolution
+        if final_lhs.inferred_type != final_rhs.inferred_type {
             return Err(DiagnosticKind::ExpectedSameType(
-                lhs_t.inferred_type.to_string(),
-                rhs_t.inferred_type.to_string(),
+                final_lhs.inferred_type.to_string(),
+                final_rhs.inferred_type.to_string(),
             )
             .error_in(expr_span));
-        };
+        }
 
         Ok(TypedExpr {
             inferred_type: result_type,
@@ -227,52 +159,16 @@ pub fn type_expr_comparison<'input>(
     expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
     // Handle {int} type resolution
-    let (final_lhs, final_rhs) = if lhs_t.inferred_type == rhs_t.inferred_type {
-        // Both have the same type
-        if matches!(lhs_t.inferred_type, TastType::Int) {
-            // Both are {int}, resolve to i32
-            let lhs_resolved = TypedExpr {
-                inferred_type: TastType::I32,
-                kind: lhs_t.kind,
-            };
-            let rhs_resolved = TypedExpr {
-                inferred_type: TastType::I32,
-                kind: rhs_t.kind,
-            };
-            (lhs_resolved, rhs_resolved)
-        } else {
-            (lhs_t, rhs_t)
-        }
-    } else if matches!(lhs_t.inferred_type, TastType::Int)
-        && lhs_t
-            .inferred_type
-            .can_implicitly_cast_to(&rhs_t.inferred_type)
-    {
-        // lhs is {int}, resolve to rhs type
-        let lhs_with_resolved_type = TypedExpr {
-            inferred_type: rhs_t.inferred_type.clone(),
-            kind: lhs_t.kind,
-        };
-        (lhs_with_resolved_type, rhs_t)
-    } else if matches!(rhs_t.inferred_type, TastType::Int)
-        && rhs_t
-            .inferred_type
-            .can_implicitly_cast_to(&lhs_t.inferred_type)
-    {
-        // rhs is {int}, resolve to lhs type
-        let rhs_with_resolved_type = TypedExpr {
-            inferred_type: lhs_t.inferred_type.clone(),
-            kind: rhs_t.kind,
-        };
-        (lhs_t, rhs_with_resolved_type)
-    } else {
-        // Types don't match
+    let (_, final_lhs, final_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
+
+    // Check if types match after resolution
+    if final_lhs.inferred_type != final_rhs.inferred_type {
         return Err(DiagnosticKind::ExpectedSameType(
-            lhs_t.inferred_type.to_string(),
-            rhs_t.inferred_type.to_string(),
+            final_lhs.inferred_type.to_string(),
+            final_rhs.inferred_type.to_string(),
         )
         .error_in(expr_span));
-    };
+    }
 
     Ok(TypedExpr {
         inferred_type: TastType::Bool,
@@ -309,14 +205,8 @@ pub fn type_expr_arithmetic<'input>(
         // converts to usize)
         let final_rhs = if rhs_t.inferred_type == TastType::Usize {
             rhs_t
-        } else if matches!(rhs_t.inferred_type, TastType::Int)
-            && rhs_t.inferred_type.can_implicitly_cast_to(&TastType::Usize)
-        {
-            // rhs is {int}, resolve to usize
-            TypedExpr {
-                inferred_type: TastType::Usize,
-                kind: rhs_t.kind,
-            }
+        } else if rhs_t.inferred_type.can_implicitly_cast_to(&TastType::Usize) {
+            try_coerce_to(rhs_t, &TastType::Usize)
         } else {
             return Err(DiagnosticKind::ExpectedGot {
                 expected: "usize".to_string(),
@@ -335,52 +225,16 @@ pub fn type_expr_arithmetic<'input>(
         expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
         // Handle {int} type resolution
-        let (result_type, final_lhs, final_rhs) = if lhs_t.inferred_type == rhs_t.inferred_type {
-            // Both have the same type
-            if matches!(lhs_t.inferred_type, TastType::Int) {
-                // Both are {int}, resolve to i32
-                let lhs_resolved = TypedExpr {
-                    inferred_type: TastType::I32,
-                    kind: lhs_t.kind,
-                };
-                let rhs_resolved = TypedExpr {
-                    inferred_type: TastType::I32,
-                    kind: rhs_t.kind,
-                };
-                (TastType::I32, lhs_resolved, rhs_resolved)
-            } else {
-                (lhs_t.inferred_type.clone(), lhs_t, rhs_t)
-            }
-        } else if matches!(lhs_t.inferred_type, TastType::Int)
-            && lhs_t
-                .inferred_type
-                .can_implicitly_cast_to(&rhs_t.inferred_type)
-        {
-            // lhs is {int}, resolve to rhs type
-            let lhs_with_resolved_type = TypedExpr {
-                inferred_type: rhs_t.inferred_type.clone(),
-                kind: lhs_t.kind,
-            };
-            (rhs_t.inferred_type.clone(), lhs_with_resolved_type, rhs_t)
-        } else if matches!(rhs_t.inferred_type, TastType::Int)
-            && rhs_t
-                .inferred_type
-                .can_implicitly_cast_to(&lhs_t.inferred_type)
-        {
-            // rhs is {int}, resolve to lhs type
-            let rhs_with_resolved_type = TypedExpr {
-                inferred_type: lhs_t.inferred_type.clone(),
-                kind: rhs_t.kind,
-            };
-            (lhs_t.inferred_type.clone(), lhs_t, rhs_with_resolved_type)
-        } else {
-            // Types don't match
+        let (result_type, final_lhs, final_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
+
+        // Check if types match after resolution
+        if final_lhs.inferred_type != final_rhs.inferred_type {
             return Err(DiagnosticKind::ExpectedSameType(
-                lhs_t.inferred_type.to_string(),
-                rhs_t.inferred_type.to_string(),
+                final_lhs.inferred_type.to_string(),
+                final_rhs.inferred_type.to_string(),
             )
             .error_in(expr_span));
-        };
+        }
 
         Ok(TypedExpr {
             inferred_type: result_type,
