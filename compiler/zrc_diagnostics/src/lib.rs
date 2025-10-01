@@ -58,7 +58,6 @@
 mod diagnostic;
 mod diagnostic_kind;
 mod ext;
-mod fmt;
 
 pub use diagnostic::{Diagnostic, Severity};
 pub use diagnostic_kind::DiagnosticKind;
