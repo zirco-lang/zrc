@@ -85,9 +85,9 @@ mod test_utils;
 mod ty;
 
 pub use inkwell::{
+    OptimizationLevel,
     debug_info::DWARFEmissionKind as DebugLevel,
     targets::{FileType, TargetTriple},
-    OptimizationLevel,
 };
 pub use program::{cg_program_to_buffer, cg_program_to_string};
 

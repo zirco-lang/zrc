@@ -7,9 +7,9 @@ use zrc_parser::ast::stmt::{
 use zrc_utils::span::{Spannable, Spanned};
 
 use super::{
-    resolve_type,
+    BlockReturnAbility, resolve_type,
     scope::{GlobalScope, Scope},
-    type_block, type_expr, BlockReturnAbility,
+    type_block, type_expr,
 };
 use crate::tast::{
     self,
@@ -305,46 +305,48 @@ mod tests {
 
     #[test]
     fn re_declaration_works_as_expected() {
-        assert!(process_declaration(
-            &mut GlobalScope {
-                global_values: ValueCtx::from([(
-                    "get_true",
-                    TastType::Fn(Fn {
-                        arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
-                        returns: Box::new(TastType::Bool)
-                    })
-                )]),
-                types: TypeCtx::from([("bool", TastType::Bool)]),
-                declarations: HashMap::from([(
-                    "get_true",
-                    FunctionDeclarationGlobalMetadata {
-                        fn_type: Fn {
+        assert!(
+            process_declaration(
+                &mut GlobalScope {
+                    global_values: ValueCtx::from([(
+                        "get_true",
+                        TastType::Fn(Fn {
                             arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
                             returns: Box::new(TastType::Bool)
-                        },
-                        has_implementation: false
-                    }
-                )])
-            },
-            AstDeclaration::FunctionDeclaration {
-                name: spanned!(0, "get_true", 0),
-                parameters: spanned!(0, AstArgumentDeclarationList::NonVariadic(vec![]), 0),
-                return_type: Some(Type(spanned!(0, TypeKind::Identifier("bool"), 0))),
-                body: Some(spanned!(
-                    0,
-                    vec![Stmt(spanned!(
+                        })
+                    )]),
+                    types: TypeCtx::from([("bool", TastType::Bool)]),
+                    declarations: HashMap::from([(
+                        "get_true",
+                        FunctionDeclarationGlobalMetadata {
+                            fn_type: Fn {
+                                arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
+                                returns: Box::new(TastType::Bool)
+                            },
+                            has_implementation: false
+                        }
+                    )])
+                },
+                AstDeclaration::FunctionDeclaration {
+                    name: spanned!(0, "get_true", 0),
+                    parameters: spanned!(0, AstArgumentDeclarationList::NonVariadic(vec![]), 0),
+                    return_type: Some(Type(spanned!(0, TypeKind::Identifier("bool"), 0))),
+                    body: Some(spanned!(
                         0,
-                        StmtKind::ReturnStmt(Some(Expr(spanned!(
+                        vec![Stmt(spanned!(
                             0,
-                            ExprKind::BooleanLiteral(true),
+                            StmtKind::ReturnStmt(Some(Expr(spanned!(
+                                0,
+                                ExprKind::BooleanLiteral(true),
+                                0
+                            )))),
                             0
-                        )))),
+                        ))],
                         0
-                    ))],
-                    0
-                ))
-            }
-        )
-        .is_ok());
+                    ))
+                }
+            )
+            .is_ok()
+        );
     }
 }

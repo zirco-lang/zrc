@@ -6,7 +6,7 @@ mod expr;
 mod scope;
 mod ty;
 
-pub use block::{type_block, BlockReturnAbility, BlockReturnActuality};
+pub use block::{BlockReturnAbility, BlockReturnActuality, type_block};
 pub use declaration::process_declaration;
 pub use expr::type_expr;
 pub use ty::resolve_type;

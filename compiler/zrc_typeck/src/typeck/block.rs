@@ -444,18 +444,18 @@ pub fn type_block<'input, 'gs>(
                                 let typed_cond =
                                     cond.map(|cond| type_expr(&loop_scope, cond)).transpose()?;
 
-                                if let Some(inner_t_cond) = typed_cond.clone() {
-                                    if inner_t_cond.inferred_type != TastType::Bool {
-                                        return Err(Diagnostic(
-                                            Severity::Error,
-                                            cond_span
-                                                .expect("span should exist if we unwrapped it")
-                                                .containing(DiagnosticKind::ExpectedGot {
-                                                    expected: "bool".to_string(),
-                                                    got: inner_t_cond.inferred_type.to_string(),
-                                                }),
-                                        ));
-                                    }
+                                if let Some(inner_t_cond) = typed_cond.clone()
+                                    && inner_t_cond.inferred_type != TastType::Bool
+                                {
+                                    return Err(Diagnostic(
+                                        Severity::Error,
+                                        cond_span
+                                            .expect("span should exist if we unwrapped it")
+                                            .containing(DiagnosticKind::ExpectedGot {
+                                                expected: "bool".to_string(),
+                                                got: inner_t_cond.inferred_type.to_string(),
+                                            }),
+                                    ));
                                 }
 
                                 let typed_post =

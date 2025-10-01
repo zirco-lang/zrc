@@ -1,6 +1,7 @@
 //! Code generation for entire Zirco programs
 
 use inkwell::{
+    OptimizationLevel,
     context::Context,
     debug_info::{AsDIScope, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage},
     memory_buffer::MemoryBuffer,
@@ -11,7 +12,6 @@ use inkwell::{
     },
     types::{AnyType, BasicMetadataTypeEnum, BasicTypeEnum},
     values::{BasicValueEnum, FunctionValue},
-    OptimizationLevel,
 };
 use zrc_typeck::tast::{
     stmt::{ArgumentDeclaration, TypedDeclaration},
@@ -21,9 +21,9 @@ use zrc_utils::{line_finder::LineLookup, span::Spanned};
 
 use super::stmt::cg_block;
 use crate::{
+    CgScope,
     ctx::{CompilationUnitCtx, FunctionCtx},
     ty::{create_fn, llvm_basic_type, llvm_type},
-    CgScope,
 };
 
 /// Initialize the LLVM [`FunctionValue`] for a given function prototype
@@ -61,9 +61,7 @@ pub fn cg_init_extern_fn<'ctx>(
         is_variadic,
     );
 
-    let fn_val = unit.module.add_function(name, fn_type, None);
-
-    fn_val
+    unit.module.add_function(name, fn_type, None)
 }
 
 /// Same as [`cg_init_extern_fn`] but properly initializes function

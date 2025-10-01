@@ -115,7 +115,7 @@ impl<'input> Type<'input> {
     /// Returns `true` if this is an integer type like [`Type::I8`].
     #[must_use]
     pub const fn is_integer(&self) -> bool {
-        use Type::{Isize, Usize, I16, I32, I64, I8, U16, U32, U64, U8};
+        use Type::{I8, I16, I32, I64, Isize, U8, U16, U32, U64, Usize};
         matches!(
             self,
             I8 | U8 | I16 | U16 | I32 | U32 | I64 | U64 | Isize | Usize
@@ -125,14 +125,14 @@ impl<'input> Type<'input> {
     /// Returns `true` if this is a signed integer type like [`Type::I8`].
     #[must_use]
     pub const fn is_signed_integer(&self) -> bool {
-        use Type::{Isize, I16, I32, I64, I8};
+        use Type::{I8, I16, I32, I64, Isize};
         matches!(self, I8 | I16 | I32 | I64 | Isize)
     }
 
     /// Returns `true` if this is an unsigned integer type like [`Type::U8`].
     #[must_use]
     pub const fn is_unsigned_integer(&self) -> bool {
-        use Type::{Usize, U16, U32, U64, U8};
+        use Type::{U8, U16, U32, U64, Usize};
         matches!(self, U8 | U16 | U32 | U64 | Usize)
     }
 
