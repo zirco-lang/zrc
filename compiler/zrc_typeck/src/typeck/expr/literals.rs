@@ -45,27 +45,26 @@ pub fn type_expr_number_literal<'input>(
 
     // Check bounds based on type
     #[allow(clippy::wildcard_enum_match_arm)]
-    let (min_val, max_val) = match ty_resolved {
-        TastType::I8 => (Some(i128::from(i8::MIN)), Some(i128::from(i8::MAX))),
-        TastType::U8 => (Some(0), Some(i128::from(u8::MAX))),
-        TastType::I16 => (Some(i128::from(i16::MIN)), Some(i128::from(i16::MAX))),
-        TastType::U16 => (Some(0), Some(i128::from(u16::MAX))),
-        TastType::I32 => (Some(i128::from(i32::MIN)), Some(i128::from(i32::MAX))),
-        TastType::U32 => (Some(0), Some(i128::from(u32::MAX))),
-        TastType::I64 => (Some(i128::from(i64::MIN)), Some(i128::from(i64::MAX))),
-        TastType::U64 => (Some(0), Some(i128::from(u64::MAX))),
+    let bounds = match ty_resolved {
+        TastType::I8 => Some((i8::MIN.into(), i8::MAX.into())),
+        TastType::U8 => Some((u8::MIN.into(), u8::MAX.into())),
+        TastType::I16 => Some((i16::MIN.into(), i16::MAX.into())),
+        TastType::U16 => Some((u16::MIN.into(), u16::MAX.into())),
+        TastType::I32 => Some((i32::MIN.into(), i32::MAX.into())),
+        TastType::U32 => Some((u32::MIN.into(), u32::MAX.into())),
+        TastType::I64 => Some((i64::MIN.into(), i64::MAX.into())),
+        TastType::U64 => Some((u64::MIN.into(), u64::MAX.into())),
         // Skip usize/isize as their size is platform-dependent
         // Also skip all other types (caught by is_integer() check above)
-        _ => (None, None),
+        _ => None,
     };
 
-    if let (Some(min), Some(max)) = (min_val, max_val) {
+    if let Some((min, max)) = bounds {
         // Check if the value fits in the range
         // We need to handle unsigned values that might be larger than i128::MAX
-        #[allow(clippy::option_if_let_else)]
         #[allow(clippy::cast_possible_wrap)]
         #[allow(clippy::as_conversions)]
-        let value_in_range = if let Ok(max_as_u128) = u128::try_from(i128::MAX) {
+        let value_in_range = u128::try_from(i128::MAX).ok().is_some_and(|max_as_u128| {
             if parsed_value <= max_as_u128 {
                 let value_as_signed = parsed_value as i128;
                 value_as_signed >= min && value_as_signed <= max
@@ -73,9 +72,7 @@ pub fn type_expr_number_literal<'input>(
                 // Value is too large to fit in any signed integer type we support
                 false
             }
-        } else {
-            false
-        };
+        });
 
         if !value_in_range {
             return Err(DiagnosticKind::NumberLiteralOutOfBounds(
@@ -148,21 +145,22 @@ pub fn type_expr_boolean_literal<'input>(
 #[cfg(test)]
 mod tests {
     use zrc_parser::{ast::ty::Type as AstType, lexer::NumberLiteral};
-    use zrc_utils::{span::Span, spanned};
+    use zrc_utils::spanned;
 
     use super::*;
     use crate::typeck::scope::GlobalScope;
 
     /// Helper to create an AST Type from a string identifier
     fn make_ast_type(name: &str) -> AstType<'_> {
-        AstType::build_ident(spanned!(0, name, name.len()))
+        let len = name.len();
+        AstType::build_ident(spanned!(10, name, 10 + len))
     }
 
     #[test]
     fn test_number_literal_within_bounds() {
         let global_scope = GlobalScope::new();
         let scope = global_scope.create_subscope();
-        let span = Span::from_positions(0, 5);
+        let span = spanned!(0, (), 5).span();
 
         // Test valid i8 values
         assert!(
@@ -211,7 +209,7 @@ mod tests {
     fn test_number_literal_out_of_bounds() {
         let global_scope = GlobalScope::new();
         let scope = global_scope.create_subscope();
-        let span = Span::from_positions(0, 5);
+        let span = spanned!(0, (), 5).span();
 
         // Test i8 overflow
         let result = type_expr_number_literal(
@@ -220,12 +218,13 @@ mod tests {
             NumberLiteral::Decimal("128"),
             Some(make_ast_type("i8")),
         );
-        assert!(result.is_err());
         if let Err(diagnostic) = result {
             assert!(matches!(
                 diagnostic.1.into_value(),
                 DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
             ));
+        } else {
+            panic!("Expected error for i8 overflow");
         }
 
         // Test u8 overflow
@@ -235,12 +234,13 @@ mod tests {
             NumberLiteral::Decimal("256"),
             Some(make_ast_type("u8")),
         );
-        assert!(result.is_err());
         if let Err(diagnostic) = result {
             assert!(matches!(
                 diagnostic.1.into_value(),
                 DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
             ));
+        } else {
+            panic!("Expected error for u8 overflow");
         }
 
         // Test i32 default overflow
@@ -250,12 +250,13 @@ mod tests {
             NumberLiteral::Decimal("5000000000"),
             None, // defaults to i32
         );
-        assert!(result.is_err());
         if let Err(diagnostic) = result {
             assert!(matches!(
                 diagnostic.1.into_value(),
                 DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
             ));
+        } else {
+            panic!("Expected error for i32 overflow");
         }
     }
 
@@ -263,7 +264,7 @@ mod tests {
     fn test_number_literal_hex_and_binary() {
         let global_scope = GlobalScope::new();
         let scope = global_scope.create_subscope();
-        let span = Span::from_positions(0, 5);
+        let span = spanned!(0, (), 5).span();
 
         // Test valid hex
         assert!(
@@ -283,7 +284,14 @@ mod tests {
             NumberLiteral::Hexadecimal("100"),
             Some(make_ast_type("u8")),
         );
-        assert!(result.is_err());
+        if let Err(diagnostic) = result {
+            assert!(matches!(
+                diagnostic.1.into_value(),
+                DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
+            ));
+        } else {
+            panic!("Expected error for hex u8 overflow");
+        }
 
         // Test valid binary
         assert!(
@@ -303,6 +311,13 @@ mod tests {
             NumberLiteral::Binary("100000000"),
             Some(make_ast_type("u8")),
         );
-        assert!(result.is_err());
+        if let Err(diagnostic) = result {
+            assert!(matches!(
+                diagnostic.1.into_value(),
+                DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
+            ));
+        } else {
+            panic!("Expected error for binary u8 overflow");
+        }
     }
 }
