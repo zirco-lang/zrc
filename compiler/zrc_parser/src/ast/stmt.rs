@@ -17,7 +17,7 @@ fn indent_lines(code: &str, prefix: &str) -> String {
         .map(|line| format!("{prefix}{line}"))
         .collect::<Vec<_>>()
         .join("\n")
-} 
+}
 
 /// A Zirco statement
 #[derive(PartialEq, Debug, Clone, Display)]
