@@ -1,6 +1,6 @@
 //! Defines types for Zirco compile time diagnostics.
 
-use std::error::Error;
+use std::{error::Error, path::Path};
 
 use ariadne::{Color, Label, Report, ReportKind};
 use derive_more::Display;
@@ -38,16 +38,6 @@ impl Severity {
 pub struct Diagnostic(pub Severity, pub Spanned<DiagnosticKind>);
 
 impl Diagnostic {
-    /// Convert this [`Diagnostic`] to a printable string using ariadne
-    ///
-    /// # Panics
-    /// This function may panic if the span is invalid or if writing to the
-    /// buffer fails.
-    #[must_use]
-    pub fn print(&self, source: &str) -> String {
-        self.print_with_filename(source, "<source>")
-    }
-
     /// Convert this [`Diagnostic`] to a printable string using ariadne with a
     /// custom filename
     ///
@@ -55,18 +45,19 @@ impl Diagnostic {
     /// This function may panic if the span is invalid or if writing to the
     /// buffer fails.
     #[must_use]
-    pub fn print_with_filename(&self, source: &str, filename: &str) -> String {
+    pub fn print_with_filename(&self, source: &str, path: &Path) -> String {
         let span = self.1.span();
         let message = self.1.to_string();
 
         // Create ariadne report using (filename, range) as the span type
+        let filename = path.to_string_lossy();
         let report = Report::build(
             self.0.to_report_kind(),
-            (filename, span.start()..span.end()),
+            (filename.as_ref(), span.start()..span.end()),
         )
         .with_message(message.clone())
         .with_label(
-            Label::new((filename, span.start()..span.end()))
+            Label::new((filename.as_ref(), span.start()..span.end()))
                 .with_message(message)
                 .with_color(self.0.color()),
         )
@@ -75,7 +66,10 @@ impl Diagnostic {
         // Write report to string
         let mut buffer = Vec::new();
         report
-            .write((filename, ariadne::Source::from(source)), &mut buffer)
+            .write(
+                (filename.as_ref(), ariadne::Source::from(source)),
+                &mut buffer,
+            )
             .expect("failed to write diagnostic");
 
         String::from_utf8(buffer).expect("diagnostic output should be valid UTF-8")
