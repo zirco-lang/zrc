@@ -104,4 +104,43 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn parenthesized_types_parse_correctly() {
+        // Parenthesized types should parse and normalize to their canonical form
+        // (without unnecessary parentheses)
+
+        let test_cases = vec![
+            ("*(i32)", "*i32"),
+            ("**(i32)", "**i32"),
+            ("*(struct { a: i32 })", "*struct { a: i32 }"),
+            ("*(union { a: i32, b: i32 })", "*union { a: i32, b: i32 }"),
+            // Nested parentheses
+            ("*((i32))", "*i32"),
+            ("*((struct { a: i32 }))", "*struct { a: i32 }"),
+            // Parenthesized types in struct fields
+            ("struct { x: (i32) }", "struct { x: i32 }"),
+        ];
+
+        for (input, expected) in test_cases {
+            let parsed = crate::parser::parse_type(input)
+                .unwrap_or_else(|_| panic!("Failed to parse: {input}"));
+            assert_eq!(
+                parsed.to_string(),
+                expected,
+                "Input: {input} should normalize to: {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn type_aliases_support_parenthesized_types() {
+        // Type aliases should support parenthesized types including nested parentheses
+        let test_cases = vec!["type x = (i32);", "type y = ((i32));", "type z = (*(i32));"];
+
+        for input in test_cases {
+            let result = crate::parser::parse_program(input);
+            assert!(result.is_ok(), "Failed to parse type alias: {input}");
+        }
+    }
 }
