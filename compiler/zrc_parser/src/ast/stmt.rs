@@ -12,8 +12,8 @@ use zrc_utils::span::Spanned;
 use super::{expr::Expr, ty::Type};
 
 /// Helper function to indent all lines of a string by a given prefix
-fn indent_lines(s: &str, prefix: &str) -> String {
-    s.lines()
+fn indent_lines(code: &str, prefix: &str) -> String {
+    code.lines()
         .map(|line| format!("{prefix}{line}"))
         .collect::<Vec<_>>()
         .join("\n")
