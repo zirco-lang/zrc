@@ -147,7 +147,7 @@ TypeInDeclaration: Type<'input> = {
 
 // The key-type mapping of a struct or union, including the {}
 KeyTypeMapping: KeyTypeMapping<'input> = {
-    "{" <list:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}" => 
+    "{" <list:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <TypeInDeclaration>)>>?>> "}" => 
         KeyTypeMapping(list.map(|inner| inner.unwrap_or(Vec::new()))),
 }
 
