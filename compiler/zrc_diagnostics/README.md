@@ -42,21 +42,28 @@ cargo run --example advanced_formatting --all-features
 ## Usage
 
 Current formatter (default):
-```rust
+```rust,no_run
 use zrc_diagnostics::{DiagnosticKind, SpanExt};
 use zrc_utils::span::Span;
 
+let source = "let foo = bar;";
 let span = Span::from_positions(0, 5);
 let diagnostic = span.error(DiagnosticKind::UnknownToken("foo".to_string()));
 println!("{}", diagnostic.print(source));
 ```
 
 With codespan-reporting (requires `codespan` feature):
-```rust
+```rust,ignore
+# use zrc_diagnostics::Diagnostic;
+# let diagnostic: Diagnostic = todo!();
+# let source = "";
 println!("{}", diagnostic.print_with_codespan(source, "file.zr"));
 ```
 
 With ariadne (requires `ariadne-fmt` feature):
-```rust
+```rust,ignore
+# use zrc_diagnostics::Diagnostic;
+# let diagnostic: Diagnostic = todo!();
+# let source = "";
 println!("{}", diagnostic.print_with_ariadne(source, "file.zr"));
 ```
