@@ -66,6 +66,7 @@ pub fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, Diagnostic> {
 }
 
 /// Assert two types are the same and produce a validation error otherwise
+#[cfg(test)]
 pub fn expect_identical_types<'a, 'input>(
     lhs: &'a TastType<'input>,
     rhs: &'a TastType<'input>,

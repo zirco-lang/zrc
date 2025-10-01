@@ -26,7 +26,7 @@ pub fn type_expr_number_literal<'input>(
     let ty_resolved = ty
         .map(|ty| resolve_type(scope.types, ty))
         .transpose()?
-        .unwrap_or(TastType::I32);
+        .unwrap_or(TastType::Int);
 
     if !ty_resolved.is_integer() {
         return Err(

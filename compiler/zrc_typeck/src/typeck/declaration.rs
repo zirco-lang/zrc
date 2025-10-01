@@ -83,14 +83,23 @@ pub fn process_let_declaration<'input>(
                             kind,
                         }),
                         None,
-                    ) => TastLetDeclaration {
-                        name: let_declaration.name,
-                        ty: inferred_type.clone(),
-                        value: Some(TypedExpr {
-                            inferred_type,
-                            kind,
-                        }),
-                    },
+                    ) => {
+                        // If the inferred type is {int}, resolve it to i32
+                        let resolved_type = if matches!(inferred_type, TastType::Int) {
+                            TastType::I32
+                        } else {
+                            inferred_type.clone()
+                        };
+
+                        TastLetDeclaration {
+                            name: let_declaration.name,
+                            ty: resolved_type.clone(),
+                            value: Some(TypedExpr {
+                                inferred_type: resolved_type,
+                                kind,
+                            }),
+                        }
+                    }
 
                     // Both explicitly typed and inferable
                     (
@@ -108,6 +117,18 @@ pub fn process_let_declaration<'input>(
                                     inferred_type,
                                     kind,
                                 }),
+                            }
+                        } else if inferred_type.can_implicitly_cast_to(&resolved_ty) {
+                            // Insert implicit cast (e.g., {int} -> i8)
+                            // Update the inner expression's type to match the target
+                            let value_with_resolved_type = TypedExpr {
+                                inferred_type: resolved_ty.clone(),
+                                kind,
+                            };
+                            TastLetDeclaration {
+                                name: let_declaration.name,
+                                ty: resolved_ty.clone(),
+                                value: Some(value_with_resolved_type),
                             }
                         } else {
                             return Err(DiagnosticKind::InvalidAssignmentRightHandSideType {

@@ -59,19 +59,16 @@ pub fn type_expr_call<'input>(
             let args_with_casts = arg_types
                 .iter()
                 .zip(args_t)
-                .enumerate()
-                .map(|(i, (arg_type, arg_t))| {
+                .map(|(arg_type, arg_t)| {
                     if arg_t.inferred_type != *arg_type.ty.value()
                         && arg_t
                             .inferred_type
                             .can_implicitly_cast_to(arg_type.ty.value())
                     {
-                        // Insert implicit cast
-                        let arg_span = args.value()[i].0.span();
+                        // Implicitly resolve type (e.g., {int} -> i32)
                         TypedExpr {
                             inferred_type: arg_type.ty.value().clone(),
-                            kind: TypedExprKind::Cast(Box::new(arg_t), arg_type.ty.clone())
-                                .in_span(arg_span),
+                            kind: arg_t.kind,
                         }
                     } else {
                         arg_t
@@ -114,19 +111,16 @@ pub fn type_expr_call<'input>(
 
             // Insert implicit casts where needed for non-variadic arguments
             let mut args_with_casts = Vec::new();
-            for (i, (arg_type, arg_t)) in beginning_arg_types.iter().zip(args_t.iter()).enumerate()
-            {
+            for (arg_type, arg_t) in beginning_arg_types.iter().zip(args_t.iter()) {
                 if arg_t.inferred_type != *arg_type.ty.value()
                     && arg_t
                         .inferred_type
                         .can_implicitly_cast_to(arg_type.ty.value())
                 {
-                    // Insert implicit cast
-                    let arg_span = args.value()[i].0.span();
+                    // Implicitly resolve type (e.g., {int} -> i32)
                     args_with_casts.push(TypedExpr {
                         inferred_type: arg_type.ty.value().clone(),
-                        kind: TypedExprKind::Cast(Box::new(arg_t.clone()), arg_type.ty.clone())
-                            .in_span(arg_span),
+                        kind: arg_t.kind.clone(),
                     });
                 } else {
                     args_with_casts.push(arg_t.clone());

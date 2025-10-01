@@ -4,11 +4,7 @@ use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::expr::{Expr, ExprKind};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
-use super::{
-    super::scope::Scope,
-    helpers::{expect, expr_to_place},
-    type_expr,
-};
+use super::{super::scope::Scope, helpers::expr_to_place, type_expr};
 use crate::tast::{
     expr::{TypedExpr, TypedExprKind},
     ty::Type as TastType,
@@ -24,17 +20,31 @@ pub fn type_expr_index<'input>(
     let ptr_t = type_expr(scope, ptr)?;
     let offset_t = type_expr(scope, offset)?;
 
-    expect(
-        offset_t.inferred_type == TastType::Usize,
-        "usize".to_string(),
-        offset_t.inferred_type.to_string(),
-        offset_t.kind.span(),
-    )?;
+    // Allow {int} to implicitly convert to usize
+    let offset_final = if offset_t.inferred_type == TastType::Usize {
+        offset_t
+    } else if matches!(offset_t.inferred_type, TastType::Int)
+        && offset_t
+            .inferred_type
+            .can_implicitly_cast_to(&TastType::Usize)
+    {
+        // offset is {int}, resolve to usize
+        TypedExpr {
+            inferred_type: TastType::Usize,
+            kind: offset_t.kind,
+        }
+    } else {
+        return Err(DiagnosticKind::ExpectedGot {
+            expected: "usize".to_string(),
+            got: offset_t.inferred_type.to_string(),
+        }
+        .error_in(offset_t.kind.span()));
+    };
 
     if let TastType::Ptr(points_to_ty) = ptr_t.inferred_type.clone() {
         Ok(TypedExpr {
             inferred_type: *points_to_ty,
-            kind: TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_t)).in_span(expr_span),
+            kind: TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_final)).in_span(expr_span),
         })
     } else {
         Err(
