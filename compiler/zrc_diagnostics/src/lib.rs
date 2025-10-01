@@ -63,6 +63,10 @@ use line_span::LineSpanExt;
 use thiserror::Error;
 use zrc_utils::span::{Span, Spannable, Spanned};
 
+/// Alternative error formatters using external crates
+#[cfg(any(feature = "codespan", feature = "ariadne-fmt"))]
+pub mod formatters;
+
 /// The severity of a [`Diagnostic`].
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
 #[display("{}", self.style().paint(self.text()))]
