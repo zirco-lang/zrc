@@ -50,6 +50,14 @@
     clippy::doc_comment_double_space_linebreaks
 )]
 
+use mimalloc::MiMalloc;
+/// Use the mimalloc allocator as the global allocator, as LLVM is heavy on heap
+/// allocations as a result of its OOP design. Some comparisons have shown
+/// mimalloc to be 10% faster than the default system allocator in real-world
+/// applications, and it also has better memory usage characteristics.
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 mod build_info;
 mod cli;
 mod compile;
