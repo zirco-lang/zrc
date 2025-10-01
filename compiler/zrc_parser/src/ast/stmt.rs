@@ -113,8 +113,7 @@ impl Display for StmtKind<'_> {
                         || ";".to_string(),
                         |x| format!(
                             "let {};",
-                            x.value()
-                                .iter()
+                            &x.iter()
                                 .map(ToString::to_string)
                                 .collect::<Vec<_>>()
                                 .join(", ")
@@ -150,7 +149,7 @@ impl Display for StmtKind<'_> {
                 write!(
                     f,
                     "let {};",
-                    list.value()
+                    &list
                         .iter()
                         .map(ToString::to_string)
                         .collect::<Vec<_>>()
@@ -206,7 +205,7 @@ impl Display for Declaration<'_> {
             } => write!(
                 f,
                 "fn {name}({parameters}) -> {return_ty} {{\n{}\n}}",
-                body.value()
+                &body
                     .iter()
                     .map(|stmt| indent_lines(&stmt.to_string(), "    "))
                     .collect::<Vec<String>>()
@@ -226,7 +225,7 @@ impl Display for Declaration<'_> {
             } => write!(
                 f,
                 "fn {name}({parameters}) {{\n{}\n}}",
-                body.value()
+                &body
                     .iter()
                     .map(|stmt| indent_lines(&stmt.to_string(), "    "))
                     .collect::<Vec<String>>()

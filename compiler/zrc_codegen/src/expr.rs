@@ -510,45 +510,34 @@ pub(crate) fn cg_expr<'ctx>(
 
             let x = unpack!(bb = cg_expr(cg, bb, *x));
 
-            let reg = match (
-                x.get_type().is_pointer_type(),
-                matches!(ty.value(), Type::Ptr(_)),
-            ) {
+            let reg = match (x.get_type().is_pointer_type(), matches!(*ty, Type::Ptr(_))) {
                 (true, true) => cg
                     .builder
-                    .build_bitcast(
-                        x.into_pointer_value(),
-                        llvm_basic_type(&cg, ty.value()).0,
-                        "cast",
-                    )
+                    .build_bitcast(x.into_pointer_value(), llvm_basic_type(&cg, &ty).0, "cast")
                     .expect("bitcast should have compiled successfully"),
                 (true, false) => cg
                     .builder
-                    .build_ptr_to_int(
-                        x.into_pointer_value(),
-                        llvm_int_type(&cg, ty.value()).0,
-                        "cast",
-                    )
+                    .build_ptr_to_int(x.into_pointer_value(), llvm_int_type(&cg, &ty).0, "cast")
                     .expect("ptrtoint should have compiled successfully")
                     .as_basic_value_enum(),
                 (false, true) => cg
                     .builder
                     .build_int_to_ptr(
                         x.into_int_value(),
-                        llvm_basic_type(&cg, ty.value()).0.into_pointer_type(),
+                        llvm_basic_type(&cg, &ty).0.into_pointer_type(),
                         "cast",
                     )
                     .expect("inttoptr should have compiled successfully")
                     .as_basic_value_enum(),
-                (false, false) if x.get_type().is_int_type() && ty.value().is_integer() => {
+                (false, false) if x.get_type().is_int_type() && ty.is_integer() => {
                     // Cast between two integers
-                    match (x_ty_is_signed_integer, ty.value().is_signed_integer()) {
+                    match (x_ty_is_signed_integer, ty.is_signed_integer()) {
                         // (x is signed, target is signed or unsigned)
                         (true, _) => cg
                             .builder
                             .build_int_s_extend(
                                 x.into_int_value(),
-                                llvm_basic_type(&cg, ty.value()).0.into_int_type(),
+                                llvm_basic_type(&cg, &ty).0.into_int_type(),
                                 "cast",
                             )
                             .expect("sext should have compiled successfully")
@@ -559,7 +548,7 @@ pub(crate) fn cg_expr<'ctx>(
                             .builder
                             .build_int_z_extend(
                                 x.into_int_value(),
-                                llvm_basic_type(&cg, ty.value()).0.into_int_type(),
+                                llvm_basic_type(&cg, &ty).0.into_int_type(),
                                 "cast",
                             )
                             .expect("zext should have compiled successfully")
@@ -569,11 +558,7 @@ pub(crate) fn cg_expr<'ctx>(
                 (false, false) => {
                     // Other casts are just bitcasts
                     cg.builder
-                        .build_bitcast(
-                            x.into_int_value(),
-                            llvm_basic_type(&cg, ty.value()).0,
-                            "cast",
-                        )
+                        .build_bitcast(x.into_int_value(), llvm_basic_type(&cg, &ty).0, "cast")
                         .expect("bitcast should have compiled successfully")
                         .as_basic_value_enum()
                 }

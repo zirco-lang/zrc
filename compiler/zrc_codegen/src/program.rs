@@ -210,9 +210,9 @@ fn cg_program<'ctx>(
 
                 let (fn_value, fn_subprogram) = cg_init_fn(
                     &unit,
-                    name.value(),
+                    &name,
                     line_lookup.lookup_from_index(span.start()).line,
-                    return_type.value(),
+                    &return_type,
                     parameters
                         .value()
                         .as_arguments()
@@ -220,9 +220,9 @@ fn cg_program<'ctx>(
                         .map(|ArgumentDeclaration { ty, .. }| ty.value())
                         .collect::<Vec<_>>()
                         .as_slice(),
-                    parameters.value().is_variadic(),
+                    parameters.is_variadic(),
                 );
-                global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
+                global_scope.insert(&name, fn_value.as_global_value().as_pointer_value());
                 // must come after the insert call so that recursion is valid
                 let mut fn_scope = global_scope.clone();
 
@@ -248,7 +248,7 @@ fn cg_program<'ctx>(
                 builder.set_current_debug_location(debug_location);
 
                 for (n, ArgumentDeclaration { name, ty }) in
-                    parameters.value().as_arguments().iter().enumerate()
+                    parameters.as_arguments().iter().enumerate()
                 {
                     if entry.get_first_instruction().is_some() {
                         builder.position_before(&entry.get_first_instruction().expect(
@@ -258,7 +258,7 @@ fn cg_program<'ctx>(
                         builder.position_at_end(entry);
                     }
 
-                    let (ty, dbg_ty) = llvm_basic_type(&unit, ty.value());
+                    let (ty, dbg_ty) = llvm_basic_type(&unit, ty);
 
                     let alloc = builder
                         .build_alloca(ty, &format!("arg_{name}"))
@@ -290,7 +290,7 @@ fn cg_program<'ctx>(
 
                     let decl = dbg_builder.create_parameter_variable(
                         fn_subprogram.as_debug_info_scope(),
-                        name.value(),
+                        name,
                         u32::try_from(n)
                             .expect("should not be more than u32::MAX args in a function"),
                         compilation_unit.get_file(),
@@ -308,7 +308,7 @@ fn cg_program<'ctx>(
                         entry,
                     );
 
-                    fn_scope.insert(name.value(), alloc);
+                    fn_scope.insert(name, alloc);
                 }
 
                 cg_block(
@@ -330,8 +330,8 @@ fn cg_program<'ctx>(
             } => {
                 let fn_value = cg_init_extern_fn(
                     &unit,
-                    name.value(),
-                    return_type.value(),
+                    &name,
+                    &return_type,
                     parameters
                         .value()
                         .as_arguments()
@@ -339,9 +339,9 @@ fn cg_program<'ctx>(
                         .map(|ArgumentDeclaration { ty, .. }| ty.value())
                         .collect::<Vec<_>>()
                         .as_slice(),
-                    parameters.value().is_variadic(),
+                    parameters.is_variadic(),
                 );
-                global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
+                global_scope.insert(&name, fn_value.as_global_value().as_pointer_value());
             }
         }
     }

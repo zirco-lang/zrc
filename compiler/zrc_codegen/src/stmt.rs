@@ -86,11 +86,11 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
             .build_alloca(ty, &format!("let_{}", let_declaration.name))
             .expect("alloca should generate successfully");
 
-        scope.insert(let_declaration.name.value(), ptr);
+        scope.insert(*let_declaration.name, ptr);
 
         let decl = cg.dbg_builder.create_auto_variable(
             dbg_scope.as_debug_info_scope(),
-            let_declaration.name.value(),
+            *let_declaration.name,
             cg.compilation_unit.get_file(),
             cg.line_lookup.lookup_from_index(span.start()).line,
             dbg_ty,
@@ -113,7 +113,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
                     kind: value.kind.span().containing(TypedExprKind::Assignment(
                         Box::new(Place {
                             inferred_type: let_declaration.ty,
-                            kind: PlaceKind::Variable(let_declaration.name.value())
+                            kind: PlaceKind::Variable(*let_declaration.name)
                                 .in_span(let_declaration.name.span()),
                         }),
                         Box::new(value),

@@ -206,12 +206,12 @@ pub(super) fn resolve_key_type_mapping<'input>(
         let span = member.span();
         let (key, ast_type) = member.into_value();
 
-        if map.contains_key(key.value()) {
+        if map.contains_key(*key) {
             return Err(
                 DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
             );
         }
-        map.insert(key.value(), resolve_type(type_scope, ast_type)?);
+        map.insert(&key, resolve_type(type_scope, ast_type)?);
     }
     Ok(map)
 }
@@ -234,7 +234,7 @@ fn resolve_key_type_mapping_with_opaque<'input>(
         let span = member.span();
         let (key, ast_type) = member.into_value();
 
-        if map.contains_key(key.value()) {
+        if map.contains_key(*key) {
             return Err(
                 DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
             );
@@ -242,7 +242,7 @@ fn resolve_key_type_mapping_with_opaque<'input>(
         let resolved_type = resolve_type_with_opaque(type_scope, ast_type, opaque_name)?;
         // Check this specific field for invalid opaque references
         check_opaque_behind_pointer(&resolved_type, opaque_name, span)?;
-        map.insert(key.value(), resolved_type);
+        map.insert(&key, resolved_type);
     }
     Ok(map)
 }

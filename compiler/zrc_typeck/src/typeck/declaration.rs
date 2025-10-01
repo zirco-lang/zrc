@@ -40,7 +40,7 @@ pub fn process_let_declaration<'input>(
                 let let_decl_span = let_declaration.span();
                 let let_declaration = let_declaration.into_value();
 
-                if scope.values.has(let_declaration.name.value()) {
+                if scope.values.has(&let_declaration.name) {
                     // TODO: In the future we may allow shadowing but currently no
                     return Err(let_declaration.name.error(|identifier| {
                         DiagnosticKind::IdentifierAlreadyInUse(identifier.to_string())
@@ -114,7 +114,7 @@ pub fn process_let_declaration<'input>(
 
                 scope
                     .values
-                    .insert(result_decl.name.value(), result_decl.ty.clone());
+                    .insert(&result_decl.name, result_decl.ty.clone());
                 Ok(result_decl.in_span(let_decl_span))
             },
         )
@@ -138,7 +138,7 @@ pub fn process_declaration<'input>(
             parameters,
             body: Some(_),
             ..
-        } if matches!(parameters.value(), ArgumentDeclarationList::Variadic(_)) => {
+        } if matches!(*parameters, ArgumentDeclarationList::Variadic(_)) => {
             return Err(parameters.error(|_| DiagnosticKind::VariadicFunctionMustBeExternal));
         }
 
@@ -165,15 +165,15 @@ pub fn process_declaration<'input>(
                 .iter()
                 .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
                     Ok(TastArgumentDeclaration {
-                        name: parameter.value().name,
-                        ty: resolve_type(&global_scope.types, parameter.value().ty.clone())?
+                        name: parameter.name,
+                        ty: resolve_type(&global_scope.types, parameter.ty.clone())?
                             .in_span(parameter.span()),
                     })
                 })
                 .collect::<Result<Vec<_>, Diagnostic>>()?;
 
             let fn_type = Fn {
-                arguments: match parameters.value() {
+                arguments: match *parameters {
                     ArgumentDeclarationList::NonVariadic(_) => {
                         tast::stmt::ArgumentDeclarationList::NonVariadic(
                             resolved_parameters.clone(),
@@ -187,11 +187,11 @@ pub fn process_declaration<'input>(
             };
 
             let has_existing_implementation =
-                if let Some(ty) = global_scope.global_values.resolve(name.value()) {
+                if let Some(ty) = global_scope.global_values.resolve(&name) {
                     if let TastType::Fn(_) = ty {
                         // if a function has already been declared with this name...
 
-                        let canonical = global_scope.declarations.get(name.value()).expect(
+                        let canonical = global_scope.declarations.get(*name).expect(
                             "global_scope.declarations was not populated with function properly",
                         );
 
@@ -236,7 +236,7 @@ pub fn process_declaration<'input>(
 
             Some(TypedDeclaration::FunctionDeclaration {
                 name,
-                parameters: match parameters.value() {
+                parameters: match *parameters {
                     ArgumentDeclarationList::NonVariadic(_) => {
                         tast::stmt::ArgumentDeclarationList::NonVariadic(
                             resolved_parameters.clone(),
@@ -253,7 +253,7 @@ pub fn process_declaration<'input>(
                     for param in resolved_parameters {
                         function_scope
                             .values
-                            .insert(param.name.value(), param.ty.into_value());
+                            .insert(&param.name, param.ty.into_value());
                     }
 
                     // discard return actuality as it's guaranteed
@@ -274,14 +274,13 @@ pub fn process_declaration<'input>(
             })
         }
         AstDeclaration::TypeAliasDeclaration { name, ty } => {
-            if global_scope.types.has(name.value()) {
+            if global_scope.types.has(&name) {
                 return Err(name.error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())));
             }
 
-            let resolved_ty =
-                resolve_type_with_self_reference(&global_scope.types, ty, name.value())?;
+            let resolved_ty = resolve_type_with_self_reference(&global_scope.types, ty, &name)?;
 
-            global_scope.types.insert(name.value(), resolved_ty.clone());
+            global_scope.types.insert(&name, resolved_ty.clone());
 
             None
         }

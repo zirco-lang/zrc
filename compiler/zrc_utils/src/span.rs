@@ -8,7 +8,10 @@
 //! Read the documentation for the types [`Span`] and [`Spanned<T>`], and the
 //! trait [`Spannable`] to learn more.
 
-use std::{fmt::Display, ops::RangeInclusive};
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut, RangeInclusive},
+};
 
 /// Represents the start and end of some segment of a string
 ///
@@ -163,7 +166,19 @@ where
     T: Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.value().fmt(f)
+        self.1.fmt(f)
+    }
+}
+impl<T> Deref for Spanned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.1
+    }
+}
+impl<T> DerefMut for Spanned<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.1
     }
 }
 impl<T> Spanned<Option<T>> {
@@ -294,7 +309,7 @@ mod tests {
             assert_eq!(spanned.span(), span);
             assert_eq!(spanned.start(), 3);
             assert_eq!(spanned.end(), 6);
-            assert_eq!(spanned.value(), &0);
+            assert_eq!(*spanned, 0);
             assert_eq!(spanned.into_value(), 0);
         }
 

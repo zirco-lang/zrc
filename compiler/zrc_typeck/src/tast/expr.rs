@@ -117,7 +117,7 @@ pub enum TypedExprKind<'input> {
 
 impl Display for Place<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.kind.value())
+        write!(f, "{}", self.kind)
     }
 }
 
@@ -134,7 +134,7 @@ impl Display for PlaceKind<'_> {
 
 impl Display for TypedExpr<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({} as {})", self.kind.value(), self.inferred_type)
+        write!(f, "({} as {})", self.kind, self.inferred_type)
     }
 }
 

@@ -42,10 +42,10 @@ pub fn type_expr_call<'input>(
             }
 
             for (i, (arg_type, arg_t)) in arg_types.iter().zip(args_t.iter()).enumerate() {
-                let expected = arg_type.ty.value();
+                let expected = &arg_type.ty;
                 let got = &arg_t.inferred_type;
-                if *expected != *got && !got.can_implicitly_cast_to(expected) {
-                    return Err(args.value()[i].0.span().error(
+                if **expected != *got && !got.can_implicitly_cast_to(expected) {
+                    return Err(args[i].0.span().error(
                         DiagnosticKind::FunctionArgumentTypeMismatch {
                             n: i,
                             expected: arg_type.ty.to_string(),
@@ -61,13 +61,11 @@ pub fn type_expr_call<'input>(
                 .zip(args_t)
                 .enumerate()
                 .map(|(i, (arg_type, arg_t))| {
-                    if arg_t.inferred_type != *arg_type.ty.value()
-                        && arg_t
-                            .inferred_type
-                            .can_implicitly_cast_to(arg_type.ty.value())
+                    if arg_t.inferred_type != *arg_type.ty
+                        && arg_t.inferred_type.can_implicitly_cast_to(&arg_type.ty)
                     {
                         // Insert implicit cast
-                        let arg_span = args.value()[i].0.span();
+                        let arg_span = args[i].0.span();
                         TypedExpr {
                             inferred_type: arg_type.ty.value().clone(),
                             kind: TypedExprKind::Cast(Box::new(arg_t), arg_type.ty.clone())
@@ -99,10 +97,10 @@ pub fn type_expr_call<'input>(
 
             for (i, (arg_type, arg_t)) in beginning_arg_types.iter().zip(args_t.iter()).enumerate()
             {
-                let expected = arg_type.ty.value();
+                let expected = &arg_type.ty;
                 let got = &arg_t.inferred_type;
-                if *expected != *got && !got.can_implicitly_cast_to(expected) {
-                    return Err(args.value()[i].0.span().error(
+                if **expected != *got && !got.can_implicitly_cast_to(expected) {
+                    return Err(args[i].0.span().error(
                         DiagnosticKind::FunctionArgumentTypeMismatch {
                             n: i,
                             expected: arg_type.ty.to_string(),
@@ -116,13 +114,11 @@ pub fn type_expr_call<'input>(
             let mut args_with_casts = Vec::new();
             for (i, (arg_type, arg_t)) in beginning_arg_types.iter().zip(args_t.iter()).enumerate()
             {
-                if arg_t.inferred_type != *arg_type.ty.value()
-                    && arg_t
-                        .inferred_type
-                        .can_implicitly_cast_to(arg_type.ty.value())
+                if arg_t.inferred_type != *arg_type.ty
+                    && arg_t.inferred_type.can_implicitly_cast_to(&arg_type.ty)
                 {
                     // Insert implicit cast
-                    let arg_span = args.value()[i].0.span();
+                    let arg_span = args[i].0.span();
                     args_with_casts.push(TypedExpr {
                         inferred_type: arg_type.ty.value().clone(),
                         kind: TypedExprKind::Cast(Box::new(arg_t.clone()), arg_type.ty.clone())

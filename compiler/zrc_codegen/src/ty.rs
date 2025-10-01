@@ -269,12 +269,12 @@ pub fn llvm_type<'ctx: 'a, 'a>(
                 &arguments
                     .as_arguments()
                     .iter()
-                    .map(|arg| llvm_basic_type(ctx, arg.ty.value()).0.into())
+                    .map(|arg| llvm_basic_type(ctx, &arg.ty).0.into())
                     .collect::<Vec<_>>(),
                 &arguments
                     .as_arguments()
                     .iter()
-                    .map(|arg| llvm_basic_type(ctx, arg.ty.value()).1)
+                    .map(|arg| llvm_basic_type(ctx, &arg.ty).1)
                     .collect::<Vec<_>>(),
                 is_variadic,
             );

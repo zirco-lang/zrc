@@ -167,7 +167,7 @@ pub struct ArgumentDeclaration<'input> {
 
 impl Display for LetDeclaration<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}: {}", self.name.value(), self.ty)?;
+        write!(f, "{}: {}", self.name, self.ty)?;
         if let Some(value) = &self.value {
             write!(f, " = {value}")?;
         }
@@ -219,7 +219,7 @@ impl Display for TypedStmtKind<'_> {
                 write!(
                     f,
                     "while ({cond}) {{\n{}\n}}",
-                    body.value()
+                    &body
                         .iter()
                         .map(|stmt| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
@@ -230,7 +230,7 @@ impl Display for TypedStmtKind<'_> {
                 write!(
                     f,
                     "do {{\n{}\n}} while ({cond});",
-                    body.value()
+                    &body
                         .iter()
                         .map(|stmt| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
@@ -258,7 +258,7 @@ impl Display for TypedStmtKind<'_> {
                     ),
                     cond.as_ref().map_or(String::new(), ToString::to_string),
                     post.as_ref().map_or(String::new(), ToString::to_string),
-                    body.value()
+                    &body
                         .iter()
                         .map(|stmt| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
@@ -341,7 +341,7 @@ impl Display for TypedDeclaration<'_> {
             } => write!(
                 f,
                 "fn {name}({parameters}) -> {return_type} {{\n{}\n}}",
-                body.value()
+                &body
                     .iter()
                     .map(|stmt| indent_lines(&stmt.to_string(), "    "))
                     .collect::<Vec<String>>()

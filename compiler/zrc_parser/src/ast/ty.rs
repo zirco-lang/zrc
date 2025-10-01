@@ -23,7 +23,7 @@ pub struct KeyTypeMapping<'input>(pub Spanned<Vec<Spanned<(Spanned<&'input str>,
 impl Display for KeyTypeMapping<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, member) in self.0.value().iter().enumerate() {
-            write!(f, "{}: {}", member.value().0.value(), member.value().1)?;
+            write!(f, "{}: {}", &member.0.value(), &member.1)?;
             if i < self.0.value().len() - 1 {
                 write!(f, ", ")?;
             }
