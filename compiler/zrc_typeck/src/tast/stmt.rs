@@ -93,6 +93,24 @@ pub enum TypedDeclaration<'input> {
         body: Option<Spanned<Vec<TypedStmt<'input>>>>,
     },
 }
+impl Display for TypedDeclaration<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type,
+                body: Some(_),
+            } => write!(f, "fn {name}({parameters}) -> {return_type} {{ ... }}"),
+            Self::FunctionDeclaration {
+                name,
+                parameters,
+                return_type,
+                body: None,
+            } => write!(f, "fn {name}({parameters}) -> {return_type};"),
+        }
+    }
+}
 
 /// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]
 ///

@@ -396,11 +396,7 @@ fn compile(
         OutputFormat::Ast | OutputFormat::AstDebug | OutputFormat::AstDebugPretty,
     ) {
         return Ok(match *emit {
-            OutputFormat::Ast => ast
-                .into_iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
-                .join("\n"),
+            OutputFormat::Ast => ast.to_string(),
             OutputFormat::AstDebug => format!("{ast:?}"),
             OutputFormat::AstDebugPretty => format!("{ast:#?}"),
 

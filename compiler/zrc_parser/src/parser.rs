@@ -25,7 +25,7 @@ use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpannedExt};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{
-    ast::{expr::Expr, stmt::Declaration},
+    ast::{expr::Expr, Program},
     lexer,
 };
 use crate::{
@@ -84,12 +84,12 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
     })
 }
 
-/// Parses a Zirco program, yielding a list of [`Declaration`]s.
+/// Parses a Zirco program, yielding a [`Program`] AST.
 ///
 /// This function runs an **entire program** through the Zirco parser and
 /// returns either a complete [AST](super::ast) consisting of root
-/// [`Declaration`] nodes, or a list of [`ZircoParserError`]s in the case of a
-/// syntax error.
+/// [`Declaration`] nodes wrapped in a [`Program`], or a list of
+/// [`ZircoParserError`]s in the case of a syntax error.
 ///
 /// # Example
 /// Obtaining the AST of a program:
@@ -101,9 +101,10 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input program.
-pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration<'_>>>, Diagnostic> {
+pub fn parse_program(input: &str) -> Result<Program<'_>, Diagnostic> {
     internal_parser::ProgramParser::new()
         .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .map(Program)
         .map_err(parser_error_to_diagnostic)
 }
 

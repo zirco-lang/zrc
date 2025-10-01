@@ -368,10 +368,7 @@ mod tests {
         assert_eq!(
             crate::parser::parse_program(test_case)
                 .expect("test cases should have parsed correctly")
-                .into_iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<_>>()
-                .join("\n"),
+                .to_string(),
             test_case
         );
     }

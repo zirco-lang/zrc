@@ -377,7 +377,7 @@ pub fn cg_program_to_string(
     file_name: &str,
     cli_args: &str,
     source: &str,
-    program: Vec<Spanned<TypedDeclaration>>,
+    program: zrc_typeck::tast::Program<'_>,
     optimization_level: OptimizationLevel,
     debug_level: DWARFEmissionKind,
     triple: &TargetTriple,
@@ -411,7 +411,7 @@ pub fn cg_program_to_string(
         parent_directory,
         file_name,
         &LineLookup::new(source),
-        program,
+        program.0,
     );
 
     module.print_to_string().to_string()
@@ -430,7 +430,7 @@ pub fn cg_program_to_buffer(
     file_name: &str,
     cli_args: &str,
     source: &str,
-    program: Vec<Spanned<TypedDeclaration>>,
+    program: zrc_typeck::tast::Program<'_>,
     file_type: FileType,
     optimization_level: OptimizationLevel,
     debug_level: DWARFEmissionKind,
@@ -465,7 +465,7 @@ pub fn cg_program_to_buffer(
         parent_directory,
         file_name,
         &LineLookup::new(source),
-        program,
+        program.0,
     );
 
     target_machine
