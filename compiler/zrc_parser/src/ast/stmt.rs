@@ -11,6 +11,14 @@ use zrc_utils::span::Spanned;
 
 use super::{expr::Expr, ty::Type};
 
+/// Helper function to indent all lines of a string by a given prefix
+fn indent_lines(code: &str, prefix: &str) -> String {
+    code.lines()
+        .map(|line| format!("{prefix}{line}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// A Zirco statement
 #[derive(PartialEq, Debug, Clone, Display)]
 #[display("{_0}")]
@@ -126,11 +134,19 @@ impl Display for StmtKind<'_> {
             }
 
             Self::BlockStmt(stmts) => {
-                write!(f, "{{")?;
-                for stmt in stmts {
-                    write!(f, "{stmt}")?;
+                if stmts.is_empty() {
+                    write!(f, "{{}}")
+                } else {
+                    write!(
+                        f,
+                        "{{\n{}\n}}",
+                        stmts
+                            .iter()
+                            .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    )
                 }
-                write!(f, "}}")
             }
             Self::ExprStmt(expr) => write!(f, "{expr};"),
             Self::EmptyStmt => write!(f, ";"),
@@ -200,7 +216,7 @@ impl Display for Declaration<'_> {
                 "fn {name}({parameters}) -> {return_ty} {{\n{}\n}}",
                 body.value()
                     .iter()
-                    .map(|stmt| format!("    {stmt}"))
+                    .map(|stmt| indent_lines(&stmt.to_string(), "    "))
                     .collect::<Vec<String>>()
                     .join("\n")
             ),
@@ -220,7 +236,7 @@ impl Display for Declaration<'_> {
                 "fn {name}({parameters}) {{\n{}\n}}",
                 body.value()
                     .iter()
-                    .map(|stmt| format!("    {stmt}"))
+                    .map(|stmt| indent_lines(&stmt.to_string(), "    "))
                     .collect::<Vec<String>>()
                     .join("\n")
             ),
@@ -323,20 +339,20 @@ mod tests {
             "((f)((x)));",
             "{}",
             ";",
-            "if ((true)) {;}",
-            "if ((true)) {;} else {;}",
-            "while ((true)) {;}",
-            "do {;} while ((true));",
-            "for (; ; ) {;}",
-            "for (let x = (4); ; ) {;}",
-            "for (let x = (4), y = (5); ; ) {;}",
-            "for (let x = (4); (true); ) {;}",
+            "if ((true)) {\n    ;\n}",
+            "if ((true)) {\n    ;\n} else {\n    ;\n}",
+            "while ((true)) {\n    ;\n}",
+            "do {\n    ;\n} while ((true));",
+            "for (; ; ) {\n    ;\n}",
+            "for (let x = (4); ; ) {\n    ;\n}",
+            "for (let x = (4), y = (5); ; ) {\n    ;\n}",
+            "for (let x = (4); (true); ) {\n    ;\n}",
             "let x;",
             "let x = (4);",
             "let x: i32;",
             "let x: i32 = (4);",
-            "{let x = (4);}",
-            "switch ((7)) { (4) => (false); default => {(12);} }",
+            "{\n    let x = (4);\n}",
+            "switch ((7)) { (4) => (false); default => {\n    (12);\n} }",
         ];
 
         for input in test_cases {
@@ -363,6 +379,29 @@ mod tests {
             fn no_return_extern();
             fn no_return() {
 
+            }"};
+
+        assert_eq!(
+            crate::parser::parse_program(test_case)
+                .expect("test cases should have parsed correctly")
+                .into_iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+            test_case
+        );
+    }
+
+    #[test]
+    fn nested_blocks_are_properly_indented() {
+        // Test case from issue: AST to_string() should indent blocks properly
+        let test_case = indoc::indoc! {"
+            fn main() -> i32 {
+                if ((((2) + (2)) == (5))) {
+                    return (1);
+                } else {
+                    return (0);
+                }
             }"};
 
         assert_eq!(
