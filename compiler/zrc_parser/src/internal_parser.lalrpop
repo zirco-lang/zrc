@@ -141,8 +141,10 @@ TypeAliasDeclaration: Declaration<'input> = {
 
 // The key-type mapping of a struct or union, including the {}
 KeyTypeMapping: KeyTypeMapping<'input> = {
-    "{" <Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}" => 
-        KeyTypeMapping(<>.map(|inner| inner.unwrap_or(Vec::new())))
+    <l:@L> "{" "}" <r:@R> => 
+        KeyTypeMapping(spanned!(l, Vec::new(), r)),
+    <l:@L> "{" <list:CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>> "}" <r:@R> => 
+        KeyTypeMapping(spanned!(l, list, r)),
 }
 
 StructOrUnionDeclaration: Declaration<'input> = {
@@ -180,11 +182,16 @@ LetDeclaration: Vec<Spanned<LetDeclaration<'input>>> = {
 
 pub Type: Type<'input> = {
     Spanned<IDENTIFIER> => Type(<>.map(|x| TypeKind::Identifier(x))),
-    Spanned<("*" <Type>)> => Type(<>.map(|x| TypeKind::Ptr(Box::new(x)))),
+    Spanned<("*" <TypeOrParenthesizedType>)> => Type(<>.map(|x| TypeKind::Ptr(Box::new(x)))),
     Spanned<("struct" <KeyTypeMapping>)> => 
         Type(<>.map(TypeKind::Struct)),
     Spanned<("union" <KeyTypeMapping>)> =>
         Type(<>.map(TypeKind::Union)),
+}
+
+TypeOrParenthesizedType: Type<'input> = {
+    <Type>,
+    "(" <Type> ")" => <>,
 }
 
 FlowStmt: StmtKind<'input> = {
@@ -318,11 +325,18 @@ _Postfix: ExprKind<'input> = {
     <x:Postfix> "[" <i:Expr> "]" => ExprKind::Index(Box::new(x), Box::new(i)),
     <l:Postfix> "." <r:Spanned<IDENTIFIER>> => ExprKind::Dot(Box::new(l), r),
     <l:Postfix> "->" <r:Spanned<IDENTIFIER>> => ExprKind::Arrow(Box::new(l), r),
-    <i:Postfix> <c:Spanned<("(" <ArgumentList?> ")")>> => ExprKind::Call(Box::new(i), c.map(|x| x.unwrap_or(Vec::new()))),
+    <i:Postfix> <c:Spanned<("(" ")")>> => ExprKind::Call(Box::new(i), c.map(|_| Vec::new())),
+    <i:Postfix> <c:Spanned<("(" <ArgumentList> ")")>> => ExprKind::Call(Box::new(i), c.map(|x| x)),
 };
 Postfix: Expr<'input> = ExprPrecedenceTier<_Postfix, Primary>;
 
-ArgumentList: Vec<Expr<'input>> = CommaSeparated<Assignment>;
+ArgumentList: Vec<Expr<'input>> = {
+    <Assignment> => vec![<>],
+    <mut v:ArgumentList> "," <e:Assignment> => {
+        v.push(e);
+        v
+    }
+};
 
 Primary: Expr<'input> = {
     Spanned<(<NUMBER> <Spanned<IDENTIFIER>?>)> => Expr(<>.map(|(n, ty)| ExprKind::NumberLiteral(n, ty.map(|t| Type(t.map(TypeKind::Identifier)))))),

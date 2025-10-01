@@ -104,4 +104,29 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn parenthesized_types_parse_correctly() {
+        // Parenthesized types should parse and normalize to their canonical form
+        // (without unnecessary parentheses)
+
+        let test_cases = vec![
+            ("*(i32)", "*i32"),
+            ("**(i32)", "**i32"),
+            ("*(struct { a: i32 })", "*struct { a: i32 }"),
+            ("*(union { a: i32, b: i32 })", "*union { a: i32, b: i32 }"),
+        ];
+
+        for (input, expected) in test_cases {
+            let parsed = crate::parser::parse_type(input)
+                .unwrap_or_else(|_| panic!("Failed to parse: {}", input));
+            assert_eq!(
+                parsed.to_string(),
+                expected,
+                "Input: {} should normalize to: {}",
+                input,
+                expected
+            );
+        }
+    }
 }
