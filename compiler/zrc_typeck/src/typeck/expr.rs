@@ -349,7 +349,7 @@ pub fn type_expr<'input>(
                     // Insert implicit casts where needed
                     let args_with_casts = arg_types
                         .iter()
-                        .zip(args_t.into_iter())
+                        .zip(args_t)
                         .enumerate()
                         .map(|(i, (arg_type, arg_t))| {
                             if arg_t.inferred_type != *arg_type.ty.value()
