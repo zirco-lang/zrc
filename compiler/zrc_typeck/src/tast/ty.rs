@@ -171,4 +171,20 @@ impl<'input> Type<'input> {
     pub fn unit() -> Self {
         Type::Struct(IndexMap::new())
     }
+
+    /// Check if this type can be implicitly cast to the target type.
+    /// Currently only supports `*T` -> `*struct{}` (void pointer downcast).
+    #[must_use]
+    pub fn can_implicitly_cast_to(&self, target: &Self) -> bool {
+        // Allow any pointer type to implicitly cast to void pointer (*struct{})
+        if let (Type::Ptr(_from_pointee), Type::Ptr(to_pointee)) = (self, target) {
+            if let Type::Struct(fields) = to_pointee.as_ref() {
+                if fields.is_empty() {
+                    // Target is *struct{}, allow implicit cast from any *T
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
