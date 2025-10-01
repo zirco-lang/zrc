@@ -6,7 +6,9 @@ mod expr;
 mod scope;
 mod ty;
 
-pub use block::{BlockReturnAbility, BlockReturnActuality, type_block};
+pub use block::{
+    BlockReturnAbility, BlockReturnActuality, coerce_stmt_into_block, has_duplicates, type_block,
+};
 pub use declaration::process_declaration;
 pub use expr::type_expr;
 pub use ty::resolve_type;

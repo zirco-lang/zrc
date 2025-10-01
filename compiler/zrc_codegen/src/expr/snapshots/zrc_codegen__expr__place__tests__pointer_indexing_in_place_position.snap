@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
+source: compiler/zrc_codegen/src/expr/place.rs
 description: "fn test() {\n    let x: *i32;\n\n    // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).\n    // %let_x needs to be GEP'd into and then stored into, but we must not load\n    // from the address.\n    x[4 as usize] = 5;\n}\n"
 expression: resulting_ir
 ---

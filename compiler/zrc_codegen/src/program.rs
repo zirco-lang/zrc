@@ -21,8 +21,8 @@ use zrc_utils::{line_finder::LineLookup, span::Spanned};
 
 use super::stmt::cg_block;
 use crate::{
-    CgScope,
     ctx::{CompilationUnitCtx, FunctionCtx},
+    scope::CgScope,
     ty::{create_fn, llvm_basic_type, llvm_type},
 };
 
