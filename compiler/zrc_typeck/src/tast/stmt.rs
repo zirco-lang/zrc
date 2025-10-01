@@ -3,7 +3,7 @@
 use std::fmt::Display;
 
 use derive_more::Display;
-use zrc_utils::span::Spanned;
+use zrc_utils::{code_fmt::indent_lines, span::Spanned};
 
 use super::{expr::TypedExpr, ty::Type};
 
@@ -163,14 +163,6 @@ pub struct ArgumentDeclaration<'input> {
     pub name: Spanned<&'input str>,
     /// The type of the parameter.
     pub ty: Spanned<Type<'input>>,
-}
-
-/// Helper function to indent all lines of a string by a given prefix
-fn indent_lines(code: &str, prefix: &str) -> String {
-    code.lines()
-        .map(|line| format!("{prefix}{line}"))
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 impl Display for LetDeclaration<'_> {
