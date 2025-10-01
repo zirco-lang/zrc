@@ -176,7 +176,7 @@ impl<'input> Type<'input> {
     /// Currently only supports `*T` -> `*struct{}` (void pointer downcast).
     ///
     /// # Examples
-    /// 
+    ///
     /// This allows any pointer type to implicitly downcast to void pointer:
     /// ```zirco
     /// fn takes_void_ptr(ptr: *struct{}) -> struct{} {

@@ -353,17 +353,16 @@ pub fn type_expr<'input>(
                         .enumerate()
                         .map(|(i, (arg_type, arg_t))| {
                             if arg_t.inferred_type != *arg_type.ty.value()
-                                && arg_t.inferred_type.can_implicitly_cast_to(arg_type.ty.value())
+                                && arg_t
+                                    .inferred_type
+                                    .can_implicitly_cast_to(arg_type.ty.value())
                             {
                                 // Insert implicit cast
                                 let arg_span = args.value()[i].0.span();
                                 TypedExpr {
                                     inferred_type: arg_type.ty.value().clone(),
-                                    kind: TypedExprKind::Cast(
-                                        Box::new(arg_t),
-                                        arg_type.ty.clone(),
-                                    )
-                                    .in_span(arg_span),
+                                    kind: TypedExprKind::Cast(Box::new(arg_t), arg_type.ty.clone())
+                                        .in_span(arg_span),
                                 }
                             } else {
                                 arg_t
@@ -414,7 +413,9 @@ pub fn type_expr<'input>(
                         beginning_arg_types.iter().zip(args_t.iter()).enumerate()
                     {
                         if arg_t.inferred_type != *arg_type.ty.value()
-                            && arg_t.inferred_type.can_implicitly_cast_to(arg_type.ty.value())
+                            && arg_t
+                                .inferred_type
+                                .can_implicitly_cast_to(arg_type.ty.value())
                         {
                             // Insert implicit cast
                             let arg_span = args.value()[i].0.span();
