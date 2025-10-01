@@ -171,4 +171,66 @@ impl<'input> Type<'input> {
     pub fn unit() -> Self {
         Type::Struct(IndexMap::new())
     }
+
+    /// Check if this type can be implicitly cast to the target type.
+    /// Currently only supports `*T` -> `*struct{}` (void pointer downcast).
+    ///
+    /// # Examples
+    ///
+    /// This allows any pointer type to implicitly downcast to void pointer:
+    /// ```zirco
+    /// fn takes_void_ptr(ptr: *struct{}) -> struct{} {
+    ///     // ...
+    /// }
+    ///
+    /// // All of these work without explicit casts:
+    /// takes_void_ptr(&x);        // where x: i32
+    /// takes_void_ptr(&y);        // where y: SomeStruct
+    /// takes_void_ptr(&z);        // where z: bool
+    /// ```
+    #[must_use]
+    pub fn can_implicitly_cast_to(&self, target: &Self) -> bool {
+        // Allow any pointer type to implicitly cast to void pointer (*struct{})
+        if let (Type::Ptr(_from_pointee), Type::Ptr(to_pointee)) = (self, target)
+            && let Type::Struct(fields) = to_pointee.as_ref()
+            && fields.is_empty()
+        {
+            // Target is *struct{}, allow implicit cast from any *T
+            return true;
+        }
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_void_ptr_implicit_cast() {
+        // Create a void pointer type (*struct{})
+        let void_ptr = Type::Ptr(Box::new(Type::Struct(IndexMap::new())));
+
+        // Create various pointer types
+        let i32_ptr = Type::Ptr(Box::new(Type::I32));
+        let bool_ptr = Type::Ptr(Box::new(Type::Bool));
+        let struct_ptr = Type::Ptr(Box::new(Type::Struct(IndexMap::from([("x", Type::I8)]))));
+
+        // All should be able to implicitly cast to void pointer
+        assert!(i32_ptr.can_implicitly_cast_to(&void_ptr));
+        assert!(bool_ptr.can_implicitly_cast_to(&void_ptr));
+        assert!(struct_ptr.can_implicitly_cast_to(&void_ptr));
+
+        // Void pointer itself should also work
+        assert!(void_ptr.can_implicitly_cast_to(&void_ptr));
+
+        // Non-pointer types should not implicitly cast to void pointer
+        assert!(!Type::I32.can_implicitly_cast_to(&void_ptr));
+
+        // Void pointer should not implicitly cast to specific pointer
+        assert!(!void_ptr.can_implicitly_cast_to(&i32_ptr));
+
+        // Specific pointers should not implicitly cast to other specific pointers
+        assert!(!i32_ptr.can_implicitly_cast_to(&bool_ptr));
+    }
 }

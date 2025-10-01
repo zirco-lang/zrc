@@ -333,7 +333,9 @@ pub fn type_expr<'input>(
                     }
 
                     for (i, (arg_type, arg_t)) in arg_types.iter().zip(args_t.iter()).enumerate() {
-                        if *arg_type.ty.value() != arg_t.inferred_type {
+                        let expected = arg_type.ty.value();
+                        let got = &arg_t.inferred_type;
+                        if *expected != *got && !got.can_implicitly_cast_to(expected) {
                             return Err(args.value()[i].0.span().error(
                                 DiagnosticKind::FunctionArgumentTypeMismatch {
                                     n: i,
@@ -344,10 +346,37 @@ pub fn type_expr<'input>(
                         }
                     }
 
+                    // Insert implicit casts where needed
+                    let args_with_casts = arg_types
+                        .iter()
+                        .zip(args_t)
+                        .enumerate()
+                        .map(|(i, (arg_type, arg_t))| {
+                            if arg_t.inferred_type != *arg_type.ty.value()
+                                && arg_t
+                                    .inferred_type
+                                    .can_implicitly_cast_to(arg_type.ty.value())
+                            {
+                                // Insert implicit cast
+                                let arg_span = args.value()[i].0.span();
+                                TypedExpr {
+                                    inferred_type: arg_type.ty.value().clone(),
+                                    kind: TypedExprKind::Cast(Box::new(arg_t), arg_type.ty.clone())
+                                        .in_span(arg_span),
+                                }
+                            } else {
+                                arg_t
+                            }
+                        })
+                        .collect();
+
                     TypedExpr {
                         inferred_type: *ret_type,
-                        kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_t)
-                            .in_span(expr_span),
+                        kind: TypedExprKind::Call(
+                            Box::new(expr_to_place(f_span, ft)?),
+                            args_with_casts,
+                        )
+                        .in_span(expr_span),
                     }
                 }
                 TastType::Fn(Fn {
@@ -365,7 +394,9 @@ pub fn type_expr<'input>(
                     for (i, (arg_type, arg_t)) in
                         beginning_arg_types.iter().zip(args_t.iter()).enumerate()
                     {
-                        if *arg_type.ty.value() != arg_t.inferred_type {
+                        let expected = arg_type.ty.value();
+                        let got = &arg_t.inferred_type;
+                        if *expected != *got && !got.can_implicitly_cast_to(expected) {
                             return Err(args.value()[i].0.span().error(
                                 DiagnosticKind::FunctionArgumentTypeMismatch {
                                     n: i,
@@ -376,11 +407,41 @@ pub fn type_expr<'input>(
                         }
                     }
 
+                    // Insert implicit casts where needed for non-variadic arguments
+                    let mut args_with_casts = Vec::new();
+                    for (i, (arg_type, arg_t)) in
+                        beginning_arg_types.iter().zip(args_t.iter()).enumerate()
+                    {
+                        if arg_t.inferred_type != *arg_type.ty.value()
+                            && arg_t
+                                .inferred_type
+                                .can_implicitly_cast_to(arg_type.ty.value())
+                        {
+                            // Insert implicit cast
+                            let arg_span = args.value()[i].0.span();
+                            args_with_casts.push(TypedExpr {
+                                inferred_type: arg_type.ty.value().clone(),
+                                kind: TypedExprKind::Cast(
+                                    Box::new(arg_t.clone()),
+                                    arg_type.ty.clone(),
+                                )
+                                .in_span(arg_span),
+                            });
+                        } else {
+                            args_with_casts.push(arg_t.clone());
+                        }
+                    }
+                    // Add the variadic arguments as-is
+                    args_with_casts.extend(args_t.into_iter().skip(beginning_arg_types.len()));
+
                     // the rest may be any, so we don't need to check them
                     TypedExpr {
                         inferred_type: *ret_type,
-                        kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_t)
-                            .in_span(expr_span),
+                        kind: TypedExprKind::Call(
+                            Box::new(expr_to_place(f_span, ft)?),
+                            args_with_casts,
+                        )
+                        .in_span(expr_span),
                     }
                 }
                 _ => {
@@ -823,6 +884,18 @@ mod tests {
                         returns: Box::new(TastType::unit()),
                     }),
                 ),
+                (
+                    "void_ptr_func",
+                    TastType::Fn(Fn {
+                        arguments: ArgumentDeclarationList::NonVariadic(vec![
+                            ArgumentDeclaration {
+                                name: spanned!(0, "ptr", 3),
+                                ty: spanned!(0, TastType::Ptr(Box::new(TastType::unit())), 3),
+                            },
+                        ]),
+                        returns: Box::new(TastType::unit()),
+                    }),
+                ),
             ])),
             types: TypeCtx::from_defaults_and_mappings(HashMap::from([(
                 "NonIntegerType",
@@ -936,6 +1009,11 @@ mod tests {
                     got: "i32".to_string(),
                 }),
             ),
+            // Test void pointer implicit downcasts
+            ("void_ptr_func(&i8)", Ok(TastType::unit())),
+            ("void_ptr_func(&i32)", Ok(TastType::unit())),
+            ("void_ptr_func(&bool)", Ok(TastType::unit())),
+            ("void_ptr_func(&s)", Ok(TastType::unit())),
             (
                 "bool()",
                 Err(DiagnosticKind::CannotCallNonFunction("bool".to_string())),
