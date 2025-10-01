@@ -69,6 +69,8 @@ pub enum Type<'input> {
     Struct(IndexMap<&'input str, Type<'input>>),
     /// Union type literals. Ordered by declaration order.
     Union(IndexMap<&'input str, Type<'input>>),
+    /// An opaque/incomplete type used for forward declarations of self-referential types
+    Opaque(&'input str),
 }
 
 impl Display for Type<'_> {
@@ -107,6 +109,7 @@ impl Display for Type<'_> {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Self::Opaque(name) => write!(f, "{name}"),
         }
     }
 }

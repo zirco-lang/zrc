@@ -180,4 +180,52 @@ mod tests {
             ))
         );
     }
+
+    #[test]
+    fn self_referential_struct_via_opaque_type() {
+        // Test that opaque types can be used for self-referential structs
+        // type Node = struct { value: i32, next: *Node }
+        // This tests the resolution with an opaque type already in scope
+        let mut type_ctx = TypeCtx::default();
+        type_ctx.insert("Node", TastType::Opaque("Node"));
+
+        assert_eq!(
+            resolve_type(
+                &type_ctx,
+                ParserType(spanned!(
+                    0,
+                    ParserTypeKind::Struct(KeyTypeMapping(spanned!(
+                        7,
+                        vec![
+                            spanned!(
+                                9,
+                                (
+                                    spanned!(9, "value", 14),
+                                    ParserType(spanned!(16, ParserTypeKind::Identifier("i32"), 19))
+                                ),
+                                19
+                            ),
+                            spanned!(
+                                21,
+                                (
+                                    spanned!(21, "next", 25),
+                                    ParserType::build_ptr(
+                                        Span::from_positions(27, 32),
+                                        ParserType::build_ident(spanned!(28, "Node", 32))
+                                    )
+                                ),
+                                32
+                            )
+                        ],
+                        34
+                    ))),
+                    34
+                ))
+            ),
+            Ok(TastType::Struct(IndexMap::from([
+                ("value", TastType::I32),
+                ("next", TastType::Ptr(Box::new(TastType::Opaque("Node"))))
+            ])))
+        );
+    }
 }

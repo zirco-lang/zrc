@@ -105,7 +105,7 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
                 &ctx.target_machine().get_target_data(),
                 Some(AddressSpace::default()),
             ),
-            Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
+            Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) | Type::Opaque(_) => {
                 panic!("not an integer type")
             }
         },
@@ -140,11 +140,23 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
             (ty.as_basic_type_enum(), dbg_ty.as_type())
         }
         Type::Ptr(x) => {
-            let (pointee_ty, pointee_dbg_ty) = llvm_type(ctx, x);
+            let (pointee_ty, pointee_dbg_ty) = match **x {
+                // Opaque types behind pointers are treated as opaque pointers
+                // We use i8 as a placeholder since we don't know the actual size
+                Type::Opaque(name) => (
+                    ctx.ctx().i8_type().as_any_type_enum(),
+                    ctx.dbg_builder()
+                        .create_basic_type(name, 0, 0, 0)
+                        .expect("basic type should be valid")
+                        .as_type(),
+                ),
+                _ => llvm_type(ctx, x),
+            };
             let (ty, dbg_ty) = create_ptr(ctx, pointee_ty, pointee_dbg_ty);
             (ty.as_basic_type_enum(), dbg_ty.as_type())
         }
         Type::Fn(_) => panic!("function is not a basic type"),
+        Type::Opaque(_) => panic!("opaque types should only appear behind pointers and should be resolved before codegen"),
         Type::Struct(fields) => (
             ctx.ctx()
                 .struct_type(
@@ -252,6 +264,8 @@ pub fn llvm_type<'ctx: 'a, 'a>(
             let (ty, dbg_ty) = llvm_basic_type(ctx, ty);
             (ty.as_any_type_enum(), dbg_ty)
         }
+
+        Type::Opaque(name) => panic!("opaque type '{name}' should only appear behind pointers"),
 
         Type::Fn(Fn { arguments, returns }) => {
             let (ret, ret_dbg) = llvm_type(ctx, returns);

@@ -276,8 +276,12 @@ pub fn process_declaration<'input>(
                 return Err(name.error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())));
             }
 
+            // Insert an opaque forward declaration to allow self-referential types
+            global_scope.types.insert(name.value(), TastType::Opaque(name.value()));
+
             let resolved_ty = resolve_type(&global_scope.types, ty)?;
 
+            // Replace the opaque type with the fully resolved type
             global_scope.types.insert(name.value(), resolved_ty.clone());
 
             None
@@ -296,9 +300,9 @@ mod tests {
             ArgumentDeclarationList as AstArgumentDeclarationList, Declaration as AstDeclaration,
             Stmt, StmtKind,
         },
-        ty::{Type, TypeKind},
+        ty::{KeyTypeMapping, Type, TypeKind},
     };
-    use zrc_utils::spanned;
+    use zrc_utils::{span::Span, spanned};
 
     use super::*;
     use crate::typeck::scope::{TypeCtx, ValueCtx};
@@ -348,5 +352,73 @@ mod tests {
             )
             .is_ok()
         );
+    }
+
+    #[test]
+    fn self_referential_type_alias_works() {
+        // type Node = struct { value: i32, next: *Node }
+        let mut global_scope = GlobalScope::new();
+        
+        let result = process_declaration(
+            &mut global_scope,
+            AstDeclaration::TypeAliasDeclaration {
+                name: spanned!(0, "Node", 4),
+                ty: Type(spanned!(
+                    8,
+                    TypeKind::Struct(KeyTypeMapping(spanned!(
+                        15,
+                        vec![
+                            spanned!(
+                                17,
+                                (
+                                    spanned!(17, "value", 22),
+                                    Type(spanned!(24, TypeKind::Identifier("i32"), 27))
+                                ),
+                                27
+                            ),
+                            spanned!(
+                                29,
+                                (
+                                    spanned!(29, "next", 33),
+                                    Type::build_ptr(
+                                        Span::from_positions(35, 40),
+                                        Type::build_ident(spanned!(36, "Node", 40))
+                                    )
+                                ),
+                                40
+                            )
+                        ],
+                        42
+                    ))),
+                    42
+                ))
+            }
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), None);
+
+        // Verify the type was inserted correctly
+        let resolved_type = global_scope.types.resolve("Node");
+        assert!(resolved_type.is_some());
+        
+        if let Some(TastType::Struct(fields)) = resolved_type {
+            assert_eq!(fields.len(), 2);
+            assert!(fields.contains_key("value"));
+            assert!(fields.contains_key("next"));
+            
+            // Check that 'value' is i32
+            assert_eq!(fields.get("value"), Some(&TastType::I32));
+            
+            // Check that 'next' is a pointer to Node
+            if let Some(TastType::Ptr(pointee)) = fields.get("next") {
+                // The pointee should be an Opaque("Node") since it was forward declared
+                assert_eq!(**pointee, TastType::Opaque("Node"));
+            } else {
+                panic!("Expected 'next' field to be a pointer type");
+            }
+        } else {
+            panic!("Expected Node to be a Struct type");
+        }
     }
 }
