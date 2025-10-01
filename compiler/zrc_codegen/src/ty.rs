@@ -156,7 +156,9 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
             (ty.as_basic_type_enum(), dbg_ty.as_type())
         }
         Type::Fn(_) => panic!("function is not a basic type"),
-        Type::Opaque(_) => panic!("opaque types should only appear behind pointers and should be resolved before codegen"),
+        Type::Opaque(_) => panic!(
+            "opaque types should only appear behind pointers and should be resolved before codegen"
+        ),
         Type::Struct(fields) => (
             ctx.ctx()
                 .struct_type(

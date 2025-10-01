@@ -277,7 +277,9 @@ pub fn process_declaration<'input>(
             }
 
             // Insert an opaque forward declaration to allow self-referential types
-            global_scope.types.insert(name.value(), TastType::Opaque(name.value()));
+            global_scope
+                .types
+                .insert(name.value(), TastType::Opaque(name.value()));
 
             let resolved_ty = resolve_type(&global_scope.types, ty)?;
 
@@ -358,7 +360,7 @@ mod tests {
     fn self_referential_type_alias_works() {
         // type Node = struct { value: i32, next: *Node }
         let mut global_scope = GlobalScope::new();
-        
+
         let result = process_declaration(
             &mut global_scope,
             AstDeclaration::TypeAliasDeclaration {
@@ -391,8 +393,8 @@ mod tests {
                         42
                     ))),
                     42
-                ))
-            }
+                )),
+            },
         );
 
         assert!(result.is_ok());
@@ -401,15 +403,15 @@ mod tests {
         // Verify the type was inserted correctly
         let resolved_type = global_scope.types.resolve("Node");
         assert!(resolved_type.is_some());
-        
+
         if let Some(TastType::Struct(fields)) = resolved_type {
             assert_eq!(fields.len(), 2);
             assert!(fields.contains_key("value"));
             assert!(fields.contains_key("next"));
-            
+
             // Check that 'value' is i32
             assert_eq!(fields.get("value"), Some(&TastType::I32));
-            
+
             // Check that 'next' is a pointer to Node
             if let Some(TastType::Ptr(pointee)) = fields.get("next") {
                 // The pointee should be an Opaque("Node") since it was forward declared
@@ -426,7 +428,7 @@ mod tests {
     fn doubly_linked_list_node_works() {
         // type Node = struct { value: i32, prev: *Node, next: *Node }
         let mut global_scope = GlobalScope::new();
-        
+
         let result = process_declaration(
             &mut global_scope,
             AstDeclaration::TypeAliasDeclaration {
@@ -470,8 +472,8 @@ mod tests {
                         55
                     ))),
                     55
-                ))
-            }
+                )),
+            },
         );
 
         assert!(result.is_ok());
@@ -479,7 +481,7 @@ mod tests {
         // Verify the type was inserted correctly with multiple self-references
         let resolved_type = global_scope.types.resolve("Node");
         assert!(resolved_type.is_some());
-        
+
         if let Some(TastType::Struct(fields)) = resolved_type {
             assert_eq!(fields.len(), 3);
             assert!(fields.contains_key("value"));
