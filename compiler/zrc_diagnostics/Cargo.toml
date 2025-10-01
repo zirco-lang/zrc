@@ -6,8 +6,7 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ansi_term = "0.12.1"
+ariadne = "0.5.1"
 derive_more = { version = "2.0.1", features = ["display"] }
-line-span = "0.1.5"
 thiserror = "1.0.58"
 zrc_utils = { version = "0.1.0", path = "../zrc_utils" }

@@ -2,31 +2,32 @@
 
 use std::error::Error;
 
-use ansi_term::{Color, Style};
+use ariadne::{Color, Label, Report, ReportKind};
 use derive_more::Display;
 use zrc_utils::span::Spanned;
 
-use crate::{DiagnosticKind, fmt::display_source_window};
+use crate::DiagnosticKind;
 
 /// The severity of a [`Diagnostic`].
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
-#[display("{}", self.style().paint(self.text()))]
 pub enum Severity {
     /// Error. Compilation will not continue.
+    #[display("error")]
     Error,
 }
+
 impl Severity {
-    /// Get the display [`Style`] of this severity
-    pub(crate) fn style(&self) -> Style {
+    /// Convert severity to ariadne's [`ReportKind`]
+    const fn to_report_kind(&self) -> ReportKind<'static> {
         match *self {
-            Self::Error => Color::Red.bold(),
+            Self::Error => ReportKind::Error,
         }
     }
 
-    /// Get this severity's name
-    pub(crate) const fn text(&self) -> &'static str {
+    /// Get the color for this severity
+    const fn color(&self) -> Color {
         match *self {
-            Self::Error => "error",
+            Self::Error => Color::Red,
         }
     }
 }
@@ -35,16 +36,50 @@ impl Severity {
 #[derive(Debug, PartialEq, Eq, Display)]
 #[display("{_0}: {_1}")]
 pub struct Diagnostic(pub Severity, pub Spanned<DiagnosticKind>);
+
 impl Diagnostic {
-    /// Convert this [`Diagnostic`] to a printable string
+    /// Convert this [`Diagnostic`] to a printable string using ariadne
+    ///
+    /// # Panics
+    /// This function may panic if the span is invalid or if writing to the
+    /// buffer fails.
     #[must_use]
     pub fn print(&self, source: &str) -> String {
-        format!(
-            "{}: {}\n{}",
-            self.0,
-            Color::White.bold().paint(self.1.to_string()),
-            display_source_window(&self.0, self.1.span(), source)
+        self.print_with_filename(source, "<source>")
+    }
+
+    /// Convert this [`Diagnostic`] to a printable string using ariadne with a
+    /// custom filename
+    ///
+    /// # Panics
+    /// This function may panic if the span is invalid or if writing to the
+    /// buffer fails.
+    #[must_use]
+    pub fn print_with_filename(&self, source: &str, filename: &str) -> String {
+        let span = self.1.span();
+        let message = self.1.to_string();
+
+        // Create ariadne report using (filename, range) as the span type
+        let report = Report::build(
+            self.0.to_report_kind(),
+            (filename, span.start()..span.end()),
         )
+        .with_message(message.clone())
+        .with_label(
+            Label::new((filename, span.start()..span.end()))
+                .with_message(message)
+                .with_color(self.0.color()),
+        )
+        .finish();
+
+        // Write report to string
+        let mut buffer = Vec::new();
+        report
+            .write((filename, ariadne::Source::from(source)), &mut buffer)
+            .expect("failed to write diagnostic");
+
+        String::from_utf8(buffer).expect("diagnostic output should be valid UTF-8")
     }
 }
+
 impl Error for Diagnostic {}
