@@ -277,7 +277,8 @@ pub fn process_declaration<'input>(
                 return Err(name.error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())));
             }
 
-            let resolved_ty = resolve_type(&global_scope.types, ty)?;
+            let resolved_ty =
+                super::ty::resolve_type_with_self_reference(&global_scope.types, ty, name.value())?;
 
             global_scope.types.insert(name.value(), resolved_ty.clone());
 

@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind};
+use zrc_utils::span::Span;
 
 use super::scope::TypeCtx;
 use crate::tast::ty::Type as TastType;
@@ -37,6 +38,133 @@ pub fn resolve_type<'input>(
     })
 }
 
+/// Resolve an identifier to its corresponding [`tast::ty::Type`], allowing
+/// opaque references to the type being defined.
+///
+/// # Errors
+/// Errors if the identifier is not found in the type scope or a key is
+/// double-defined.
+fn resolve_type_with_opaque<'input>(
+    type_scope: &TypeCtx<'input>,
+    ty: ParserType<'input>,
+    opaque_name: &'input str,
+) -> Result<TastType<'input>, Diagnostic> {
+    let span = ty.0.span();
+    Ok(match ty.0.into_value() {
+        ParserTypeKind::Identifier(x) => {
+            if x == opaque_name {
+                TastType::Opaque(x)
+            } else if let Some(ty) = type_scope.resolve(x) {
+                ty.clone()
+            } else {
+                return Err(DiagnosticKind::UnableToResolveType(x.to_string()).error_in(span));
+            }
+        }
+        ParserTypeKind::Ptr(pointee_ty) => TastType::Ptr(Box::new(resolve_type_with_opaque(
+            type_scope,
+            *pointee_ty,
+            opaque_name,
+        )?)),
+        ParserTypeKind::Struct(members) => TastType::Struct(resolve_key_type_mapping_with_opaque(
+            type_scope,
+            members,
+            opaque_name,
+        )?),
+        ParserTypeKind::Union(members) => TastType::Union(resolve_key_type_mapping_with_opaque(
+            type_scope,
+            members,
+            opaque_name,
+        )?),
+    })
+}
+
+/// Check if a type contains an opaque reference not behind a pointer.
+///
+/// # Errors
+/// Returns an error if an opaque type is found not behind a pointer.
+#[allow(clippy::wildcard_enum_match_arm)]
+fn check_opaque_behind_pointer<'input>(
+    ty: &TastType<'input>,
+    opaque_name: &'input str,
+    span: Span,
+) -> Result<(), Diagnostic> {
+    match ty {
+        TastType::Opaque(name) if *name == opaque_name => Err(
+            DiagnosticKind::SelfReferentialTypeNotBehindPointer((*name).to_string()).error_in(span),
+        ),
+        TastType::Ptr(_) => {
+            // Anything behind a pointer is OK, even opaque types
+            Ok(())
+        }
+        TastType::Struct(members) | TastType::Union(members) => {
+            for (_, member_ty) in members {
+                check_opaque_behind_pointer(member_ty, opaque_name, span)?;
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Resolve a type definition that may contain self-references (only allowed
+/// behind pointers).
+///
+/// # Errors
+/// Errors if the type contains self-references not behind pointers or other
+/// type resolution errors.
+pub fn resolve_type_with_self_reference<'input>(
+    type_scope: &TypeCtx<'input>,
+    ty: ParserType<'input>,
+    self_name: &'input str,
+) -> Result<TastType<'input>, Diagnostic> {
+    let span = ty.0.span();
+    let resolved = resolve_type_with_opaque(type_scope, ty, self_name)?;
+    check_opaque_behind_pointer(&resolved, self_name, span)?;
+    Ok(replace_opaque_with_concrete(resolved, self_name))
+}
+
+/// Replace all opaque type references with the concrete type.
+/// For self-referential types behind pointers, replaces with an empty struct
+/// as a placeholder since pointers don't need to know the full pointee type.
+#[allow(clippy::wildcard_enum_match_arm)]
+fn replace_opaque_with_concrete<'input>(
+    ty: TastType<'input>,
+    opaque_name: &'input str,
+) -> TastType<'input> {
+    match ty {
+        TastType::Opaque(name) if name == opaque_name => {
+            // This should never happen if check_opaque_behind_pointer succeeded
+            // but we handle it gracefully by replacing with empty struct (unit type)
+            TastType::unit()
+        }
+        TastType::Ptr(pointee) => {
+            // For pointers to opaque types, we can safely replace the opaque
+            // with an empty struct placeholder. The pointer doesn't need to know
+            // the full layout of what it points to.
+            match *pointee {
+                TastType::Opaque(name) if name == opaque_name => {
+                    // Replace *Opaque(name) with *struct{} (pointer to empty struct)
+                    TastType::Ptr(Box::new(TastType::unit()))
+                }
+                other => TastType::Ptr(Box::new(replace_opaque_with_concrete(other, opaque_name))),
+            }
+        }
+        TastType::Struct(members) => TastType::Struct(
+            members
+                .into_iter()
+                .map(|(key, val)| (key, replace_opaque_with_concrete(val, opaque_name)))
+                .collect(),
+        ),
+        TastType::Union(members) => TastType::Union(
+            members
+                .into_iter()
+                .map(|(key, val)| (key, replace_opaque_with_concrete(val, opaque_name)))
+                .collect(),
+        ),
+        other => other,
+    }
+}
+
 /// Resolve the types within the [`IndexMap`]s used by
 /// [`ParserTypeKind::Struct`] and ensure keys are unique, returning the value
 /// to be passed to [`TastType::Struct`].
@@ -59,6 +187,35 @@ pub(super) fn resolve_key_type_mapping<'input>(
             );
         }
         map.insert(key.value(), resolve_type(type_scope, ast_type)?);
+    }
+    Ok(map)
+}
+
+/// Resolve the types within the [`IndexMap`]s used by
+/// [`ParserTypeKind::Struct`] with opaque type support.
+///
+/// # Errors
+/// Errors if a key is not unique or is unresolvable.
+#[allow(clippy::type_complexity)]
+fn resolve_key_type_mapping_with_opaque<'input>(
+    type_scope: &TypeCtx<'input>,
+    members: KeyTypeMapping<'input>,
+    opaque_name: &'input str,
+) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {
+    let mut map: IndexMap<&'input str, TastType> = IndexMap::new();
+    for member in members.0.into_value() {
+        let span = member.span();
+        let (key, ast_type) = member.into_value();
+
+        if map.contains_key(key.value()) {
+            return Err(
+                DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
+            );
+        }
+        map.insert(
+            key.value(),
+            resolve_type_with_opaque(type_scope, ast_type, opaque_name)?,
+        );
     }
     Ok(map)
 }
@@ -179,5 +336,204 @@ mod tests {
                 )
             ))
         );
+    }
+
+    #[test]
+    fn self_referential_type_behind_pointer_resolves_correctly() {
+        // struct { value: i32, next: *Node }
+        // where Node is the name being defined
+        let result = resolve_type_with_self_reference(
+            &TypeCtx::default(),
+            ParserType(spanned!(
+                0,
+                ParserTypeKind::Struct(KeyTypeMapping(spanned!(
+                    7,
+                    vec![
+                        spanned!(
+                            9,
+                            (
+                                spanned!(9, "value", 14),
+                                ParserType(spanned!(16, ParserTypeKind::Identifier("i32"), 19))
+                            ),
+                            19
+                        ),
+                        spanned!(
+                            21,
+                            (
+                                spanned!(21, "next", 25),
+                                ParserType(spanned!(
+                                    27,
+                                    ParserTypeKind::Ptr(Box::new(ParserType(spanned!(
+                                        28,
+                                        ParserTypeKind::Identifier("Node"),
+                                        32
+                                    )))),
+                                    32
+                                ))
+                            ),
+                            32
+                        )
+                    ],
+                    34
+                ))),
+                34
+            )),
+            "Node",
+        );
+
+        assert!(result.is_ok());
+        let resolved_ty = result.expect("should resolve successfully");
+        if let TastType::Struct(fields) = resolved_ty {
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields.get("value"), Some(&TastType::I32));
+            // The pointer to self should be replaced with pointer to empty struct
+            assert_eq!(
+                fields.get("next"),
+                Some(&TastType::Ptr(Box::new(TastType::unit())))
+            );
+        } else {
+            panic!("Expected struct type");
+        }
+    }
+
+    #[test]
+    fn self_referential_type_not_behind_pointer_produces_error() {
+        // struct { value: i32, next: Node }
+        // where Node is the name being defined (ERROR: not behind pointer)
+        let result = resolve_type_with_self_reference(
+            &TypeCtx::default(),
+            ParserType(spanned!(
+                0,
+                ParserTypeKind::Struct(KeyTypeMapping(spanned!(
+                    7,
+                    vec![
+                        spanned!(
+                            9,
+                            (
+                                spanned!(9, "value", 14),
+                                ParserType(spanned!(16, ParserTypeKind::Identifier("i32"), 19))
+                            ),
+                            19
+                        ),
+                        spanned!(
+                            21,
+                            (
+                                spanned!(21, "next", 25),
+                                ParserType(spanned!(27, ParserTypeKind::Identifier("Node"), 31))
+                            ),
+                            31
+                        )
+                    ],
+                    33
+                ))),
+                33
+            )),
+            "Node",
+        );
+
+        assert!(result.is_err());
+        let err = result.expect_err("should produce error");
+        assert_eq!(
+            err,
+            Diagnostic(
+                Severity::Error,
+                spanned!(
+                    0,
+                    DiagnosticKind::SelfReferentialTypeNotBehindPointer("Node".to_string()),
+                    33
+                )
+            )
+        );
+    }
+
+    #[test]
+    fn nested_self_referential_type_works() {
+        // struct { data: i32, children: *struct { item: *Node, next: *Node } }
+        // where Node is the name being defined
+        let result = resolve_type_with_self_reference(
+            &TypeCtx::default(),
+            ParserType(spanned!(
+                0,
+                ParserTypeKind::Struct(KeyTypeMapping(spanned!(
+                    7,
+                    vec![
+                        spanned!(
+                            9,
+                            (
+                                spanned!(9, "data", 13),
+                                ParserType(spanned!(15, ParserTypeKind::Identifier("i32"), 18))
+                            ),
+                            18
+                        ),
+                        spanned!(
+                            20,
+                            (
+                                spanned!(20, "children", 28),
+                                ParserType(spanned!(
+                                    30,
+                                    ParserTypeKind::Ptr(Box::new(ParserType(spanned!(
+                                        31,
+                                        ParserTypeKind::Struct(KeyTypeMapping(spanned!(
+                                            38,
+                                            vec![
+                                                spanned!(
+                                                    40,
+                                                    (
+                                                        spanned!(40, "item", 44),
+                                                        ParserType(spanned!(
+                                                            46,
+                                                            ParserTypeKind::Ptr(Box::new(
+                                                                ParserType(spanned!(
+                                                                    47,
+                                                                    ParserTypeKind::Identifier(
+                                                                        "Node"
+                                                                    ),
+                                                                    51
+                                                                ))
+                                                            )),
+                                                            51
+                                                        ))
+                                                    ),
+                                                    51
+                                                ),
+                                                spanned!(
+                                                    53,
+                                                    (
+                                                        spanned!(53, "next", 57),
+                                                        ParserType(spanned!(
+                                                            59,
+                                                            ParserTypeKind::Ptr(Box::new(
+                                                                ParserType(spanned!(
+                                                                    60,
+                                                                    ParserTypeKind::Identifier(
+                                                                        "Node"
+                                                                    ),
+                                                                    64
+                                                                ))
+                                                            )),
+                                                            64
+                                                        ))
+                                                    ),
+                                                    64
+                                                )
+                                            ],
+                                            66
+                                        ))),
+                                        66
+                                    )))),
+                                    66
+                                ))
+                            ),
+                            66
+                        )
+                    ],
+                    68
+                ))),
+                68
+            )),
+            "Node",
+        );
+
+        assert!(result.is_ok());
     }
 }
