@@ -343,6 +343,38 @@ fn cg_program<'ctx>(
                 );
                 global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
             }
+            
+            TypedDeclaration::GlobalLetDeclaration { declarations } => {
+                use inkwell::AddressSpace;
+                use super::ty::llvm_basic_type;
+                use super::expr::cg_const_expr;
+                
+                for spanned_let_declaration in declarations {
+                    let let_declaration = spanned_let_declaration.value();
+                    
+                    // Get the LLVM type for this global
+                    let (llvm_ty, _) = llvm_basic_type(&unit, &let_declaration.ty);
+                    
+                    // Create the global variable
+                    let global = unit.module.add_global(
+                        llvm_ty,
+                        Some(AddressSpace::default()),
+                        let_declaration.name.value(),
+                    );
+                    
+                    // If there's an initializer, set it
+                    if let Some(ref init_expr) = let_declaration.value {
+                        let const_val = cg_const_expr(&unit, init_expr);
+                        global.set_initializer(&const_val);
+                    }
+                    
+                    // Mark as constant (immutable)
+                    global.set_constant(true);
+                    
+                    // Insert into scope
+                    global_scope.insert(let_declaration.name.value(), global.as_pointer_value());
+                }
+            }
         }
     }
 

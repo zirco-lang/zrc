@@ -282,6 +282,121 @@ pub fn process_declaration<'input>(
 
             None
         }
+        
+        AstDeclaration::GlobalLetDeclaration { declarations } => {
+            // Create a subscope for processing the let declarations
+            let mut scope = global_scope.create_subscope();
+            
+            // Process each declaration
+            let typed_declarations = declarations
+                .value()
+                .iter()
+                .map(|let_declaration| -> Result<Spanned<TastLetDeclaration>, Diagnostic> {
+                    let let_decl_span = let_declaration.span();
+                    let let_declaration = let_declaration.value();
+
+                    if global_scope.global_values.has(let_declaration.name.value()) {
+                        return Err(let_declaration.name.error(|identifier| {
+                            DiagnosticKind::IdentifierAlreadyInUse(identifier.to_string())
+                        }));
+                    }
+
+                    let typed_expr = let_declaration
+                        .value
+                        .as_ref()
+                        .map(|expr| type_expr(&scope, expr.clone()))
+                        .transpose()?;
+
+                    let resolved_ty = let_declaration
+                        .ty
+                        .as_ref()
+                        .map(|ty| resolve_type(&scope.types, ty.clone()))
+                        .transpose()?;
+
+                    let result_decl = match (typed_expr, resolved_ty) {
+                        (None, None) => {
+                            return Err(DiagnosticKind::NoTypeNoValue.error_in(let_decl_span));
+                        }
+
+                        // Explicitly typed with no value - not allowed for global variables
+                        (None, Some(_)) => {
+                            return Err(DiagnosticKind::GlobalLetMustHaveValue.error_in(let_decl_span));
+                        }
+
+                        // Infer type from value
+                        (
+                            Some(TypedExpr {
+                                inferred_type,
+                                kind,
+                            }),
+                            None,
+                        ) => {
+                            // Check if the expression is constant
+                            let expr = TypedExpr {
+                                inferred_type: inferred_type.clone(),
+                                kind: kind.clone(),
+                            };
+                            if !expr.is_constant() {
+                                return Err(DiagnosticKind::GlobalLetMustBeConstant.error_in(let_decl_span));
+                            }
+                            
+                            TastLetDeclaration {
+                                name: let_declaration.name,
+                                ty: inferred_type.clone(),
+                                value: Some(TypedExpr {
+                                    inferred_type,
+                                    kind,
+                                }),
+                            }
+                        }
+
+                        // Both explicitly typed and inferable
+                        (
+                            Some(TypedExpr {
+                                inferred_type,
+                                kind,
+                            }),
+                            Some(resolved_ty),
+                        ) => {
+                            if inferred_type == resolved_ty {
+                                // Check if the expression is constant
+                                let expr = TypedExpr {
+                                    inferred_type: inferred_type.clone(),
+                                    kind: kind.clone(),
+                                };
+                                if !expr.is_constant() {
+                                    return Err(DiagnosticKind::GlobalLetMustBeConstant.error_in(let_decl_span));
+                                }
+                                
+                                TastLetDeclaration {
+                                    name: let_declaration.name,
+                                    ty: inferred_type.clone(),
+                                    value: Some(TypedExpr {
+                                        inferred_type,
+                                        kind,
+                                    }),
+                                }
+                            } else {
+                                return Err(DiagnosticKind::InvalidAssignmentRightHandSideType {
+                                    expected: resolved_ty.to_string(),
+                                    got: inferred_type.to_string(),
+                                }
+                                .error_in(let_decl_span));
+                            }
+                        }
+                    };
+
+                    global_scope
+                        .global_values
+                        .insert(result_decl.name.value(), result_decl.ty.clone());
+                    Ok(result_decl.in_span(let_decl_span))
+                })
+                .collect::<Result<Vec<_>, Diagnostic>>()?;
+
+            Some(TypedDeclaration::GlobalLetDeclaration {
+                declarations: typed_declarations,
+            })
+        }
     })
 }
 

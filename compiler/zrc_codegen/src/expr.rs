@@ -1035,3 +1035,197 @@ mod tests {
         }
     }
 }
+
+/// Evaluate a constant expression at compile time
+///
+/// # Panics
+/// Panics if the expression is not constant or if code generation fails
+pub(crate) fn cg_const_expr<'ctx>(
+    unit: &crate::ctx::CompilationUnitCtx<'ctx, '_>,
+    expr: &TypedExpr,
+) -> BasicValueEnum<'ctx> {
+    use inkwell::values::AggregateValueEnum;
+    
+    match expr.kind.value() {
+        TypedExprKind::NumberLiteral(n, ty) => {
+            let no_underscores = n.text_content().replace('_', "");
+            llvm_int_type(unit, ty)
+                .0
+                .const_int_from_string(&no_underscores, number_literal_radix(n))
+                .expect("number literal should have parsed correctly")
+                .as_basic_value_enum()
+        }
+        
+        TypedExprKind::BooleanLiteral(value) => {
+            unit.ctx
+                .bool_type()
+                .const_int((*value).into(), false)
+                .as_basic_value_enum()
+        }
+        
+        TypedExprKind::CharLiteral(ch) => {
+            unit.ctx
+                .i8_type()
+                .const_int(ch.as_byte().into(), false)
+                .as_basic_value_enum()
+        }
+        
+        TypedExprKind::StringLiteral(str) => {
+            unit.ctx
+                .const_string(str.as_bytes(), false)
+                .as_basic_value_enum()
+        }
+        
+        TypedExprKind::SizeOf(ty) => {
+            let (llvm_ty, _) = llvm_type(unit, ty);
+            llvm_ty
+                .size_of()
+                .expect("type should have a size")
+                .as_basic_value_enum()
+        }
+        
+        TypedExprKind::Arithmetic(op, lhs, rhs) => {
+            let lhs_val = cg_const_expr(unit, lhs);
+            let rhs_val = cg_const_expr(unit, rhs);
+            
+            let result = match op {
+                Arithmetic::Add => {
+                    lhs_val.into_int_value().const_add(rhs_val.into_int_value())
+                }
+                Arithmetic::Sub => {
+                    lhs_val.into_int_value().const_sub(rhs_val.into_int_value())
+                }
+                Arithmetic::Mul => {
+                    lhs_val.into_int_value().const_mul(rhs_val.into_int_value())
+                }
+                Arithmetic::Div => {
+                    if lhs.inferred_type.is_signed_integer() {
+                        lhs_val.into_int_value().const_signed_div(rhs_val.into_int_value())
+                    } else {
+                        lhs_val.into_int_value().const_unsigned_div(rhs_val.into_int_value())
+                    }
+                }
+                Arithmetic::Mod => {
+                    if lhs.inferred_type.is_signed_integer() {
+                        lhs_val.into_int_value().const_signed_remainder(rhs_val.into_int_value())
+                    } else {
+                        lhs_val.into_int_value().const_unsigned_remainder(rhs_val.into_int_value())
+                    }
+                }
+                Arithmetic::LeftShift => {
+                    lhs_val.into_int_value().const_shl(rhs_val.into_int_value())
+                }
+                Arithmetic::RightShift => {
+                    if lhs.inferred_type.is_signed_integer() {
+                        lhs_val.into_int_value().const_ashr(rhs_val.into_int_value())
+                    } else {
+                        lhs_val.into_int_value().const_lshr(rhs_val.into_int_value())
+                    }
+                }
+            };
+            result.as_basic_value_enum()
+        }
+        
+        TypedExprKind::BinaryBitwise(op, lhs, rhs) => {
+            let lhs_val = cg_const_expr(unit, lhs);
+            let rhs_val = cg_const_expr(unit, rhs);
+            
+            let result = match op {
+                BinaryBitwise::And => {
+                    lhs_val.into_int_value().const_and(rhs_val.into_int_value())
+                }
+                BinaryBitwise::Or => {
+                    lhs_val.into_int_value().const_or(rhs_val.into_int_value())
+                }
+                BinaryBitwise::Xor => {
+                    lhs_val.into_int_value().const_xor(rhs_val.into_int_value())
+                }
+            };
+            result.as_basic_value_enum()
+        }
+        
+        TypedExprKind::Logical(op, lhs, rhs) => {
+            let lhs_val = cg_const_expr(unit, lhs);
+            let rhs_val = cg_const_expr(unit, rhs);
+            
+            let result = match op {
+                Logical::And => {
+                    lhs_val.into_int_value().const_and(rhs_val.into_int_value())
+                }
+                Logical::Or => {
+                    lhs_val.into_int_value().const_or(rhs_val.into_int_value())
+                }
+            };
+            result.as_basic_value_enum()
+        }
+        
+        TypedExprKind::Equality(op, lhs, rhs) => {
+            let lhs_val = cg_const_expr(unit, lhs);
+            let rhs_val = cg_const_expr(unit, rhs);
+            
+            lhs_val
+                .into_int_value()
+                .const_int_compare(
+                    int_predicate_for_equality(op),
+                    rhs_val.into_int_value(),
+                )
+                .as_basic_value_enum()
+        }
+        
+        TypedExprKind::Comparison(op, lhs, rhs) => {
+            let lhs_val = cg_const_expr(unit, lhs);
+            let rhs_val = cg_const_expr(unit, rhs);
+            
+            lhs_val
+                .into_int_value()
+                .const_int_compare(
+                    int_predicate_for_comparison(op, expr.inferred_type.is_signed_integer()),
+                    rhs_val.into_int_value(),
+                )
+                .as_basic_value_enum()
+        }
+        
+        TypedExprKind::UnaryNot(operand) => {
+            let val = cg_const_expr(unit, operand);
+            val.into_int_value().const_not().as_basic_value_enum()
+        }
+        
+        TypedExprKind::UnaryBitwiseNot(operand) => {
+            let val = cg_const_expr(unit, operand);
+            val.into_int_value().const_not().as_basic_value_enum()
+        }
+        
+        TypedExprKind::UnaryMinus(operand) => {
+            let val = cg_const_expr(unit, operand);
+            val.into_int_value().const_neg().as_basic_value_enum()
+        }
+        
+        TypedExprKind::Cast(operand, target_type) => {
+            let val = cg_const_expr(unit, operand);
+            let (target_llvm_type, _) = llvm_basic_type(unit, target_type.value());
+            
+            // For constant casts, we need to handle different scenarios
+            if let BasicValueEnum::IntValue(int_val) = val {
+                let target_int_type = target_llvm_type.into_int_type();
+                int_val.const_cast(target_int_type, operand.inferred_type.is_signed_integer())
+                    .as_basic_value_enum()
+            } else {
+                panic!("Unsupported constant cast");
+            }
+        }
+        
+        TypedExprKind::Ternary(cond, if_true, if_false) => {
+            let cond_val = cg_const_expr(unit, cond);
+            
+            // Evaluate condition
+            if cond_val.into_int_value().get_zero_extended_constant().unwrap_or(0) != 0 {
+                cg_const_expr(unit, if_true)
+            } else {
+                cg_const_expr(unit, if_false)
+            }
+        }
+        
+        _ => panic!("Expression is not constant: {:?}", expr.kind.value()),
+    }
+}
+

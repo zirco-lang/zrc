@@ -204,6 +204,10 @@ pub enum DiagnosticKind {
     SwitchCaseMissingTerminalDefault,
     #[error("multiple case statements are matching for the same value")]
     MultipleCases,
+    #[error("global let declaration must have an initializer value")]
+    GlobalLetMustHaveValue,
+    #[error("global let declaration must be initialized with a constant expression")]
+    GlobalLetMustBeConstant,
 }
 impl DiagnosticKind {
     /// Create an [error] diagnostic in a given [`Span`]

@@ -112,3 +112,54 @@ pub enum TypedExprKind<'input> {
     /// Any boolean literal.
     BooleanLiteral(bool),
 }
+
+impl<'input> TypedExpr<'input> {
+    /// Check if this expression is a constant expression
+    /// 
+    /// Constant expressions are:
+    /// - Numeric literals
+    /// - Boolean literals
+    /// - Character literals
+    /// - String literals
+    /// - `sizeof` expressions
+    /// - Arithmetic, bitwise, logical, equality, and comparison operations on constant expressions
+    /// - Unary operations on constant expressions (except address-of and dereference)
+    /// - Casts of constant expressions
+    /// - Ternary operations where all operands are constant
+    #[must_use]
+    pub fn is_constant(&self) -> bool {
+        match self.kind.value() {
+            TypedExprKind::NumberLiteral(_, _)
+            | TypedExprKind::BooleanLiteral(_)
+            | TypedExprKind::CharLiteral(_)
+            | TypedExprKind::StringLiteral(_)
+            | TypedExprKind::SizeOf(_) => true,
+
+            TypedExprKind::Arithmetic(_, lhs, rhs)
+            | TypedExprKind::BinaryBitwise(_, lhs, rhs)
+            | TypedExprKind::Logical(_, lhs, rhs)
+            | TypedExprKind::Equality(_, lhs, rhs)
+            | TypedExprKind::Comparison(_, lhs, rhs) => lhs.is_constant() && rhs.is_constant(),
+
+            TypedExprKind::UnaryNot(expr)
+            | TypedExprKind::UnaryBitwiseNot(expr)
+            | TypedExprKind::UnaryMinus(expr) => expr.is_constant(),
+
+            TypedExprKind::Cast(expr, _) => expr.is_constant(),
+
+            TypedExprKind::Ternary(cond, if_true, if_false) => {
+                cond.is_constant() && if_true.is_constant() && if_false.is_constant()
+            }
+
+            // These are not constant expressions
+            TypedExprKind::Comma(_, _)
+            | TypedExprKind::Assignment(_, _)
+            | TypedExprKind::UnaryAddressOf(_)
+            | TypedExprKind::UnaryDereference(_)
+            | TypedExprKind::Index(_, _)
+            | TypedExprKind::Dot(_, _)
+            | TypedExprKind::Call(_, _)
+            | TypedExprKind::Identifier(_) => false,
+        }
+    }
+}

@@ -114,6 +114,7 @@ Declaration: Declaration<'input> = {
     <FunctionDeclaration>,
     <StructOrUnionDeclaration>,
     <TypeAliasDeclaration>,
+    <GlobalLetDeclaration>,
 };
 
 FunctionDeclaration: Declaration<'input> = {
@@ -136,6 +137,12 @@ TypeAliasDeclaration: Declaration<'input> = {
     "type" <i:Spanned<IDENTIFIER>> "=" <t:Type> ";" => Declaration::TypeAliasDeclaration {
         name: i,
         ty: t,
+    },
+}
+
+GlobalLetDeclaration: Declaration<'input> = {
+    <Spanned<LetDeclaration>> => Declaration::GlobalLetDeclaration {
+        declarations: <>,
     },
 }
 

@@ -92,6 +92,11 @@ pub enum TypedDeclaration<'input> {
         /// declaration.
         body: Option<Spanned<Vec<TypedStmt<'input>>>>,
     },
+    /// A global let declaration
+    GlobalLetDeclaration {
+        /// The let declarations (can be multiple in a single statement)
+        declarations: Vec<Spanned<LetDeclaration<'input>>>,
+    },
 }
 
 /// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]
