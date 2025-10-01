@@ -78,7 +78,8 @@ pub fn validate_no_bare_opaque_types<'input>(
             Err(DiagnosticKind::InfiniteSizedType(type_name.to_string()))
         }
         TastType::Ptr(_) => {
-            // Pointers are fine - we don't recurse because opaque types behind pointers are valid
+            // Pointers are fine - we don't recurse because opaque types behind pointers are
+            // valid
             Ok(())
         }
         TastType::Struct(fields) | TastType::Union(fields) => {
@@ -98,7 +99,17 @@ pub fn validate_no_bare_opaque_types<'input>(
             Ok(())
         }
         // All other types (primitives) are fine
-        _ => Ok(()),
+        TastType::I8
+        | TastType::U8
+        | TastType::I16
+        | TastType::U16
+        | TastType::I32
+        | TastType::U32
+        | TastType::I64
+        | TastType::U64
+        | TastType::Usize
+        | TastType::Isize
+        | TastType::Bool => Ok(()),
     }
 }
 
@@ -266,5 +277,51 @@ mod tests {
                 ("next", TastType::Ptr(Box::new(TastType::Opaque("Node"))))
             ])))
         );
+    }
+
+    #[test]
+    fn validate_opaque_behind_pointer_succeeds() {
+        // struct { value: i32, next: *Node } - valid, opaque behind pointer
+        let ty = TastType::Struct(IndexMap::from([
+            ("value", TastType::I32),
+            ("next", TastType::Ptr(Box::new(TastType::Opaque("Node")))),
+        ]));
+
+        assert!(validate_no_bare_opaque_types(&ty, "Node").is_ok());
+    }
+
+    #[test]
+    fn validate_bare_opaque_fails() {
+        // Direct opaque type - invalid
+        let ty = TastType::Opaque("Bad");
+
+        assert!(validate_no_bare_opaque_types(&ty, "Bad").is_err());
+        assert!(matches!(
+            validate_no_bare_opaque_types(&ty, "Bad"),
+            Err(DiagnosticKind::InfiniteSizedType(_))
+        ));
+    }
+
+    #[test]
+    fn validate_opaque_in_struct_fails() {
+        // struct { x: Bad } - invalid, bare opaque in struct
+        let ty = TastType::Struct(IndexMap::from([("x", TastType::Opaque("Bad"))]));
+
+        assert!(validate_no_bare_opaque_types(&ty, "Bad").is_err());
+        assert!(matches!(
+            validate_no_bare_opaque_types(&ty, "Bad"),
+            Err(DiagnosticKind::InfiniteSizedType(_))
+        ));
+    }
+
+    #[test]
+    fn validate_nested_opaque_in_struct_fails() {
+        // struct { wrapper: struct { inner: Bad } } - invalid
+        let ty = TastType::Struct(IndexMap::from([(
+            "wrapper",
+            TastType::Struct(IndexMap::from([("inner", TastType::Opaque("Bad"))])),
+        )]));
+
+        assert!(validate_no_bare_opaque_types(&ty, "Bad").is_err());
     }
 }

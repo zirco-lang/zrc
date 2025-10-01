@@ -302,6 +302,7 @@ mod tests {
     use std::collections::HashMap;
 
     use tast::stmt::ArgumentDeclarationList as TastArgumentDeclarationList;
+    use zrc_diagnostics::Severity;
     use zrc_parser::ast::{
         expr::{Expr, ExprKind},
         stmt::{
@@ -495,6 +496,103 @@ mod tests {
             assert!(fields.contains_key("next"));
         } else {
             panic!("Expected Node to be a Struct type");
+        }
+    }
+
+    #[test]
+    fn invalid_direct_self_reference_fails() {
+        // type Bad = struct { x: Bad }
+        // This should fail because it would create an infinitely sized type
+        let mut global_scope = GlobalScope::new();
+
+        let result = process_declaration(
+            &mut global_scope,
+            AstDeclaration::TypeAliasDeclaration {
+                name: spanned!(0, "Bad", 3),
+                ty: Type(spanned!(
+                    7,
+                    TypeKind::Struct(KeyTypeMapping(spanned!(
+                        14,
+                        vec![spanned!(
+                            16,
+                            (
+                                spanned!(16, "x", 17),
+                                Type::build_ident(spanned!(19, "Bad", 22))
+                            ),
+                            22
+                        )],
+                        24
+                    ))),
+                    24
+                )),
+            },
+        );
+
+        // Should fail with InfiniteSizedType error
+        assert!(result.is_err());
+        if let Err(Diagnostic(Severity::Error, spanned_kind)) = result {
+            assert!(matches!(
+                spanned_kind.into_value(),
+                DiagnosticKind::InfiniteSizedType(_)
+            ));
+        } else {
+            panic!("Expected an error diagnostic");
+        }
+    }
+
+    #[test]
+    fn nested_invalid_self_reference_fails() {
+        // type Bad = struct { wrapper: struct { inner: Bad } }
+        // This should also fail - nested structs with direct self-reference
+        let mut global_scope = GlobalScope::new();
+
+        let result = process_declaration(
+            &mut global_scope,
+            AstDeclaration::TypeAliasDeclaration {
+                name: spanned!(0, "Bad", 3),
+                ty: Type(spanned!(
+                    7,
+                    TypeKind::Struct(KeyTypeMapping(spanned!(
+                        14,
+                        vec![spanned!(
+                            16,
+                            (
+                                spanned!(16, "wrapper", 23),
+                                Type(spanned!(
+                                    25,
+                                    TypeKind::Struct(KeyTypeMapping(spanned!(
+                                        32,
+                                        vec![spanned!(
+                                            34,
+                                            (
+                                                spanned!(34, "inner", 39),
+                                                Type::build_ident(spanned!(41, "Bad", 44))
+                                            ),
+                                            44
+                                        )],
+                                        46
+                                    ))),
+                                    46
+                                ))
+                            ),
+                            46
+                        )],
+                        48
+                    ))),
+                    48
+                )),
+            },
+        );
+
+        // Should fail with InfiniteSizedType error
+        assert!(result.is_err());
+        if let Err(Diagnostic(Severity::Error, spanned_kind)) = result {
+            assert!(matches!(
+                spanned_kind.into_value(),
+                DiagnosticKind::InfiniteSizedType(_)
+            ));
+        } else {
+            panic!("Expected an error diagnostic");
         }
     }
 }
