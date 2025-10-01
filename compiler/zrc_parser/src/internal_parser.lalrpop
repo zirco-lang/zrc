@@ -133,18 +133,22 @@ FunctionDeclaration: Declaration<'input> = {
 };
 
 TypeAliasDeclaration: Declaration<'input> = {
-    "type" <i:Spanned<IDENTIFIER>> "=" <t:Type> ";" => Declaration::TypeAliasDeclaration {
+    "type" <i:Spanned<IDENTIFIER>> "=" <t:TypeInDeclaration> ";" => Declaration::TypeAliasDeclaration {
         name: i,
         ty: t,
     },
 }
 
+// Type that allows parentheses - use in declaration contexts
+TypeInDeclaration: Type<'input> = {
+    <Type>,
+    "(" <TypeInDeclaration> ")" => <>,
+}
+
 // The key-type mapping of a struct or union, including the {}
 KeyTypeMapping: KeyTypeMapping<'input> = {
-    <l:@L> "{" "}" <r:@R> => 
-        KeyTypeMapping(spanned!(l, Vec::new(), r)),
-    <l:@L> "{" <list:CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>> "}" <r:@R> => 
-        KeyTypeMapping(spanned!(l, list, r)),
+    "{" <list:Spanned<CommaSeparated<Spanned<(<Spanned<IDENTIFIER>> ":" <Type>)>>?>> "}" => 
+        KeyTypeMapping(list.map(|inner| inner.unwrap_or(Vec::new()))),
 }
 
 StructOrUnionDeclaration: Declaration<'input> = {
@@ -191,7 +195,7 @@ pub Type: Type<'input> = {
 
 TypeOrParenthesizedType: Type<'input> = {
     <Type>,
-    "(" <Type> ")" => <>,
+    "(" <TypeOrParenthesizedType> ")" => <>,
 }
 
 FlowStmt: StmtKind<'input> = {
