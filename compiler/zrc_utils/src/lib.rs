@@ -48,5 +48,6 @@
     clippy::doc_comment_double_space_linebreaks
 )]
 
+pub mod code_fmt;
 pub mod line_finder;
 pub mod span;

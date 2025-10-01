@@ -7,17 +7,9 @@
 use std::fmt::Display;
 
 use derive_more::Display;
-use zrc_utils::span::Spanned;
+use zrc_utils::{code_fmt::indent_lines, span::Spanned};
 
 use super::{expr::Expr, ty::Type};
-
-/// Helper function to indent all lines of a string by a given prefix
-fn indent_lines(code: &str, prefix: &str) -> String {
-    code.lines()
-        .map(|line| format!("{prefix}{line}"))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
 
 /// A Zirco statement
 #[derive(PartialEq, Debug, Clone, Display)]

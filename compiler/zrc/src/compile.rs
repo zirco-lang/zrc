@@ -49,11 +49,16 @@ pub fn compile(
     // display the TAST if the user wants it
     if matches!(
         emit,
-        OutputFormat::TastDebug | OutputFormat::TastDebugPretty,
+        OutputFormat::TastDebug | OutputFormat::TastDebugPretty | OutputFormat::Tast,
     ) {
         return Ok(match *emit {
             OutputFormat::TastDebug => format!("{typed_ast:?}"),
             OutputFormat::TastDebugPretty => format!("{typed_ast:#?}"),
+            OutputFormat::Tast => typed_ast
+                .into_iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
 
             // unreachable because we test above
             _ => unreachable!(),
