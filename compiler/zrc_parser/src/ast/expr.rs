@@ -224,6 +224,16 @@ pub enum ExprKind<'input> {
     #[display("sizeof({_0})")]
     SizeOfExpr(Box<Expr<'input>>),
 
+    /// Struct construction: `Type [ field1: value1, field2: value2 ]`
+    #[display(
+        "{_0} [ {} ]",
+        _1.value()
+            .iter()
+            .map(|kv| format!("{}: {}", kv.value().0.value(), kv.value().1))
+            .collect::<Vec<String>>()
+            .join(", "))]
+    StructConstruction(Type<'input>, Spanned<Vec<Spanned<(Spanned<&'input str>, Expr<'input>)>>>),
+
     /// Any numeric literal.
     #[display("{_0}{}", _1.as_ref().map_or_else(String::new, Type::to_string))]
     NumberLiteral(NumberLiteral<'input>, Option<Type<'input>>),
@@ -539,6 +549,19 @@ impl<'input> Expr<'input> {
             span.start(),
             ExprKind::BooleanLiteral(lit.into_value()),
             span.end()
+        ))
+    }
+    #[must_use]
+    pub fn build_struct_construction(
+        ty: Type<'input>,
+        fields: Spanned<Vec<Spanned<(Spanned<&'input str>, Self)>>>,
+    ) -> Self {
+        let start = ty.0.start();
+        let end = fields.end();
+        Self(spanned!(
+            start,
+            ExprKind::StructConstruction(ty, fields),
+            end
         ))
     }
 }
