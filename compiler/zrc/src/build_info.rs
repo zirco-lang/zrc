@@ -60,3 +60,26 @@ pub fn version() -> String {
         }
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn version_string_contains_expected_components() {
+        let version = version();
+
+        assert!(version.contains("version"));
+        assert!(version.contains(build::PROJECT_NAME));
+        assert!(version.contains(build::PKG_VERSION));
+    }
+
+    #[test]
+    fn version_string_contains_build_info() {
+        let version = version();
+
+        assert!(version.contains(build::BUILD_TARGET));
+        assert!(version.contains(build::RUST_VERSION));
+        assert!(version.contains(build::CARGO_VERSION));
+    }
+}

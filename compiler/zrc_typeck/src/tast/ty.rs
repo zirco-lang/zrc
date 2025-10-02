@@ -240,4 +240,95 @@ mod tests {
         // Specific pointers should not implicitly cast to other specific pointers
         assert!(!i32_ptr.can_implicitly_cast_to(&bool_ptr));
     }
+
+    #[test]
+    fn type_display_works_for_primitives() {
+        assert_eq!(Type::I8.to_string(), "i8");
+        assert_eq!(Type::U8.to_string(), "u8");
+        assert_eq!(Type::I16.to_string(), "i16");
+        assert_eq!(Type::U16.to_string(), "u16");
+        assert_eq!(Type::I32.to_string(), "i32");
+        assert_eq!(Type::U32.to_string(), "u32");
+        assert_eq!(Type::I64.to_string(), "i64");
+        assert_eq!(Type::U64.to_string(), "u64");
+        assert_eq!(Type::Usize.to_string(), "usize");
+        assert_eq!(Type::Isize.to_string(), "isize");
+        assert_eq!(Type::Bool.to_string(), "bool");
+    }
+
+    #[test]
+    fn type_display_works_for_pointer() {
+        let ptr_type = Type::Ptr(Box::new(Type::I32));
+        assert_eq!(ptr_type.to_string(), "*i32");
+    }
+
+    #[test]
+    fn type_display_works_for_empty_struct() {
+        let struct_type = Type::Struct(IndexMap::new());
+        assert_eq!(struct_type.to_string(), "struct {}");
+    }
+
+    #[test]
+    fn type_display_works_for_empty_union() {
+        let union_type = Type::Union(IndexMap::new());
+        assert_eq!(union_type.to_string(), "union {}");
+    }
+
+    #[test]
+    fn into_pointee_returns_pointee_for_pointer() {
+        let ptr_type = Type::Ptr(Box::new(Type::I32));
+        assert_eq!(ptr_type.into_pointee(), Some(Type::I32));
+    }
+
+    #[test]
+    fn into_pointee_returns_none_for_non_pointer() {
+        assert_eq!(Type::I32.into_pointee(), None);
+    }
+
+    #[test]
+    fn into_struct_contents_returns_fields_for_struct() {
+        let fields = IndexMap::from([("x", Type::I32)]);
+        let struct_type = Type::Struct(fields.clone());
+        assert_eq!(struct_type.into_struct_contents(), Some(fields));
+    }
+
+    #[test]
+    fn into_struct_contents_returns_none_for_non_struct() {
+        assert_eq!(Type::I32.into_struct_contents(), None);
+    }
+
+    #[test]
+    fn into_union_contents_returns_fields_for_union() {
+        let fields = IndexMap::from([("x", Type::I32)]);
+        let union_type = Type::Union(fields.clone());
+        assert_eq!(union_type.into_union_contents(), Some(fields));
+    }
+
+    #[test]
+    fn into_union_contents_returns_none_for_non_union() {
+        assert_eq!(Type::I32.into_union_contents(), None);
+    }
+
+    #[test]
+    fn unit_type_is_empty_struct() {
+        let unit = Type::unit();
+        match unit {
+            Type::Struct(fields) => assert!(fields.is_empty()),
+            Type::I8
+            | Type::U8
+            | Type::I16
+            | Type::U16
+            | Type::I32
+            | Type::U32
+            | Type::I64
+            | Type::U64
+            | Type::Usize
+            | Type::Isize
+            | Type::Bool
+            | Type::Ptr(_)
+            | Type::Fn(_)
+            | Type::Union(_)
+            | Type::Opaque(_) => panic!("unit should be an empty struct"),
+        }
+    }
 }
