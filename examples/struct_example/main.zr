@@ -1,0 +1,25 @@
+fn printf(format: *u8, ...) -> i32;
+
+struct Point {
+    x: i32,
+    y: i32
+}
+
+fn distance_squared(p1: Point, p2: Point) -> i32 {
+    let dx = p2.x - p1.x;
+    let dy = p2.y - p1.y;
+    return dx * dx + dy * dy;
+}
+
+fn main() {
+    let p1: Point;
+    p1.x = 0;
+    p1.y = 0;
+    
+    let p2: Point;
+    p2.x = 3;
+    p2.y = 4;
+    
+    let dist_sq = distance_squared(p1, p2);
+    printf("Distance squared: %d\n", dist_sq);
+}

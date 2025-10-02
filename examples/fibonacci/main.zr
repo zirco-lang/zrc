@@ -1,0 +1,16 @@
+fn printf(format: *u8, ...) -> i32;
+
+fn fibonacci(n: i32) -> i32 {
+    if (n <= 1) {
+        return n;
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+fn main() {
+    let i = 0;
+    while (i < 10) {
+        printf("fibonacci(%d) = %d\n", i, fibonacci(i));
+        i = i + 1;
+    }
+}

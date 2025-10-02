@@ -5,13 +5,81 @@ Version 0.1.0 (Draft)
 ## Table of Contents
 
 1. [Introduction](#1-introduction)
+   - [About Zirco](#11-about-zirco)
+   - [Design Philosophy](#12-design-philosophy)
+   - [Stability Notice](#13-stability-notice)
 2. [Lexical Structure](#2-lexical-structure)
+   - [Character Set](#21-character-set)
+   - [Whitespace](#22-whitespace)
+   - [Comments](#23-comments)
+   - [Keywords](#24-keywords)
+   - [Identifiers](#25-identifiers)
+   - [Literals](#26-literals)
+   - [Operators and Punctuation](#27-operators-and-punctuation)
 3. [Type System](#3-type-system)
+   - [Type Overview](#31-type-overview)
+   - [Type Syntax](#32-type-syntax)
+   - [Primitive Types](#33-primitive-types)
+   - [Pointer Types](#34-pointer-types)
+   - [Struct Types](#35-struct-types)
+   - [Union Types](#36-union-types)
+   - [Type Aliases](#37-type-aliases)
+   - [Type Inference and Implicit Conversions](#38-type-inference-and-implicit-conversions)
 4. [Expressions](#4-expressions)
+   - [Expression Overview](#41-expression-overview)
+   - [Operator Precedence](#42-operator-precedence)
+   - [Primary Expressions](#43-primary-expressions)
+   - [Arithmetic Expressions](#44-arithmetic-expressions)
+   - [Comparison Expressions](#45-comparison-expressions)
+   - [Logical Expressions](#46-logical-expressions)
+   - [Bitwise Expressions](#47-bitwise-expressions)
+   - [Assignment Expressions](#48-assignment-expressions)
+   - [Pointer Expressions](#49-pointer-expressions)
+   - [Member Access Expressions](#410-member-access-expressions)
+   - [Index Expressions](#411-index-expressions)
+   - [Function Call Expressions](#412-function-call-expressions)
+   - [Cast Expressions](#413-cast-expressions)
+   - [Ternary Conditional Expression](#414-ternary-conditional-expression)
+   - [Sizeof Expressions](#415-sizeof-expressions)
+   - [Comma Expression](#416-comma-expression)
 5. [Statements](#5-statements)
+   - [Statement Overview](#51-statement-overview)
+   - [Expression Statements](#52-expression-statements)
+   - [Empty Statement](#53-empty-statement)
+   - [Block Statements](#54-block-statements)
+   - [Let Declarations (Local Variables)](#55-let-declarations-local-variables)
+   - [If Statements](#56-if-statements)
+   - [While Loops](#57-while-loops)
+   - [Do-While Loops](#58-do-while-loops)
+   - [For Loops](#59-for-loops)
+   - [Break Statement](#510-break-statement)
+   - [Continue Statement](#511-continue-statement)
+   - [Return Statement](#512-return-statement)
+   - [Switch Statement](#513-switch-statement)
 6. [Declarations](#6-declarations)
+   - [Declaration Overview](#61-declaration-overview)
+   - [Function Declarations](#62-function-declarations)
+   - [Type Alias Declarations](#63-type-alias-declarations)
+   - [Struct Declarations](#64-struct-declarations)
+   - [Union Declarations](#65-union-declarations)
 7. [Functions](#7-functions)
+   - [Function Declarations](#71-function-declarations)
+   - [Function Parameters](#72-function-parameters)
+   - [Variadic Functions](#73-variadic-functions)
+   - [Function Calls](#74-function-calls)
+   - [External Declarations](#75-external-declarations)
+   - [Return Types](#76-return-types)
+   - [Function Examples](#77-function-examples)
 8. [Semantics and Behavior](#8-semantics-and-behavior)
+   - [Memory Model](#81-memory-model)
+   - [Type Compatibility](#82-type-compatibility)
+   - [Evaluation Order](#83-evaluation-order)
+   - [Undefined Behavior](#84-undefined-behavior)
+   - [Scope and Lifetime](#85-scope-and-lifetime)
+   - [Name Resolution](#86-name-resolution)
+   - [Linkage](#87-linkage)
+   - [Program Entry Point](#88-program-entry-point)
+   - [Future Directions](#89-future-directions)
 
 ---
 
@@ -239,21 +307,28 @@ type ::= identifier
 
 ### 3.3 Primitive Types
 
-While Zirco does not have built-in primitive types in the language specification, the following types are conventionally used and recognized by the compiler:
+Zirco has the following built-in primitive types that are explicitly defined by the compiler:
 
 **Signed Integers**:
 - `i8` - 8-bit signed integer
 - `i16` - 16-bit signed integer
 - `i32` - 32-bit signed integer
 - `i64` - 64-bit signed integer
+- `isize` - Pointer-sized signed integer
 
 **Unsigned Integers**:
 - `u8` - 8-bit unsigned integer
 - `u16` - 16-bit unsigned integer
 - `u32` - 32-bit unsigned integer
 - `u64` - 64-bit unsigned integer
+- `usize` - Pointer-sized unsigned integer
 
-**Note**: The actual primitive types are implementation-defined and may vary.
+**Boolean**:
+- `bool` - Boolean type (true or false)
+
+**Unit/Void Type**:
+- `struct {}` - Empty struct, used as the unit/void type
+- `*struct {}` - Pointer to empty struct, used as a void pointer (analogous to `void*` in C)
 
 ### 3.4 Pointer Types
 
@@ -342,9 +417,28 @@ type ComplexStruct = struct { a: i32, b: *u8 };
 
 Type aliases are transparent - they create a new name but not a new type. The alias and the original type are interchangeable.
 
-### 3.8 Type Inference
+### 3.8 Type Inference and Implicit Conversions
+
+**Type Inference**:
 
 Currently, Zirco has limited type inference. Variables declared with `let` may omit their type if they have an initializer, but the type inference mechanism is implementation-defined and may be restricted.
+
+**Implicit Conversions**:
+
+Zirco allows the following implicit type conversions:
+
+1. **Pointer to Void Pointer**: Any pointer type `*T` can be implicitly converted to a void pointer `*struct {}`. This is useful for generic pointer handling.
+
+   ```zirco
+   fn takes_void_ptr(ptr: *struct {});
+   
+   let x: i32;
+   takes_void_ptr(&x);  // *i32 implicitly converts to *struct {}
+   ```
+
+2. **Untyped Integer Literals**: Integer literals without a type suffix can be implicitly converted to any integer type when used in contexts where the target type is known (implementation-defined behavior).
+
+Note: Implicit conversions only apply in specific contexts such as function arguments. Most operations require explicit type matching or explicit casts using the `as` operator.
 
 ---
 
@@ -381,7 +475,7 @@ Operators are listed from highest to lowest precedence:
 
 #### 4.3.1 Literals
 
-See section 2.6 for literal syntax.
+See [section 2.6](#26-literals) for literal syntax.
 
 #### 4.3.2 Identifiers
 
@@ -561,13 +655,17 @@ let x_val = ptr->x;  // equivalent to (*ptr).x
 
 ### 4.11 Index Expressions
 
-The `[]` operator indexes into an array or pointer:
+The `[]` operator indexes into an array or pointer, accepting a `usize` index:
 
 ```zirco
 let arr: *i32;
 let value = arr[0];
 arr[5] = 42;
 ```
+
+**Rules**:
+- The index must be of type `usize`
+- Indexing is equivalent to pointer arithmetic and dereferencing
 
 ### 4.12 Function Call Expressions
 
@@ -1112,34 +1210,19 @@ The following behaviors are undefined:
 - Function parameters are scoped to the function body
 - Global declarations have file scope
 
-**Lifetime**:
-- Local variables exist from declaration until the end of their scope
-- Dynamic lifetime management is implementation-defined
-
 ### 8.6 Name Resolution
 
 - Names are resolved in the innermost scope first
 - Outer scopes are searched if a name is not found in the current scope
 - Global names can be accessed from any scope unless shadowed
 
-### 8.7 Compilation Model
-
-Zirco is compiled to native code via LLVM:
-
-1. **Lexing**: Source code is tokenized
-2. **Parsing**: Tokens are parsed into an Abstract Syntax Tree (AST)
-3. **Type Checking**: Types are checked and a Typed AST (TAST) is generated
-4. **Code Generation**: LLVM IR is generated from the TAST
-5. **Optimization**: LLVM optimizes the IR
-6. **Binary Generation**: Native code is produced
-
-### 8.8 Linkage
+### 8.7 Linkage
 
 - Functions can be declared as external to link with C libraries
 - The linker combines compiled object files into executables
 - Linking behavior follows the platform's standard
 
-### 8.9 Program Entry Point
+### 8.8 Program Entry Point
 
 By convention, programs begin execution at a function named `main`:
 
@@ -1149,9 +1232,9 @@ fn main() {
 }
 ```
 
-The signature of `main` is implementation-defined.
+The signature of `main` follows C conventions and is compatible with what LLVM allows (typically `fn main()` for void or `fn main() -> i32` for returning an exit code).
 
-### 8.10 Future Directions
+### 8.9 Future Directions
 
 The following features are planned or under consideration:
 
@@ -1259,13 +1342,13 @@ field_list ::= identifier ":" type ("," identifier ":" type)*
 
 ## Appendix B: Operator Precedence Table
 
-See section 4.2 for the complete operator precedence table.
+See [section 4.2](#42-operator-precedence) for the complete operator precedence table.
 
 ---
 
 ## Appendix C: Keywords Reference
 
-See section 2.4 for the complete list of reserved keywords.
+See [section 2.4](#24-keywords) for the complete list of reserved keywords.
 
 ---
 
@@ -1346,4 +1429,4 @@ fn print_numbers(n: i32) {
 
 ---
 
-*This specification is subject to change as Zirco evolves. Last updated: 2024*
+*This specification is subject to change as Zirco evolves. Last updated: 2025*
