@@ -4,7 +4,11 @@ use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpanExt};
 use zrc_parser::ast::expr::Expr;
 use zrc_utils::span::{Span, Spannable, Spanned};
 
-use super::{super::scope::Scope, helpers::expr_to_place, type_expr};
+use super::{
+    super::scope::Scope,
+    helpers::{expr_to_place, try_coerce_to},
+    type_expr,
+};
 use crate::tast::{
     expr::{TypedExpr, TypedExprKind},
     stmt::ArgumentDeclarationList,
@@ -65,11 +69,8 @@ pub fn type_expr_call<'input>(
                             .inferred_type
                             .can_implicitly_cast_to(arg_type.ty.value())
                     {
-                        // Implicitly resolve type (e.g., {int} -> i32)
-                        TypedExpr {
-                            inferred_type: arg_type.ty.value().clone(),
-                            kind: arg_t.kind,
-                        }
+                        // Try to coerce the argument to the parameter type
+                        try_coerce_to(arg_t, arg_type.ty.value())
                     } else {
                         arg_t
                     }
@@ -117,11 +118,8 @@ pub fn type_expr_call<'input>(
                         .inferred_type
                         .can_implicitly_cast_to(arg_type.ty.value())
                 {
-                    // Implicitly resolve type (e.g., {int} -> i32)
-                    args_with_casts.push(TypedExpr {
-                        inferred_type: arg_type.ty.value().clone(),
-                        kind: arg_t.kind.clone(),
-                    });
+                    // Try to coerce the argument to the parameter type
+                    args_with_casts.push(try_coerce_to(arg_t.clone(), arg_type.ty.value()));
                 } else {
                     args_with_casts.push(arg_t.clone());
                 }

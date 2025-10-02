@@ -4,7 +4,11 @@ use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::{expr::Expr, ty::Type};
 use zrc_utils::span::{Span, Spannable};
 
-use super::{super::scope::Scope, helpers::expect, type_expr};
+use super::{
+    super::scope::Scope,
+    helpers::{expect, try_coerce_to},
+    type_expr,
+};
 use crate::{
     tast::{
         expr::{TypedExpr, TypedExprKind},
@@ -54,48 +58,30 @@ pub fn type_expr_ternary<'input>(
             // Both branches have the same type
             if matches!(if_true_t.inferred_type, TastType::Int) {
                 // Both are {int}, resolve to i32
-                let if_true_resolved = TypedExpr {
-                    inferred_type: TastType::I32,
-                    kind: if_true_t.kind,
-                };
-                let if_false_resolved = TypedExpr {
-                    inferred_type: TastType::I32,
-                    kind: if_false_t.kind,
-                };
+                let if_true_resolved = try_coerce_to(if_true_t, &TastType::I32);
+                let if_false_resolved = try_coerce_to(if_false_t, &TastType::I32);
                 (TastType::I32, if_true_resolved, if_false_resolved)
             } else {
                 (if_true_t.inferred_type.clone(), if_true_t, if_false_t)
             }
-        } else if matches!(if_true_t.inferred_type, TastType::Int)
-            && if_true_t
-                .inferred_type
-                .can_implicitly_cast_to(&if_false_t.inferred_type)
+        } else if if_true_t
+            .inferred_type
+            .can_implicitly_cast_to(&if_false_t.inferred_type)
         {
-            // if_true is {int}, resolve to if_false type
-            let if_true_with_resolved_type = TypedExpr {
-                inferred_type: if_false_t.inferred_type.clone(),
-                kind: if_true_t.kind,
-            };
+            // if_true can coerce to if_false type
+            let if_true_coerced = try_coerce_to(if_true_t, &if_false_t.inferred_type);
             (
                 if_false_t.inferred_type.clone(),
-                if_true_with_resolved_type,
+                if_true_coerced,
                 if_false_t,
             )
-        } else if matches!(if_false_t.inferred_type, TastType::Int)
-            && if_false_t
-                .inferred_type
-                .can_implicitly_cast_to(&if_true_t.inferred_type)
+        } else if if_false_t
+            .inferred_type
+            .can_implicitly_cast_to(&if_true_t.inferred_type)
         {
-            // if_false is {int}, resolve to if_true type
-            let if_false_with_resolved_type = TypedExpr {
-                inferred_type: if_true_t.inferred_type.clone(),
-                kind: if_false_t.kind,
-            };
-            (
-                if_true_t.inferred_type.clone(),
-                if_true_t,
-                if_false_with_resolved_type,
-            )
+            // if_false can coerce to if_true type
+            let if_false_coerced = try_coerce_to(if_false_t, &if_true_t.inferred_type);
+            (if_true_t.inferred_type.clone(), if_true_t, if_false_coerced)
         } else {
             // Types don't match and can't be implicitly cast
             return Err(DiagnosticKind::ExpectedSameType(

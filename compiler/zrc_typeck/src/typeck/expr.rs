@@ -9,6 +9,7 @@ mod literals;
 mod misc;
 mod unary;
 
+pub use helpers::try_coerce_to;
 use zrc_diagnostics::Diagnostic;
 use zrc_parser::ast::expr::{Expr, ExprKind};
 

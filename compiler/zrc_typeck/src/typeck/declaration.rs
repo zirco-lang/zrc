@@ -8,6 +8,7 @@ use zrc_utils::span::{Spannable, Spanned};
 
 use super::{
     block::BlockReturnAbility,
+    expr::try_coerce_to,
     resolve_type,
     scope::{GlobalScope, Scope},
     ty::resolve_type_with_self_reference,
@@ -91,13 +92,18 @@ pub fn process_let_declaration<'input>(
                             inferred_type.clone()
                         };
 
+                        let value_coerced = try_coerce_to(
+                            TypedExpr {
+                                inferred_type,
+                                kind,
+                            },
+                            &resolved_type,
+                        );
+
                         TastLetDeclaration {
                             name: let_declaration.name,
-                            ty: resolved_type.clone(),
-                            value: Some(TypedExpr {
-                                inferred_type: resolved_type,
-                                kind,
-                            }),
+                            ty: resolved_type,
+                            value: Some(value_coerced),
                         }
                     }
 
@@ -120,15 +126,17 @@ pub fn process_let_declaration<'input>(
                             }
                         } else if inferred_type.can_implicitly_cast_to(&resolved_ty) {
                             // Insert implicit cast (e.g., {int} -> i8)
-                            // Update the inner expression's type to match the target
-                            let value_with_resolved_type = TypedExpr {
-                                inferred_type: resolved_ty.clone(),
-                                kind,
-                            };
+                            let value_coerced = try_coerce_to(
+                                TypedExpr {
+                                    inferred_type,
+                                    kind,
+                                },
+                                &resolved_ty,
+                            );
                             TastLetDeclaration {
                                 name: let_declaration.name,
-                                ty: resolved_ty.clone(),
-                                value: Some(value_with_resolved_type),
+                                ty: resolved_ty,
+                                value: Some(value_coerced),
                             }
                         } else {
                             return Err(DiagnosticKind::InvalidAssignmentRightHandSideType {

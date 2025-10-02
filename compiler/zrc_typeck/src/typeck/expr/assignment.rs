@@ -6,7 +6,7 @@ use zrc_utils::span::{Span, Spannable};
 
 use super::{
     super::scope::Scope,
-    helpers::{desugar_assignment, expr_to_place},
+    helpers::{desugar_assignment, expr_to_place, try_coerce_to},
     type_expr,
 };
 use crate::tast::expr::{TypedExpr, TypedExprKind};
@@ -35,15 +35,11 @@ pub fn type_expr_assignment<'input>(
         .inferred_type
         .can_implicitly_cast_to(&place_t.inferred_type)
     {
-        // Implicitly resolve type (e.g., {int} -> i32)
-        // No runtime cast needed, just update the type
-        let value_with_resolved_type = TypedExpr {
-            inferred_type: place_t.inferred_type.clone(),
-            kind: value_t.kind,
-        };
+        // Try to coerce the value to the place type
+        let value_coerced = try_coerce_to(value_t, &place_t.inferred_type);
         Ok(TypedExpr {
             inferred_type: place_t.inferred_type.clone(),
-            kind: TypedExprKind::Assignment(Box::new(place_t), Box::new(value_with_resolved_type))
+            kind: TypedExprKind::Assignment(Box::new(place_t), Box::new(value_coerced))
                 .in_span(expr_span),
         })
     } else {
