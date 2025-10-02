@@ -59,11 +59,12 @@ impl Span {
         self.start()..=self.end()
     }
 
-    /// Creates a [`Spanned<T>`] instance using this [`Span`] and a passed value
+    /// Creates a [`Spanned<T>`] instance using this [`Span`], a passed value,
+    /// and a file name
     #[must_use]
     #[inline]
-    pub const fn containing<T>(self, value: T) -> Spanned<T> {
-        Spanned::from_span_and_value(self, value)
+    pub const fn containing<T>(self, value: T, file_name: &'static str) -> Spanned<T> {
+        Spanned::from_span_and_value(self, value, file_name)
     }
 
     /// Creates a new [`Span`] containing the intersection of two passed spans
@@ -99,13 +100,13 @@ impl Display for Span {
 /// - By attaching a [`Span`] to a value (with the [`Spannable`] trait's
 ///   [`Spannable::in_span`] method)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Spanned<T>(Span, T);
+pub struct Spanned<T>(Span, T, &'static str);
 impl<T> Spanned<T> {
-    /// Create a new [`Spanned<T>`] instance from a [`Span`] and some value
+    /// Create a new [`Spanned<T>`] instance from a [`Span`], value, and file name
     #[must_use]
     #[inline]
-    pub const fn from_span_and_value(span: Span, value: T) -> Self {
-        Self(span, value)
+    pub const fn from_span_and_value(span: Span, value: T, file_name: &'static str) -> Self {
+        Self(span, value, file_name)
     }
 
     /// Obtains the [`Span`] associated with this [`Spanned<T>`] instance
@@ -121,11 +122,20 @@ impl<T> Spanned<T> {
         &self.1
     }
 
+    /// Obtains the file name associated with this [`Spanned<T>`] instance
+    #[must_use]
+    #[inline]
+    pub const fn file_name(&self) -> &'static str {
+        self.2
+    }
+
     /// Applies a function to the contained value, returning a new
-    /// [`Spanned<T>`] instance with the same associated [`Span`]
+    /// [`Spanned<T>`] instance with the same associated [`Span`] and file name
     #[inline]
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Spanned<U> {
-        self.span().containing(f(self.into_value()))
+        let span = self.span();
+        let file_name = self.file_name();
+        Spanned::from_span_and_value(span, f(self.into_value()), file_name)
     }
 
     /// "Strips" the [`Spanned<T>`] of its [`Span`], returning the inner value
@@ -155,7 +165,7 @@ impl<T> Spanned<T> {
     /// Converts a [`&Spanned<T>`][Spanned] to a [`Spanned<&T>`].
     #[inline]
     pub const fn as_ref(&self) -> Spanned<&T> {
-        self.span().containing(&self.1)
+        Spanned::from_span_and_value(self.span(), &self.1, self.file_name())
     }
 }
 impl<T> Display for Spanned<T>
@@ -172,7 +182,8 @@ impl<T> Spanned<Option<T>> {
     /// [`Spanned`] [`Some`] from [`None`], what span would you use?
     pub fn transpose(self) -> Option<Spanned<T>> {
         let span = self.span();
-        self.into_value().map(|x| x.in_span(span))
+        let file_name = self.file_name();
+        self.into_value().map(|x| Spanned::from_span_and_value(span, x, file_name))
     }
 }
 impl<T, E> Spanned<Result<T, E>> {
@@ -182,9 +193,10 @@ impl<T, E> Spanned<Result<T, E>> {
     #[allow(clippy::missing_errors_doc)] // just propagates input error
     pub fn transpose(self) -> Result<Spanned<T>, Spanned<E>> {
         let span = self.span();
+        let file_name = self.file_name();
         self.into_value()
-            .map(|x| x.in_span(span))
-            .map_err(|x| x.in_span(span))
+            .map(|x| Spanned::from_span_and_value(span, x, file_name))
+            .map_err(|x| Spanned::from_span_and_value(span, x, file_name))
     }
 }
 
@@ -194,23 +206,23 @@ pub trait Spannable
 where
     Self: Sized,
 {
-    /// Attach a [`Span`] to this value, creating a [`Spanned<T>`] instance
+    /// Attach a [`Span`] and file name to this value, creating a [`Spanned<T>`] instance
     ///
-    /// This method can be used to attach a [`Span`] to any arbitrary value. It
+    /// This method can be used to attach a [`Span`] and file name to any arbitrary value. It
     /// is a cleaner syntax for the [`Spanned::from_span_and_value`] or
     /// [`Span::containing`] functions.
-    fn in_span(self, span: Span) -> Spanned<Self>;
+    fn in_span(self, span: Span, file_name: &'static str) -> Spanned<Self>;
 }
 
 // Automatically implement Spannable for all types
 impl<T: Sized> Spannable for T {
     #[inline]
-    fn in_span(self, span: Span) -> Spanned<Self> {
-        Spanned::from_span_and_value(span, self)
+    fn in_span(self, span: Span, file_name: &'static str) -> Spanned<Self> {
+        Spanned::from_span_and_value(span, self, file_name)
     }
 }
 
-/// Create a [`Spanned<T>`] instance from two locations and a value.
+/// Create a [`Spanned<T>`] instance from two locations, a value, and a file name.
 /// Simply just expands to a [`Spanned::from_span_and_value`] and
 /// [`Span::from_positions`] calls.
 ///
@@ -218,10 +230,11 @@ impl<T: Sized> Spannable for T {
 /// Panics if `start > end`.
 #[macro_export]
 macro_rules! spanned {
-    ($start:expr, $value:expr, $end:expr) => {
+    ($start:expr, $value:expr, $end:expr, $file_name:expr) => {
         $crate::span::Spanned::from_span_and_value(
             $crate::span::Span::from_positions($start, $end),
             $value,
+            $file_name,
         )
     };
 }
@@ -233,8 +246,8 @@ mod tests {
     #[test]
     fn spanned_macro_creates_spanned_item() {
         assert_eq!(
-            spanned!(0, (), 3),
-            Spanned::from_span_and_value(Span::from_positions(0, 3), ())
+            spanned!(0, (), 3, "test.zrc"),
+            Spanned::from_span_and_value(Span::from_positions(0, 3), (), "test.zrc")
         );
     }
 
@@ -277,8 +290,8 @@ mod tests {
         #[test]
         fn span_containing_returns_spanned() {
             assert_eq!(
-                Span::from_positions(0, 3).containing(()),
-                spanned!(0, (), 3)
+                Span::from_positions(0, 3).containing((), "test.zrc"),
+                spanned!(0, (), 3, "test.zrc")
             );
         }
     }
@@ -289,63 +302,64 @@ mod tests {
         #[test]
         fn basic_methods_work_as_expected() {
             let span = Span::from_positions(3, 6);
-            let spanned = Spanned::from_span_and_value(span, 0);
+            let spanned = Spanned::from_span_and_value(span, 0, "test.zrc");
 
             assert_eq!(spanned.span(), span);
             assert_eq!(spanned.start(), 3);
             assert_eq!(spanned.end(), 6);
             assert_eq!(spanned.value(), &0);
+            assert_eq!(spanned.file_name(), "test.zrc");
             assert_eq!(spanned.into_value(), 0);
         }
 
         #[test]
         fn map_works_as_expected() {
-            let spanned = spanned!(3, 0, 6);
+            let spanned = spanned!(3, 0, 6, "test.zrc");
 
-            assert_eq!(spanned.map(|n| n == 0), spanned!(3, true, 6));
+            assert_eq!(spanned.map(|n| n == 0), spanned!(3, true, 6, "test.zrc"));
         }
 
         #[test]
         fn as_ref_works_as_expected() {
-            let spanned = spanned!(3, 0, 6);
+            let spanned = spanned!(3, 0, 6, "test.zrc");
 
-            assert_eq!(spanned.as_ref(), spanned!(3, &0, 6));
+            assert_eq!(spanned.as_ref(), spanned!(3, &0, 6, "test.zrc"));
         }
 
         #[test]
         fn transpose_option_some_case() {
-            let spanned = spanned!(3, Some(0), 6);
+            let spanned = spanned!(3, Some(0), 6, "test.zrc");
 
-            assert_eq!(spanned.transpose(), Some(spanned!(3, 0, 6)));
+            assert_eq!(spanned.transpose(), Some(spanned!(3, 0, 6, "test.zrc")));
         }
 
         #[test]
         fn transpose_option_none_case() {
-            let spanned: Spanned<Option<()>> = spanned!(3, None, 6);
+            let spanned: Spanned<Option<()>> = spanned!(3, None, 6, "test.zrc");
 
             assert_eq!(spanned.transpose(), None);
         }
 
         #[test]
         fn transpose_result_ok_case() {
-            let spanned: Spanned<Result<i32, ()>> = spanned!(3, Ok(0), 6);
+            let spanned: Spanned<Result<i32, ()>> = spanned!(3, Ok(0), 6, "test.zrc");
 
-            assert_eq!(spanned.transpose(), Ok(spanned!(3, 0, 6)));
+            assert_eq!(spanned.transpose(), Ok(spanned!(3, 0, 6, "test.zrc")));
         }
 
         #[test]
         fn transpose_result_err_case() {
-            let spanned: Spanned<Result<(), i32>> = spanned!(3, Err(0), 6);
+            let spanned: Spanned<Result<(), i32>> = spanned!(3, Err(0), 6, "test.zrc");
 
-            assert_eq!(spanned.transpose(), Err(spanned!(3, 0, 6)));
+            assert_eq!(spanned.transpose(), Err(spanned!(3, 0, 6, "test.zrc")));
         }
     }
 
     #[test]
     fn spannable_in_span_creates_spanned() {
         assert_eq!(
-            7.in_span(Span::from_positions(3, 6)),
-            Spanned(Span(3, 6), 7),
+            7.in_span(Span::from_positions(3, 6), "test.zrc"),
+            Spanned(Span(3, 6), 7, "test.zrc"),
         );
     }
 }

@@ -113,12 +113,12 @@ pub enum DiagnosticKind {
     GlobalInitializerMustBeConstant,
 }
 impl DiagnosticKind {
-    /// Create an [error] diagnostic in a given [`Span`]
+    /// Create an [error] diagnostic in a given [`Span`] and file
     ///
     /// [error]: [`Severity::Error`]
     #[must_use]
     #[inline]
-    pub fn error_in(self, span: Span) -> Diagnostic {
-        Diagnostic(Severity::Error, self.in_span(span))
+    pub fn error_in(self, span: Span, file_name: &'static str) -> Diagnostic {
+        Diagnostic(Severity::Error, self.in_span(span, file_name))
     }
 }

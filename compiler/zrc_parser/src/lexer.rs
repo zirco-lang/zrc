@@ -14,17 +14,19 @@
 //! use zrc_parser::lexer::{ZircoLexer, Tok, NumberLiteral};
 //! use zrc_utils::{span::{Span, Spanned}, spanned};
 //!
-//! let mut lex = ZircoLexer::new("2 + 2");
+//! let mut lex = ZircoLexer::new("2 + 2", "test.zrc");
 //! assert_eq!(lex.next(), Some(spanned!(
 //!     0,
 //!     Ok(Tok::NumberLiteral(NumberLiteral::Decimal("2"))),
-//!     1
+//!     1,
+//!     "test.zrc"
 //! )));
-//! assert_eq!(lex.next(), Some(spanned!(2, Ok(Tok::Plus), 3)));
+//! assert_eq!(lex.next(), Some(spanned!(2, Ok(Tok::Plus), 3, "test.zrc")));
 //! assert_eq!(lex.next(), Some(spanned!(
 //!     4,
 //!     Ok(Tok::NumberLiteral(NumberLiteral::Decimal("2"))),
-//!     5
+//!     5,
+//!     "test.zrc"
 //! )));
 //! assert_eq!(lex.next(), None);
 //! ```
@@ -651,14 +653,17 @@ impl ZrcString<'_> {
 pub struct ZircoLexer<'input> {
     /// The internal [`Lexer`] we wrap
     lex: Lexer<'input, Tok<'input>>,
+    /// The file name associated with this lexer
+    file_name: &'static str,
 }
 
 impl<'input> ZircoLexer<'input> {
-    /// Create a new [`ZircoLexer`] given an input string
+    /// Create a new [`ZircoLexer`] given an input string and file name
     #[must_use]
-    pub fn new(input: &'input str) -> Self {
+    pub fn new(input: &'input str, file_name: &'static str) -> Self {
         ZircoLexer {
             lex: Tok::lexer(input),
+            file_name,
         }
     }
 }
@@ -690,7 +695,7 @@ impl<'input> Iterator for ZircoLexer<'input> {
                         LexicalError::JavascriptUserDetected(expected)
                     }
                 })
-                .in_span(span),
+                .in_span(span, self.file_name),
         )
     }
 }
@@ -701,31 +706,33 @@ mod tests {
 
     use super::*;
 
+    const TEST_FILE: &str = "test.zrc";
+
     #[test]
     fn whitespace_should_be_skipped() {
-        let lexer = ZircoLexer::new(" t\t e \n\ns\nt\r\n  s");
+        let lexer = ZircoLexer::new(" t\t e \n\ns\nt\r\n  s", TEST_FILE);
         let tokens: Vec<_> = lexer
             .map(|x| x.transpose().expect("lexing should succeed"))
             .collect();
         assert_eq!(
             tokens,
             vec![
-                spanned!(1, Tok::Identifier("t"), 2),
-                spanned!(4, Tok::Identifier("e"), 5),
-                spanned!(8, Tok::Identifier("s"), 9),
-                spanned!(10, Tok::Identifier("t"), 11),
-                spanned!(15, Tok::Identifier("s"), 16),
+                spanned!(1, Tok::Identifier("t"), 2, TEST_FILE),
+                spanned!(4, Tok::Identifier("e"), 5, TEST_FILE),
+                spanned!(8, Tok::Identifier("s"), 9, TEST_FILE),
+                spanned!(10, Tok::Identifier("t"), 11, TEST_FILE),
+                spanned!(15, Tok::Identifier("s"), 16, TEST_FILE),
             ]
         );
     }
 
     #[test]
     fn unclosed_strings_should_error() {
-        let lexer = ZircoLexer::new("\"abc");
+        let lexer = ZircoLexer::new("\"abc", TEST_FILE);
         let tokens: Vec<_> = lexer.collect();
         assert_eq!(
             tokens,
-            vec![spanned!(0, Err(LexicalError::UnterminatedStringLiteral), 4),]
+            vec![spanned!(0, Err(LexicalError::UnterminatedStringLiteral), 4, TEST_FILE),]
         );
     }
 
@@ -815,7 +822,7 @@ mod tests {
         ];
 
         assert_eq!(
-            ZircoLexer::new(input)
+            ZircoLexer::new(input, TEST_FILE)
                 .map(|x| x.transpose().expect("lexing should succeed").into_value())
                 .collect::<Vec<_>>(),
             tokens
@@ -844,16 +851,16 @@ mod tests {
                 "// def\n",
                 "c // ghi\n",
                 "// jkl",
-            ));
+            ), TEST_FILE);
             let tokens: Vec<_> = lexer
                 .map(|x| x.transpose().expect("lexing should succeed"))
                 .collect();
             assert_eq!(
                 tokens,
                 vec![
-                    spanned!(0, Tok::Identifier("a"), 1),
-                    spanned!(8, Tok::Identifier("b"), 9),
-                    spanned!(17, Tok::Identifier("c"), 18),
+                    spanned!(0, Tok::Identifier("a"), 1, TEST_FILE),
+                    spanned!(8, Tok::Identifier("b"), 9, TEST_FILE),
+                    spanned!(17, Tok::Identifier("c"), 18, TEST_FILE),
                 ]
             );
         }
@@ -861,17 +868,17 @@ mod tests {
         /// Non-nested multi-line comments work as expected
         #[test]
         fn multiline_comments_are_skipped() {
-            let lexer = ZircoLexer::new("a\nb/* abc */c/*\naaa\n*/d");
+            let lexer = ZircoLexer::new("a\nb/* abc */c/*\naaa\n*/d", TEST_FILE);
             let tokens: Vec<_> = lexer
                 .map(|x| x.transpose().expect("lexing should succeed"))
                 .collect();
             assert_eq!(
                 tokens,
                 vec![
-                    spanned!(0, Tok::Identifier("a"), 1),
-                    spanned!(2, Tok::Identifier("b"), 3),
-                    spanned!(12, Tok::Identifier("c"), 13),
-                    spanned!(22, Tok::Identifier("d"), 23),
+                    spanned!(0, Tok::Identifier("a"), 1, TEST_FILE),
+                    spanned!(2, Tok::Identifier("b"), 3, TEST_FILE),
+                    spanned!(12, Tok::Identifier("c"), 13, TEST_FILE),
+                    spanned!(22, Tok::Identifier("d"), 23, TEST_FILE),
                 ]
             );
         }
@@ -879,15 +886,15 @@ mod tests {
         /// Nested multi-line comments work as expected
         #[test]
         fn nested_multiline_comments_are_skipped() {
-            let lexer = ZircoLexer::new("a/* /* */ */b"); // should lex OK
+            let lexer = ZircoLexer::new("a/* /* */ */b", TEST_FILE); // should lex OK
             let tokens: Vec<_> = lexer
                 .map(|x| x.transpose().expect("lexing should succeed"))
                 .collect();
             assert_eq!(
                 tokens,
                 vec![
-                    spanned!(0, Tok::Identifier("a"), 1),
-                    spanned!(12, Tok::Identifier("b"), 13),
+                    spanned!(0, Tok::Identifier("a"), 1, TEST_FILE),
+                    spanned!(12, Tok::Identifier("b"), 13, TEST_FILE),
                 ]
             );
         }
@@ -895,13 +902,13 @@ mod tests {
         /// Unclosed nested comments produce the correct error
         #[test]
         fn unclosed_multiline_comments_fail() {
-            let lexer = ZircoLexer::new("a /* /*");
+            let lexer = ZircoLexer::new("a /* /*", TEST_FILE);
             let tokens: Vec<_> = lexer.collect();
             assert_eq!(
                 tokens,
                 vec![
-                    spanned!(0, Ok(Tok::Identifier("a")), 1),
-                    spanned!(2, Err(LexicalError::UnterminatedBlockComment), 7),
+                    spanned!(0, Ok(Tok::Identifier("a")), 1, TEST_FILE),
+                    spanned!(2, Err(LexicalError::UnterminatedBlockComment), 7, TEST_FILE),
                 ]
             );
         }

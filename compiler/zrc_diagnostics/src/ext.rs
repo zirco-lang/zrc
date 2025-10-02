@@ -1,22 +1,8 @@
 //! Extension types for Zirco diagnostics
 
-use zrc_utils::span::{Span, Spannable, Spanned};
+use zrc_utils::span::Spanned;
 
 use crate::{Diagnostic, DiagnosticKind, Severity};
-
-/// A trait to easily create [`Diagnostic`]s from [`Span`]s
-/// See also: [`Spannable`]
-pub trait SpanExt {
-    /// Create a [`Diagnostic`] from this [`Span`] and a [`DiagnosticKind`]
-    #[must_use]
-    fn error(self, kind: DiagnosticKind) -> Diagnostic;
-}
-impl SpanExt for Span {
-    #[inline]
-    fn error(self, kind: DiagnosticKind) -> Diagnostic {
-        Diagnostic(Severity::Error, kind.in_span(self))
-    }
-}
 
 /// A trait to easily create [`Diagnostic`]s from [`Spanned`]s
 /// See also: [`SpanExt`] and [`Spannable`]
@@ -34,22 +20,24 @@ impl<T> SpannedExt<T> for Spanned<T> {
 
 #[cfg(test)]
 mod tests {
-    use zrc_utils::spanned;
+    use zrc_utils::{span::Span, spanned};
 
     use super::*;
+    use crate::DiagnosticKind;
 
     #[test]
-    fn span_ext_creates_diagnostic() {
+    fn diagnostic_kind_error_in_creates_diagnostic() {
         let span = Span::from_positions(0, 5);
-        let diagnostic = span.error(DiagnosticKind::InvalidToken);
+        let diagnostic = DiagnosticKind::InvalidToken.error_in(span, "test.zrc");
 
         assert_eq!(diagnostic.0, Severity::Error);
         assert_eq!(diagnostic.1.span(), span);
+        assert_eq!(diagnostic.1.file_name(), "test.zrc");
     }
 
     #[test]
     fn spanned_ext_creates_diagnostic() {
-        let spanned_str = spanned!(0, "test", 4);
+        let spanned_str = spanned!(0, "test", 4, "test.zrc");
         let diagnostic =
             spanned_str.error(|value| DiagnosticKind::UnableToResolveIdentifier(value.to_string()));
 

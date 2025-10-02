@@ -104,7 +104,7 @@ mod tests {
     fn diagnostic_display_includes_severity_and_kind() {
         let diagnostic = Diagnostic(
             Severity::Error,
-            spanned!(0, DiagnosticKind::InvalidToken, 4),
+            spanned!(0, DiagnosticKind::InvalidToken, 4, "test.zrc"),
         );
         let display = diagnostic.to_string();
         assert!(display.contains("error"));
@@ -116,7 +116,7 @@ mod tests {
         let source = "let x = 5;";
         let diagnostic = Diagnostic(
             Severity::Error,
-            spanned!(4, DiagnosticKind::InvalidToken, 5),
+            spanned!(4, DiagnosticKind::InvalidToken, 5, "test.zrc"),
         );
         let path = Path::new("test.zrc");
         let output = diagnostic.print_with_filename(source, path);

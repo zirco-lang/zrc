@@ -37,28 +37,27 @@ use crate::{
 /// Converts from a LALRPOP [`ParseError`] to a corresponding [`Diagnostic`].
 fn parser_error_to_diagnostic(
     error: ParseError<usize, lexer::Tok, Spanned<LexicalError>>,
+    file_name: &'static str,
 ) -> Diagnostic {
     match error {
-        ParseError::InvalidToken { location } => {
-            DiagnosticKind::InvalidToken.error_in(Span::from_positions(location, location))
-        }
+        ParseError::InvalidToken { location } => DiagnosticKind::InvalidToken
+            .error_in(Span::from_positions(location, location), file_name),
 
         ParseError::UnrecognizedEof { location, expected } => {
             DiagnosticKind::UnexpectedEof(expected)
-                .error_in(Span::from_positions(location - 1, location))
+                .error_in(Span::from_positions(location - 1, location), file_name)
         }
 
         ParseError::UnrecognizedToken {
             token: (start, token, end),
             expected,
         } => DiagnosticKind::UnrecognizedToken(token.to_string(), expected)
-            .error_in(Span::from_positions(start, end)),
+            .error_in(Span::from_positions(start, end), file_name),
 
         ParseError::ExtraToken {
             token: (start, token, end),
-        } => {
-            DiagnosticKind::ExtraToken(token.to_string()).error_in(Span::from_positions(start, end))
-        }
+        } => DiagnosticKind::ExtraToken(token.to_string())
+            .error_in(Span::from_positions(start, end), file_name),
 
         ParseError::User { error } => error.error(|error| match error {
             LexicalError::UnknownToken(token) => DiagnosticKind::UnknownToken(token.to_string()),
@@ -95,16 +94,22 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 /// Obtaining the AST of a program:
 /// ```
 /// use zrc_parser::parser::parse_program;
-/// let ast = parse_program("fn main() {}");
+/// let ast = parse_program("fn main() {}", "test.zrc");
 /// ```
 ///
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input program.
-pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration<'_>>>, Diagnostic> {
+pub fn parse_program(
+    input: &str,
+    file_name: &'static str,
+) -> Result<Vec<Spanned<Declaration<'_>>>, Diagnostic> {
     internal_parser::ProgramParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
-        .map_err(parser_error_to_diagnostic)
+        .parse(
+            file_name,
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
+        .map_err(|e| parser_error_to_diagnostic(e, file_name))
 }
 
 /// Parses a singular Zirco statement list, yielding a vector of AST [`Stmt`]
@@ -119,17 +124,23 @@ pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration<'_>>>, Diagn
 /// Obtaining the AST of a statement:
 /// ```
 /// use zrc_parser::parser::parse_stmt_list;
-/// let ast = parse_stmt_list("let x = 6;");
+/// let ast = parse_stmt_list("let x = 6;", "test.zrc");
 /// ```
 ///
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input statement list.
-pub fn parse_stmt_list(input: &str) -> Result<Spanned<Vec<Stmt<'_>>>, Diagnostic> {
+pub fn parse_stmt_list(
+    input: &str,
+    file_name: &'static str,
+) -> Result<Spanned<Vec<Stmt<'_>>>, Diagnostic> {
     internal_parser::StmtListParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
-        .map(|stmt_list| stmt_list.in_span(Span::from_positions(0, input.len())))
-        .map_err(parser_error_to_diagnostic)
+        .parse(
+            file_name,
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
+        .map(|stmt_list| stmt_list.in_span(Span::from_positions(0, input.len()), file_name))
+        .map_err(|e| parser_error_to_diagnostic(e, file_name))
 }
 
 /// Parses a singular Zirco type, yielding an AST [`Type`] node.
@@ -143,16 +154,19 @@ pub fn parse_stmt_list(input: &str) -> Result<Spanned<Vec<Stmt<'_>>>, Diagnostic
 /// Obtaining the AST of a type:
 /// ```
 /// use zrc_parser::parser::parse_type;
-/// let ast = parse_type("struct { x: i32 }");
+/// let ast = parse_type("struct { x: i32 }", "test.zrc");
 /// ```
 ///
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input expression.
-pub fn parse_type(input: &str) -> Result<Type<'_>, Diagnostic> {
+pub fn parse_type(input: &str, file_name: &'static str) -> Result<Type<'_>, Diagnostic> {
     internal_parser::TypeParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
-        .map_err(parser_error_to_diagnostic)
+        .parse(
+            file_name,
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
+        .map_err(|e| parser_error_to_diagnostic(e, file_name))
 }
 
 /// Parses a singular Zirco expression, yielding an AST [`Expr`] node.
@@ -166,16 +180,19 @@ pub fn parse_type(input: &str) -> Result<Type<'_>, Diagnostic> {
 /// Obtaining the AST of an expression:
 /// ```
 /// use zrc_parser::parser::parse_expr;
-/// let ast = parse_expr("1 + 2");
+/// let ast = parse_expr("1 + 2", "test.zrc");
 /// ```
 ///
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input expression.
-pub fn parse_expr(input: &str) -> Result<Expr<'_>, Diagnostic> {
+pub fn parse_expr(input: &str, file_name: &'static str) -> Result<Expr<'_>, Diagnostic> {
     internal_parser::ExprParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
-        .map_err(parser_error_to_diagnostic)
+        .parse(
+            file_name,
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
+        .map_err(|e| parser_error_to_diagnostic(e, file_name))
 }
 
 #[cfg(test)]

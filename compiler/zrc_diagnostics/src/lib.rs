@@ -61,4 +61,4 @@ mod ext;
 
 pub use diagnostic::{Diagnostic, Severity};
 pub use diagnostic_kind::DiagnosticKind;
-pub use ext::{SpanExt, SpannedExt};
+pub use ext::SpannedExt;
