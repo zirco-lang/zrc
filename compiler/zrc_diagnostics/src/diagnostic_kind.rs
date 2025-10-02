@@ -109,6 +109,10 @@ pub enum DiagnosticKind {
     SelfReferentialTypeNotBehindPointer(String),
     #[error("number literal `{0}` is out of bounds for type `{1}` (valid range: {2} to {3})")]
     NumberLiteralOutOfBounds(String, String, String, String),
+
+    // PREPROCESSOR ERRORS
+    #[error("preprocessor error: {0}")]
+    PreprocessorError(String),
 }
 impl DiagnosticKind {
     /// Create an [error] diagnostic in a given [`Span`]

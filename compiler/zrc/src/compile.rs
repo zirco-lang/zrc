@@ -18,6 +18,10 @@ pub fn compile(
     triple: &zrc_codegen::TargetTriple,
     cpu: &str,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
+    // === PREPROCESSOR ===
+    let preprocessed = zrc_preprocessor::preprocess::preprocess(file_name, content)?;
+    let content = preprocessed.content();
+    
     // === PARSER ===
     let ast = zrc_parser::parser::parse_program(content)?;
 
