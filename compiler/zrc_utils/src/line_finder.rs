@@ -66,3 +66,48 @@ impl LineLookup {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn line_lookup_finds_first_line() {
+        let input = "hello\nworld\ntest";
+        let lookup = LineLookup::new(input);
+
+        let result = lookup.lookup_from_index(0);
+        assert_eq!(result.line, 1);
+        assert_eq!(result.col, 1);
+    }
+
+    #[test]
+    fn line_lookup_finds_second_line() {
+        let input = "hello\nworld\ntest";
+        let lookup = LineLookup::new(input);
+
+        let result = lookup.lookup_from_index(6); // 'w' in "world"
+        assert_eq!(result.line, 2);
+        assert_eq!(result.col, 1);
+    }
+
+    #[test]
+    fn line_lookup_finds_column_correctly() {
+        let input = "hello\nworld\ntest";
+        let lookup = LineLookup::new(input);
+
+        let result = lookup.lookup_from_index(9); // 'd' in "world"
+        assert_eq!(result.line, 2);
+        assert_eq!(result.col, 4);
+    }
+
+    #[test]
+    fn line_lookup_finds_third_line() {
+        let input = "hello\nworld\ntest";
+        let lookup = LineLookup::new(input);
+
+        let result = lookup.lookup_from_index(12); // 't' in "test"
+        assert_eq!(result.line, 3);
+        assert_eq!(result.col, 1);
+    }
+}

@@ -356,3 +356,97 @@ impl Display for TypedDeclaration<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use zrc_utils::spanned;
+
+    use super::*;
+
+    #[test]
+    fn let_declaration_displays_correctly() {
+        let decl = LetDeclaration {
+            name: spanned!(0, "x", 1),
+            ty: Type::I32,
+            value: None,
+        };
+        assert_eq!(decl.to_string(), "x: i32");
+    }
+
+    #[test]
+    fn let_declaration_with_value_displays_correctly() {
+        let decl = LetDeclaration {
+            name: spanned!(0, "x", 1),
+            ty: Type::I32,
+            value: Some(TypedExpr {
+                inferred_type: Type::I32,
+                kind: spanned!(0, super::super::expr::TypedExprKind::Identifier("y"), 1),
+            }),
+        };
+        let display = decl.to_string();
+        assert!(display.contains("x: i32"));
+        assert!(display.contains('='));
+    }
+
+    #[test]
+    fn typed_stmt_continue_displays_correctly() {
+        let stmt = TypedStmt(spanned!(0, TypedStmtKind::ContinueStmt, 8));
+        assert_eq!(stmt.to_string(), "continue;");
+    }
+
+    #[test]
+    fn typed_stmt_break_displays_correctly() {
+        let stmt = TypedStmt(spanned!(0, TypedStmtKind::BreakStmt, 5));
+        assert_eq!(stmt.to_string(), "break;");
+    }
+
+    #[test]
+    fn typed_stmt_return_without_value_displays_correctly() {
+        let stmt = TypedStmt(spanned!(0, TypedStmtKind::ReturnStmt(None), 6));
+        assert_eq!(stmt.to_string(), "return;");
+    }
+
+    #[test]
+    fn argument_declaration_displays_correctly() {
+        let arg = ArgumentDeclaration {
+            name: spanned!(0, "x", 1),
+            ty: spanned!(3, Type::I32, 6),
+        };
+        assert_eq!(arg.to_string(), "x: i32");
+    }
+
+    #[test]
+    fn argument_declaration_list_non_variadic_displays_correctly() {
+        let list = ArgumentDeclarationList::NonVariadic(vec![
+            ArgumentDeclaration {
+                name: spanned!(0, "x", 1),
+                ty: spanned!(3, Type::I32, 6),
+            },
+            ArgumentDeclaration {
+                name: spanned!(8, "y", 9),
+                ty: spanned!(11, Type::Bool, 15),
+            },
+        ]);
+        assert_eq!(list.to_string(), "x: i32, y: bool");
+    }
+
+    #[test]
+    fn argument_declaration_list_variadic_displays_correctly() {
+        let list = ArgumentDeclarationList::Variadic(vec![ArgumentDeclaration {
+            name: spanned!(0, "x", 1),
+            ty: spanned!(3, Type::I32, 6),
+        }]);
+        let display = list.to_string();
+        assert!(display.contains("x: i32"));
+        assert!(display.contains("..."));
+    }
+
+    #[test]
+    fn argument_declaration_list_is_variadic_works() {
+        let variadic = ArgumentDeclarationList::Variadic(vec![]);
+        let non_variadic = ArgumentDeclarationList::NonVariadic(vec![]);
+
+        assert!(variadic.is_variadic());
+        assert!(!non_variadic.is_variadic());
+    }
+}
