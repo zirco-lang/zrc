@@ -278,6 +278,20 @@ pub fn process_declaration<'input>(
 
             None
         }
+        AstDeclaration::GlobalLetDeclaration(declarations) => {
+            let mut scope = global_scope.create_subscope();
+            let typed_declarations =
+                process_let_declaration(&mut scope, declarations.into_value())?;
+
+            // Add global variables to the global scope
+            for decl in &typed_declarations {
+                global_scope
+                    .global_values
+                    .insert(decl.value().name.value(), decl.value().ty.clone());
+            }
+
+            Some(TypedDeclaration::GlobalLetDeclaration(typed_declarations))
+        }
     })
 }
 

@@ -11,7 +11,7 @@ use inkwell::{
         CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
     },
     types::{AnyType, BasicMetadataTypeEnum, BasicTypeEnum},
-    values::{BasicValueEnum, FunctionValue},
+    values::{BasicValue, BasicValueEnum, FunctionValue},
 };
 use zrc_typeck::tast::{
     stmt::{ArgumentDeclaration, TypedDeclaration},
@@ -25,6 +25,65 @@ use crate::{
     scope::CgScope,
     ty::{create_fn, llvm_basic_type, llvm_type},
 };
+
+/// Evaluate a constant expression to an LLVM constant value.
+/// This is used for global variable initializers.
+///
+/// # Panics
+/// Panics if the expression is not a valid constant expression.
+#[allow(clippy::too_many_lines, clippy::wildcard_enum_match_arm)]
+fn eval_const_expr<'ctx>(
+    unit: &CompilationUnitCtx<'ctx, '_>,
+    expr: &zrc_typeck::tast::expr::TypedExpr,
+    ty: &Type,
+) -> BasicValueEnum<'ctx> {
+    use inkwell::types::StringRadix;
+    use zrc_typeck::tast::expr::{NumberLiteral, TypedExprKind};
+
+    match expr.kind.value() {
+        TypedExprKind::NumberLiteral(n, _) => {
+            let no_underscores = match n {
+                NumberLiteral::Decimal(string)
+                | NumberLiteral::Binary(string)
+                | NumberLiteral::Hexadecimal(string) => string.replace('_', ""),
+            };
+
+            let radix = match n {
+                NumberLiteral::Decimal(_) => StringRadix::Decimal,
+                NumberLiteral::Binary(_) => StringRadix::Binary,
+                NumberLiteral::Hexadecimal(_) => StringRadix::Hexadecimal,
+            };
+
+            let (llvm_ty, _) = llvm_basic_type(unit, ty);
+            llvm_ty
+                .into_int_type()
+                .const_int_from_string(&no_underscores, radix)
+                .expect("number literal should have parsed correctly")
+                .as_basic_value_enum()
+        }
+        TypedExprKind::BooleanLiteral(value) => unit
+            .ctx
+            .bool_type()
+            .const_int((*value).into(), false)
+            .as_basic_value_enum(),
+        TypedExprKind::StringLiteral(string) => {
+            let bytes = string.as_bytes();
+            unit.ctx
+                .const_string(bytes.as_bytes(), false)
+                .as_basic_value_enum()
+        }
+        TypedExprKind::CharLiteral(ch) => unit
+            .ctx
+            .i8_type()
+            .const_int(ch.as_byte().into(), false)
+            .as_basic_value_enum(),
+        _ => {
+            // For now, unsupported constant expressions default to zero
+            let (llvm_ty, _) = llvm_basic_type(unit, ty);
+            llvm_ty.const_zero()
+        }
+    }
+}
 
 /// Initialize the LLVM [`FunctionValue`] for a given function prototype
 /// This should only be used when generating **extern** declarations, as
@@ -342,6 +401,23 @@ fn cg_program<'ctx>(
                     parameters.value().is_variadic(),
                 );
                 global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
+            }
+            TypedDeclaration::GlobalLetDeclaration(declarations) => {
+                for let_decl in declarations {
+                    let let_declaration = let_decl.value();
+                    let (llvm_ty, _) = llvm_basic_type(&unit, &let_declaration.ty);
+
+                    let global = module.add_global(llvm_ty, None, let_declaration.name.value());
+
+                    // Evaluate constant expression or use zero initializer
+                    let initializer = let_declaration.value.as_ref().map_or_else(
+                        || llvm_ty.const_zero(),
+                        |value| eval_const_expr(&unit, value, &let_declaration.ty),
+                    );
+                    global.set_initializer(&initializer);
+
+                    global_scope.insert(let_declaration.name.value(), global.as_pointer_value());
+                }
             }
         }
     }
