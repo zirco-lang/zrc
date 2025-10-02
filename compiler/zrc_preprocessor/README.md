@@ -1,4 +1,4 @@
-# zrc_preprocessor
+# `zrc_preprocessor`
 
 The Zirco preprocessor handles file inclusion and other preprocessing directives
 before the source code is parsed.

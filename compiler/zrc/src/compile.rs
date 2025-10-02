@@ -19,11 +19,20 @@ pub fn compile(
     cpu: &str,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
     // === PREPROCESSOR ===
+    // Collect all source files (main file + includes)
     let preprocessed = zrc_preprocessor::preprocess::preprocess(file_name, content)?;
-    let content = preprocessed.content();
-    
+
     // === PARSER ===
-    let ast = zrc_parser::parser::parse_program(content)?;
+    // Parse all included files first
+    let mut ast = Vec::new();
+    for included_file in &preprocessed.included_files {
+        let included_ast = zrc_parser::parser::parse_program(&included_file.content)?;
+        ast.extend(included_ast);
+    }
+
+    // Then parse the main file
+    let main_ast = zrc_parser::parser::parse_program(&preprocessed.main_file.content)?;
+    ast.extend(main_ast);
 
     // display the AST if the user wants it
     if matches!(
