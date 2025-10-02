@@ -103,6 +103,9 @@ pub enum TypedExprKind<'input> {
     /// `sizeof(T)`
     SizeOf(Type<'input>),
 
+    /// `new Type { field1: value1, field2: value2, ... }`
+    StructConstruction(indexmap::IndexMap<&'input str, TypedExpr<'input>>),
+
     /// Any numeric literal.
     NumberLiteral(NumberLiteral<'input>, Type<'input>),
     /// Any string literal.
@@ -168,6 +171,17 @@ impl Display for TypedExprKind<'_> {
             }
             Self::Cast(expr, ty) => write!(f, "({expr}) as {ty}"),
             Self::SizeOf(ty) => write!(f, "sizeof {ty}"),
+            Self::StructConstruction(fields) => {
+                write!(
+                    f,
+                    "{{ {} }}",
+                    fields
+                        .iter()
+                        .map(|(name, expr)| format!("{name}: ({expr})"))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }
             Self::NumberLiteral(num, _ty) => write!(f, "{num}"),
             Self::StringLiteral(string) => write!(f, "\"{string}\""),
             Self::CharLiteral(ch) => write!(f, "'{ch}'"),

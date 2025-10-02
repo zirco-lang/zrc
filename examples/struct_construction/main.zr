@@ -19,7 +19,7 @@ fn print_color(c: Color) {
     printf("Color { r: %d, g: %d, b: %d }\n", c.r, c.g, c.b);
 }
 
-fn main() {
+fn main() -> i32 {
     printf("=== Struct Construction Examples ===\n");
     
     // Named struct construction
@@ -57,4 +57,6 @@ fn main() {
     printf("is %d\n", dist_sq);
     
     printf("\n=== All tests passed! ===\n");
+    
+    return 0;
 }
