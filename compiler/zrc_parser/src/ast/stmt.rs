@@ -339,24 +339,24 @@ mod tests {
             "return;",
             "break;",
             "continue;",
-            "return (4);",
-            "((f)((x)));",
+            "return 4;",
+            "f(x);",
             "{}",
             ";",
-            "if ((true)) {\n    ;\n}",
-            "if ((true)) {\n    ;\n} else {\n    ;\n}",
-            "while ((true)) {\n    ;\n}",
-            "do {\n    ;\n} while ((true));",
+            "if (true) {\n    ;\n}",
+            "if (true) {\n    ;\n} else {\n    ;\n}",
+            "while (true) {\n    ;\n}",
+            "do {\n    ;\n} while (true);",
             "for (; ; ) {\n    ;\n}",
-            "for (let x = (4); ; ) {\n    ;\n}",
-            "for (let x = (4), y = (5); ; ) {\n    ;\n}",
-            "for (let x = (4); (true); ) {\n    ;\n}",
+            "for (let x = 4; ; ) {\n    ;\n}",
+            "for (let x = 4, y = 5; ; ) {\n    ;\n}",
+            "for (let x = 4; true; ) {\n    ;\n}",
             "let x;",
-            "let x = (4);",
+            "let x = 4;",
             "let x: i32;",
-            "let x: i32 = (4);",
-            "{\n    let x = (4);\n}",
-            "switch ((7)) { (4) => (false); default => {\n    (12);\n} }",
+            "let x: i32 = 4;",
+            "{\n    let x = 4;\n}",
+            "switch (7) { 4 => false; default => {\n    12;\n} }",
         ];
 
         for input in test_cases {
@@ -378,7 +378,7 @@ mod tests {
         let test_case = indoc::indoc! {"
             fn add(a: i32, b: i32) -> bool;
             fn add(a: i32, b: i32) -> i32 {
-                return ((a) + (b));
+                return a + b;
             }
             fn no_return_extern();
             fn no_return() {
@@ -401,10 +401,10 @@ mod tests {
         // Test case from issue: AST to_string() should indent blocks properly
         let test_case = indoc::indoc! {"
             fn main() -> i32 {
-                if ((((2) + (2)) == (5))) {
-                    return (1);
+                if (2 + 2 == 5) {
+                    return 1;
                 } else {
-                    return (0);
+                    return 0;
                 }
             }"};
 
