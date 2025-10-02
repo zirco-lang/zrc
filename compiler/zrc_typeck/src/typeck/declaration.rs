@@ -15,13 +15,27 @@ use super::{
 };
 use crate::tast::{
     self,
-    expr::TypedExpr,
+    expr::{TypedExpr, TypedExprKind},
     stmt::{
         ArgumentDeclaration as TastArgumentDeclaration, LetDeclaration as TastLetDeclaration,
         TypedDeclaration,
     },
     ty::{Fn, FunctionDeclarationGlobalMetadata, Type as TastType},
 };
+
+/// Check if an expression is a constant expression that can be evaluated at
+/// compile time.
+///
+/// Currently, only literal expressions are considered constant.
+const fn is_constant_expr(expr: &TypedExpr) -> bool {
+    matches!(
+        expr.kind.value(),
+        TypedExprKind::NumberLiteral(_, _)
+            | TypedExprKind::BooleanLiteral(_)
+            | TypedExprKind::StringLiteral(_)
+            | TypedExprKind::CharLiteral(_)
+    )
+}
 
 /// Process a vector of [AST let declarations](AstLetDeclaration) and insert it
 /// into the scope, returning a vector of [TAST let
@@ -282,6 +296,17 @@ pub fn process_declaration<'input>(
             let mut scope = global_scope.create_subscope();
             let typed_declarations =
                 process_let_declaration(&mut scope, declarations.into_value())?;
+
+            // Validate that all initializers are constant expressions
+            for decl in &typed_declarations {
+                if let Some(ref value) = decl.value().value
+                    && !is_constant_expr(value)
+                {
+                    return Err(
+                        DiagnosticKind::GlobalInitializerMustBeConstant.error_in(value.kind.span())
+                    );
+                }
+            }
 
             // Add global variables to the global scope
             for decl in &typed_declarations {

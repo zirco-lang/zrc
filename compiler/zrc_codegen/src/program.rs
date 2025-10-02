@@ -78,9 +78,11 @@ fn eval_const_expr<'ctx>(
             .const_int(ch.as_byte().into(), false)
             .as_basic_value_enum(),
         _ => {
-            // For now, unsupported constant expressions default to zero
-            let (llvm_ty, _) = llvm_basic_type(unit, ty);
-            llvm_ty.const_zero()
+            // This should never happen as the type checker validates constant expressions
+            panic!(
+                "internal compiler error: non-constant expression in global initializer: {:?}",
+                expr.kind.value()
+            )
         }
     }
 }

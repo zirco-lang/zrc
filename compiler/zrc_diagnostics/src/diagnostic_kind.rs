@@ -109,6 +109,8 @@ pub enum DiagnosticKind {
     SelfReferentialTypeNotBehindPointer(String),
     #[error("number literal `{0}` is out of bounds for type `{1}` (valid range: {2} to {3})")]
     NumberLiteralOutOfBounds(String, String, String, String),
+    #[error("global variable initializer must be a constant expression")]
+    GlobalInitializerMustBeConstant,
 }
 impl DiagnosticKind {
     /// Create an [error] diagnostic in a given [`Span`]
