@@ -62,6 +62,7 @@ Version 0.1.0 (Draft)
    - [Type Alias Declarations](#63-type-alias-declarations)
    - [Struct Declarations](#64-struct-declarations)
    - [Union Declarations](#65-union-declarations)
+   - [Global Let Declarations](#66-global-let-declarations)
 7. [Functions](#7-functions)
    - [Function Declarations](#71-function-declarations)
    - [Function Parameters](#72-function-parameters)
@@ -1034,6 +1035,59 @@ This is equivalent to:
 ```zirco
 type Value = union { i: i32, f: f32, b: u8 };
 ```
+
+### 6.6 Global Let Declarations
+
+Global variables can be declared at the file scope using `let`:
+
+```zirco
+let MAX_SIZE: i32 = 1000;
+let DEBUG_MODE: bool = true;
+let VERSION: i8 = 1i8;
+```
+
+**Syntax**: `let name: type = initializer;`
+
+**Rules**:
+- Global variables must be declared at file scope (not inside functions)
+- Type annotation is required (no type inference for globals)
+- Initializer must be a constant expression (literals only)
+- Supported constant expressions:
+  - Number literals: `42`, `0xFF`, `0b1010`, `42i8`
+  - Boolean literals: `true`, `false`
+  - Character literals: `'a'`, `'\n'`
+  - String literals: `"hello"`
+- Variables without initializers are zero-initialized
+
+**Multiple Declarations**:
+```zirco
+let x: i32 = 10, y: i32 = 20, z: i32 = 30;
+```
+
+**Zero-Initialized Variable**:
+```zirco
+let counter: i32;  // initialized to 0
+```
+
+**Example with Usage**:
+```zirco
+let MAX_RETRIES: i32 = 5;
+let error_count: i32;
+
+fn increment_errors() {
+    error_count = error_count + 1;
+}
+
+fn should_retry() -> bool {
+    return error_count < MAX_RETRIES;
+}
+```
+
+**Restrictions**:
+- Initializers cannot reference other variables
+- Initializers cannot call functions
+- Initializers cannot use arithmetic or other operations
+- Global variables are always mutable
 
 ---
 

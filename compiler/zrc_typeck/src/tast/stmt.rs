@@ -92,6 +92,8 @@ pub enum TypedDeclaration<'input> {
         /// declaration.
         body: Option<Spanned<Vec<TypedStmt<'input>>>>,
     },
+    /// A global let declaration
+    GlobalLetDeclaration(Vec<Spanned<LetDeclaration<'input>>>),
 }
 
 /// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]
@@ -353,6 +355,16 @@ impl Display for TypedDeclaration<'_> {
                 return_type,
                 body: None,
             } => write!(f, "fn {name}({parameters}) -> {return_type};"),
+            Self::GlobalLetDeclaration(list) => {
+                write!(
+                    f,
+                    "let {};",
+                    list.iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
         }
     }
 }

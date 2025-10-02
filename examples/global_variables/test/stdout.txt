@@ -1,0 +1,6 @@
+Initial counter: 0
+Max count: 100
+Version: 1
+Enabled: 1
+After 3 increments: 3
+Still below maximum

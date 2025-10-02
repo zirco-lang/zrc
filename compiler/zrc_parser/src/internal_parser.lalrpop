@@ -114,6 +114,7 @@ Declaration: Declaration<'input> = {
     <FunctionDeclaration>,
     <StructOrUnionDeclaration>,
     <TypeAliasDeclaration>,
+    <GlobalLetDeclaration>,
 };
 
 FunctionDeclaration: Declaration<'input> = {
@@ -137,6 +138,10 @@ TypeAliasDeclaration: Declaration<'input> = {
         name: i,
         ty: t,
     },
+}
+
+GlobalLetDeclaration: Declaration<'input> = {
+    <Spanned<LetDeclaration>> => Declaration::GlobalLetDeclaration(<>),
 }
 
 // Type that allows parentheses - use in declaration contexts

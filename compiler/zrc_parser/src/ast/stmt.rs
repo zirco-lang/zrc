@@ -194,6 +194,8 @@ pub enum Declaration<'input> {
         /// The type to associate.
         ty: Type<'input>,
     },
+    /// A global let declaration
+    GlobalLetDeclaration(Spanned<Vec<Spanned<LetDeclaration<'input>>>>),
 }
 impl Display for Declaration<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -240,6 +242,16 @@ impl Display for Declaration<'_> {
             } => write!(f, "fn {name}({parameters});"),
 
             Self::TypeAliasDeclaration { name, ty } => write!(f, "type {name} = {ty};"),
+
+            Self::GlobalLetDeclaration(list) => write!(
+                f,
+                "let {};",
+                list.value()
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
         }
     }
 }
