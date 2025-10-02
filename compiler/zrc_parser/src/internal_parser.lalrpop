@@ -368,12 +368,6 @@ Primary: Expr<'input> = {
     Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
     Spanned<("sizeof" <Type>)> => Expr(<>.map(|t| ExprKind::SizeOfType(t))),
     Spanned<("sizeof" "(" <Expr> ")")> => Expr(<>.map(|ex| ExprKind::SizeOfExpr(Box::new(ex)))),
-    // Struct construction: (Type) [ fields ]
-    <s:@L> "(" <ty:Type> ")" "[" <fields:StructFieldInitList?> "]" <e:@R> => 
-        Expr(spanned!(s, ExprKind::StructConstruction(
-            ty, 
-            spanned!(s, fields.unwrap_or(Vec::new()), e)
-        ), e)),
     "(" <Expr> ")" => <>,
 };
 

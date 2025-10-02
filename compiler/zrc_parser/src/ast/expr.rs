@@ -235,9 +235,9 @@ pub enum ExprKind<'input> {
     /// `sizeof(expr)`
     SizeOfExpr(Box<Expr<'input>>),
 
-    /// Struct construction: `Type [ field1: value1, field2: value2 ]`
+    /// Struct construction: `(Type) [ field1: value1, field2: value2 ]` (NOT YET FULLY IMPLEMENTED IN PARSER)
     #[display(
-        "{_0} [ {} ]",
+        "({_0}) [ {} ]",
         _1.value()
             .iter()
             .map(|kv| format!("{}: {}", kv.value().0.value(), kv.value().1))
