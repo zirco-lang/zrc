@@ -17,7 +17,7 @@
 //! function.
 //! ```
 //! use zrc_parser::parser::parse_program;
-//! let ast = parse_program("fn main() {}");
+//! let ast = parse_program("fn main() {}", TEST_FILE);
 //! ```
 
 use lalrpop_util::ParseError;
@@ -202,6 +202,8 @@ mod tests {
     use super::*;
     use crate::ast::{expr::Expr, ty::Type};
 
+    const TEST_FILE: &str = "test.zrc";
+
     mod expr {
         use super::*;
 
@@ -209,21 +211,21 @@ mod tests {
         fn arithmetic_operators_parse_as_expected() {
             assert_eq!(
                 // ((1 + 1) - (((1 * 1) / 1) % 1))
-                parse_expr("1 + 1 - 1 * 1 / 1 % 1"),
+                parse_expr("1 + 1 - 1 * 1 / 1 % 1", TEST_FILE),
                 Ok(Expr::build_sub(
                     Expr::build_add(
-                        Expr::build_number_dec(spanned!(0, "1", 1), None),
-                        Expr::build_number_dec(spanned!(4, "1", 5), None)
+                        Expr::build_number_dec(spanned!(0, "1", 1, TEST_FILE), None),
+                        Expr::build_number_dec(spanned!(4, "1", 5, TEST_FILE), None)
                     ),
                     Expr::build_modulo(
                         Expr::build_div(
                             Expr::build_mul(
-                                Expr::build_number_dec(spanned!(8, "1", 9), None),
-                                Expr::build_number_dec(spanned!(12, "1", 13), None)
+                                Expr::build_number_dec(spanned!(8, "1", 9, TEST_FILE), None),
+                                Expr::build_number_dec(spanned!(12, "1", 13, TEST_FILE), None)
                             ),
-                            Expr::build_number_dec(spanned!(16, "1", 17), None)
+                            Expr::build_number_dec(spanned!(16, "1", 17, TEST_FILE), None)
                         ),
-                        Expr::build_number_dec(spanned!(20, "1", 21), None)
+                        Expr::build_number_dec(spanned!(20, "1", 21, TEST_FILE), None)
                     )
                 ))
             );
@@ -232,20 +234,20 @@ mod tests {
         #[test]
         fn bitwise_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("1 & 1 | 1 ^ 1 << 1 >> 1"),
+                parse_expr("1 & 1 | 1 ^ 1 << 1 >> 1", TEST_FILE),
                 Ok(Expr::build_bit_or(
                     Expr::build_bit_and(
-                        Expr::build_number_dec(spanned!(0, "1", 1), None),
-                        Expr::build_number_dec(spanned!(4, "1", 5), None)
+                        Expr::build_number_dec(spanned!(0, "1", 1, TEST_FILE), None),
+                        Expr::build_number_dec(spanned!(4, "1", 5, TEST_FILE), None)
                     ),
                     Expr::build_bit_xor(
-                        Expr::build_number_dec(spanned!(8, "1", 9), None),
+                        Expr::build_number_dec(spanned!(8, "1", 9, TEST_FILE), None),
                         Expr::build_shr(
                             Expr::build_shl(
-                                Expr::build_number_dec(spanned!(12, "1", 13), None),
-                                Expr::build_number_dec(spanned!(17, "1", 18), None)
+                                Expr::build_number_dec(spanned!(12, "1", 13, TEST_FILE), None),
+                                Expr::build_number_dec(spanned!(17, "1", 18, TEST_FILE), None)
                             ),
-                            Expr::build_number_dec(spanned!(22, "1", 23), None)
+                            Expr::build_number_dec(spanned!(22, "1", 23, TEST_FILE), None)
                         )
                     )
                 ))
@@ -255,13 +257,13 @@ mod tests {
         #[test]
         fn logical_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("1 && 1 || 1"),
+                parse_expr("1 && 1 || 1", TEST_FILE),
                 Ok(Expr::build_logical_or(
                     Expr::build_logical_and(
-                        Expr::build_number_dec(spanned!(0, "1", 1), None),
-                        Expr::build_number_dec(spanned!(5, "1", 6), None)
+                        Expr::build_number_dec(spanned!(0, "1", 1, TEST_FILE), None),
+                        Expr::build_number_dec(spanned!(5, "1", 6, TEST_FILE), None)
                     ),
-                    Expr::build_number_dec(spanned!(10, "1", 11), None)
+                    Expr::build_number_dec(spanned!(10, "1", 11, TEST_FILE), None)
                 ))
             );
         }
@@ -269,13 +271,13 @@ mod tests {
         #[test]
         fn equality_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("1 == 1 != 1"),
+                parse_expr("1 == 1 != 1", TEST_FILE),
                 Ok(Expr::build_neq(
                     Expr::build_eq(
-                        Expr::build_number_dec(spanned!(0, "1", 1), None),
-                        Expr::build_number_dec(spanned!(5, "1", 6), None)
+                        Expr::build_number_dec(spanned!(0, "1", 1, TEST_FILE), None),
+                        Expr::build_number_dec(spanned!(5, "1", 6, TEST_FILE), None)
                     ),
-                    Expr::build_number_dec(spanned!(10, "1", 11), None)
+                    Expr::build_number_dec(spanned!(10, "1", 11, TEST_FILE), None)
                 ))
             );
         }
@@ -283,19 +285,19 @@ mod tests {
         #[test]
         fn comparison_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("1 > 1 >= 1 < 1 <= 1"),
+                parse_expr("1 > 1 >= 1 < 1 <= 1", TEST_FILE),
                 Ok(Expr::build_lte(
                     Expr::build_lt(
                         Expr::build_gte(
                             Expr::build_gt(
-                                Expr::build_number_dec(spanned!(0, "1", 1), None),
-                                Expr::build_number_dec(spanned!(4, "1", 5), None)
+                                Expr::build_number_dec(spanned!(0, "1", 1, TEST_FILE), None),
+                                Expr::build_number_dec(spanned!(4, "1", 5, TEST_FILE), None)
                             ),
-                            Expr::build_number_dec(spanned!(9, "1", 10), None)
+                            Expr::build_number_dec(spanned!(9, "1", 10, TEST_FILE), None)
                         ),
-                        Expr::build_number_dec(spanned!(13, "1", 14), None)
+                        Expr::build_number_dec(spanned!(13, "1", 14, TEST_FILE), None)
                     ),
-                    Expr::build_number_dec(spanned!(18, "1", 19), None)
+                    Expr::build_number_dec(spanned!(18, "1", 19, TEST_FILE), None)
                 ))
             );
         }
@@ -303,7 +305,7 @@ mod tests {
         #[test]
         fn unary_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("!~-&*x"),
+                parse_expr("!~-&*x", TEST_FILE),
                 Ok(Expr::build_not(
                     Span::from_positions(0, 6),
                     Expr::build_bit_not(
@@ -314,7 +316,7 @@ mod tests {
                                 Span::from_positions(3, 6),
                                 Expr::build_deref(
                                     Span::from_positions(4, 6),
-                                    Expr::build_ident(spanned!(5, "x", 6))
+                                    Expr::build_ident(spanned!(5, "x", 6, TEST_FILE))
                                 )
                             )
                         )
@@ -326,17 +328,17 @@ mod tests {
         #[test]
         fn indexing_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("x[x].x->x"),
+                parse_expr("x[x].x->x", TEST_FILE),
                 Ok(Expr::build_arrow(
                     Expr::build_dot(
                         Expr::build_index(
                             Span::from_positions(0, 4),
-                            Expr::build_ident(spanned!(0, "x", 1)),
-                            Expr::build_ident(spanned!(2, "x", 3))
+                            Expr::build_ident(spanned!(0, "x", 1, TEST_FILE)),
+                            Expr::build_ident(spanned!(2, "x", 3, TEST_FILE))
                         ),
-                        spanned!(5, "x", 6)
+                        spanned!(5, "x", 6, TEST_FILE)
                     ),
-                    spanned!(8, "x", 9)
+                    spanned!(8, "x", 9, TEST_FILE)
                 ))
             );
         }
@@ -344,15 +346,15 @@ mod tests {
         #[test]
         fn function_calls_parse_as_expected() {
             assert_eq!(
-                parse_expr("f(x, y)"),
+                parse_expr("f(x, y)", TEST_FILE),
                 Ok(Expr::build_call(
                     Span::from_positions(0, 7),
-                    Expr::build_ident(spanned!(0, "f", 1)),
+                    Expr::build_ident(spanned!(0, "f", 1, TEST_FILE)),
                     spanned!(
                         1,
                         vec![
-                            Expr::build_ident(spanned!(2, "x", 3)),
-                            Expr::build_ident(spanned!(5, "y", 6))
+                            Expr::build_ident(spanned!(2, "x", 3, TEST_FILE)),
+                            Expr::build_ident(spanned!(5, "y", 6, TEST_FILE))
                         ],
                         7
                     )
@@ -363,11 +365,11 @@ mod tests {
         #[test]
         fn ternary_operator_parses_as_expected() {
             assert_eq!(
-                parse_expr("a ? b : c"),
+                parse_expr("a ? b : c", TEST_FILE),
                 Ok(Expr::build_ternary(
-                    Expr::build_ident(spanned!(0, "a", 1)),
-                    Expr::build_ident(spanned!(4, "b", 5)),
-                    Expr::build_ident(spanned!(8, "c", 9))
+                    Expr::build_ident(spanned!(0, "a", 1, TEST_FILE)),
+                    Expr::build_ident(spanned!(4, "b", 5, TEST_FILE)),
+                    Expr::build_ident(spanned!(8, "c", 9, TEST_FILE))
                 ))
             );
         }
@@ -375,10 +377,10 @@ mod tests {
         #[test]
         fn casts_parse_as_expected() {
             assert_eq!(
-                parse_expr("x as T"),
+                parse_expr("x as T", TEST_FILE),
                 Ok(Expr::build_cast(
-                    Expr::build_ident(spanned!(0, "x", 1)),
-                    Type::build_ident(spanned!(5, "T", 6))
+                    Expr::build_ident(spanned!(0, "x", 1, TEST_FILE)),
+                    Type::build_ident(spanned!(5, "T", 6, TEST_FILE))
                 ))
             );
         }
@@ -390,8 +392,8 @@ mod tests {
             #[test]
             fn number_literals_parse_as_expected() {
                 assert_eq!(
-                    parse_expr("1"),
-                    Ok(Expr::build_number_dec(spanned!(0, "1", 1), None))
+                    parse_expr("1", TEST_FILE),
+                    Ok(Expr::build_number_dec(spanned!(0, "1", 1, TEST_FILE), None))
                 );
             }
 
@@ -409,14 +411,14 @@ mod tests {
 
             #[test]
             fn identifiers_parse_as_expected() {
-                assert_eq!(parse_expr("x"), Ok(Expr::build_ident(spanned!(0, "x", 1))));
+                assert_eq!(parse_expr("x", TEST_FILE), Ok(Expr::build_ident(spanned!(0, "x", 1, TEST_FILE))));
             }
 
             #[test]
             fn booleans_parse_as_expected() {
                 assert_eq!(
-                    parse_expr("true"),
-                    Ok(Expr::build_bool(spanned!(0, true, 4)))
+                    parse_expr("true", TEST_FILE),
+                    Ok(Expr::build_bool(spanned!(0, true, 4, TEST_FILE)))
                 );
             }
         }

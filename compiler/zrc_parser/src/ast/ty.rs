@@ -58,31 +58,35 @@ impl<'input> Type<'input> {
     #[must_use]
     pub fn build_ident(ident: Spanned<&'input str>) -> Self {
         let span = ident.span();
+        let file_name = ident.file_name();
         Self(spanned!(
             span.start(),
             TypeKind::Identifier(ident.into_value()),
-            ident.end()
+            ident.end(),
+            file_name
         ))
     }
 
     #[must_use]
-    pub fn build_struct_from_contents(span: Span, keys: KeyTypeMapping<'input>) -> Self {
-        Self(TypeKind::Struct(keys).in_span(span))
+    pub fn build_struct_from_contents(span: Span, keys: KeyTypeMapping<'input>, file_name: &'static str) -> Self {
+        Self(TypeKind::Struct(keys).in_span(span, file_name))
     }
 
     #[must_use]
-    pub fn build_union_from_contents(span: Span, keys: KeyTypeMapping<'input>) -> Self {
-        Self(TypeKind::Union(keys).in_span(span))
+    pub fn build_union_from_contents(span: Span, keys: KeyTypeMapping<'input>, file_name: &'static str) -> Self {
+        Self(TypeKind::Union(keys).in_span(span, file_name))
     }
 
     #[must_use]
-    pub fn build_ptr(span: Span, ty: Self) -> Self {
-        Self(TypeKind::Ptr(Box::new(ty)).in_span(span))
+    pub fn build_ptr(span: Span, ty: Self, file_name: &'static str) -> Self {
+        Self(TypeKind::Ptr(Box::new(ty)).in_span(span, file_name))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    const TEST_FILE: &str = "test.zrc";
+
     #[test]
     fn types_stringify_to_their_canonical_form() {
         // A list of sample types in "canonical form."
@@ -97,7 +101,7 @@ mod tests {
 
         for input in test_cases {
             assert_eq!(
-                crate::parser::parse_type(input)
+                crate::parser::parse_type(input, TEST_FILE)
                     .expect("test cases should have parsed correctly")
                     .to_string(),
                 input
