@@ -136,6 +136,85 @@ pub fn type_expr_size_of_expr<'input>(
     })
 }
 
+/// Typeck a struct construction expr
+pub fn type_expr_struct_construction<'input>(
+    scope: &Scope<'input, '_>,
+    expr_span: Span,
+    ty: Type<'input>,
+    fields: zrc_utils::span::Spanned<Vec<zrc_utils::span::Spanned<(zrc_utils::span::Spanned<&'input str>, Expr<'input>)>>>,
+) -> Result<TypedExpr<'input>, Diagnostic> {
+    use indexmap::IndexMap;
+    
+    // Resolve the type being constructed
+    let resolved_ty = resolve_type(scope.types, ty)?;
+    
+    // Ensure it's a struct or union type
+    let expected_fields = match &resolved_ty {
+        TastType::Struct(fields) | TastType::Union(fields) => fields.clone(),
+        _ => {
+            return Err(DiagnosticKind::ExpectedGot {
+                expected: "struct or union type".to_string(),
+                got: resolved_ty.to_string(),
+            }
+            .error_in(expr_span));
+        }
+    };
+    
+    // Type check each field initialization
+    let mut initialized_fields: IndexMap<&'input str, TypedExpr<'input>> = IndexMap::new();
+    
+    for field_init in fields.value() {
+        let (field_name, field_expr) = field_init.value();
+        let field_name_str = field_name.value();
+        
+        // Check if field exists in the struct
+        let expected_type = expected_fields.get(field_name_str).ok_or_else(|| {
+            DiagnosticKind::StructOrUnionDoesNotHaveMember(
+                resolved_ty.to_string(),
+                field_name_str.to_string(),
+            )
+            .error_in(field_name.span())
+        })?;
+        
+        // Type check the field value
+        let typed_field_expr = type_expr(scope, field_expr.clone())?;
+        
+        // Ensure the types match
+        expect(
+            &typed_field_expr.inferred_type == expected_type,
+            expected_type.to_string(),
+            typed_field_expr.inferred_type.to_string(),
+            typed_field_expr.kind.span(),
+        )?;
+        
+        // Check for duplicate field initialization
+        if initialized_fields.contains_key(field_name_str) {
+            return Err(DiagnosticKind::DuplicateStructMember(field_name_str.to_string())
+                .error_in(field_name.span()));
+        }
+        
+        initialized_fields.insert(field_name_str, typed_field_expr);
+    }
+    
+    // For structs (not unions), verify all fields are initialized
+    if matches!(resolved_ty, TastType::Struct(_)) {
+        for (field_name, _field_type) in &expected_fields {
+            if !initialized_fields.contains_key(field_name) {
+                return Err(DiagnosticKind::ExpectedGot {
+                    expected: format!("initialization of field '{field_name}'"),
+                    got: "missing field".to_string(),
+                }
+                .error_in(fields.span()));
+            }
+        }
+    }
+    
+    Ok(TypedExpr {
+        inferred_type: resolved_ty,
+        kind: TypedExprKind::StructConstruction(initialized_fields).in_span(expr_span),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use zrc_parser::{ast::expr::Expr, lexer::NumberLiteral};

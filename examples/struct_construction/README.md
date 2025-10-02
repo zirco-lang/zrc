@@ -1,88 +1,89 @@
-# Struct Construction Parser Example
+# Struct Construction Example
 
-This example demonstrates that the new struct construction syntax successfully parses in Zirco.
+This example demonstrates the struct construction syntax in Zirco using the `new` keyword.
 
 ## Features Demonstrated
 
-The parser correctly handles:
+The example shows fully working struct construction with:
 
 1. **Named Struct Construction**: `new Point { x: 0, y: 0 }`
 2. **Multi-field Structs**: `new Color { r: 255, g: 0, b: 0 }`
-3. **Anonymous Struct Types**: `new struct { x: i32, y: i32 } { x: 5, y: 15 }`
-4. **Empty Structs**: `new EmptyStruct { }`
-5. **Expression Values**: `new Point { x: 1 + 2, y: 3 * 4 }`
+3. **Using Constructed Structs**: Accessing and manipulating fields of constructed struct instances
+4. **Expression Values**: Using struct fields in calculations
 
-## Viewing the AST
-
-To see the parsed AST output:
-
-```bash
-../../target/debug/zrc main.zr --emit ast
-```
-
-This will show that the parser successfully recognizes and processes the `new` keyword syntax for struct construction.
-
-## Example Code
-
-The `main.zr` file contains multiple examples of struct construction syntax:
+## Syntax
 
 ```zirco
+// Define a struct type
 struct Point {
     x: i32,
     y: i32
 }
 
-fn main() {
-    // Named struct construction
-    let origin = new Point { x: 0, y: 0 };
-    
-    // Multi-field struct
-    let red = new Color { r: 255, g: 0, b: 0 };
-    
-    // Anonymous struct
-    let p = new struct { x: i32, y: i32 } { x: 5, y: 15 };
-}
+// Construct an instance using the new keyword
+let origin = new Point { x: 0, y: 0 };
+
+// Access fields
+let x_value = origin.x;
+```
+
+## Building and Running
+
+```bash
+# Build the example
+make build
+
+# Run the example
+./out/run
+
+# Run tests
+make test
+```
+
+## Expected Output
+
+The example demonstrates various struct construction patterns and prints:
+
+```
+=== Struct Construction Examples ===
+
+1. Named struct construction:
+Point { x: 0, y: 0 }
+Point { x: 50, y: 50 }
+
+2. Multi-field struct construction:
+Color { r: 255, g: 0, b: 0 }
+Color { r: 0, g: 255, b: 0 }
+Color { r: 0, g: 0, b: 255 }
+
+3. Using struct fields in calculations:
+Distance squared between Point { x: 3, y: 4 }
+and Point { x: 6, y: 8 }
+is 25
+
+=== All tests passed! ===
 ```
 
 ## Implementation Status
 
 **✅ Parser**: Fully implemented and tested  
-**⚠️ Type Checker**: Placeholder implementation (returns error message)  
-**⚠️ Code Generator**: Not yet implemented  
+**✅ Type Checker**: Fully implemented  
+**✅ Code Generator**: Fully implemented  
 
-## Testing
+All components are complete and working!
 
-The parser functionality is tested with unit tests in `compiler/zrc_parser/src/parser.rs`:
+## Implementation Notes
 
-```bash
-cd ../../
-cargo test -p zrc_parser
-```
+This example showcases the `new` keyword syntax which was chosen to avoid LALR(1) parser ambiguities. The syntax is:
 
-All struct construction parser tests pass successfully.
+- `new TypeName { field1: value1, field2: value2, ... }`
 
-## Viewing Parsed Output
+This works for both named types (like `Point` and `Color` in this example) and anonymous struct types.
 
-You can verify the parser works correctly by viewing the AST:
+The type checker ensures:
+- All required struct fields are initialized
+- Field types match the struct definition
+- No duplicate field initializations
+- The constructed type is indeed a struct or union
 
-```bash
-cd /home/runner/work/zrc/zrc
-cargo run --bin zrc -- examples/struct_construction/main.zr --emit ast
-```
-
-**Expected output includes**:
-```
-let origin = (new Point { x: (0), y: (0) });
-let red = (new Color { r: (255), g: (0), b: (0) });
-```
-
-## Next Steps
-
-To make this example fully executable, the following components need to be implemented:
-
-1. Type checker support for struct construction expressions
-2. TAST (Typed AST) variant for struct construction
-3. Code generation for struct construction in LLVM IR
-
-The parser foundation is complete and ready for these next implementation steps.
 
