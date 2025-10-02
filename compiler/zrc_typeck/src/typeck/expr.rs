@@ -72,6 +72,14 @@ pub fn type_expr<'input>(
         ExprKind::BooleanLiteral(value) => {
             literals::type_expr_boolean_literal(scope, expr_span, value)
         }
+        ExprKind::StructConstruction(ty, _fields) => {
+            // TODO: Implement struct construction type checking
+            // For now, return an error with a message
+            return Err(zrc_diagnostics::DiagnosticKind::ExpectedGot {
+                expected: "struct construction (not yet implemented)".to_string(),
+                got: format!("{ty}")
+            }.error_in(expr_span));
+        }
     })
 }
 
