@@ -47,10 +47,13 @@ cargo build
 # 2. Run tests (takes ~15-20 seconds)
 cargo test
 
-# 3. Run nightly clippy (takes ~45-50 seconds)
+# 3. Test examples
+make -C examples test
+
+# 4. Run nightly clippy (takes ~45-50 seconds)
 cargo +nightly clippy --all-targets -- -D warnings
 
-# 4. Run nightly fmt (takes <1 second)
+# 5. Run nightly fmt (takes <1 second)
 cargo +nightly fmt --check
 ```
 
@@ -181,7 +184,7 @@ The project uses GitHub Actions with 4 workflows in `.github/workflows/`:
 -   Expected time: <30 seconds
 -   **FAILS if any files need formatting**
 
-**Critical:** ALWAYS run `cargo +nightly clippy --all-targets -- -D warnings` and `cargo +nightly fmt --check` before pushing commits, as CI will fail otherwise.
+**Critical:** ALWAYS run `cargo +nightly clippy --all-targets -- -D warnings` and `cargo +nightly fmt --check` before pushing commits, as CI will fail otherwise. Make sure to also test and update examples too!
 
 ## Code Style and Linting
 
