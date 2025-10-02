@@ -100,10 +100,10 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input program.
-pub fn parse_program(
-    input: &str,
+pub fn parse_program<'input>(
+    input: &'input str,
     file_name: &'static str,
-) -> Result<Vec<Spanned<Declaration<'_>>>, Diagnostic> {
+) -> Result<Vec<Spanned<Declaration<'input>>>, Diagnostic> {
     internal_parser::ProgramParser::new()
         .parse(
             file_name,
@@ -130,10 +130,10 @@ pub fn parse_program(
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input statement list.
-pub fn parse_stmt_list(
-    input: &str,
+pub fn parse_stmt_list<'input>(
+    input: &'input str,
     file_name: &'static str,
-) -> Result<Spanned<Vec<Stmt<'_>>>, Diagnostic> {
+) -> Result<Spanned<Vec<Stmt<'input>>>, Diagnostic> {
     internal_parser::StmtListParser::new()
         .parse(
             file_name,
