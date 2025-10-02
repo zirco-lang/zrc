@@ -23,7 +23,6 @@ jobs:
               with:
                   toolchain: stable
                   override: true
-                  components: rustfmt, clippy
             - name: Install Rust problem matchers
               uses: r7kamura/rust-problem-matchers@v1
             - name: Use dependency cache
@@ -32,3 +31,31 @@ jobs:
               uses: actions-rs/cargo@v1
               with:
                   command: build
+            - name: Upload build artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: zrc-debug
+                  path: target/debug/zrc
+                  retention-days: 1
+    verify-examples:
+        needs: build
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v5
+              with:
+                  # Make sure the actual branch is checked out when running on pull requests
+                  ref: ${{ github.head_ref }}
+                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+            - name: Download build artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: zrc-debug
+                  path: ./artifacts
+            - name: Make zrc executable
+              run: chmod +x ./artifacts/zrc
+            - name: Add zrc to PATH
+              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
+            - name: Build and test all examples
+              run: make -C examples test ZRC=zrc
