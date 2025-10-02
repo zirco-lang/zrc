@@ -277,11 +277,12 @@ impl ExprKind<'_> {
             | Self::UnaryBitwiseNot(_)
             | Self::UnaryMinus(_)
             | Self::UnaryAddressOf(_)
-            | Self::UnaryDereference(_) => Precedence::Unary,
+            | Self::UnaryDereference(_)
+            | Self::SizeOfType(_)
+            | Self::SizeOfExpr(_) => Precedence::Unary,
             Self::Index(_, _) | Self::Dot(_, _) | Self::Arrow(_, _) | Self::Call(_, _) => {
                 Precedence::Postfix
             }
-            Self::SizeOfType(_) | Self::SizeOfExpr(_) => Precedence::Unary,
             Self::NumberLiteral(_, _)
             | Self::StringLiteral(_)
             | Self::CharLiteral(_)
@@ -290,9 +291,11 @@ impl ExprKind<'_> {
         }
     }
 
-    /// Format a child expression with parentheses if needed based on precedence.
-    /// For left children of left-associative operators, we need parens if child_prec < parent_prec.
-    /// For right children of left-associative operators, we need parens if child_prec <= parent_prec.
+    /// Format a child expression with parentheses if needed based on
+    /// precedence. For left children of left-associative operators, we need
+    /// parens if `child_prec` < `parent_prec`. For right children of
+    /// left-associative operators, we need parens if `child_prec` <=
+    /// `parent_prec`.
     fn fmt_child(
         f: &mut std::fmt::Formatter<'_>,
         child: &Expr<'_>,
@@ -301,7 +304,8 @@ impl ExprKind<'_> {
     ) -> std::fmt::Result {
         let child_prec = child.0.value().precedence();
         let needs_parens = if is_right {
-            // For right children, parenthesize if precedence is lower or equal (left-associative)
+            // For right children, parenthesize if precedence is lower or equal
+            // (left-associative)
             child_prec <= parent_prec
         } else {
             // For left children, parenthesize if precedence is strictly lower
@@ -386,7 +390,8 @@ impl std::fmt::Display for ExprKind<'_> {
             Self::Index(lhs, rhs) => {
                 Self::fmt_child(f, lhs, Precedence::Postfix, false)?;
                 write!(f, "[")?;
-                // Inside brackets, we can use any expression without parens (like in function calls)
+                // Inside brackets, we can use any expression without parens (like in function
+                // calls)
                 write!(f, "{rhs}")?;
                 write!(f, "]")
             }
@@ -427,12 +432,16 @@ impl std::fmt::Display for ExprKind<'_> {
             Self::SizeOfType(ty) => write!(f, "sizeof {ty}"),
             Self::SizeOfExpr(expr) => write!(f, "sizeof({expr})"),
             Self::NumberLiteral(num, ty) => {
-                write!(f, "{num}{}", ty.as_ref().map_or(String::new(), |t| t.to_string()))
+                write!(
+                    f,
+                    "{num}{}",
+                    ty.as_ref().map_or(String::new(), ToString::to_string)
+                )
             }
-            Self::StringLiteral(s) => write!(f, "\"{s}\""),
-            Self::CharLiteral(ch) => write!(f, "'{ch}'"),
+            Self::StringLiteral(string) => write!(f, "\"{string}\""),
+            Self::CharLiteral(character) => write!(f, "'{character}'"),
             Self::Identifier(name) => write!(f, "{name}"),
-            Self::BooleanLiteral(b) => write!(f, "{b}"),
+            Self::BooleanLiteral(boolean) => write!(f, "{boolean}"),
         }
     }
 }
