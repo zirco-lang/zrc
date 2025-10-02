@@ -40,13 +40,6 @@ pub fn process_let_declaration<'input>(
                 let let_decl_span = let_declaration.span();
                 let let_declaration = let_declaration.into_value();
 
-                if scope.values.has(let_declaration.name.value()) {
-                    // TODO: In the future we may allow shadowing but currently no
-                    return Err(let_declaration.name.error(|identifier| {
-                        DiagnosticKind::IdentifierAlreadyInUse(identifier.to_string())
-                    }));
-                }
-
                 let typed_expr = let_declaration
                     .value
                     .map(|expr| type_expr(scope, expr))

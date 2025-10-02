@@ -643,6 +643,19 @@ mod tests {
         "});
     }
 
+    #[test]
+    fn variable_shadowing_generates_properly() {
+        cg_snapshot_test!(indoc! {"
+            fn test() {
+                // TEST: shadowing should work, each variable gets its own allocation
+                let x: i32 = 5;
+                let y: i32 = x + 1;  // uses first x (5)
+                let x: i32 = 10;     // shadows x
+                let z: i32 = x + 1;  // uses second x (10)
+            }
+        "});
+    }
+
     mod cg_block {
         use super::*;
 
