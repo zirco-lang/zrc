@@ -77,8 +77,9 @@ pub fn type_expr<'input>(
             // For now, return an error with a message
             return Err(zrc_diagnostics::DiagnosticKind::ExpectedGot {
                 expected: "struct construction (not yet implemented)".to_string(),
-                got: format!("{ty}")
-            }.error_in(expr_span));
+                got: format!("{ty}"),
+            }
+            .error_in(expr_span));
         }
     })
 }

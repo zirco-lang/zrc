@@ -510,6 +510,10 @@ pub enum Tok<'input> {
     #[token("default")]
     #[display("default")]
     Default,
+    /// The keyword `new`
+    #[token("new")]
+    #[display("new")]
+    New,
     /// The operator `->`
     #[token("->")]
     #[display("->")]

@@ -224,15 +224,19 @@ pub enum ExprKind<'input> {
     #[display("sizeof({_0})")]
     SizeOfExpr(Box<Expr<'input>>),
 
-    /// Struct construction: `(Type) [ field1: value1, field2: value2 ]` (NOT YET FULLY IMPLEMENTED IN PARSER)
+    /// Struct construction: `new Type { field1: value1, field2: value2 }`
     #[display(
-        "({_0}) [ {} ]",
+        "new {_0} {{ {} }}",
         _1.value()
             .iter()
             .map(|kv| format!("{}: {}", kv.value().0.value(), kv.value().1))
             .collect::<Vec<String>>()
             .join(", "))]
-    StructConstruction(Type<'input>, Spanned<Vec<Spanned<(Spanned<&'input str>, Expr<'input>)>>>),
+    #[allow(clippy::type_complexity)]
+    StructConstruction(
+        Type<'input>,
+        Spanned<Vec<Spanned<(Spanned<&'input str>, Expr<'input>)>>>,
+    ),
 
     /// Any numeric literal.
     #[display("{_0}{}", _1.as_ref().map_or_else(String::new, Type::to_string))]
@@ -552,6 +556,7 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
+    #[allow(clippy::type_complexity)]
     pub fn build_struct_construction(
         ty: Type<'input>,
         fields: Spanned<Vec<Spanned<(Spanned<&'input str>, Self)>>>,
