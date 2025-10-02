@@ -68,6 +68,8 @@ struct Preprocessor {
     included_files: HashSet<PathBuf>,
     /// List of collected source files
     files: Vec<SourceFile>,
+    /// Set of files that have #pragma once
+    pragma_once_files: HashSet<PathBuf>,
 }
 
 impl Preprocessor {
@@ -76,6 +78,7 @@ impl Preprocessor {
         Self {
             included_files: HashSet::new(),
             files: Vec::new(),
+            pragma_once_files: HashSet::new(),
         }
     }
 
@@ -106,7 +109,10 @@ impl Preprocessor {
     fn remove_includes(content: &str) -> String {
         content
             .lines()
-            .filter(|line| !line.trim().starts_with("#include"))
+            .filter(|line| {
+                let trimmed = line.trim();
+                !trimmed.starts_with("#include") && !trimmed.starts_with("#pragma once")
+            })
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -136,7 +142,7 @@ impl Preprocessor {
             .error_in(Span::from_positions(0, 0)));
         }
 
-        // First, process all includes in this file
+        // Process all includes in this file
         let mut current_pos = 0;
         for line in content.lines() {
             let line_start = current_pos;
@@ -169,11 +175,28 @@ impl Preprocessor {
                     .error_in(Span::from_positions(line_start, line_start + line.len()))
                 })?;
 
-                // Add this file to our collection
-                let resolved_path_str = resolved_path.to_string_lossy().to_string();
+                let resolved_path_buf = resolved_path;
+                let resolved_path_str = resolved_path_buf.to_string_lossy().to_string();
+
+                // Check if this file has #pragma once and was already processed
+                let has_pragma_once = included_content
+                    .lines()
+                    .any(|line| line.trim() == "#pragma once");
+                if has_pragma_once && self.pragma_once_files.contains(&resolved_path_buf) {
+                    // File has #pragma once and was already included, skip it
+                    current_pos = line_start + line.len() + 1;
+                    continue;
+                }
+
+                // Mark file with #pragma once
+                if has_pragma_once {
+                    self.pragma_once_files.insert(resolved_path_buf.clone());
+                }
+
+                // Add this file to our collection (with preprocessor directives removed)
                 self.files.push(SourceFile {
                     path: resolved_path_str.clone(),
-                    content: included_content.clone(),
+                    content: Self::remove_includes(&included_content),
                 });
 
                 // Recursively process the included file

@@ -16,6 +16,7 @@ ASTs are combined. This approach:
 ## Features
 
 - `#include "file.zr"` - Include other Zirco source files
+- `#pragma once` - Prevent multiple inclusions of the same file
 - File path resolution relative to the including file
 - Circular include detection
 - Comprehensive error messages for missing or malformed includes
@@ -64,6 +65,32 @@ which operates on text before parsing.
 
 - Files are included in the order they are encountered
 - Each file is included only once (duplicate includes are ignored)
+- Files with `#pragma once` are automatically guarded against multiple inclusion
 - Circular includes are detected and reported as errors
 - Paths are resolved relative to the including file's directory
+
+### `#pragma once`
+
+The `#pragma once` directive provides a simpler alternative to traditional include guards.
+When a file contains `#pragma once`, it will only be included once even if it's referenced
+multiple times:
+
+```zirco
+// utils.zr
+#pragma once
+
+fn helper() -> i32 {
+    return 42;
+}
+```
+
+```zirco
+// main.zr
+#include "utils.zr"
+#include "utils.zr"  // This is ignored due to #pragma once
+
+fn main() -> i32 {
+    return helper();  // helper() is defined only once
+}
+```
 
