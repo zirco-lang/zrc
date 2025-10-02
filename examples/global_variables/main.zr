@@ -1,0 +1,38 @@
+fn printf(format: *u8, ...) -> i32;
+
+// Global constants with initializers
+let MAX_COUNT: i32 = 100;
+let ENABLED: bool = true;
+let VERSION: i8 = 1i8;
+
+// Global variable without initializer (zero-initialized)
+let counter: i32;
+
+fn increment_counter() {
+    counter = counter + 1;
+}
+
+fn get_counter() -> i32 {
+    return counter;
+}
+
+fn is_below_max() -> bool {
+    return counter < MAX_COUNT;
+}
+
+fn main() {
+    printf("Initial counter: %d\n", counter);
+    printf("Max count: %d\n", MAX_COUNT);
+    printf("Version: %d\n", VERSION);
+    printf("Enabled: %d\n", ENABLED);
+    
+    increment_counter();
+    increment_counter();
+    increment_counter();
+    
+    printf("After 3 increments: %d\n", get_counter());
+    
+    if (is_below_max()) {
+        printf("Still below maximum\n");
+    }
+}
