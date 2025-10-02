@@ -41,6 +41,10 @@ Then, to compile `zrc` and all of its dependencies in debug mode, simply run `ca
 
 If you would like to install `zrc` to your Cargo `$PATH`, run `cargo install --path compiler/zrc`. This will allow you to use `zrc` just like other executables on your system.
 
+## Language Specification
+
+For a comprehensive guide to the Zirco language syntax, semantics, and behavior, see the [Language Specification](./SPEC.md).
+
 ## Usage
 
 If you are directly invoking the compiler with `cargo`, replace `zrc` with `cargo run --` in the below commands.

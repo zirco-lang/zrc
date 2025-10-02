@@ -1,0 +1,16 @@
+fn printf(format: *u8, ...) -> i32;
+
+fn swap(a: *i32, b: *i32) {
+    let temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+fn main() {
+    let x = 42;
+    let y = 17;
+    
+    printf("Before swap: x=%d, y=%d\n", x, y);
+    swap(&x, &y);
+    printf("After swap: x=%d, y=%d\n", x, y);
+}
