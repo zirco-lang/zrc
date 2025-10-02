@@ -77,3 +77,52 @@ impl Diagnostic {
 }
 
 impl Error for Diagnostic {}
+
+#[cfg(test)]
+mod tests {
+    use zrc_utils::spanned;
+
+    use super::*;
+    use crate::DiagnosticKind;
+
+    #[test]
+    fn severity_display_works_correctly() {
+        assert_eq!(Severity::Error.to_string(), "error");
+    }
+
+    #[test]
+    fn severity_to_report_kind_returns_error() {
+        assert_eq!(Severity::Error.to_report_kind(), ReportKind::Error);
+    }
+
+    #[test]
+    fn severity_color_returns_red() {
+        assert_eq!(Severity::Error.color(), Color::Red);
+    }
+
+    #[test]
+    fn diagnostic_display_includes_severity_and_kind() {
+        let diagnostic = Diagnostic(
+            Severity::Error,
+            spanned!(0, DiagnosticKind::InvalidToken, 4),
+        );
+        let display = diagnostic.to_string();
+        assert!(display.contains("error"));
+        assert!(display.contains("invalid token"));
+    }
+
+    #[test]
+    fn diagnostic_print_with_filename_formats_correctly() {
+        let source = "let x = 5;";
+        let diagnostic = Diagnostic(
+            Severity::Error,
+            spanned!(4, DiagnosticKind::InvalidToken, 5),
+        );
+        let path = Path::new("test.zrc");
+        let output = diagnostic.print_with_filename(source, path);
+
+        assert!(output.contains("test.zrc"));
+        assert!(output.contains("Error"));
+        assert!(output.contains("invalid token"));
+    }
+}

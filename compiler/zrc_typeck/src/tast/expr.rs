@@ -176,3 +176,48 @@ impl Display for TypedExprKind<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use zrc_utils::spanned;
+
+    use super::*;
+
+    #[test]
+    fn place_kind_variable_displays_correctly() {
+        let place = PlaceKind::Variable("x");
+        assert_eq!(place.to_string(), "x");
+    }
+
+    #[test]
+    fn typed_expr_kind_identifier_displays_correctly() {
+        let expr = TypedExprKind::Identifier("foo");
+        assert_eq!(expr.to_string(), "foo");
+    }
+
+    #[test]
+    fn typed_expr_kind_boolean_literal_displays_correctly() {
+        let expr_true = TypedExprKind::BooleanLiteral(true);
+        let expr_false = TypedExprKind::BooleanLiteral(false);
+        assert_eq!(expr_true.to_string(), "true");
+        assert_eq!(expr_false.to_string(), "false");
+    }
+
+    #[test]
+    fn typed_expr_displays_with_type() {
+        let expr = TypedExpr {
+            inferred_type: Type::I32,
+            kind: spanned!(0, TypedExprKind::Identifier("x"), 1),
+        };
+        assert_eq!(expr.to_string(), "(x as i32)");
+    }
+
+    #[test]
+    fn place_displays_correctly() {
+        let place = Place {
+            inferred_type: Type::I32,
+            kind: spanned!(0, PlaceKind::Variable("y"), 1),
+        };
+        assert_eq!(place.to_string(), "y");
+    }
+}
