@@ -19,7 +19,9 @@ pub fn compile(
     cpu: &str,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
     // === PARSER ===
-    let ast = zrc_parser::parser::parse_program(content)?;
+    // Leak the file_name to get a &'static str for Spanned
+    let static_file_name: &'static str = Box::leak(file_name.to_string().into_boxed_str());
+    let ast = zrc_parser::parser::parse_program(content, static_file_name)?;
 
     // display the AST if the user wants it
     if matches!(

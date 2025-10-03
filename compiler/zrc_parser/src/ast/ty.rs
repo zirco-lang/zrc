@@ -58,26 +58,33 @@ impl<'input> Type<'input> {
     #[must_use]
     pub fn build_ident(ident: Spanned<&'input str>) -> Self {
         let span = ident.span();
+        let file_name = ident.file_name;
         Self(spanned!(
             span.start(),
             TypeKind::Identifier(ident.into_value()),
-            ident.end()
+            ident.end(),
+            file_name
         ))
     }
 
     #[must_use]
     pub fn build_struct_from_contents(span: Span, keys: KeyTypeMapping<'input>) -> Self {
-        Self(TypeKind::Struct(keys).in_span(span))
+        // For types built from span only, we need a file name - using the keys' file_name
+        let file_name = keys.0.file_name;
+        Self(TypeKind::Struct(keys).in_span(span, file_name))
     }
 
     #[must_use]
     pub fn build_union_from_contents(span: Span, keys: KeyTypeMapping<'input>) -> Self {
-        Self(TypeKind::Union(keys).in_span(span))
+        // For types built from span only, we need a file name - using the keys' file_name
+        let file_name = keys.0.file_name;
+        Self(TypeKind::Union(keys).in_span(span, file_name))
     }
 
     #[must_use]
     pub fn build_ptr(span: Span, ty: Self) -> Self {
-        Self(TypeKind::Ptr(Box::new(ty)).in_span(span))
+        let file_name = ty.0.file_name;
+        Self(TypeKind::Ptr(Box::new(ty)).in_span(span, file_name))
     }
 }
 
@@ -97,7 +104,7 @@ mod tests {
 
         for input in test_cases {
             assert_eq!(
-                crate::parser::parse_type(input)
+                crate::parser::parse_type(input, "test.zrc")
                     .expect("test cases should have parsed correctly")
                     .to_string(),
                 input
@@ -123,7 +130,7 @@ mod tests {
         ];
 
         for (input, expected) in test_cases {
-            let parsed = crate::parser::parse_type(input)
+            let parsed = crate::parser::parse_type(input, "test.zrc")
                 .unwrap_or_else(|_| panic!("Failed to parse: {input}"));
             assert_eq!(
                 parsed.to_string(),
@@ -139,7 +146,7 @@ mod tests {
         let test_cases = vec!["type x = (i32);", "type y = ((i32));", "type z = (*(i32));"];
 
         for input in test_cases {
-            let result = crate::parser::parse_program(input);
+            let result = crate::parser::parse_program(input, "test.zrc");
             assert!(result.is_ok(), "Failed to parse type alias: {input}");
         }
     }

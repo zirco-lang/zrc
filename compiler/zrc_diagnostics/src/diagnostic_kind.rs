@@ -119,6 +119,6 @@ impl DiagnosticKind {
     #[must_use]
     #[inline]
     pub fn error_in(self, span: Span) -> Diagnostic {
-        Diagnostic(Severity::Error, self.in_span(span))
+        Diagnostic(Severity::Error, self.in_span(span, "<unknown>"))
     }
 }

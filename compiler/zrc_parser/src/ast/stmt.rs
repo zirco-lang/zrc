@@ -361,7 +361,7 @@ mod tests {
 
         for input in test_cases {
             assert_eq!(
-                crate::parser::parse_stmt_list(input)
+                crate::parser::parse_stmt_list(input, "test.zrc")
                     .expect("test cases should have parsed correctly")
                     .into_value()
                     .into_iter()
@@ -386,7 +386,7 @@ mod tests {
             }"};
 
         assert_eq!(
-            crate::parser::parse_program(test_case)
+            crate::parser::parse_program(test_case, "test.zrc")
                 .expect("test cases should have parsed correctly")
                 .into_iter()
                 .map(|x| x.to_string())
@@ -409,7 +409,7 @@ mod tests {
             }"};
 
         assert_eq!(
-            crate::parser::parse_program(test_case)
+            crate::parser::parse_program(test_case, "test.zrc")
                 .expect("test cases should have parsed correctly")
                 .into_iter()
                 .map(|x| x.to_string())

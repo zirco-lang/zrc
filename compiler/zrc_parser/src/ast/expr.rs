@@ -249,18 +249,22 @@ pub enum ExprKind<'input> {
 impl<'input> Expr<'input> {
     #[must_use]
     pub fn build_comma(lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name;
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Comma(Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            file_name
         ))
     }
 
     fn build_assignment(assignment: Assignment, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name;
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Assignment(assignment, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            file_name
         ))
     }
 
@@ -295,10 +299,12 @@ impl<'input> Expr<'input> {
     }
 
     fn build_binary_bitwise(op: BinaryBitwise, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name;
         Self(spanned!(
             lhs.0.start(),
             ExprKind::BinaryBitwise(op, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            file_name
         ))
     }
     #[must_use]
@@ -323,10 +329,12 @@ impl<'input> Expr<'input> {
     }
 
     fn build_logical(op: Logical, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name;
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Logical(op, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            file_name
         ))
     }
     #[must_use]
@@ -339,10 +347,12 @@ impl<'input> Expr<'input> {
     }
 
     fn build_equality(op: Equality, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name;
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Equality(op, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            file_name
         ))
     }
     #[must_use]
@@ -355,10 +365,12 @@ impl<'input> Expr<'input> {
     }
 
     fn build_comparison(op: Comparison, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name;
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Comparison(op, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            file_name
         ))
     }
     #[must_use]
@@ -379,10 +391,12 @@ impl<'input> Expr<'input> {
     }
 
     fn build_arithmetic(op: Arithmetic, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name;
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Arithmetic(op, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            file_name
         ))
     }
     #[must_use]
@@ -409,74 +423,91 @@ impl<'input> Expr<'input> {
     // Span needed as the unary op may be in a different position than the expr
     #[must_use]
     pub fn build_not(sp: Span, expr: Self) -> Self {
-        Self(ExprKind::UnaryNot(Box::new(expr)).in_span(sp))
+        let file_name = expr.0.file_name;
+        Self(ExprKind::UnaryNot(Box::new(expr)).in_span(sp, file_name))
     }
     #[must_use]
     pub fn build_bit_not(sp: Span, expr: Self) -> Self {
-        Self(ExprKind::UnaryBitwiseNot(Box::new(expr)).in_span(sp))
+        let file_name = expr.0.file_name;
+        Self(ExprKind::UnaryBitwiseNot(Box::new(expr)).in_span(sp, file_name))
     }
     #[must_use]
     pub fn build_neg(sp: Span, expr: Self) -> Self {
-        Self(ExprKind::UnaryMinus(Box::new(expr)).in_span(sp))
+        let file_name = expr.0.file_name;
+        Self(ExprKind::UnaryMinus(Box::new(expr)).in_span(sp, file_name))
     }
     #[must_use]
     pub fn build_address_of(sp: Span, expr: Self) -> Self {
-        Self(ExprKind::UnaryAddressOf(Box::new(expr)).in_span(sp))
+        let file_name = expr.0.file_name;
+        Self(ExprKind::UnaryAddressOf(Box::new(expr)).in_span(sp, file_name))
     }
     #[must_use]
     pub fn build_deref(sp: Span, expr: Self) -> Self {
-        Self(ExprKind::UnaryDereference(Box::new(expr)).in_span(sp))
+        let file_name = expr.0.file_name;
+        Self(ExprKind::UnaryDereference(Box::new(expr)).in_span(sp, file_name))
     }
 
     /// Span is needed for right brace
     #[must_use]
     pub fn build_index(sp: Span, lhs: Self, rhs: Self) -> Self {
-        Self(ExprKind::Index(Box::new(lhs), Box::new(rhs)).in_span(sp))
+        let file_name = lhs.0.file_name;
+        Self(ExprKind::Index(Box::new(lhs), Box::new(rhs)).in_span(sp, file_name))
     }
     #[must_use]
     pub fn build_dot(expr: Self, prop: Spanned<&'input str>) -> Self {
+        let file_name = expr.0.file_name;
         Self(spanned!(
             expr.0.start(),
             ExprKind::Dot(Box::new(expr), prop),
-            prop.end()
+            prop.end(),
+            file_name
         ))
     }
     #[must_use]
     pub fn build_arrow(expr: Self, prop: Spanned<&'input str>) -> Self {
+        let file_name = expr.0.file_name;
         Self(spanned!(
             expr.0.start(),
             ExprKind::Arrow(Box::new(expr), prop),
-            prop.end()
+            prop.end(),
+            file_name
         ))
     }
 
     #[must_use]
     pub fn build_call(span: Span, f: Self, params: Spanned<Vec<Self>>) -> Self {
-        Self(ExprKind::Call(Box::new(f), params).in_span(span))
+        let file_name = f.0.file_name;
+        Self(ExprKind::Call(Box::new(f), params).in_span(span, file_name))
     }
     #[must_use]
     pub fn build_ternary(cond: Self, if_true: Self, if_false: Self) -> Self {
+        let file_name = cond.0.file_name;
         Self(spanned!(
             cond.0.start(),
             ExprKind::Ternary(Box::new(cond), Box::new(if_true), Box::new(if_false)),
-            if_false.0.end()
+            if_false.0.end(),
+            file_name
         ))
     }
     #[must_use]
     pub fn build_cast(expr: Self, ty: Type<'input>) -> Self {
+        let file_name = expr.0.file_name;
         Self(spanned!(
             expr.0.start(),
             ExprKind::Cast(Box::new(expr), ty),
-            ty.0.end()
+            ty.0.end(),
+            file_name
         ))
     }
     #[must_use]
     pub fn build_sizeof_type(span: Span, ty: Type<'input>) -> Self {
-        Self(ExprKind::SizeOfType(ty).in_span(span))
+        let file_name = ty.0.file_name;
+        Self(ExprKind::SizeOfType(ty).in_span(span, file_name))
     }
     #[must_use]
     pub fn build_sizeof_expr(span: Span, expr: Self) -> Self {
-        Self(ExprKind::SizeOfExpr(Box::new(expr)).in_span(span))
+        let file_name = expr.0.file_name;
+        Self(ExprKind::SizeOfExpr(Box::new(expr)).in_span(span, file_name))
     }
 
     // These all need spans because they can't be guessed
@@ -487,10 +518,12 @@ impl<'input> Expr<'input> {
     ) -> Self {
         let start = lit.start();
         let end = ty.as_ref().map_or_else(|| lit.end(), Spanned::end);
+        let file_name = lit.file_name;
         Self(spanned!(
             start,
             ExprKind::NumberLiteral(lit.into_value(), ty.map(Spanned::into_value)),
-            end
+            end,
+            file_name
         ))
     }
     #[must_use]
@@ -508,37 +541,45 @@ impl<'input> Expr<'input> {
     #[must_use]
     pub fn build_string(lit: Spanned<ZrcString<'input>>) -> Self {
         let span = lit.span();
+        let file_name = lit.file_name;
         Self(spanned!(
             span.start(),
             ExprKind::StringLiteral(lit.into_value()),
-            span.end()
+            span.end(),
+            file_name
         ))
     }
     #[must_use]
     pub fn build_char(lit: Spanned<StringTok<'input>>) -> Self {
         let span = lit.span();
+        let file_name = lit.file_name;
         Self(spanned!(
             span.start(),
             ExprKind::CharLiteral(lit.into_value()),
-            span.end()
+            span.end(),
+            file_name
         ))
     }
     #[must_use]
     pub fn build_ident(lit: Spanned<&'input str>) -> Self {
         let span = lit.span();
+        let file_name = lit.file_name;
         Self(spanned!(
             span.start(),
             ExprKind::Identifier(lit.into_value()),
-            span.end()
+            span.end(),
+            file_name
         ))
     }
     #[must_use]
     pub fn build_bool(lit: Spanned<bool>) -> Self {
         let span = lit.span();
+        let file_name = lit.file_name;
         Self(spanned!(
             span.start(),
             ExprKind::BooleanLiteral(lit.into_value()),
-            span.end()
+            span.end(),
+            file_name
         ))
     }
 }
@@ -600,7 +641,7 @@ mod tests {
 
         for input in test_cases {
             assert_eq!(
-                crate::parser::parse_expr(input)
+                crate::parser::parse_expr(input, "test.zrc")
                     .expect("test cases should have parsed correctly")
                     .to_string(),
                 input

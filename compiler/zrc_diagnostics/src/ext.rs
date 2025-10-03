@@ -14,7 +14,7 @@ pub trait SpanExt {
 impl SpanExt for Span {
     #[inline]
     fn error(self, kind: DiagnosticKind) -> Diagnostic {
-        Diagnostic(Severity::Error, kind.in_span(self))
+        Diagnostic(Severity::Error, kind.in_span(self, "<unknown>"))
     }
 }
 
@@ -49,7 +49,7 @@ mod tests {
 
     #[test]
     fn spanned_ext_creates_diagnostic() {
-        let spanned_str = spanned!(0, "test", 4);
+        let spanned_str = spanned!(0, "test", 4, "test.zrc");
         let diagnostic =
             spanned_str.error(|value| DiagnosticKind::UnableToResolveIdentifier(value.to_string()));
 
