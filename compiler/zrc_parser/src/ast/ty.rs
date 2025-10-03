@@ -127,7 +127,7 @@ mod tests {
         ];
 
         for (input, expected) in test_cases {
-            let parsed = crate::parser::parse_type(input)
+            let parsed = crate::parser::parse_type(input, TEST_FILE)
                 .unwrap_or_else(|_| panic!("Failed to parse: {input}"));
             assert_eq!(
                 parsed.to_string(),
@@ -143,7 +143,7 @@ mod tests {
         let test_cases = vec!["type x = (i32);", "type y = ((i32));", "type z = (*(i32));"];
 
         for input in test_cases {
-            let result = crate::parser::parse_program(input);
+            let result = crate::parser::parse_program(input, TEST_FILE);
             assert!(result.is_ok(), "Failed to parse type alias: {input}");
         }
     }

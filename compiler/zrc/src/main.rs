@@ -84,6 +84,8 @@ fn main() -> anyhow::Result<()> {
     };
 
     let (directory_name, file_name, mut input) = io::open_input(&path)?;
+    // Leak the file name to get a 'static lifetime for use throughout compilation
+    let file_name_static: &'static str = Box::leak(file_name.into_boxed_str());
 
     let mut source_content = String::new();
     input.read_to_string(&mut source_content)?;
@@ -99,7 +101,7 @@ fn main() -> anyhow::Result<()> {
         &build_info::version(),
         &cli.emit,
         &directory_name,
-        &file_name,
+        file_name_static,
         &std::env::args().collect::<Vec<_>>().join(" "),
         &source_content,
         cli.opt_level.into(),

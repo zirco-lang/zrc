@@ -330,6 +330,8 @@ pub struct ArgumentDeclaration<'input> {
 
 #[cfg(test)]
 mod tests {
+    const TEST_FILE: &str = "test.zrc";
+
     #[test]
     fn statements_stringify_to_their_canonical_form() {
         // A list of sample statements in "canonical form."
@@ -361,7 +363,7 @@ mod tests {
 
         for input in test_cases {
             assert_eq!(
-                crate::parser::parse_stmt_list(input)
+                crate::parser::parse_stmt_list(input, TEST_FILE)
                     .expect("test cases should have parsed correctly")
                     .into_value()
                     .into_iter()
@@ -386,7 +388,7 @@ mod tests {
             }"};
 
         assert_eq!(
-            crate::parser::parse_program(test_case)
+            crate::parser::parse_program(test_case, TEST_FILE)
                 .expect("test cases should have parsed correctly")
                 .into_iter()
                 .map(|x| x.to_string())
@@ -409,7 +411,7 @@ mod tests {
             }"};
 
         assert_eq!(
-            crate::parser::parse_program(test_case)
+            crate::parser::parse_program(test_case, TEST_FILE)
                 .expect("test cases should have parsed correctly")
                 .into_iter()
                 .map(|x| x.to_string())

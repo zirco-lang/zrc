@@ -10,7 +10,7 @@ pub fn compile(
     frontend_version_string: &str,
     emit: &OutputFormat,
     parent_directory: &str,
-    file_name: &str,
+    file_name: &'static str,
     cli_args: &str,
     content: &str,
     optimization_level: OptimizationLevel,
@@ -19,7 +19,7 @@ pub fn compile(
     cpu: &str,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
     // === PARSER ===
-    let ast = zrc_parser::parser::parse_program(content)?;
+    let ast = zrc_parser::parser::parse_program(content, file_name)?;
 
     // display the AST if the user wants it
     if matches!(

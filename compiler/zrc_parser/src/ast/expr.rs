@@ -249,20 +249,22 @@ pub enum ExprKind<'input> {
 impl<'input> Expr<'input> {
     #[must_use]
     pub fn build_comma(lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name();
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Comma(Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            lhs.0.file_name()
+            file_name
         ))
     }
 
     fn build_assignment(assignment: Assignment, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name();
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Assignment(assignment, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            lhs.0.file_name()
+            file_name
         ))
     }
 
@@ -297,11 +299,12 @@ impl<'input> Expr<'input> {
     }
 
     fn build_binary_bitwise(op: BinaryBitwise, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name();
         Self(spanned!(
             lhs.0.start(),
             ExprKind::BinaryBitwise(op, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            lhs.0.file_name()
+            file_name
         ))
     }
     #[must_use]
@@ -326,11 +329,12 @@ impl<'input> Expr<'input> {
     }
 
     fn build_logical(op: Logical, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name();
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Logical(op, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            lhs.0.file_name()
+            file_name
         ))
     }
     #[must_use]
@@ -343,11 +347,12 @@ impl<'input> Expr<'input> {
     }
 
     fn build_equality(op: Equality, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name();
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Equality(op, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            lhs.0.file_name()
+            file_name
         ))
     }
     #[must_use]
@@ -360,11 +365,12 @@ impl<'input> Expr<'input> {
     }
 
     fn build_comparison(op: Comparison, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name();
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Comparison(op, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            lhs.0.file_name()
+            file_name
         ))
     }
     #[must_use]
@@ -385,11 +391,12 @@ impl<'input> Expr<'input> {
     }
 
     fn build_arithmetic(op: Arithmetic, lhs: Self, rhs: Self) -> Self {
+        let file_name = lhs.0.file_name();
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Arithmetic(op, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            lhs.0.file_name()
+            file_name
         ))
     }
     #[must_use]
@@ -448,20 +455,22 @@ impl<'input> Expr<'input> {
     }
     #[must_use]
     pub fn build_dot(expr: Self, prop: Spanned<&'input str>) -> Self {
+        let file_name = expr.0.file_name();
         Self(spanned!(
             expr.0.start(),
             ExprKind::Dot(Box::new(expr), prop),
             prop.end(),
-            expr.0.file_name()
+            file_name
         ))
     }
     #[must_use]
     pub fn build_arrow(expr: Self, prop: Spanned<&'input str>) -> Self {
+        let file_name = expr.0.file_name();
         Self(spanned!(
             expr.0.start(),
             ExprKind::Arrow(Box::new(expr), prop),
             prop.end(),
-            expr.0.file_name()
+            file_name
         ))
     }
 
@@ -472,20 +481,22 @@ impl<'input> Expr<'input> {
     }
     #[must_use]
     pub fn build_ternary(cond: Self, if_true: Self, if_false: Self) -> Self {
+        let file_name = cond.0.file_name();
         Self(spanned!(
             cond.0.start(),
             ExprKind::Ternary(Box::new(cond), Box::new(if_true), Box::new(if_false)),
             if_false.0.end(),
-            cond.0.file_name()
+            file_name
         ))
     }
     #[must_use]
     pub fn build_cast(expr: Self, ty: Type<'input>) -> Self {
+        let file_name = expr.0.file_name();
         Self(spanned!(
             expr.0.start(),
             ExprKind::Cast(Box::new(expr), ty),
             ty.0.end(),
-            expr.0.file_name()
+            file_name
         ))
     }
     #[must_use]
@@ -575,6 +586,8 @@ impl<'input> Expr<'input> {
 
 #[cfg(test)]
 mod tests {
+    const TEST_FILE: &str = "test.zrc";
+
     #[test]
     fn expressions_stringify_to_their_canonical_form() {
         // A list of sample expressions in "canonical form."
@@ -630,7 +643,7 @@ mod tests {
 
         for input in test_cases {
             assert_eq!(
-                crate::parser::parse_expr(input)
+                crate::parser::parse_expr(input, TEST_FILE)
                     .expect("test cases should have parsed correctly")
                     .to_string(),
                 input

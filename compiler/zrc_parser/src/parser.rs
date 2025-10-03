@@ -17,7 +17,7 @@
 //! function.
 //! ```
 //! use zrc_parser::parser::parse_program;
-//! let ast = parse_program("fn main() {}", TEST_FILE);
+//! let ast = parse_program("fn main() {}", "test.zrc");
 //! ```
 
 use lalrpop_util::ParseError;
@@ -160,7 +160,7 @@ pub fn parse_stmt_list<'input>(
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input expression.
-pub fn parse_type(input: &str, file_name: &'static str) -> Result<Type<'_>, Diagnostic> {
+pub fn parse_type<'input>(input: &'input str, file_name: &'static str) -> Result<Type<'input>, Diagnostic> {
     internal_parser::TypeParser::new()
         .parse(
             file_name,
@@ -186,7 +186,7 @@ pub fn parse_type(input: &str, file_name: &'static str) -> Result<Type<'_>, Diag
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input expression.
-pub fn parse_expr(input: &str, file_name: &'static str) -> Result<Expr<'_>, Diagnostic> {
+pub fn parse_expr<'input>(input: &'input str, file_name: &'static str) -> Result<Expr<'input>, Diagnostic> {
     internal_parser::ExprParser::new()
         .parse(
             file_name,
@@ -356,7 +356,8 @@ mod tests {
                             Expr::build_ident(spanned!(2, "x", 3, TEST_FILE)),
                             Expr::build_ident(spanned!(5, "y", 6, TEST_FILE))
                         ],
-                        7
+                        7,
+                        TEST_FILE
                     )
                 ))
             );
@@ -400,11 +401,12 @@ mod tests {
             #[test]
             fn string_literals_parse_as_expected() {
                 assert_eq!(
-                    parse_expr("\"x\""),
+                    parse_expr("\"x\"", TEST_FILE),
                     Ok(Expr::build_string(spanned!(
                         0,
                         ZrcString(vec![StringTok::Text("x")]),
-                        3
+                        3,
+                        TEST_FILE
                     )))
                 );
             }
