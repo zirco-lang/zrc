@@ -95,25 +95,51 @@ fn main() -> anyhow::Result<()> {
         bail!("emitting raw object code to stdout is not allowed. use --force to override this");
     }
 
-    let result = compile::compile(
-        &build_info::version(),
-        &cli.emit,
-        &directory_name,
-        &file_name,
-        &std::env::args().collect::<Vec<_>>().join(" "),
-        &source_content,
-        cli.opt_level.into(),
-        if cli.debug {
-            DebugLevel::Full
-        } else {
-            DebugLevel::None
-        },
-        &cli.target
-            .map_or_else(zrc_codegen::get_native_triple, |triple| {
-                zrc_codegen::TargetTriple::create(&triple)
-            }),
-        &cli.cpu,
-    );
+    // Check if source contains #include directives
+    let use_preprocessor = source_content.contains("#include");
+
+    let result = if use_preprocessor && path.to_str().unwrap_or("-") != "-" {
+        // Use preprocessor for files with #include
+        compile::compile_with_preprocessor(
+            &build_info::version(),
+            &cli.emit,
+            &directory_name,
+            &path,
+            &std::env::args().collect::<Vec<_>>().join(" "),
+            cli.opt_level.into(),
+            if cli.debug {
+                DebugLevel::Full
+            } else {
+                DebugLevel::None
+            },
+            &cli.target
+                .map_or_else(zrc_codegen::get_native_triple, |triple| {
+                    zrc_codegen::TargetTriple::create(&triple)
+                }),
+            &cli.cpu,
+        )
+    } else {
+        // Use direct compilation for simple files or stdin
+        compile::compile(
+            &build_info::version(),
+            &cli.emit,
+            &directory_name,
+            &file_name,
+            &std::env::args().collect::<Vec<_>>().join(" "),
+            &source_content,
+            cli.opt_level.into(),
+            if cli.debug {
+                DebugLevel::Full
+            } else {
+                DebugLevel::None
+            },
+            &cli.target
+                .map_or_else(zrc_codegen::get_native_triple, |triple| {
+                    zrc_codegen::TargetTriple::create(&triple)
+                }),
+            &cli.cpu,
+        )
+    };
 
     match result {
         Err(diagnostic) => eprintln!("{}", diagnostic.print_with_filename(&source_content, &path)),
