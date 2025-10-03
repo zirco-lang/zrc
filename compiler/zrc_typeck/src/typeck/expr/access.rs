@@ -34,7 +34,8 @@ pub fn type_expr_index<'input>(
     if let TastType::Ptr(points_to_ty) = ptr_t.inferred_type.clone() {
         Ok(TypedExpr {
             inferred_type: *points_to_ty,
-            kind: TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_t)).in_span_no_file(expr_span),
+            kind: TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_t))
+                .in_span_no_file(expr_span),
         })
     } else {
         Err(
@@ -92,7 +93,9 @@ pub fn type_expr_arrow<'input>(
                 Span::from_positions(obj.0.start(), key.end()),
                 ExprKind::Dot(
                     Box::new(Expr(
-                        obj.0.span().containing_no_file(ExprKind::UnaryDereference(obj)),
+                        obj.0
+                            .span()
+                            .containing_no_file(ExprKind::UnaryDereference(obj)),
                     )),
                     key,
                 ),

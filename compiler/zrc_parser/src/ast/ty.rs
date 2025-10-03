@@ -69,14 +69,16 @@ impl<'input> Type<'input> {
 
     #[must_use]
     pub fn build_struct_from_contents(span: Span, keys: KeyTypeMapping<'input>) -> Self {
-        // For types built from span only, we need a file name - using the keys' file_name
+        // For types built from span only, we need a file name - using the keys'
+        // file_name
         let file_name = keys.0.file_name;
         Self(TypeKind::Struct(keys).in_span(span, file_name))
     }
 
     #[must_use]
     pub fn build_union_from_contents(span: Span, keys: KeyTypeMapping<'input>) -> Self {
-        // For types built from span only, we need a file name - using the keys' file_name
+        // For types built from span only, we need a file name - using the keys'
+        // file_name
         let file_name = keys.0.file_name;
         Self(TypeKind::Union(keys).in_span(span, file_name))
     }

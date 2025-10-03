@@ -730,7 +730,12 @@ mod tests {
         let tokens: Vec<_> = lexer.collect();
         assert_eq!(
             tokens,
-            vec![spanned!(0, Err(LexicalError::UnterminatedStringLiteral), 4, "test.zrc"),]
+            vec![spanned!(
+                0,
+                Err(LexicalError::UnterminatedStringLiteral),
+                4,
+                "test.zrc"
+            ),]
         );
     }
 
@@ -842,14 +847,10 @@ mod tests {
         /// Simple single-line comments should work as expected
         #[test]
         fn single_line_comments_are_skipped() {
-            let lexer = ZircoLexer::new(concat!(
-                "a\n",
-                "//abc\n",
-                "b\n",
-                "// def\n",
-                "c // ghi\n",
-                "// jkl",
-            ), "test.zrc");
+            let lexer = ZircoLexer::new(
+                concat!("a\n", "//abc\n", "b\n", "// def\n", "c // ghi\n", "// jkl",),
+                "test.zrc",
+            );
             let tokens: Vec<_> = lexer
                 .map(|x| x.transpose().expect("lexing should succeed"))
                 .collect();
@@ -906,7 +907,12 @@ mod tests {
                 tokens,
                 vec![
                     spanned!(0, Ok(Tok::Identifier("a")), 1, "test.zrc"),
-                    spanned!(2, Err(LexicalError::UnterminatedBlockComment), 7, "test.zrc"),
+                    spanned!(
+                        2,
+                        Err(LexicalError::UnterminatedBlockComment),
+                        7,
+                        "test.zrc"
+                    ),
                 ]
             );
         }

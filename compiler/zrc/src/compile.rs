@@ -5,7 +5,11 @@ use zrc_codegen::{DebugLevel, OptimizationLevel};
 use crate::OutputFormat;
 
 /// Drive the compilation process.
-#[allow(clippy::too_many_arguments, clippy::wildcard_enum_match_arm)]
+#[allow(
+    clippy::too_many_arguments,
+    clippy::wildcard_enum_match_arm,
+    clippy::result_large_err
+)]
 pub fn compile(
     frontend_version_string: &str,
     emit: &OutputFormat,

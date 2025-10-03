@@ -101,9 +101,15 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input program.
-pub fn parse_program<'a>(input: &'a str, file_name: &'static str) -> Result<Vec<Spanned<Declaration<'a>>>, Diagnostic> {
+pub fn parse_program<'a>(
+    input: &'a str,
+    file_name: &'static str,
+) -> Result<Vec<Spanned<Declaration<'a>>>, Diagnostic> {
     internal_parser::ProgramParser::new()
-        .parse(Some(file_name), lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(
+            Some(file_name),
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
         .map_err(parser_error_to_diagnostic)
 }
 
@@ -125,9 +131,15 @@ pub fn parse_program<'a>(input: &'a str, file_name: &'static str) -> Result<Vec<
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input statement list.
-pub fn parse_stmt_list<'a>(input: &'a str, file_name: &'static str) -> Result<Spanned<Vec<Stmt<'a>>>, Diagnostic> {
+pub fn parse_stmt_list<'a>(
+    input: &'a str,
+    file_name: &'static str,
+) -> Result<Spanned<Vec<Stmt<'a>>>, Diagnostic> {
     internal_parser::StmtListParser::new()
-        .parse(Some(file_name), lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(
+            Some(file_name),
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
         .map(|stmt_list| stmt_list.in_span(Span::from_positions(0, input.len()), Some(file_name)))
         .map_err(parser_error_to_diagnostic)
 }
@@ -151,7 +163,10 @@ pub fn parse_stmt_list<'a>(input: &'a str, file_name: &'static str) -> Result<Sp
 /// encountered while parsing the input expression.
 pub fn parse_type<'a>(input: &'a str, file_name: &'static str) -> Result<Type<'a>, Diagnostic> {
     internal_parser::TypeParser::new()
-        .parse(Some(file_name), lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(
+            Some(file_name),
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
         .map_err(parser_error_to_diagnostic)
 }
 
@@ -174,7 +189,10 @@ pub fn parse_type<'a>(input: &'a str, file_name: &'static str) -> Result<Type<'a
 /// encountered while parsing the input expression.
 pub fn parse_expr<'a>(input: &'a str, file_name: &'static str) -> Result<Expr<'a>, Diagnostic> {
     internal_parser::ExprParser::new()
-        .parse(Some(file_name), lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(
+            Some(file_name),
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
         .map_err(parser_error_to_diagnostic)
 }
 
@@ -375,7 +393,10 @@ mod tests {
             fn number_literals_parse_as_expected() {
                 assert_eq!(
                     parse_expr("1", "test.zrc"),
-                    Ok(Expr::build_number_dec(spanned!(0, "1", 1, "test.zrc"), None))
+                    Ok(Expr::build_number_dec(
+                        spanned!(0, "1", 1, "test.zrc"),
+                        None
+                    ))
                 );
             }
 
@@ -394,7 +415,10 @@ mod tests {
 
             #[test]
             fn identifiers_parse_as_expected() {
-                assert_eq!(parse_expr("x", "test.zrc"), Ok(Expr::build_ident(spanned!(0, "x", 1, "test.zrc"))));
+                assert_eq!(
+                    parse_expr("x", "test.zrc"),
+                    Ok(Expr::build_ident(spanned!(0, "x", 1, "test.zrc")))
+                );
             }
 
             #[test]

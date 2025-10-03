@@ -254,7 +254,9 @@ pub fn process_declaration<'input>(
                     }
                 }
                 .in_span_no_file(parameters.span()),
-                return_type: resolved_return_type.clone().in_span_no_file(return_type_span),
+                return_type: resolved_return_type
+                    .clone()
+                    .in_span_no_file(return_type_span),
                 body: if let Some(body) = body {
                     let mut function_scope = global_scope.create_subscope();
                     for param in resolved_parameters {

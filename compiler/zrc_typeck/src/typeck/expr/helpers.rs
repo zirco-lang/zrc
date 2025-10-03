@@ -21,11 +21,11 @@ pub fn desugar_assignment<'input>(
         // this?
         Assignment::Arithmetic(op) => (
             lhs.clone(),
-            Expr(
-                rhs.0
-                    .span()
-                    .containing_no_file(ExprKind::Arithmetic(op, Box::new(lhs), Box::new(rhs))),
-            ),
+            Expr(rhs.0.span().containing_no_file(ExprKind::Arithmetic(
+                op,
+                Box::new(lhs),
+                Box::new(rhs),
+            ))),
         ),
         Assignment::BinaryBitwise(op) => (
             lhs.clone(),

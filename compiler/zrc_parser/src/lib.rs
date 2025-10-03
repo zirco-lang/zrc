@@ -52,7 +52,9 @@
     clippy::multiple_crate_versions,
     clippy::cargo_common_metadata,
     clippy::module_name_repetitions,
-    clippy::doc_comment_double_space_linebreaks
+    clippy::doc_comment_double_space_linebreaks,
+    // TODO: Fix this - Diagnostic grew due to file_name addition
+    clippy::result_large_err
 )]
 
 use lalrpop_util::lalrpop_mod;

@@ -104,7 +104,8 @@ pub fn type_expr_cast<'input>(
 
     Ok(TypedExpr {
         inferred_type: resolved_ty.clone(),
-        kind: TypedExprKind::Cast(Box::new(x_t), resolved_ty.in_span_no_file(ty_span)).in_span_no_file(expr_span),
+        kind: TypedExprKind::Cast(Box::new(x_t), resolved_ty.in_span_no_file(ty_span))
+            .in_span_no_file(expr_span),
     })
 }
 
@@ -165,7 +166,8 @@ mod tests {
             ),
             Ok(TypedExpr {
                 inferred_type: TastType::Usize,
-                kind: TypedExprKind::SizeOf(TastType::I32).in_span_no_file(Span::from_positions(0, 9)),
+                kind: TypedExprKind::SizeOf(TastType::I32)
+                    .in_span_no_file(Span::from_positions(0, 9)),
             })
         );
     }

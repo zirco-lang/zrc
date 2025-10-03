@@ -59,14 +59,16 @@ impl Span {
         self.start()..=self.end()
     }
 
-    /// Creates a [`Spanned<T>`] instance using this [`Span`], a passed value, and optional file name
+    /// Creates a [`Spanned<T>`] instance using this [`Span`], a passed value,
+    /// and optional file name
     #[must_use]
     #[inline]
     pub const fn containing<T>(self, value: T, file_name: Option<&'static str>) -> Spanned<T> {
         Spanned::from_span_and_value(self, value, file_name)
     }
 
-    /// Creates a [`Spanned<T>`] instance using this [`Span`] and a passed value without file name
+    /// Creates a [`Spanned<T>`] instance using this [`Span`] and a passed value
+    /// without file name
     #[must_use]
     #[inline]
     pub const fn containing_no_file<T>(self, value: T) -> Spanned<T> {
@@ -115,18 +117,32 @@ pub struct Spanned<T> {
     pub file_name: Option<&'static str>,
 }
 impl<T> Spanned<T> {
-    /// Create a new [`Spanned<T>`] instance from a [`Span`], value, and optional file name
+    /// Create a new [`Spanned<T>`] instance from a [`Span`], value, and
+    /// optional file name
     #[must_use]
     #[inline]
-    pub const fn from_span_and_value(span: Span, value: T, file_name: Option<&'static str>) -> Self {
-        Self { span, value, file_name }
+    pub const fn from_span_and_value(
+        span: Span,
+        value: T,
+        file_name: Option<&'static str>,
+    ) -> Self {
+        Self {
+            span,
+            value,
+            file_name,
+        }
     }
 
-    /// Create a new [`Spanned<T>`] instance from a [`Span`] and value without file name
+    /// Create a new [`Spanned<T>`] instance from a [`Span`] and value without
+    /// file name
     #[must_use]
     #[inline]
     pub const fn from_span(span: Span, value: T) -> Self {
-        Self { span, value, file_name: None }
+        Self {
+            span,
+            value,
+            file_name: None,
+        }
     }
 
     /// Obtains the [`Span`] associated with this [`Spanned<T>`] instance
@@ -237,14 +253,16 @@ pub trait Spannable
 where
     Self: Sized,
 {
-    /// Attach a [`Span`] and optional file name to this value, creating a [`Spanned<T>`] instance
+    /// Attach a [`Span`] and optional file name to this value, creating a
+    /// [`Spanned<T>`] instance
     ///
     /// This method can be used to attach a [`Span`] to any arbitrary value. It
     /// is a cleaner syntax for the [`Spanned::from_span_and_value`] or
     /// [`Span::containing`] functions.
     fn in_span(self, span: Span, file_name: Option<&'static str>) -> Spanned<Self>;
 
-    /// Attach a [`Span`] to this value without a file name, creating a [`Spanned<T>`] instance
+    /// Attach a [`Span`] to this value without a file name, creating a
+    /// [`Spanned<T>`] instance
     fn in_span_no_file(self, span: Span) -> Spanned<Self>;
 }
 
@@ -261,9 +279,9 @@ impl<T: Sized> Spannable for T {
     }
 }
 
-/// Create a [`Spanned<T>`] instance from two locations, a value, and an optional file name.
-/// Simply just expands to a [`Spanned::from_span_and_value`] and
-/// [`Span::from_positions`] calls.
+/// Create a [`Spanned<T>`] instance from two locations, a value, and an
+/// optional file name. Simply just expands to a
+/// [`Spanned::from_span_and_value`] and [`Span::from_positions`] calls.
 ///
 /// # Panics
 /// Panics if `start > end`.

@@ -407,7 +407,8 @@ pub fn type_block<'input, 'gs>(
                                 )?;
                                 Ok(Some((
                                     TypedStmt(
-                                        TypedStmtKind::BlockStmt(typed_body).in_span_no_file(stmt_span),
+                                        TypedStmtKind::BlockStmt(typed_body)
+                                            .in_span_no_file(stmt_span),
                                     ),
                                     return_actuality,
                                 )))
@@ -451,10 +452,12 @@ pub fn type_block<'input, 'gs>(
                                         } else {
                                             Err(Diagnostic(
                                                 Severity::Error,
-                                                stmt_span.containing_no_file(DiagnosticKind::ExpectedGot {
-                                                    expected: return_ty.to_string(),
-                                                    got: inferred_return_type.to_string(),
-                                                }),
+                                                stmt_span.containing_no_file(
+                                                    DiagnosticKind::ExpectedGot {
+                                                        expected: return_ty.to_string(),
+                                                        got: inferred_return_type.to_string(),
+                                                    },
+                                                ),
                                             ))
                                         }
                                     }
@@ -544,7 +547,8 @@ mod tests {
 
         let source = "switch (1 as i32) { 3 as i8 => {} default => {} }";
 
-        let block_ast = zrc_parser::parser::parse_stmt_list(source, "test.zrc").expect("should parse");
+        let block_ast =
+            zrc_parser::parser::parse_stmt_list(source, "test.zrc").expect("should parse");
 
         let tck_result = type_block(
             &gs.create_subscope(),

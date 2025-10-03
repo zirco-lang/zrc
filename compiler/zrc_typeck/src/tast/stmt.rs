@@ -79,6 +79,7 @@ pub enum TypedStmtKind<'input> {
 
 /// A struct or function declaration at the top level of a file
 #[derive(Debug, Clone, PartialEq)]
+#[allow(variant_size_differences, clippy::large_enum_variant)] // TODO: Box large variants
 pub enum TypedDeclaration<'input> {
     /// A declaration of a function
     FunctionDeclaration {

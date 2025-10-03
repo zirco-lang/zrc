@@ -110,14 +110,17 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
                 bb,
                 TypedExpr {
                     inferred_type: let_declaration.ty.clone(),
-                    kind: value.kind.span().containing_no_file(TypedExprKind::Assignment(
-                        Box::new(Place {
-                            inferred_type: let_declaration.ty,
-                            kind: PlaceKind::Variable(let_declaration.name.value())
-                                .in_span_no_file(let_declaration.name.span()),
-                        }),
-                        Box::new(value),
-                    )),
+                    kind: value
+                        .kind
+                        .span()
+                        .containing_no_file(TypedExprKind::Assignment(
+                            Box::new(Place {
+                                inferred_type: let_declaration.ty,
+                                kind: PlaceKind::Variable(let_declaration.name.value())
+                                    .in_span_no_file(let_declaration.name.span()),
+                            }),
+                            Box::new(value),
+                        )),
                 },
             )
             .bb;

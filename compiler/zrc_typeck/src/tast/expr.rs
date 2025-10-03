@@ -26,6 +26,7 @@ pub struct Place<'input> {
 /// - A variable or an property access of a place
 /// - A dereference or index into any expression yielding a pointer
 #[derive(PartialEq, Debug, Clone)]
+#[allow(variant_size_differences, clippy::large_enum_variant)] // TODO: Box large variants
 pub enum PlaceKind<'input> {
     /// `*x`
     Deref(Box<TypedExpr<'input>>),
