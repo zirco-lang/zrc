@@ -14,7 +14,7 @@ pub trait SpanExt {
 impl SpanExt for Span {
     #[inline]
     fn error(self, kind: DiagnosticKind) -> Diagnostic {
-        Diagnostic(Severity::Error, kind.in_span(self, "<unknown>"))
+        Diagnostic(Severity::Error, kind.in_span(self, None))
     }
 }
 

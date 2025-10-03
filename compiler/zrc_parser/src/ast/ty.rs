@@ -63,7 +63,7 @@ impl<'input> Type<'input> {
             span.start(),
             TypeKind::Identifier(ident.into_value()),
             ident.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
 

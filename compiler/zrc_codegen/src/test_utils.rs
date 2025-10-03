@@ -33,7 +33,7 @@ macro_rules! cg_snapshot_test {
             "zrc --fake-args",
             $source,
             ::zrc_typeck::typeck::type_program(
-                ::zrc_parser::parser::parse_program($source).expect("parsing should succeed")
+                ::zrc_parser::parser::parse_program($source, "test.zrc").expect("parsing should succeed")
             ).expect("typeck should succeed"),
             ::inkwell::OptimizationLevel::None,
             ::inkwell::debug_info::DWARFEmissionKind::Full,

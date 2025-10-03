@@ -71,7 +71,7 @@ pub fn type_expr_call<'input>(
                         TypedExpr {
                             inferred_type: arg_type.ty.value().clone(),
                             kind: TypedExprKind::Cast(Box::new(arg_t), arg_type.ty.clone())
-                                .in_span(arg_span),
+                                .in_span_no_file(arg_span),
                         }
                     } else {
                         arg_t
@@ -82,7 +82,7 @@ pub fn type_expr_call<'input>(
             Ok(TypedExpr {
                 inferred_type: *ret_type,
                 kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_with_casts)
-                    .in_span(expr_span),
+                    .in_span_no_file(expr_span),
             })
         }
         TastType::Fn(Fn {
@@ -126,7 +126,7 @@ pub fn type_expr_call<'input>(
                     args_with_casts.push(TypedExpr {
                         inferred_type: arg_type.ty.value().clone(),
                         kind: TypedExprKind::Cast(Box::new(arg_t.clone()), arg_type.ty.clone())
-                            .in_span(arg_span),
+                            .in_span_no_file(arg_span),
                     });
                 } else {
                     args_with_casts.push(arg_t.clone());
@@ -139,7 +139,7 @@ pub fn type_expr_call<'input>(
             Ok(TypedExpr {
                 inferred_type: *ret_type,
                 kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_with_casts)
-                    .in_span(expr_span),
+                    .in_span_no_file(expr_span),
             })
         }
         _ => Err(

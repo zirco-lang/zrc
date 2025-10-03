@@ -122,7 +122,7 @@ pub fn process_let_declaration<'input>(
                 scope
                     .values
                     .insert(result_decl.name.value(), result_decl.ty.clone());
-                Ok(result_decl.in_span(let_decl_span))
+                Ok(result_decl.in_span_no_file(let_decl_span))
             },
         )
         .collect::<Result<Vec<_>, Diagnostic>>()
@@ -174,7 +174,7 @@ pub fn process_declaration<'input>(
                     Ok(TastArgumentDeclaration {
                         name: parameter.value().name,
                         ty: resolve_type(&global_scope.types, parameter.value().ty.clone())?
-                            .in_span(parameter.span()),
+                            .in_span_no_file(parameter.span()),
                     })
                 })
                 .collect::<Result<Vec<_>, Diagnostic>>()?;
@@ -253,8 +253,8 @@ pub fn process_declaration<'input>(
                         tast::stmt::ArgumentDeclarationList::Variadic(resolved_parameters.clone())
                     }
                 }
-                .in_span(parameters.span()),
-                return_type: resolved_return_type.clone().in_span(return_type_span),
+                .in_span_no_file(parameters.span()),
+                return_type: resolved_return_type.clone().in_span_no_file(return_type_span),
                 body: if let Some(body) = body {
                     let mut function_scope = global_scope.create_subscope();
                     for param in resolved_parameters {
@@ -265,7 +265,7 @@ pub fn process_declaration<'input>(
 
                     // discard return actuality as it's guaranteed
                     Some(
-                        body.span().containing(
+                        body.span().containing_no_file(
                             type_block(
                                 &function_scope,
                                 body,

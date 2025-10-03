@@ -87,7 +87,7 @@ pub fn type_expr_number_literal<'input>(
 
     Ok(TypedExpr {
         inferred_type: ty_resolved.clone(),
-        kind: TypedExprKind::NumberLiteral(n, ty_resolved).in_span(expr_span),
+        kind: TypedExprKind::NumberLiteral(n, ty_resolved).in_span_no_file(expr_span),
     })
 }
 
@@ -99,7 +99,7 @@ pub fn type_expr_string_literal<'input>(
 ) -> TypedExpr<'input> {
     TypedExpr {
         inferred_type: TastType::Ptr(Box::new(TastType::U8)),
-        kind: TypedExprKind::StringLiteral(str).in_span(expr_span),
+        kind: TypedExprKind::StringLiteral(str).in_span_no_file(expr_span),
     }
 }
 
@@ -111,7 +111,7 @@ pub fn type_expr_char_literal<'input>(
 ) -> TypedExpr<'input> {
     TypedExpr {
         inferred_type: TastType::U8,
-        kind: TypedExprKind::CharLiteral(ch).in_span(expr_span),
+        kind: TypedExprKind::CharLiteral(ch).in_span_no_file(expr_span),
     }
 }
 
@@ -126,7 +126,7 @@ pub fn type_expr_identifier<'input>(
     })?;
     Ok(TypedExpr {
         inferred_type: ty.clone(),
-        kind: TypedExprKind::Identifier(i).in_span(expr_span),
+        kind: TypedExprKind::Identifier(i).in_span_no_file(expr_span),
     })
 }
 
@@ -138,7 +138,7 @@ pub fn type_expr_boolean_literal<'input>(
 ) -> TypedExpr<'input> {
     TypedExpr {
         inferred_type: TastType::Bool,
-        kind: TypedExprKind::BooleanLiteral(value).in_span(expr_span),
+        kind: TypedExprKind::BooleanLiteral(value).in_span_no_file(expr_span),
     }
 }
 

@@ -103,7 +103,7 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 /// encountered while parsing the input program.
 pub fn parse_program<'a>(input: &'a str, file_name: &'static str) -> Result<Vec<Spanned<Declaration<'a>>>, Diagnostic> {
     internal_parser::ProgramParser::new()
-        .parse(file_name, lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(Some(file_name), lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
         .map_err(parser_error_to_diagnostic)
 }
 
@@ -127,8 +127,8 @@ pub fn parse_program<'a>(input: &'a str, file_name: &'static str) -> Result<Vec<
 /// encountered while parsing the input statement list.
 pub fn parse_stmt_list<'a>(input: &'a str, file_name: &'static str) -> Result<Spanned<Vec<Stmt<'a>>>, Diagnostic> {
     internal_parser::StmtListParser::new()
-        .parse(file_name, lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
-        .map(|stmt_list| stmt_list.in_span(Span::from_positions(0, input.len()), file_name))
+        .parse(Some(file_name), lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
+        .map(|stmt_list| stmt_list.in_span(Span::from_positions(0, input.len()), Some(file_name)))
         .map_err(parser_error_to_diagnostic)
 }
 
@@ -151,7 +151,7 @@ pub fn parse_stmt_list<'a>(input: &'a str, file_name: &'static str) -> Result<Sp
 /// encountered while parsing the input expression.
 pub fn parse_type<'a>(input: &'a str, file_name: &'static str) -> Result<Type<'a>, Diagnostic> {
     internal_parser::TypeParser::new()
-        .parse(file_name, lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(Some(file_name), lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
         .map_err(parser_error_to_diagnostic)
 }
 
@@ -174,7 +174,7 @@ pub fn parse_type<'a>(input: &'a str, file_name: &'static str) -> Result<Type<'a
 /// encountered while parsing the input expression.
 pub fn parse_expr<'a>(input: &'a str, file_name: &'static str) -> Result<Expr<'a>, Diagnostic> {
     internal_parser::ExprParser::new()
-        .parse(file_name, lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(Some(file_name), lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span))
         .map_err(parser_error_to_diagnostic)
 }
 

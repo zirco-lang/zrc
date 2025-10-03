@@ -164,7 +164,7 @@ pub(crate) fn cg_expr<'ctx>(
                     bb,
                     Place {
                         inferred_type: expr.inferred_type.clone(),
-                        kind: PlaceKind::Variable(id).in_span(expr_span),
+                        kind: PlaceKind::Variable(id).in_span_no_file(expr_span),
                     },
                 )
             );
@@ -376,7 +376,7 @@ pub(crate) fn cg_expr<'ctx>(
                     bb,
                     Place {
                         inferred_type: expr.inferred_type.clone(),
-                        kind: PlaceKind::Index(ptr, idx).in_span(expr_span),
+                        kind: PlaceKind::Index(ptr, idx).in_span_no_file(expr_span),
                     },
                 )
             );
@@ -396,7 +396,7 @@ pub(crate) fn cg_expr<'ctx>(
                     bb,
                     Place {
                         inferred_type: expr.inferred_type.clone(),
-                        kind: PlaceKind::Dot(place, key).in_span(expr_span),
+                        kind: PlaceKind::Dot(place, key).in_span_no_file(expr_span),
                     },
                 )
             );

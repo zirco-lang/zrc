@@ -254,7 +254,7 @@ impl<'input> Expr<'input> {
             lhs.0.start(),
             ExprKind::Comma(Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
 
@@ -264,7 +264,7 @@ impl<'input> Expr<'input> {
             lhs.0.start(),
             ExprKind::Assignment(assignment, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
 
@@ -304,7 +304,7 @@ impl<'input> Expr<'input> {
             lhs.0.start(),
             ExprKind::BinaryBitwise(op, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -334,7 +334,7 @@ impl<'input> Expr<'input> {
             lhs.0.start(),
             ExprKind::Logical(op, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -352,7 +352,7 @@ impl<'input> Expr<'input> {
             lhs.0.start(),
             ExprKind::Equality(op, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -370,7 +370,7 @@ impl<'input> Expr<'input> {
             lhs.0.start(),
             ExprKind::Comparison(op, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -396,7 +396,7 @@ impl<'input> Expr<'input> {
             lhs.0.start(),
             ExprKind::Arithmetic(op, Box::new(lhs), Box::new(rhs)),
             rhs.0.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -460,7 +460,7 @@ impl<'input> Expr<'input> {
             expr.0.start(),
             ExprKind::Dot(Box::new(expr), prop),
             prop.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -470,7 +470,7 @@ impl<'input> Expr<'input> {
             expr.0.start(),
             ExprKind::Arrow(Box::new(expr), prop),
             prop.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
 
@@ -486,7 +486,7 @@ impl<'input> Expr<'input> {
             cond.0.start(),
             ExprKind::Ternary(Box::new(cond), Box::new(if_true), Box::new(if_false)),
             if_false.0.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -496,7 +496,7 @@ impl<'input> Expr<'input> {
             expr.0.start(),
             ExprKind::Cast(Box::new(expr), ty),
             ty.0.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -523,7 +523,7 @@ impl<'input> Expr<'input> {
             start,
             ExprKind::NumberLiteral(lit.into_value(), ty.map(Spanned::into_value)),
             end,
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -546,7 +546,7 @@ impl<'input> Expr<'input> {
             span.start(),
             ExprKind::StringLiteral(lit.into_value()),
             span.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -557,7 +557,7 @@ impl<'input> Expr<'input> {
             span.start(),
             ExprKind::CharLiteral(lit.into_value()),
             span.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -568,7 +568,7 @@ impl<'input> Expr<'input> {
             span.start(),
             ExprKind::Identifier(lit.into_value()),
             span.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
     #[must_use]
@@ -579,7 +579,7 @@ impl<'input> Expr<'input> {
             span.start(),
             ExprKind::BooleanLiteral(lit.into_value()),
             span.end(),
-            file_name
+            file_name.unwrap_or("<unknown>")
         ))
     }
 }

@@ -24,12 +24,12 @@ pub fn desugar_assignment<'input>(
             Expr(
                 rhs.0
                     .span()
-                    .containing(ExprKind::Arithmetic(op, Box::new(lhs), Box::new(rhs))),
+                    .containing_no_file(ExprKind::Arithmetic(op, Box::new(lhs), Box::new(rhs))),
             ),
         ),
         Assignment::BinaryBitwise(op) => (
             lhs.clone(),
-            Expr(rhs.0.span().containing(ExprKind::BinaryBitwise(
+            Expr(rhs.0.span().containing_no_file(ExprKind::BinaryBitwise(
                 op,
                 Box::new(lhs),
                 Box::new(rhs),
@@ -47,19 +47,19 @@ pub fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, Diagnostic> {
     Ok(match expr.kind.into_value() {
         TypedExprKind::UnaryDereference(x) => Place {
             inferred_type: expr.inferred_type,
-            kind: PlaceKind::Deref(x).in_span(kind_span),
+            kind: PlaceKind::Deref(x).in_span_no_file(kind_span),
         },
         TypedExprKind::Identifier(x) => Place {
             inferred_type: expr.inferred_type,
-            kind: PlaceKind::Variable(x).in_span(kind_span),
+            kind: PlaceKind::Variable(x).in_span_no_file(kind_span),
         },
         TypedExprKind::Index(x, y) => Place {
             inferred_type: expr.inferred_type,
-            kind: PlaceKind::Index(x, y).in_span(kind_span),
+            kind: PlaceKind::Index(x, y).in_span_no_file(kind_span),
         },
         TypedExprKind::Dot(x, y) => Place {
             inferred_type: expr.inferred_type,
-            kind: PlaceKind::Dot(x, y).in_span(kind_span),
+            kind: PlaceKind::Dot(x, y).in_span_no_file(kind_span),
         },
         _ => return Err(span.error(DiagnosticKind::NotAnLvalue(stringified))),
     })
@@ -143,7 +143,7 @@ mod tests {
             Err(Diagnostic(
                 Severity::Error,
                 DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string())
-                    .in_span(sample_span)
+                    .in_span_no_file(sample_span)
             ))
         );
     }
@@ -164,7 +164,7 @@ mod tests {
                     expected: "expected".to_string(),
                     got: "got".to_string()
                 }
-                .in_span(sample_span)
+                .in_span_no_file(sample_span)
             ))
         );
     }

@@ -396,7 +396,7 @@ mod tests {
             assert_eq!(
                 type_expr(
                     &scope.create_subscope(),
-                    zrc_parser::parser::parse_expr(input).expect("parsing should succeed")
+                    zrc_parser::parser::parse_expr(input, "test.zrc").expect("parsing should succeed")
                 )
                 .map(|result| result.inferred_type)
                 .map_err(|diagnostic| diagnostic.1.into_value()),

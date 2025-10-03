@@ -35,6 +35,6 @@ pub fn type_expr_assignment<'input>(
 
     Ok(TypedExpr {
         inferred_type: place_t.inferred_type.clone(),
-        kind: TypedExprKind::Assignment(Box::new(place_t), Box::new(value_t)).in_span(expr_span),
+        kind: TypedExprKind::Assignment(Box::new(place_t), Box::new(value_t)).in_span_no_file(expr_span),
     })
 }

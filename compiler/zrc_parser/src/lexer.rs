@@ -695,7 +695,7 @@ impl<'input> Iterator for ZircoLexer<'input> {
                         LexicalError::JavascriptUserDetected(expected)
                     }
                 })
-                .in_span(span, self.file_name),
+                .in_span(span, Some(self.file_name)),
         )
     }
 }

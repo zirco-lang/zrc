@@ -11,10 +11,10 @@ use super::{
     }
 };
 
-grammar<'input>(file_name: &'static str);
+grammar<'input>(file_name: Option<&'static str>);
 
 Spanned<T>: Spanned<T> = {
-    <l:@L> <x:T> <r:@R> => spanned!(l, x, r, file_name),
+    <l:@L> <x:T> <r:@R> => spanned!(l, x, r, file_name.unwrap_or("<unknown>")),
 }
 SpannedExpr<T>: Expr<'input> = {
     <Spanned<T>> => Expr(<>),

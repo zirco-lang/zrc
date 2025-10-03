@@ -110,11 +110,11 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
                 bb,
                 TypedExpr {
                     inferred_type: let_declaration.ty.clone(),
-                    kind: value.kind.span().containing(TypedExprKind::Assignment(
+                    kind: value.kind.span().containing_no_file(TypedExprKind::Assignment(
                         Box::new(Place {
                             inferred_type: let_declaration.ty,
                             kind: PlaceKind::Variable(let_declaration.name.value())
-                                .in_span(let_declaration.name.span()),
+                                .in_span_no_file(let_declaration.name.span()),
                         }),
                         Box::new(value),
                     )),
@@ -212,7 +212,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         default_bb,
                         &scope,
                         lexical_block,
-                        default.in_span(stmt_span),
+                        default.in_span_no_file(stmt_span),
                         breakaway,
                     );
                     cg.builder
@@ -226,7 +226,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                             case_bb,
                             &scope,
                             lexical_block,
-                            stmt.in_span(stmt_span),
+                            stmt.in_span_no_file(stmt_span),
                             breakaway,
                         );
 
@@ -252,7 +252,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
 
                     let then_else = then_else.unwrap_or_else(|| {
-                        vec![].in_span(Span::from_positions(then.end(), then.end()))
+                        vec![].in_span_no_file(Span::from_positions(then.end(), then.end()))
                     });
 
                     let then_end = then.end();
@@ -354,7 +354,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     bb,
                     &scope,
                     lexical_block,
-                    block.in_span(stmt_span),
+                    block.in_span_no_file(stmt_span),
                     breakaway,
                 ),
 

@@ -42,7 +42,7 @@ pub fn type_expr_logical<'input>(
 
     Ok(TypedExpr {
         inferred_type: TastType::Bool,
-        kind: TypedExprKind::Logical(op, Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
+        kind: TypedExprKind::Logical(op, Box::new(lhs_t), Box::new(rhs_t)).in_span_no_file(expr_span),
     })
 }
 
@@ -78,7 +78,7 @@ pub fn type_expr_equality<'input>(
 
     Ok(TypedExpr {
         inferred_type: TastType::Bool,
-        kind: TypedExprKind::Equality(op, Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
+        kind: TypedExprKind::Equality(op, Box::new(lhs_t), Box::new(rhs_t)).in_span_no_file(expr_span),
     })
 }
 
@@ -108,7 +108,7 @@ pub fn type_expr_binary_bitwise<'input>(
 
     Ok(TypedExpr {
         inferred_type: lhs_t.inferred_type.clone(),
-        kind: TypedExprKind::BinaryBitwise(op, Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
+        kind: TypedExprKind::BinaryBitwise(op, Box::new(lhs_t), Box::new(rhs_t)).in_span_no_file(expr_span),
     })
 }
 
@@ -132,7 +132,7 @@ pub fn type_expr_comparison<'input>(
 
     Ok(TypedExpr {
         inferred_type: TastType::Bool,
-        kind: TypedExprKind::Comparison(op, Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
+        kind: TypedExprKind::Comparison(op, Box::new(lhs_t), Box::new(rhs_t)).in_span_no_file(expr_span),
     })
 }
 
@@ -175,6 +175,6 @@ pub fn type_expr_arithmetic<'input>(
 
     Ok(TypedExpr {
         inferred_type: lhs_t.inferred_type.clone(),
-        kind: TypedExprKind::Arithmetic(op, Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
+        kind: TypedExprKind::Arithmetic(op, Box::new(lhs_t), Box::new(rhs_t)).in_span_no_file(expr_span),
     })
 }

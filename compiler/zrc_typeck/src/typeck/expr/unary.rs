@@ -31,7 +31,7 @@ pub fn type_expr_unary_not<'input>(
 
     Ok(TypedExpr {
         inferred_type: x_ty.inferred_type.clone(),
-        kind: TypedExprKind::UnaryNot(Box::new(x_ty)).in_span(expr_span),
+        kind: TypedExprKind::UnaryNot(Box::new(x_ty)).in_span_no_file(expr_span),
     })
 }
 
@@ -48,7 +48,7 @@ pub fn type_expr_unary_bitwise_not<'input>(
 
     Ok(TypedExpr {
         inferred_type: x_ty.inferred_type.clone(),
-        kind: TypedExprKind::UnaryBitwiseNot(Box::new(x_ty)).in_span(expr_span),
+        kind: TypedExprKind::UnaryBitwiseNot(Box::new(x_ty)).in_span_no_file(expr_span),
     })
 }
 
@@ -65,7 +65,7 @@ pub fn type_expr_unary_minus<'input>(
 
     Ok(TypedExpr {
         inferred_type: x_ty.inferred_type.clone(),
-        kind: TypedExprKind::UnaryMinus(Box::new(x_ty)).in_span(expr_span),
+        kind: TypedExprKind::UnaryMinus(Box::new(x_ty)).in_span_no_file(expr_span),
     })
 }
 
@@ -80,7 +80,7 @@ pub fn type_expr_unary_address_of<'input>(
     Ok(TypedExpr {
         inferred_type: TastType::Ptr(Box::new(x_ty.inferred_type.clone())),
         kind: TypedExprKind::UnaryAddressOf(Box::new(expr_to_place(expr_span, x_ty)?))
-            .in_span(expr_span),
+            .in_span_no_file(expr_span),
     })
 }
 
@@ -95,7 +95,7 @@ pub fn type_expr_unary_dereference<'input>(
     if let TastType::Ptr(tt) = x_ty.inferred_type.clone() {
         Ok(TypedExpr {
             inferred_type: *tt,
-            kind: TypedExprKind::UnaryDereference(Box::new(x_ty)).in_span(expr_span),
+            kind: TypedExprKind::UnaryDereference(Box::new(x_ty)).in_span_no_file(expr_span),
         })
     } else {
         Err(

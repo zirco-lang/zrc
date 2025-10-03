@@ -76,7 +76,7 @@ pub fn type_block<'input, 'gs>(
                         match stmt.0.into_value() {
                             StmtKind::EmptyStmt => Ok(None),
                             StmtKind::BreakStmt if can_use_break_continue => Ok(Some((
-                                TypedStmt(TypedStmtKind::BreakStmt.in_span(stmt_span)),
+                                TypedStmt(TypedStmtKind::BreakStmt.in_span_no_file(stmt_span)),
                                 BlockReturnActuality::NeverReturns,
                             ))),
                             StmtKind::BreakStmt => {
@@ -84,7 +84,7 @@ pub fn type_block<'input, 'gs>(
                             }
 
                             StmtKind::ContinueStmt if can_use_break_continue => Ok(Some((
-                                TypedStmt(TypedStmtKind::ContinueStmt.in_span(stmt_span)),
+                                TypedStmt(TypedStmtKind::ContinueStmt.in_span_no_file(stmt_span)),
                                 BlockReturnActuality::NeverReturns,
                             ))),
                             StmtKind::ContinueStmt => {
@@ -178,7 +178,7 @@ pub fn type_block<'input, 'gs>(
                                             default: default_stmt,
                                             cases,
                                         })
-                                        .in_span(stmt_span),
+                                        .in_span_no_file(stmt_span),
                                     ),
                                     BlockReturnActuality::join(
                                         BlockReturnActuality::join_iter(return_statuses),
@@ -193,7 +193,7 @@ pub fn type_block<'input, 'gs>(
                                         &mut scope,
                                         declarations.clone().into_value(),
                                     )?)
-                                    .in_span(stmt_span),
+                                    .in_span_no_file(stmt_span),
                                 ),
                                 BlockReturnActuality::NeverReturns, /* because expressions
                                                                      * can't
@@ -244,16 +244,16 @@ pub fn type_block<'input, 'gs>(
                                     TypedStmt(
                                         TypedStmtKind::IfStmt(
                                             typed_cond,
-                                            typed_then.in_span(then_span),
+                                            typed_then.in_span_no_file(then_span),
                                             typed_then_else.map(|x| {
-                                                x.in_span(
+                                                x.in_span_no_file(
                                                     te_span.expect(
                                                         "should have been unwrapped already",
                                                     ),
                                                 )
                                             }),
                                         )
-                                        .in_span(stmt_span),
+                                        .in_span_no_file(stmt_span),
                                     ),
                                     BlockReturnActuality::join(
                                         then_return_actuality,
@@ -290,9 +290,9 @@ pub fn type_block<'input, 'gs>(
                                     TypedStmt(
                                         TypedStmtKind::WhileStmt(
                                             typed_cond,
-                                            typed_body.in_span(body_span),
+                                            typed_body.in_span_no_file(body_span),
                                         )
-                                        .in_span(stmt_span),
+                                        .in_span_no_file(stmt_span),
                                     ),
                                     body_return_actuality.demote(),
                                 )))
@@ -320,10 +320,10 @@ pub fn type_block<'input, 'gs>(
                                 Ok(Some((
                                     TypedStmt(
                                         TypedStmtKind::DoWhileStmt(
-                                            typed_body.in_span(body_span),
+                                            typed_body.in_span_no_file(body_span),
                                             typed_cond,
                                         )
-                                        .in_span(stmt_span),
+                                        .in_span_no_file(stmt_span),
                                     ),
                                     // Unlike `while`, a `do..while` loop is guaranteed to run at
                                     // least once. For this reason, we do not need to `demote` it.
@@ -365,7 +365,7 @@ pub fn type_block<'input, 'gs>(
                                         Severity::Error,
                                         cond_span
                                             .expect("span should exist if we unwrapped it")
-                                            .containing(DiagnosticKind::ExpectedGot {
+                                            .containing_no_file(DiagnosticKind::ExpectedGot {
                                                 expected: "bool".to_string(),
                                                 got: inner_t_cond.inferred_type.to_string(),
                                             }),
@@ -390,9 +390,9 @@ pub fn type_block<'input, 'gs>(
                                             init: typed_init.map(Box::new),
                                             cond: typed_cond,
                                             post: typed_post,
-                                            body: typed_body.in_span(body_as_block_span),
+                                            body: typed_body.in_span_no_file(body_as_block_span),
                                         }
-                                        .in_span(stmt_span),
+                                        .in_span_no_file(stmt_span),
                                     ),
                                     body_return_actuality.demote(),
                                 )))
@@ -401,13 +401,13 @@ pub fn type_block<'input, 'gs>(
                             StmtKind::BlockStmt(body) => {
                                 let (typed_body, return_actuality) = type_block(
                                     &scope,
-                                    body.in_span(stmt_span),
+                                    body.in_span_no_file(stmt_span),
                                     can_use_break_continue,
                                     return_ability.clone().demote(),
                                 )?;
                                 Ok(Some((
                                     TypedStmt(
-                                        TypedStmtKind::BlockStmt(typed_body).in_span(stmt_span),
+                                        TypedStmtKind::BlockStmt(typed_body).in_span_no_file(stmt_span),
                                     ),
                                     return_actuality,
                                 )))
@@ -416,7 +416,7 @@ pub fn type_block<'input, 'gs>(
                             StmtKind::ExprStmt(expr) => Ok(Some((
                                 TypedStmt(
                                     TypedStmtKind::ExprStmt(type_expr(&scope, expr)?)
-                                        .in_span(stmt_span),
+                                        .in_span_no_file(stmt_span),
                                 ),
                                 BlockReturnActuality::NeverReturns,
                             ))),
@@ -444,14 +444,14 @@ pub fn type_block<'input, 'gs>(
                                             Ok(Some((
                                                 TypedStmt(
                                                     TypedStmtKind::ReturnStmt(return_value)
-                                                        .in_span(stmt_span),
+                                                        .in_span_no_file(stmt_span),
                                                 ),
                                                 BlockReturnActuality::AlwaysReturns,
                                             )))
                                         } else {
                                             Err(Diagnostic(
                                                 Severity::Error,
-                                                stmt_span.containing(DiagnosticKind::ExpectedGot {
+                                                stmt_span.containing_no_file(DiagnosticKind::ExpectedGot {
                                                     expected: return_ty.to_string(),
                                                     got: inferred_return_type.to_string(),
                                                 }),
@@ -506,7 +506,7 @@ pub fn type_block<'input, 'gs>(
             BlockReturnAbility::MustReturn(return_ty),
             BlockReturnActuality::SometimesReturns | BlockReturnActuality::NeverReturns,
         ) if return_ty == TastType::unit() => {
-            tast_block.push(TypedStmt(TypedStmtKind::ReturnStmt(None).in_span(
+            tast_block.push(TypedStmt(TypedStmtKind::ReturnStmt(None).in_span_no_file(
                 Span::from_positions(input_block_span.end() - 1, input_block_span.end()),
             )));
 
@@ -544,7 +544,7 @@ mod tests {
 
         let source = "switch (1 as i32) { 3 as i8 => {} default => {} }";
 
-        let block_ast = zrc_parser::parser::parse_stmt_list(source).expect("should parse");
+        let block_ast = zrc_parser::parser::parse_stmt_list(source, "test.zrc").expect("should parse");
 
         let tck_result = type_block(
             &gs.create_subscope(),

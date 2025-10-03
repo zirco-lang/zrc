@@ -28,7 +28,7 @@ pub fn type_expr_comma<'input>(
     let rhs_t = type_expr(scope, rhs)?;
     Ok(TypedExpr {
         inferred_type: rhs_t.inferred_type.clone(),
-        kind: TypedExprKind::Comma(Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
+        kind: TypedExprKind::Comma(Box::new(lhs_t), Box::new(rhs_t)).in_span_no_file(expr_span),
     })
 }
 
@@ -61,7 +61,7 @@ pub fn type_expr_ternary<'input>(
     Ok(TypedExpr {
         inferred_type: if_true_t.inferred_type.clone(),
         kind: TypedExprKind::Ternary(Box::new(cond_t), Box::new(if_true_t), Box::new(if_false_t))
-            .in_span(expr_span),
+            .in_span_no_file(expr_span),
     })
 }
 
@@ -104,7 +104,7 @@ pub fn type_expr_cast<'input>(
 
     Ok(TypedExpr {
         inferred_type: resolved_ty.clone(),
-        kind: TypedExprKind::Cast(Box::new(x_t), resolved_ty.in_span(ty_span)).in_span(expr_span),
+        kind: TypedExprKind::Cast(Box::new(x_t), resolved_ty.in_span_no_file(ty_span)).in_span_no_file(expr_span),
     })
 }
 
@@ -117,7 +117,7 @@ pub fn type_expr_size_of_type<'input>(
     let resolved_ty = resolve_type(scope.types, ty)?;
     Ok(TypedExpr {
         inferred_type: TastType::Usize,
-        kind: TypedExprKind::SizeOf(resolved_ty).in_span(expr_span),
+        kind: TypedExprKind::SizeOf(resolved_ty).in_span_no_file(expr_span),
     })
 }
 
@@ -132,7 +132,7 @@ pub fn type_expr_size_of_expr<'input>(
     let x_ty = type_expr(scope, x)?;
     Ok(TypedExpr {
         inferred_type: TastType::Usize,
-        kind: TypedExprKind::SizeOf(x_ty.inferred_type).in_span(expr_span),
+        kind: TypedExprKind::SizeOf(x_ty.inferred_type).in_span_no_file(expr_span),
     })
 }
 
@@ -165,7 +165,7 @@ mod tests {
             ),
             Ok(TypedExpr {
                 inferred_type: TastType::Usize,
-                kind: TypedExprKind::SizeOf(TastType::I32).in_span(Span::from_positions(0, 9)),
+                kind: TypedExprKind::SizeOf(TastType::I32).in_span_no_file(Span::from_positions(0, 9)),
             })
         );
     }
