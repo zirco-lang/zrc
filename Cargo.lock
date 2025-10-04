@@ -1483,6 +1483,7 @@ dependencies = [
  "zrc_codegen",
  "zrc_diagnostics",
  "zrc_parser",
+ "zrc_preprocessor",
  "zrc_typeck",
 ]
 
@@ -1517,6 +1518,15 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "logos",
+ "zrc_diagnostics",
+ "zrc_preprocessor",
+ "zrc_utils",
+]
+
+[[package]]
+name = "zrc_preprocessor"
+version = "0.1.0"
+dependencies = [
  "zrc_diagnostics",
  "zrc_utils",
 ]

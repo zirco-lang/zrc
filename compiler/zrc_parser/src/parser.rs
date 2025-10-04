@@ -101,9 +101,30 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input program.
+#[allow(clippy::result_large_err)]
 pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration<'_>>>, Diagnostic> {
+    parse_program_with_file(input, "")
+}
+
+/// Parses a Zirco program with a specific file name, yielding a list of
+/// [`Declaration`]s.
+///
+/// This function is similar to [`parse_program`] but allows specifying a file
+/// name for better error reporting and source tracking.
+///
+/// # Errors
+/// This function returns [`Err`] with a [`ZircoParserError`] if any error was
+/// encountered while parsing the input program.
+#[allow(clippy::result_large_err)]
+pub fn parse_program_with_file<'input>(
+    input: &'input str,
+    file_name: &'static str,
+) -> Result<Vec<Spanned<Declaration<'input>>>, Diagnostic> {
     internal_parser::ProgramParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(
+            file_name,
+            lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span),
+        )
         .map_err(parser_error_to_diagnostic)
 }
 
@@ -125,9 +146,13 @@ pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration<'_>>>, Diagn
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input statement list.
+#[allow(clippy::result_large_err)]
 pub fn parse_stmt_list(input: &str) -> Result<Spanned<Vec<Stmt<'_>>>, Diagnostic> {
     internal_parser::StmtListParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(
+            "",
+            lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span),
+        )
         .map(|stmt_list| stmt_list.in_span(Span::from_positions(0, input.len())))
         .map_err(parser_error_to_diagnostic)
 }
@@ -149,9 +174,13 @@ pub fn parse_stmt_list(input: &str) -> Result<Spanned<Vec<Stmt<'_>>>, Diagnostic
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input expression.
+#[allow(clippy::result_large_err)]
 pub fn parse_type(input: &str) -> Result<Type<'_>, Diagnostic> {
     internal_parser::TypeParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(
+            "",
+            lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span),
+        )
         .map_err(parser_error_to_diagnostic)
 }
 
@@ -172,10 +201,45 @@ pub fn parse_type(input: &str) -> Result<Type<'_>, Diagnostic> {
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input expression.
+#[allow(clippy::result_large_err)]
 pub fn parse_expr(input: &str) -> Result<Expr<'_>, Diagnostic> {
     internal_parser::ExprParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(
+            "",
+            lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span),
+        )
         .map_err(parser_error_to_diagnostic)
+}
+
+/// Parses a list of source chunks from the preprocessor.
+///
+/// This function processes multiple source chunks (from preprocessed files)
+/// and combines them into a single AST.
+///
+/// # Errors
+/// This function returns [`Err`] with a diagnostic if any error was
+/// encountered while parsing any of the chunks.
+#[allow(clippy::result_large_err, clippy::elidable_lifetime_names)]
+pub fn parse_source_chunks<'input>(
+    chunks: &'input [zrc_preprocessor::SourceChunk],
+) -> Result<Vec<Spanned<Declaration<'input>>>, Diagnostic> {
+    let mut declarations = Vec::new();
+
+    for chunk in chunks {
+        // Convert String to &'static str using Box::leak
+        let file_name: &'static str = Box::leak(chunk.file_name.clone().into_boxed_str());
+
+        let chunk_decls = internal_parser::ProgramParser::new()
+            .parse(
+                file_name,
+                lexer::ZircoLexer::new(&chunk.content).map(zirco_lexer_span_to_lalrpop_span),
+            )
+            .map_err(parser_error_to_diagnostic)?;
+
+        declarations.extend(chunk_decls);
+    }
+
+    Ok(declarations)
 }
 
 #[cfg(test)]

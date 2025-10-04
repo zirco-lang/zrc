@@ -111,6 +111,10 @@ pub enum DiagnosticKind {
     NumberLiteralOutOfBounds(String, String, String, String),
     #[error("global variable initializer must be a constant expression")]
     GlobalInitializerMustBeConstant,
+
+    // PREPROCESSOR ERRORS
+    #[error("preprocessor error: {0}")]
+    PreprocessorError(String),
 }
 impl DiagnosticKind {
     /// Create an [error] diagnostic in a given [`Span`]

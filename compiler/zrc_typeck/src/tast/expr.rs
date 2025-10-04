@@ -25,6 +25,7 @@ pub struct Place<'input> {
 /// Places may be:
 /// - A variable or an property access of a place
 /// - A dereference or index into any expression yielding a pointer
+#[allow(variant_size_differences)]
 #[derive(PartialEq, Debug, Clone)]
 pub enum PlaceKind<'input> {
     /// `*x`
