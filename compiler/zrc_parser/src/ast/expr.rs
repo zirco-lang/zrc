@@ -220,9 +220,6 @@ pub enum ExprKind<'input> {
     /// `sizeof T`
     #[display("sizeof {_0}")]
     SizeOfType(Type<'input>),
-    /// `sizeof(expr)`
-    #[display("sizeof({_0})")]
-    SizeOfExpr(Box<Expr<'input>>),
 
     /// Any numeric literal.
     #[display("{_0}{}", _1.as_ref().map_or_else(String::new, Type::to_string))]
@@ -474,10 +471,6 @@ impl<'input> Expr<'input> {
     pub fn build_sizeof_type(span: Span, ty: Type<'input>) -> Self {
         Self(ExprKind::SizeOfType(ty).in_span(span))
     }
-    #[must_use]
-    pub fn build_sizeof_expr(span: Span, expr: Self) -> Self {
-        Self(ExprKind::SizeOfExpr(Box::new(expr)).in_span(span))
-    }
 
     // These all need spans because they can't be guessed
     #[must_use]
@@ -590,7 +583,7 @@ mod tests {
             "((a) ? (b) : (c))",
             "((a) as T)",
             "(sizeof T)",
-            "(sizeof((expr)))",
+            "(sizeof typeof((expr)))",
             "(1)",
             "(\"a\")",
             "('a')",

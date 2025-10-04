@@ -11,6 +11,8 @@ use zrc_utils::{
     spanned,
 };
 
+use super::expr::Expr;
+
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone, Display)]
 #[display("{_0}")]
@@ -47,6 +49,9 @@ pub enum TypeKind<'input> {
     /// A direct union type
     #[display("union {{ {_0} }}")]
     Union(KeyTypeMapping<'input>),
+    /// `typeof(expr)`
+    #[display("typeof({_0})")]
+    TypeOf(Box<Expr<'input>>),
 }
 
 // AST builder. We are able to infer the spans of many based on the start of
@@ -78,6 +83,11 @@ impl<'input> Type<'input> {
     #[must_use]
     pub fn build_ptr(span: Span, ty: Self) -> Self {
         Self(TypeKind::Ptr(Box::new(ty)).in_span(span))
+    }
+
+    #[must_use]
+    pub fn build_typeof(span: Span, expr: Expr<'input>) -> Self {
+        Self(TypeKind::TypeOf(Box::new(expr)).in_span(span))
     }
 }
 

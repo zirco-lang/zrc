@@ -62,7 +62,6 @@ pub fn type_expr<'input>(
         }
         ExprKind::Cast(x, ty) => misc::type_expr_cast(scope, expr_span, *x, ty)?,
         ExprKind::SizeOfType(ty) => misc::type_expr_size_of_type(scope, expr_span, ty)?,
-        ExprKind::SizeOfExpr(x) => misc::type_expr_size_of_expr(scope, expr_span, *x)?,
         ExprKind::NumberLiteral(n, ty) => {
             literals::type_expr_number_literal(scope, expr_span, n, ty)?
         }
@@ -370,7 +369,7 @@ mod tests {
                     "i8".to_string(),
                 )),
             ),
-            ("sizeof(7)", Ok(TastType::Usize)),
+            ("sizeof typeof(7)", Ok(TastType::Usize)),
             ("sizeof struct {}", Ok(TastType::Usize)),
             ("\"hello\"", Ok(TastType::Ptr(Box::new(TastType::U8)))),
             ("'a'", Ok(TastType::U8)),

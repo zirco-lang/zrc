@@ -5,7 +5,9 @@ use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind};
 use zrc_utils::span::Span;
 
-use super::scope::TypeCtx;
+// Import type_expr to evaluate typeof expressions
+use super::expr::type_expr;
+use super::scope::{Scope, TypeCtx};
 use crate::tast::ty::Type as TastType;
 
 /// Resolve an identifier to its corresponding [`tast::ty::Type`].
@@ -13,6 +15,10 @@ use crate::tast::ty::Type as TastType;
 /// # Errors
 /// Errors if the identifier is not found in the type scope or a key is
 /// double-defined.
+///
+/// # Panics
+/// Panics if the type contains a `typeof` expression. Use
+/// [`resolve_type_with_scope`] instead when `typeof` might be present.
 pub fn resolve_type<'input>(
     type_scope: &TypeCtx<'input>,
     ty: ParserType<'input>,
@@ -34,6 +40,10 @@ pub fn resolve_type<'input>(
         }
         ParserTypeKind::Union(members) => {
             TastType::Union(resolve_key_type_mapping(type_scope, members)?)
+        }
+        ParserTypeKind::TypeOf(_) => {
+            // typeof requires full scope access, this is a programming error
+            panic!("typeof in type position requires resolve_type_with_scope, not resolve_type");
         }
     })
 }
@@ -97,6 +107,14 @@ fn resolve_type_with_opaque<'input>(
             members,
             opaque_name,
         )?),
+        ParserTypeKind::TypeOf(_) => {
+            // typeof is not allowed in type alias declarations
+            // (we can't evaluate expressions without a value scope)
+            return Err(
+                DiagnosticKind::UnableToResolveType("typeof in type alias".to_string())
+                    .error_in(span),
+            );
+        }
     })
 }
 
@@ -190,6 +208,43 @@ fn replace_opaque_with_concrete<'input>(
     }
 }
 
+/// Resolve a type with access to the full scope (including values).
+///
+/// This function is needed to handle `typeof` expressions in type positions,
+/// which require evaluating expressions to determine their types.
+///
+/// # Errors
+/// Errors if type resolution fails or typeof expression evaluation fails.
+pub(super) fn resolve_type_with_scope<'input>(
+    scope: &Scope<'input, '_>,
+    ty: ParserType<'input>,
+) -> Result<TastType<'input>, Diagnostic> {
+    let span = ty.0.span();
+    Ok(match ty.0.into_value() {
+        ParserTypeKind::Identifier(x) => {
+            if let Some(ty) = scope.types.resolve(x) {
+                ty.clone()
+            } else {
+                return Err(DiagnosticKind::UnableToResolveType(x.to_string()).error_in(span));
+            }
+        }
+        ParserTypeKind::Ptr(pointee_ty) => {
+            TastType::Ptr(Box::new(resolve_type_with_scope(scope, *pointee_ty)?))
+        }
+        ParserTypeKind::Struct(members) => {
+            TastType::Struct(resolve_key_type_mapping_with_scope(scope, members)?)
+        }
+        ParserTypeKind::Union(members) => {
+            TastType::Union(resolve_key_type_mapping_with_scope(scope, members)?)
+        }
+        ParserTypeKind::TypeOf(expr) => {
+            // Evaluate the expression to get its type
+            let typed_expr = type_expr(scope, *expr)?;
+            typed_expr.inferred_type
+        }
+    })
+}
+
 /// Resolve the types within the [`IndexMap`]s used by
 /// [`ParserTypeKind::Struct`] and ensure keys are unique, returning the value
 /// to be passed to [`TastType::Struct`].
@@ -212,6 +267,32 @@ pub(super) fn resolve_key_type_mapping<'input>(
             );
         }
         map.insert(key.value(), resolve_type(type_scope, ast_type)?);
+    }
+    Ok(map)
+}
+
+/// Resolve the types within the [`IndexMap`]s with access to full scope.
+///
+/// This version supports typeof expressions in type positions.
+///
+/// # Errors
+/// Errors if a key is not unique or is unresolvable.
+#[allow(clippy::type_complexity)]
+pub(super) fn resolve_key_type_mapping_with_scope<'input>(
+    scope: &Scope<'input, '_>,
+    members: KeyTypeMapping<'input>,
+) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {
+    let mut map: IndexMap<&'input str, TastType> = IndexMap::new();
+    for member in members.0.into_value() {
+        let span = member.span();
+        let (key, ast_type) = member.into_value();
+
+        if map.contains_key(key.value()) {
+            return Err(
+                DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
+            );
+        }
+        map.insert(key.value(), resolve_type_with_scope(scope, ast_type)?);
     }
     Ok(map)
 }

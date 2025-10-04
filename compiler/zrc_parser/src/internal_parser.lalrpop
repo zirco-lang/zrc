@@ -196,6 +196,7 @@ pub Type: Type<'input> = {
         Type(<>.map(TypeKind::Struct)),
     Spanned<("union" <KeyTypeMapping>)> =>
         Type(<>.map(TypeKind::Union)),
+    Spanned<("typeof" "(" <Expr> ")")> => Type(<>.map(|e| TypeKind::TypeOf(Box::new(e)))),
 }
 
 TypeOrParenthesizedType: Type<'input> = {
@@ -355,7 +356,6 @@ Primary: Expr<'input> = {
     Spanned<"true"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(true))),
     Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
     Spanned<("sizeof" <Type>)> => Expr(<>.map(|t| ExprKind::SizeOfType(t))),
-    Spanned<("sizeof" "(" <Expr> ")")> => Expr(<>.map(|ex| ExprKind::SizeOfExpr(Box::new(ex)))),
     "(" <Expr> ")" => <>,
 };
 
@@ -434,6 +434,7 @@ extern {
         "struct" => lexer::Tok::Struct,
         "union" => lexer::Tok::Union,
         "sizeof" => lexer::Tok::SizeOf,
+        "typeof" => lexer::Tok::TypeOf,
         "type" => lexer::Tok::Type,
         "switch" => lexer::Tok::Switch,
         "default" => lexer::Tok::Default,

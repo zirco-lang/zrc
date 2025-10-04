@@ -498,6 +498,10 @@ pub enum Tok<'input> {
     #[token("sizeof")]
     #[display("sizeof")]
     SizeOf,
+    /// The keyword `typeof`
+    #[token("typeof")]
+    #[display("typeof")]
+    TypeOf,
     /// The keyword `type`
     #[token("type")]
     #[display("type")]
