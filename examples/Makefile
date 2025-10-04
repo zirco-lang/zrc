@@ -5,7 +5,7 @@ EXAMPLES := $(wildcard */)
 all: $(EXAMPLES)
 test: $(EXAMPLES)
 	for dir in $(EXAMPLES); do \
-		$(MAKE) -C $$dir test; \
+		$(MAKE) -C $$dir test || exit 1; \
 	done
 
 # Build each example by invoking its Makefile
