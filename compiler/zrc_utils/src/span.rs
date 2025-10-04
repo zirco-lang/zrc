@@ -22,7 +22,7 @@ use std::{fmt::Display, ops::RangeInclusive};
 /// - Methods on another Span ([`Span::intersect`])
 /// - Stripping the value from a [`Spanned<T>`] ([`Spanned::span`])
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Span(usize, usize);
+pub struct Span(usize, usize, &'static str);
 impl Span {
     /// Create a new [`Span`] given a start and end location.
     ///
@@ -34,7 +34,20 @@ impl Span {
             end >= start,
             "span must have positive length (got span {start}..{end})"
         );
-        Self(start, end)
+        Self(start, end, "")
+    }
+
+    /// Create a new [`Span`] given a start, end location, and file name.
+    ///
+    /// # Panics
+    /// Panics if `start > end`.
+    #[must_use]
+    pub fn from_positions_and_file(start: usize, end: usize, file_name: &'static str) -> Self {
+        assert!(
+            end >= start,
+            "span must have positive length (got span {start}..{end})"
+        );
+        Self(start, end, file_name)
     }
 
     /// Obtains the starting position of this [`Span`] as a `usize`
@@ -49,6 +62,13 @@ impl Span {
     #[inline]
     pub const fn end(&self) -> usize {
         self.1
+    }
+
+    /// Obtains the file name of this [`Span`]
+    #[must_use]
+    #[inline]
+    pub const fn file_name(&self) -> &'static str {
+        self.2
     }
 
     /// Convert this [`Span`] into a [`RangeInclusive`], good for slicing into
@@ -74,9 +94,11 @@ impl Span {
         if span_a.start() > span_b.end() || span_b.start() > span_a.end() {
             None
         } else {
-            Some(Self::from_positions(
+            // Use file name from first span
+            Some(Self::from_positions_and_file(
                 std::cmp::max(span_a.start(), span_b.start()),
                 std::cmp::min(span_a.end(), span_b.end()),
+                span_a.file_name(),
             ))
         }
     }
@@ -224,6 +246,28 @@ macro_rules! spanned {
             $value,
         )
     };
+    ($start:expr, $value:expr, $end:expr, $file:expr) => {
+        $crate::span::Spanned::from_span_and_value(
+            $crate::span::Span::from_positions_and_file($start, $end, $file),
+            $value,
+        )
+    };
+}
+
+/// Create a [`Spanned<T>`] instance from two locations and a value without a
+/// file name. This is for test use only and should not be used in production
+/// code.
+///
+/// # Panics
+/// Panics if `start > end`.
+#[macro_export]
+macro_rules! spanned_no_file {
+    ($start:expr, $value:expr, $end:expr) => {
+        $crate::span::Spanned::from_span_and_value(
+            $crate::span::Span::from_positions($start, $end),
+            $value,
+        )
+    };
 }
 
 #[cfg(test)]
@@ -244,9 +288,10 @@ mod tests {
         #[test]
         fn span_from_positions_works_as_expected() {
             let span = Span::from_positions(2, 7);
-            assert_eq!(span, Span(2, 7));
+            assert_eq!(span, Span(2, 7, ""));
             assert_eq!(span.start(), 2);
             assert_eq!(span.end(), 7);
+            assert_eq!(span.file_name(), "");
             assert_eq!(span.range(), 2..=7);
             assert_eq!(span.to_string(), "2-7".to_string());
         }
@@ -345,7 +390,7 @@ mod tests {
     fn spannable_in_span_creates_spanned() {
         assert_eq!(
             7.in_span(Span::from_positions(3, 6)),
-            Spanned(Span(3, 6), 7),
+            Spanned(Span(3, 6, ""), 7),
         );
     }
 }

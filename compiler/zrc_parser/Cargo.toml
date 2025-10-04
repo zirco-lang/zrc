@@ -11,6 +11,7 @@ lalrpop-util = { version = "0.22.0" }
 logos = "0.15.0"
 zrc_diagnostics = { version = "0.1.0", path = "../zrc_diagnostics" }
 zrc_utils = { version = "0.1.0", path = "../zrc_utils" }
+zrc_preprocessor = { version = "0.1.0", path = "../zrc_preprocessor" }
 
 [build-dependencies]
 lalrpop = "0.22.0"

@@ -78,6 +78,7 @@ pub enum TypedStmtKind<'input> {
 }
 
 /// A struct or function declaration at the top level of a file
+#[allow(variant_size_differences)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypedDeclaration<'input> {
     /// A declaration of a function
