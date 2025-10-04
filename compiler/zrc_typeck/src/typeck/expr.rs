@@ -9,6 +9,7 @@ mod literals;
 mod misc;
 mod unary;
 
+pub use helpers::try_coerce_to;
 use zrc_diagnostics::Diagnostic;
 use zrc_parser::ast::expr::{Expr, ExprKind};
 
@@ -167,7 +168,7 @@ mod tests {
             ),
             (
                 "4 = i8",
-                Err(DiagnosticKind::NotAnLvalue("i32".to_string())),
+                Err(DiagnosticKind::NotAnLvalue("{int}".to_string())),
             ),
             ("!bool", Ok(TastType::Bool)),
             (
@@ -347,13 +348,7 @@ mod tests {
                     "/".to_string(),
                 )),
             ),
-            (
-                "(&i8) + 2",
-                Err(DiagnosticKind::ExpectedGot {
-                    expected: "usize".to_string(),
-                    got: "i32".to_string(),
-                }),
-            ),
+            ("(&i8) + 2", Ok(TastType::Ptr(Box::new(TastType::I8)))),
             (
                 "(&i8) + (2 as usize)",
                 Ok(TastType::Ptr(Box::new(TastType::I8))),
@@ -375,7 +370,7 @@ mod tests {
             ("\"hello\"", Ok(TastType::Ptr(Box::new(TastType::U8)))),
             ("'a'", Ok(TastType::U8)),
             ("true", Ok(TastType::Bool)),
-            ("4", Ok(TastType::I32)),
+            ("4", Ok(TastType::Int)),
             ("4i8", Ok(TastType::I8)),
             ("-4i8", Ok(TastType::I8)),
             (

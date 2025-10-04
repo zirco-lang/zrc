@@ -8,6 +8,7 @@ use zrc_utils::span::{Spannable, Spanned};
 
 use super::{
     block::BlockReturnAbility,
+    expr::try_coerce_to,
     resolve_type,
     scope::{GlobalScope, Scope},
     ty::resolve_type_with_self_reference,
@@ -83,14 +84,28 @@ pub fn process_let_declaration<'input>(
                             kind,
                         }),
                         None,
-                    ) => TastLetDeclaration {
-                        name: let_declaration.name,
-                        ty: inferred_type.clone(),
-                        value: Some(TypedExpr {
-                            inferred_type,
-                            kind,
-                        }),
-                    },
+                    ) => {
+                        // If the inferred type is {int}, resolve it to i32
+                        let resolved_type = if matches!(inferred_type, TastType::Int) {
+                            TastType::I32
+                        } else {
+                            inferred_type.clone()
+                        };
+
+                        let value_coerced = try_coerce_to(
+                            TypedExpr {
+                                inferred_type,
+                                kind,
+                            },
+                            &resolved_type,
+                        );
+
+                        TastLetDeclaration {
+                            name: let_declaration.name,
+                            ty: resolved_type,
+                            value: Some(value_coerced),
+                        }
+                    }
 
                     // Both explicitly typed and inferable
                     (
@@ -108,6 +123,20 @@ pub fn process_let_declaration<'input>(
                                     inferred_type,
                                     kind,
                                 }),
+                            }
+                        } else if inferred_type.can_implicitly_cast_to(&resolved_ty) {
+                            // Insert implicit cast (e.g., {int} -> i8)
+                            let value_coerced = try_coerce_to(
+                                TypedExpr {
+                                    inferred_type,
+                                    kind,
+                                },
+                                &resolved_ty,
+                            );
+                            TastLetDeclaration {
+                                name: let_declaration.name,
+                                ty: resolved_ty,
+                                value: Some(value_coerced),
                             }
                         } else {
                             return Err(DiagnosticKind::InvalidAssignmentRightHandSideType {

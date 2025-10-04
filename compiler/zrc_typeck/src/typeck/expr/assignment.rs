@@ -6,7 +6,7 @@ use zrc_utils::span::{Span, Spannable};
 
 use super::{
     super::scope::Scope,
-    helpers::{desugar_assignment, expr_to_place},
+    helpers::{desugar_assignment, expr_to_place, try_coerce_to},
     type_expr,
 };
 use crate::tast::expr::{TypedExpr, TypedExprKind};
@@ -25,16 +25,28 @@ pub fn type_expr_assignment<'input>(
     let place_t = expr_to_place(expr_span, type_expr(scope, place)?)?;
     let value_t = type_expr(scope, value)?;
 
-    if place_t.inferred_type != value_t.inferred_type {
-        return Err(DiagnosticKind::InvalidAssignmentRightHandSideType {
+    if place_t.inferred_type == value_t.inferred_type {
+        Ok(TypedExpr {
+            inferred_type: place_t.inferred_type.clone(),
+            kind: TypedExprKind::Assignment(Box::new(place_t), Box::new(value_t))
+                .in_span(expr_span),
+        })
+    } else if value_t
+        .inferred_type
+        .can_implicitly_cast_to(&place_t.inferred_type)
+    {
+        // Try to coerce the value to the place type
+        let value_coerced = try_coerce_to(value_t, &place_t.inferred_type);
+        Ok(TypedExpr {
+            inferred_type: place_t.inferred_type.clone(),
+            kind: TypedExprKind::Assignment(Box::new(place_t), Box::new(value_coerced))
+                .in_span(expr_span),
+        })
+    } else {
+        Err(DiagnosticKind::InvalidAssignmentRightHandSideType {
             expected: place_t.inferred_type.to_string(),
             got: value_t.inferred_type.to_string(),
         }
-        .error_in(expr_span));
+        .error_in(expr_span))
     }
-
-    Ok(TypedExpr {
-        inferred_type: place_t.inferred_type.clone(),
-        kind: TypedExprKind::Assignment(Box::new(place_t), Box::new(value_t)).in_span(expr_span),
-    })
 }
