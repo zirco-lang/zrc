@@ -61,7 +61,8 @@ impl<'input> Type<'input> {
         Self(spanned!(
             span.start(),
             TypeKind::Identifier(ident.into_value()),
-            ident.end()
+            ident.end(),
+            span.file_name()
         ))
     }
 
@@ -97,7 +98,7 @@ mod tests {
 
         for input in test_cases {
             assert_eq!(
-                crate::parser::parse_type(input)
+                crate::parser::parse_type(input, "<test>")
                     .expect("test cases should have parsed correctly")
                     .to_string(),
                 input
@@ -123,7 +124,7 @@ mod tests {
         ];
 
         for (input, expected) in test_cases {
-            let parsed = crate::parser::parse_type(input)
+            let parsed = crate::parser::parse_type(input, "<test>")
                 .unwrap_or_else(|_| panic!("Failed to parse: {input}"));
             assert_eq!(
                 parsed.to_string(),
@@ -139,7 +140,7 @@ mod tests {
         let test_cases = vec!["type x = (i32);", "type y = ((i32));", "type z = (*(i32));"];
 
         for input in test_cases {
-            let result = crate::parser::parse_program(input);
+            let result = crate::parser::parse_program(input, "<test>");
             assert!(result.is_ok(), "Failed to parse type alias: {input}");
         }
     }

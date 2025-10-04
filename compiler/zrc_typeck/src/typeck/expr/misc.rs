@@ -238,7 +238,7 @@ mod tests {
     use zrc_parser::{ast::expr::Expr, lexer::NumberLiteral};
     use zrc_utils::{
         span::{Span, Spannable},
-        spanned,
+        spanned_test,
     };
 
     use super::*;
@@ -256,13 +256,14 @@ mod tests {
             type_expr(
                 &GlobalScope::new().create_subscope(),
                 Expr::build_sizeof_expr(
-                    Span::from_positions(0, 9),
-                    Expr::build_number(spanned!(8, NumberLiteral::Decimal("1"), 9), None)
+                    Span::from_positions_and_file(0, 9, "<test>"),
+                    Expr::build_number(spanned_test!(8, NumberLiteral::Decimal("1"), 9), None)
                 ),
             ),
             Ok(TypedExpr {
                 inferred_type: TastType::Usize,
-                kind: TypedExprKind::SizeOf(TastType::I32).in_span(Span::from_positions(0, 9)),
+                kind: TypedExprKind::SizeOf(TastType::I32)
+                    .in_span(Span::from_positions_and_file(0, 9, "<test>")),
             })
         );
     }

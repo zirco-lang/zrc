@@ -1,11 +1,17 @@
 //! Zirco compiler driver
 
+use std::path::Path;
+
 use zrc_codegen::{DebugLevel, OptimizationLevel};
 
 use crate::OutputFormat;
 
 /// Drive the compilation process.
-#[allow(clippy::too_many_arguments, clippy::wildcard_enum_match_arm)]
+#[allow(
+    clippy::too_many_arguments,
+    clippy::wildcard_enum_match_arm,
+    clippy::result_large_err
+)]
 pub fn compile(
     frontend_version_string: &str,
     emit: &OutputFormat,
@@ -18,8 +24,15 @@ pub fn compile(
     triple: &zrc_codegen::TargetTriple,
     cpu: &str,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
+    // === PREPROCESSOR ===
+    let chunks = zrc_preprocessor::preprocess(Path::new(parent_directory), file_name, content)?;
+
     // === PARSER ===
-    let ast = zrc_parser::parser::parse_program(content)?;
+    let mut ast = Vec::new();
+    for chunk in &chunks {
+        let chunk_decls = zrc_parser::parser::parse_source_chunk(chunk)?;
+        ast.extend(chunk_decls);
+    }
 
     // display the AST if the user wants it
     if matches!(

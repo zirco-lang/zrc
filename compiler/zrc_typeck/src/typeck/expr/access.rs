@@ -89,7 +89,7 @@ pub fn type_expr_arrow<'input>(
         type_expr(
             scope,
             Expr(Spanned::from_span_and_value(
-                Span::from_positions(obj.0.start(), key.end()),
+                Span::from_positions_and_file(obj.0.start(), key.end(), obj.0.span().file_name()),
                 ExprKind::Dot(
                     Box::new(Expr(
                         obj.0.span().containing(ExprKind::UnaryDereference(obj)),

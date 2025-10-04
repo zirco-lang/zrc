@@ -333,7 +333,7 @@ mod tests {
         },
         ty::{Type, TypeKind},
     };
-    use zrc_utils::spanned;
+    use zrc_utils::spanned_test;
 
     use super::*;
     use crate::typeck::scope::{TypeCtx, ValueCtx};
@@ -363,14 +363,18 @@ mod tests {
                     )])
                 },
                 AstDeclaration::FunctionDeclaration {
-                    name: spanned!(0, "get_true", 0),
-                    parameters: spanned!(0, AstArgumentDeclarationList::NonVariadic(vec![]), 0),
-                    return_type: Some(Type(spanned!(0, TypeKind::Identifier("bool"), 0))),
-                    body: Some(spanned!(
+                    name: spanned_test!(0, "get_true", 0),
+                    parameters: spanned_test!(
                         0,
-                        vec![Stmt(spanned!(
+                        AstArgumentDeclarationList::NonVariadic(vec![]),
+                        0
+                    ),
+                    return_type: Some(Type(spanned_test!(0, TypeKind::Identifier("bool"), 0))),
+                    body: Some(spanned_test!(
+                        0,
+                        vec![Stmt(spanned_test!(
                             0,
-                            StmtKind::ReturnStmt(Some(Expr(spanned!(
+                            StmtKind::ReturnStmt(Some(Expr(spanned_test!(
                                 0,
                                 ExprKind::BooleanLiteral(true),
                                 0

@@ -17,7 +17,8 @@
 //! function.
 //! ```
 //! use zrc_parser::parser::parse_program;
-//! let ast = parse_program("fn main() {}");
+//! let ast = parse_program("fn main() {}", "<test>");
+//! ```
 //! ```
 
 use lalrpop_util::ParseError;
@@ -39,26 +40,31 @@ fn parser_error_to_diagnostic(
     error: ParseError<usize, lexer::Tok, Spanned<LexicalError>>,
 ) -> Diagnostic {
     match error {
-        ParseError::InvalidToken { location } => {
-            DiagnosticKind::InvalidToken.error_in(Span::from_positions(location, location))
-        }
+        ParseError::InvalidToken { location } => DiagnosticKind::InvalidToken.error_in(
+            Span::from_positions_and_file(location, location, "<unknown>"),
+        ),
 
         ParseError::UnrecognizedEof { location, expected } => {
-            DiagnosticKind::UnexpectedEof(expected)
-                .error_in(Span::from_positions(location - 1, location))
+            DiagnosticKind::UnexpectedEof(expected).error_in(Span::from_positions_and_file(
+                location - 1,
+                location,
+                "<unknown>",
+            ))
         }
 
         ParseError::UnrecognizedToken {
             token: (start, token, end),
             expected,
         } => DiagnosticKind::UnrecognizedToken(token.to_string(), expected)
-            .error_in(Span::from_positions(start, end)),
+            .error_in(Span::from_positions_and_file(start, end, "<unknown>")),
 
         ParseError::ExtraToken {
             token: (start, token, end),
-        } => {
-            DiagnosticKind::ExtraToken(token.to_string()).error_in(Span::from_positions(start, end))
-        }
+        } => DiagnosticKind::ExtraToken(token.to_string()).error_in(Span::from_positions_and_file(
+            start,
+            end,
+            "<unknown>",
+        )),
 
         ParseError::User { error } => error.error(|error| match error {
             LexicalError::UnknownToken(token) => DiagnosticKind::UnknownToken(token.to_string()),
@@ -84,7 +90,8 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
     })
 }
 
-/// Parses a Zirco program, yielding a list of [`Declaration`]s.
+/// Parses a Zirco program with a specific file name, yielding a list of
+/// [`Declaration`]s.
 ///
 /// This function runs an **entire program** through the Zirco parser and
 /// returns either a complete [AST](super::ast) consisting of root
@@ -95,15 +102,22 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 /// Obtaining the AST of a program:
 /// ```
 /// use zrc_parser::parser::parse_program;
-/// let ast = parse_program("fn main() {}");
+/// let ast = parse_program("fn main() {}", "<test>");
 /// ```
 ///
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input program.
-pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration<'_>>>, Diagnostic> {
+#[allow(clippy::result_large_err)]
+pub fn parse_program<'input>(
+    input: &'input str,
+    file_name: &'static str,
+) -> Result<Vec<Spanned<Declaration<'input>>>, Diagnostic> {
     internal_parser::ProgramParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(
+            file_name,
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
         .map_err(parser_error_to_diagnostic)
 }
 
@@ -119,16 +133,25 @@ pub fn parse_program(input: &str) -> Result<Vec<Spanned<Declaration<'_>>>, Diagn
 /// Obtaining the AST of a statement:
 /// ```
 /// use zrc_parser::parser::parse_stmt_list;
-/// let ast = parse_stmt_list("let x = 6;");
+/// let ast = parse_stmt_list("let x = 6;", "<test>");
 /// ```
 ///
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input statement list.
-pub fn parse_stmt_list(input: &str) -> Result<Spanned<Vec<Stmt<'_>>>, Diagnostic> {
+#[allow(clippy::result_large_err)]
+pub fn parse_stmt_list<'input>(
+    input: &'input str,
+    file_name: &'static str,
+) -> Result<Spanned<Vec<Stmt<'input>>>, Diagnostic> {
     internal_parser::StmtListParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
-        .map(|stmt_list| stmt_list.in_span(Span::from_positions(0, input.len())))
+        .parse(
+            file_name,
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
+        .map(|stmt_list| {
+            stmt_list.in_span(Span::from_positions_and_file(0, input.len(), file_name))
+        })
         .map_err(parser_error_to_diagnostic)
 }
 
@@ -143,15 +166,22 @@ pub fn parse_stmt_list(input: &str) -> Result<Spanned<Vec<Stmt<'_>>>, Diagnostic
 /// Obtaining the AST of a type:
 /// ```
 /// use zrc_parser::parser::parse_type;
-/// let ast = parse_type("struct { x: i32 }");
+/// let ast = parse_type("struct { x: i32 }", "<test>");
 /// ```
 ///
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input expression.
-pub fn parse_type(input: &str) -> Result<Type<'_>, Diagnostic> {
+#[allow(clippy::result_large_err)]
+pub fn parse_type<'input>(
+    input: &'input str,
+    file_name: &'static str,
+) -> Result<Type<'input>, Diagnostic> {
     internal_parser::TypeParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(
+            file_name,
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
         .map_err(parser_error_to_diagnostic)
 }
 
@@ -166,21 +196,51 @@ pub fn parse_type(input: &str) -> Result<Type<'_>, Diagnostic> {
 /// Obtaining the AST of an expression:
 /// ```
 /// use zrc_parser::parser::parse_expr;
-/// let ast = parse_expr("1 + 2");
+/// let ast = parse_expr("1 + 2", "<test>");
 /// ```
 ///
 /// # Errors
 /// This function returns [`Err`] with a [`ZircoParserError`] if any error was
 /// encountered while parsing the input expression.
-pub fn parse_expr(input: &str) -> Result<Expr<'_>, Diagnostic> {
+#[allow(clippy::result_large_err)]
+pub fn parse_expr<'input>(
+    input: &'input str,
+    file_name: &'static str,
+) -> Result<Expr<'input>, Diagnostic> {
     internal_parser::ExprParser::new()
-        .parse(lexer::ZircoLexer::new(input).map(zirco_lexer_span_to_lalrpop_span))
+        .parse(
+            file_name,
+            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
+        .map_err(parser_error_to_diagnostic)
+}
+
+/// Parses a single source chunk from the preprocessor.
+///
+/// This function processes one source chunk and returns the parsed
+/// declarations.
+///
+/// # Errors
+/// This function returns [`Err`] with a diagnostic if any error was
+/// encountered while parsing the chunk.
+#[allow(clippy::result_large_err)]
+pub fn parse_source_chunk(
+    chunk: &zrc_preprocessor::SourceChunk,
+) -> Result<Vec<Spanned<Declaration<'_>>>, Diagnostic> {
+    // Convert String to &'static str using Box::leak
+    let file_name: &'static str = Box::leak(chunk.file_name.clone().into_boxed_str());
+
+    internal_parser::ProgramParser::new()
+        .parse(
+            file_name,
+            lexer::ZircoLexer::new(&chunk.content, file_name).map(zirco_lexer_span_to_lalrpop_span),
+        )
         .map_err(parser_error_to_diagnostic)
 }
 
 #[cfg(test)]
 mod tests {
-    use zrc_utils::spanned;
+    use zrc_utils::spanned_test;
 
     use super::*;
     use crate::ast::{expr::Expr, ty::Type};
@@ -192,21 +252,21 @@ mod tests {
         fn arithmetic_operators_parse_as_expected() {
             assert_eq!(
                 // ((1 + 1) - (((1 * 1) / 1) % 1))
-                parse_expr("1 + 1 - 1 * 1 / 1 % 1"),
+                parse_expr("1 + 1 - 1 * 1 / 1 % 1", "<test>"),
                 Ok(Expr::build_sub(
                     Expr::build_add(
-                        Expr::build_number_dec(spanned!(0, "1", 1), None),
-                        Expr::build_number_dec(spanned!(4, "1", 5), None)
+                        Expr::build_number_dec(spanned_test!(0, "1", 1), None),
+                        Expr::build_number_dec(spanned_test!(4, "1", 5), None)
                     ),
                     Expr::build_modulo(
                         Expr::build_div(
                             Expr::build_mul(
-                                Expr::build_number_dec(spanned!(8, "1", 9), None),
-                                Expr::build_number_dec(spanned!(12, "1", 13), None)
+                                Expr::build_number_dec(spanned_test!(8, "1", 9), None),
+                                Expr::build_number_dec(spanned_test!(12, "1", 13), None)
                             ),
-                            Expr::build_number_dec(spanned!(16, "1", 17), None)
+                            Expr::build_number_dec(spanned_test!(16, "1", 17), None)
                         ),
-                        Expr::build_number_dec(spanned!(20, "1", 21), None)
+                        Expr::build_number_dec(spanned_test!(20, "1", 21), None)
                     )
                 ))
             );
@@ -215,20 +275,20 @@ mod tests {
         #[test]
         fn bitwise_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("1 & 1 | 1 ^ 1 << 1 >> 1"),
+                parse_expr("1 & 1 | 1 ^ 1 << 1 >> 1", "<test>"),
                 Ok(Expr::build_bit_or(
                     Expr::build_bit_and(
-                        Expr::build_number_dec(spanned!(0, "1", 1), None),
-                        Expr::build_number_dec(spanned!(4, "1", 5), None)
+                        Expr::build_number_dec(spanned_test!(0, "1", 1), None),
+                        Expr::build_number_dec(spanned_test!(4, "1", 5), None)
                     ),
                     Expr::build_bit_xor(
-                        Expr::build_number_dec(spanned!(8, "1", 9), None),
+                        Expr::build_number_dec(spanned_test!(8, "1", 9), None),
                         Expr::build_shr(
                             Expr::build_shl(
-                                Expr::build_number_dec(spanned!(12, "1", 13), None),
-                                Expr::build_number_dec(spanned!(17, "1", 18), None)
+                                Expr::build_number_dec(spanned_test!(12, "1", 13), None),
+                                Expr::build_number_dec(spanned_test!(17, "1", 18), None)
                             ),
-                            Expr::build_number_dec(spanned!(22, "1", 23), None)
+                            Expr::build_number_dec(spanned_test!(22, "1", 23), None)
                         )
                     )
                 ))
@@ -238,13 +298,13 @@ mod tests {
         #[test]
         fn logical_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("1 && 1 || 1"),
+                parse_expr("1 && 1 || 1", "<test>"),
                 Ok(Expr::build_logical_or(
                     Expr::build_logical_and(
-                        Expr::build_number_dec(spanned!(0, "1", 1), None),
-                        Expr::build_number_dec(spanned!(5, "1", 6), None)
+                        Expr::build_number_dec(spanned_test!(0, "1", 1), None),
+                        Expr::build_number_dec(spanned_test!(5, "1", 6), None)
                     ),
-                    Expr::build_number_dec(spanned!(10, "1", 11), None)
+                    Expr::build_number_dec(spanned_test!(10, "1", 11), None)
                 ))
             );
         }
@@ -252,13 +312,13 @@ mod tests {
         #[test]
         fn equality_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("1 == 1 != 1"),
+                parse_expr("1 == 1 != 1", "<test>"),
                 Ok(Expr::build_neq(
                     Expr::build_eq(
-                        Expr::build_number_dec(spanned!(0, "1", 1), None),
-                        Expr::build_number_dec(spanned!(5, "1", 6), None)
+                        Expr::build_number_dec(spanned_test!(0, "1", 1), None),
+                        Expr::build_number_dec(spanned_test!(5, "1", 6), None)
                     ),
-                    Expr::build_number_dec(spanned!(10, "1", 11), None)
+                    Expr::build_number_dec(spanned_test!(10, "1", 11), None)
                 ))
             );
         }
@@ -266,19 +326,19 @@ mod tests {
         #[test]
         fn comparison_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("1 > 1 >= 1 < 1 <= 1"),
+                parse_expr("1 > 1 >= 1 < 1 <= 1", "<test>"),
                 Ok(Expr::build_lte(
                     Expr::build_lt(
                         Expr::build_gte(
                             Expr::build_gt(
-                                Expr::build_number_dec(spanned!(0, "1", 1), None),
-                                Expr::build_number_dec(spanned!(4, "1", 5), None)
+                                Expr::build_number_dec(spanned_test!(0, "1", 1), None),
+                                Expr::build_number_dec(spanned_test!(4, "1", 5), None)
                             ),
-                            Expr::build_number_dec(spanned!(9, "1", 10), None)
+                            Expr::build_number_dec(spanned_test!(9, "1", 10), None)
                         ),
-                        Expr::build_number_dec(spanned!(13, "1", 14), None)
+                        Expr::build_number_dec(spanned_test!(13, "1", 14), None)
                     ),
-                    Expr::build_number_dec(spanned!(18, "1", 19), None)
+                    Expr::build_number_dec(spanned_test!(18, "1", 19), None)
                 ))
             );
         }
@@ -286,18 +346,18 @@ mod tests {
         #[test]
         fn unary_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("!~-&*x"),
+                parse_expr("!~-&*x", "<test>"),
                 Ok(Expr::build_not(
-                    Span::from_positions(0, 6),
+                    Span::from_positions_and_file(0, 6, "<test>"),
                     Expr::build_bit_not(
-                        Span::from_positions(1, 6),
+                        Span::from_positions_and_file(1, 6, "<test>"),
                         Expr::build_neg(
-                            Span::from_positions(2, 6),
+                            Span::from_positions_and_file(2, 6, "<test>"),
                             Expr::build_address_of(
-                                Span::from_positions(3, 6),
+                                Span::from_positions_and_file(3, 6, "<test>"),
                                 Expr::build_deref(
-                                    Span::from_positions(4, 6),
-                                    Expr::build_ident(spanned!(5, "x", 6))
+                                    Span::from_positions_and_file(4, 6, "<test>"),
+                                    Expr::build_ident(spanned_test!(5, "x", 6))
                                 )
                             )
                         )
@@ -309,17 +369,17 @@ mod tests {
         #[test]
         fn indexing_operators_parse_as_expected() {
             assert_eq!(
-                parse_expr("x[x].x->x"),
+                parse_expr("x[x].x->x", "<test>"),
                 Ok(Expr::build_arrow(
                     Expr::build_dot(
                         Expr::build_index(
-                            Span::from_positions(0, 4),
-                            Expr::build_ident(spanned!(0, "x", 1)),
-                            Expr::build_ident(spanned!(2, "x", 3))
+                            Span::from_positions_and_file(0, 4, "<test>"),
+                            Expr::build_ident(spanned_test!(0, "x", 1)),
+                            Expr::build_ident(spanned_test!(2, "x", 3))
                         ),
-                        spanned!(5, "x", 6)
+                        spanned_test!(5, "x", 6)
                     ),
-                    spanned!(8, "x", 9)
+                    spanned_test!(8, "x", 9)
                 ))
             );
         }
@@ -327,15 +387,15 @@ mod tests {
         #[test]
         fn function_calls_parse_as_expected() {
             assert_eq!(
-                parse_expr("f(x, y)"),
+                parse_expr("f(x, y)", "<test>"),
                 Ok(Expr::build_call(
-                    Span::from_positions(0, 7),
-                    Expr::build_ident(spanned!(0, "f", 1)),
-                    spanned!(
+                    Span::from_positions_and_file(0, 7, "<test>"),
+                    Expr::build_ident(spanned_test!(0, "f", 1)),
+                    spanned_test!(
                         1,
                         vec![
-                            Expr::build_ident(spanned!(2, "x", 3)),
-                            Expr::build_ident(spanned!(5, "y", 6))
+                            Expr::build_ident(spanned_test!(2, "x", 3)),
+                            Expr::build_ident(spanned_test!(5, "y", 6))
                         ],
                         7
                     )
@@ -346,11 +406,11 @@ mod tests {
         #[test]
         fn ternary_operator_parses_as_expected() {
             assert_eq!(
-                parse_expr("a ? b : c"),
+                parse_expr("a ? b : c", "<test>"),
                 Ok(Expr::build_ternary(
-                    Expr::build_ident(spanned!(0, "a", 1)),
-                    Expr::build_ident(spanned!(4, "b", 5)),
-                    Expr::build_ident(spanned!(8, "c", 9))
+                    Expr::build_ident(spanned_test!(0, "a", 1)),
+                    Expr::build_ident(spanned_test!(4, "b", 5)),
+                    Expr::build_ident(spanned_test!(8, "c", 9))
                 ))
             );
         }
@@ -358,10 +418,10 @@ mod tests {
         #[test]
         fn casts_parse_as_expected() {
             assert_eq!(
-                parse_expr("x as T"),
+                parse_expr("x as T", "<test>"),
                 Ok(Expr::build_cast(
-                    Expr::build_ident(spanned!(0, "x", 1)),
-                    Type::build_ident(spanned!(5, "T", 6))
+                    Expr::build_ident(spanned_test!(0, "x", 1)),
+                    Type::build_ident(spanned_test!(5, "T", 6))
                 ))
             );
         }
@@ -373,16 +433,16 @@ mod tests {
             #[test]
             fn number_literals_parse_as_expected() {
                 assert_eq!(
-                    parse_expr("1"),
-                    Ok(Expr::build_number_dec(spanned!(0, "1", 1), None))
+                    parse_expr("1", "<test>"),
+                    Ok(Expr::build_number_dec(spanned_test!(0, "1", 1), None))
                 );
             }
 
             #[test]
             fn string_literals_parse_as_expected() {
                 assert_eq!(
-                    parse_expr("\"x\""),
-                    Ok(Expr::build_string(spanned!(
+                    parse_expr("\"x\"", "<test>"),
+                    Ok(Expr::build_string(spanned_test!(
                         0,
                         ZrcString(vec![StringTok::Text("x")]),
                         3
@@ -392,14 +452,17 @@ mod tests {
 
             #[test]
             fn identifiers_parse_as_expected() {
-                assert_eq!(parse_expr("x"), Ok(Expr::build_ident(spanned!(0, "x", 1))));
+                assert_eq!(
+                    parse_expr("x", "<test>"),
+                    Ok(Expr::build_ident(spanned_test!(0, "x", 1)))
+                );
             }
 
             #[test]
             fn booleans_parse_as_expected() {
                 assert_eq!(
-                    parse_expr("true"),
-                    Ok(Expr::build_bool(spanned!(0, true, 4)))
+                    parse_expr("true", "<test>"),
+                    Ok(Expr::build_bool(spanned_test!(0, true, 4)))
                 );
             }
 

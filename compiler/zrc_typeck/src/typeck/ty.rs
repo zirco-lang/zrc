@@ -250,7 +250,7 @@ fn resolve_key_type_mapping_with_opaque<'input>(
 #[cfg(test)]
 mod tests {
     use zrc_diagnostics::Severity;
-    use zrc_utils::{span::Span, spanned};
+    use zrc_utils::{span::Span, spanned_test};
 
     use super::*;
 
@@ -260,8 +260,8 @@ mod tests {
             resolve_type(
                 &TypeCtx::from([("i32", TastType::I32)]),
                 ParserType::build_ptr(
-                    Span::from_positions(0, 4),
-                    ParserType::build_ident(spanned!(1, "i32", 4)),
+                    Span::from_positions_and_file(0, 4, "<test>"),
+                    ParserType::build_ident(spanned_test!(1, "i32", 4)),
                 ),
             ),
             Ok(TastType::Ptr(Box::new(TastType::I32)))
@@ -273,11 +273,11 @@ mod tests {
         assert_eq!(
             resolve_type(
                 &TypeCtx::new_empty(),
-                ParserType::build_ident(spanned!(0, "x", 1))
+                ParserType::build_ident(spanned_test!(0, "x", 1))
             ),
             Err(Diagnostic(
                 Severity::Error,
-                spanned!(0, DiagnosticKind::UnableToResolveType("x".to_string()), 1)
+                spanned_test!(0, DiagnosticKind::UnableToResolveType("x".to_string()), 1)
             ))
         );
     }
@@ -288,24 +288,32 @@ mod tests {
         assert_eq!(
             resolve_type(
                 &TypeCtx::default(),
-                ParserType(spanned!(
+                ParserType(spanned_test!(
                     0,
-                    ParserTypeKind::Struct(KeyTypeMapping(spanned!(
+                    ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
                         7,
                         vec![
-                            spanned!(
+                            spanned_test!(
                                 9,
                                 (
-                                    spanned!(9, "x", 10),
-                                    ParserType(spanned!(12, ParserTypeKind::Identifier("i32"), 15))
+                                    spanned_test!(9, "x", 10),
+                                    ParserType(spanned_test!(
+                                        12,
+                                        ParserTypeKind::Identifier("i32"),
+                                        15
+                                    ))
                                 ),
                                 15
                             ),
-                            spanned!(
+                            spanned_test!(
                                 17,
                                 (
-                                    spanned!(17, "y", 18),
-                                    ParserType(spanned!(20, ParserTypeKind::Identifier("i32"), 23))
+                                    spanned_test!(17, "y", 18),
+                                    ParserType(spanned_test!(
+                                        20,
+                                        ParserTypeKind::Identifier("i32"),
+                                        23
+                                    ))
                                 ),
                                 23
                             )
@@ -329,23 +337,31 @@ mod tests {
             resolve_type(
                 &TypeCtx::default(),
                 ParserType::build_struct_from_contents(
-                    Span::from_positions(0, 25),
-                    KeyTypeMapping(spanned!(
+                    Span::from_positions_and_file(0, 25, "<test>"),
+                    KeyTypeMapping(spanned_test!(
                         7,
                         vec![
-                            spanned!(
+                            spanned_test!(
                                 9,
                                 (
-                                    spanned!(9, "x", 10),
-                                    ParserType(spanned!(12, ParserTypeKind::Identifier("i32"), 15))
+                                    spanned_test!(9, "x", 10),
+                                    ParserType(spanned_test!(
+                                        12,
+                                        ParserTypeKind::Identifier("i32"),
+                                        15
+                                    ))
                                 ),
                                 15
                             ),
-                            spanned!(
+                            spanned_test!(
                                 17,
                                 (
-                                    spanned!(17, "x", 18),
-                                    ParserType(spanned!(20, ParserTypeKind::Identifier("i32"), 23))
+                                    spanned_test!(17, "x", 18),
+                                    ParserType(spanned_test!(
+                                        20,
+                                        ParserTypeKind::Identifier("i32"),
+                                        23
+                                    ))
                                 ),
                                 23
                             )
@@ -356,7 +372,7 @@ mod tests {
             ),
             Err(Diagnostic(
                 Severity::Error,
-                spanned!(
+                spanned_test!(
                     17,
                     DiagnosticKind::DuplicateStructMember("x".to_string()),
                     23
@@ -371,26 +387,30 @@ mod tests {
         // where Node is the name being defined
         let result = resolve_type_with_self_reference(
             &TypeCtx::default(),
-            ParserType(spanned!(
+            ParserType(spanned_test!(
                 0,
-                ParserTypeKind::Struct(KeyTypeMapping(spanned!(
+                ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
                     7,
                     vec![
-                        spanned!(
+                        spanned_test!(
                             9,
                             (
-                                spanned!(9, "value", 14),
-                                ParserType(spanned!(16, ParserTypeKind::Identifier("i32"), 19))
+                                spanned_test!(9, "value", 14),
+                                ParserType(spanned_test!(
+                                    16,
+                                    ParserTypeKind::Identifier("i32"),
+                                    19
+                                ))
                             ),
                             19
                         ),
-                        spanned!(
+                        spanned_test!(
                             21,
                             (
-                                spanned!(21, "next", 25),
-                                ParserType(spanned!(
+                                spanned_test!(21, "next", 25),
+                                ParserType(spanned_test!(
                                     27,
-                                    ParserTypeKind::Ptr(Box::new(ParserType(spanned!(
+                                    ParserTypeKind::Ptr(Box::new(ParserType(spanned_test!(
                                         28,
                                         ParserTypeKind::Identifier("Node"),
                                         32
@@ -429,24 +449,32 @@ mod tests {
         // where Node is the name being defined (ERROR: not behind pointer)
         let result = resolve_type_with_self_reference(
             &TypeCtx::default(),
-            ParserType(spanned!(
+            ParserType(spanned_test!(
                 0,
-                ParserTypeKind::Struct(KeyTypeMapping(spanned!(
+                ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
                     7,
                     vec![
-                        spanned!(
+                        spanned_test!(
                             9,
                             (
-                                spanned!(9, "value", 14),
-                                ParserType(spanned!(16, ParserTypeKind::Identifier("i32"), 19))
+                                spanned_test!(9, "value", 14),
+                                ParserType(spanned_test!(
+                                    16,
+                                    ParserTypeKind::Identifier("i32"),
+                                    19
+                                ))
                             ),
                             19
                         ),
-                        spanned!(
+                        spanned_test!(
                             21,
                             (
-                                spanned!(21, "next", 25),
-                                ParserType(spanned!(27, ParserTypeKind::Identifier("Node"), 31))
+                                spanned_test!(21, "next", 25),
+                                ParserType(spanned_test!(
+                                    27,
+                                    ParserTypeKind::Identifier("Node"),
+                                    31
+                                ))
                             ),
                             31
                         )
@@ -464,7 +492,7 @@ mod tests {
             err,
             Diagnostic(
                 Severity::Error,
-                spanned!(
+                spanned_test!(
                     21,
                     DiagnosticKind::SelfReferentialTypeNotBehindPointer("Node".to_string()),
                     31
@@ -479,38 +507,42 @@ mod tests {
         // where Node is the name being defined
         let result = resolve_type_with_self_reference(
             &TypeCtx::default(),
-            ParserType(spanned!(
+            ParserType(spanned_test!(
                 0,
-                ParserTypeKind::Struct(KeyTypeMapping(spanned!(
+                ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
                     7,
                     vec![
-                        spanned!(
+                        spanned_test!(
                             9,
                             (
-                                spanned!(9, "data", 13),
-                                ParserType(spanned!(15, ParserTypeKind::Identifier("i32"), 18))
+                                spanned_test!(9, "data", 13),
+                                ParserType(spanned_test!(
+                                    15,
+                                    ParserTypeKind::Identifier("i32"),
+                                    18
+                                ))
                             ),
                             18
                         ),
-                        spanned!(
+                        spanned_test!(
                             20,
                             (
-                                spanned!(20, "children", 28),
-                                ParserType(spanned!(
+                                spanned_test!(20, "children", 28),
+                                ParserType(spanned_test!(
                                     30,
-                                    ParserTypeKind::Ptr(Box::new(ParserType(spanned!(
+                                    ParserTypeKind::Ptr(Box::new(ParserType(spanned_test!(
                                         31,
-                                        ParserTypeKind::Struct(KeyTypeMapping(spanned!(
+                                        ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
                                             38,
                                             vec![
-                                                spanned!(
+                                                spanned_test!(
                                                     40,
                                                     (
-                                                        spanned!(40, "item", 44),
-                                                        ParserType(spanned!(
+                                                        spanned_test!(40, "item", 44),
+                                                        ParserType(spanned_test!(
                                                             46,
                                                             ParserTypeKind::Ptr(Box::new(
-                                                                ParserType(spanned!(
+                                                                ParserType(spanned_test!(
                                                                     47,
                                                                     ParserTypeKind::Identifier(
                                                                         "Node"
@@ -523,14 +555,14 @@ mod tests {
                                                     ),
                                                     51
                                                 ),
-                                                spanned!(
+                                                spanned_test!(
                                                     53,
                                                     (
-                                                        spanned!(53, "next", 57),
-                                                        ParserType(spanned!(
+                                                        spanned_test!(53, "next", 57),
+                                                        ParserType(spanned_test!(
                                                             59,
                                                             ParserTypeKind::Ptr(Box::new(
-                                                                ParserType(spanned!(
+                                                                ParserType(spanned_test!(
                                                                     60,
                                                                     ParserTypeKind::Identifier(
                                                                         "Node"

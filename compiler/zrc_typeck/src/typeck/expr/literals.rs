@@ -145,7 +145,7 @@ pub fn type_expr_boolean_literal<'input>(
 #[cfg(test)]
 mod tests {
     use zrc_parser::{ast::ty::Type as AstType, lexer::NumberLiteral};
-    use zrc_utils::spanned;
+    use zrc_utils::spanned_test;
 
     use super::*;
     use crate::typeck::scope::GlobalScope;
@@ -153,14 +153,14 @@ mod tests {
     /// Helper to create an AST Type from a string identifier
     fn make_ast_type(name: &str) -> AstType<'_> {
         let len = name.len();
-        AstType::build_ident(spanned!(10, name, 10 + len))
+        AstType::build_ident(spanned_test!(10, name, 10 + len))
     }
 
     #[test]
     fn test_number_literal_within_bounds() {
         let global_scope = GlobalScope::new();
         let scope = global_scope.create_subscope();
-        let span = spanned!(0, (), 5).span();
+        let span = spanned_test!(0, (), 5).span();
 
         // Test valid i8 values
         assert!(
@@ -209,7 +209,7 @@ mod tests {
     fn test_number_literal_out_of_bounds() {
         let global_scope = GlobalScope::new();
         let scope = global_scope.create_subscope();
-        let span = spanned!(0, (), 5).span();
+        let span = spanned_test!(0, (), 5).span();
 
         // Test i8 overflow
         let result = type_expr_number_literal(
@@ -264,7 +264,7 @@ mod tests {
     fn test_number_literal_hex_and_binary() {
         let global_scope = GlobalScope::new();
         let scope = global_scope.create_subscope();
-        let span = spanned!(0, (), 5).span();
+        let span = spanned_test!(0, (), 5).span();
 
         // Test valid hex
         assert!(

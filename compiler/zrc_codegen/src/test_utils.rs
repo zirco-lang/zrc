@@ -33,8 +33,10 @@ macro_rules! cg_snapshot_test {
             "zrc --fake-args",
             $source,
             ::zrc_typeck::typeck::type_program(
-                ::zrc_parser::parser::parse_program($source).expect("parsing should succeed")
-            ).expect("typeck should succeed"),
+                ::zrc_parser::parser::parse_program($source, "<test>")
+                    .expect("parsing should succeed"),
+            )
+            .expect("typeck should succeed"),
             ::inkwell::OptimizationLevel::None,
             ::inkwell::debug_info::DWARFEmissionKind::Full,
             &$crate::get_native_triple(),
@@ -46,5 +48,5 @@ macro_rules! cg_snapshot_test {
         }, {
             insta::assert_snapshot!(resulting_ir);
         });
-    }
+    };
 }

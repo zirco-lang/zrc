@@ -22,19 +22,19 @@ use std::{fmt::Display, ops::RangeInclusive};
 /// - Methods on another Span ([`Span::intersect`])
 /// - Stripping the value from a [`Spanned<T>`] ([`Spanned::span`])
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Span(usize, usize);
+pub struct Span(usize, usize, &'static str);
 impl Span {
-    /// Create a new [`Span`] given a start and end location.
+    /// Create a new [`Span`] given a start and end location with a file name.
     ///
     /// # Panics
     /// Panics if `start > end`.
     #[must_use]
-    pub fn from_positions(start: usize, end: usize) -> Self {
+    pub fn from_positions_and_file(start: usize, end: usize, file_name: &'static str) -> Self {
         assert!(
             end >= start,
             "span must have positive length (got span {start}..{end})"
         );
-        Self(start, end)
+        Self(start, end, file_name)
     }
 
     /// Obtains the starting position of this [`Span`] as a `usize`
@@ -49,6 +49,13 @@ impl Span {
     #[inline]
     pub const fn end(&self) -> usize {
         self.1
+    }
+
+    /// Obtains the file name of this [`Span`]
+    #[must_use]
+    #[inline]
+    pub const fn file_name(&self) -> &'static str {
+        self.2
     }
 
     /// Convert this [`Span`] into a [`RangeInclusive`], good for slicing into
@@ -68,15 +75,22 @@ impl Span {
 
     /// Creates a new [`Span`] containing the intersection of two passed spans
     ///
-    /// If this returns [`None`], no intersection exists (they are disjoint).
+    /// If this returns [`None`], no intersection exists (they are disjoint or
+    /// from different files).
     #[must_use]
     pub fn intersect(span_a: Self, span_b: Self) -> Option<Self> {
+        // Can't intersect spans from different files
+        if span_a.file_name() != span_b.file_name() {
+            return None;
+        }
+
         if span_a.start() > span_b.end() || span_b.start() > span_a.end() {
             None
         } else {
-            Some(Self::from_positions(
+            Some(Self::from_positions_and_file(
                 std::cmp::max(span_a.start(), span_b.start()),
                 std::cmp::min(span_a.end(), span_b.end()),
+                span_a.file_name(),
             ))
         }
     }
@@ -210,17 +224,33 @@ impl<T: Sized> Spannable for T {
     }
 }
 
-/// Create a [`Spanned<T>`] instance from two locations and a value.
-/// Simply just expands to a [`Spanned::from_span_and_value`] and
-/// [`Span::from_positions`] calls.
+/// Create a [`Spanned<T>`] instance from two locations, a value, and a file
+/// name. Simply just expands to a [`Spanned::from_span_and_value`] and
+/// [`Span::from_positions_and_file`] calls.
 ///
 /// # Panics
 /// Panics if `start > end`.
 #[macro_export]
 macro_rules! spanned {
+    ($start:expr, $value:expr, $end:expr, $file:expr) => {
+        $crate::span::Spanned::from_span_and_value(
+            $crate::span::Span::from_positions_and_file($start, $end, $file),
+            $value,
+        )
+    };
+}
+
+/// Create a [`Spanned<T>`] instance for testing purposes.
+/// Uses `<test>` as the file name. This is for test use only and should not be
+/// used in production code.
+///
+/// # Panics
+/// Panics if `start > end`.
+#[macro_export]
+macro_rules! spanned_test {
     ($start:expr, $value:expr, $end:expr) => {
         $crate::span::Spanned::from_span_and_value(
-            $crate::span::Span::from_positions($start, $end),
+            $crate::span::Span::from_positions_and_file($start, $end, "<test>"),
             $value,
         )
     };
@@ -233,8 +263,8 @@ mod tests {
     #[test]
     fn spanned_macro_creates_spanned_item() {
         assert_eq!(
-            spanned!(0, (), 3),
-            Spanned::from_span_and_value(Span::from_positions(0, 3), ())
+            spanned_test!(0, (), 3),
+            Spanned::from_span_and_value(Span::from_positions_and_file(0, 3, "<test>"), ())
         );
     }
 
@@ -243,10 +273,11 @@ mod tests {
 
         #[test]
         fn span_from_positions_works_as_expected() {
-            let span = Span::from_positions(2, 7);
-            assert_eq!(span, Span(2, 7));
+            let span = Span::from_positions_and_file(2, 7, "<test>");
+            assert_eq!(span, Span(2, 7, "<test>"));
             assert_eq!(span.start(), 2);
             assert_eq!(span.end(), 7);
+            assert_eq!(span.file_name(), "<test>");
             assert_eq!(span.range(), 2..=7);
             assert_eq!(span.to_string(), "2-7".to_string());
         }
@@ -255,21 +286,38 @@ mod tests {
         #[allow(clippy::let_underscore_must_use)]
         #[should_panic(expected = "span must have positive length")]
         fn span_from_invalid_positions_panics() {
-            let _ = Span::from_positions(5, 0);
+            let _ = Span::from_positions_and_file(5, 0, "<test>");
         }
 
         #[test]
         fn span_intersection_with_overlap_returns_intersection() {
             assert_eq!(
-                Span::intersect(Span::from_positions(0, 6), Span::from_positions(4, 10)),
-                Some(Span::from_positions(4, 6))
+                Span::intersect(
+                    Span::from_positions_and_file(0, 6, "<test>"),
+                    Span::from_positions_and_file(4, 10, "<test>")
+                ),
+                Some(Span::from_positions_and_file(4, 6, "<test>"))
             );
         }
 
         #[test]
         fn span_intersections_with_disjoint_spans_returns_none() {
             assert_eq!(
-                Span::intersect(Span::from_positions(0, 5), Span::from_positions(7, 10)),
+                Span::intersect(
+                    Span::from_positions_and_file(0, 5, "<test>"),
+                    Span::from_positions_and_file(7, 10, "<test>")
+                ),
+                None
+            );
+        }
+
+        #[test]
+        fn span_intersections_with_different_files_returns_none() {
+            assert_eq!(
+                Span::intersect(
+                    Span::from_positions_and_file(0, 50, "f1.zr"),
+                    Span::from_positions_and_file(10, 100, "f2.zr")
+                ),
                 None
             );
         }
@@ -277,8 +325,8 @@ mod tests {
         #[test]
         fn span_containing_returns_spanned() {
             assert_eq!(
-                Span::from_positions(0, 3).containing(()),
-                spanned!(0, (), 3)
+                Span::from_positions_and_file(0, 3, "<test>").containing(()),
+                spanned_test!(0, (), 3)
             );
         }
     }
@@ -288,7 +336,7 @@ mod tests {
 
         #[test]
         fn basic_methods_work_as_expected() {
-            let span = Span::from_positions(3, 6);
+            let span = Span::from_positions_and_file(3, 6, "<test>");
             let spanned = Spanned::from_span_and_value(span, 0);
 
             assert_eq!(spanned.span(), span);
@@ -300,52 +348,52 @@ mod tests {
 
         #[test]
         fn map_works_as_expected() {
-            let spanned = spanned!(3, 0, 6);
+            let spanned = spanned_test!(3, 0, 6);
 
-            assert_eq!(spanned.map(|n| n == 0), spanned!(3, true, 6));
+            assert_eq!(spanned.map(|n| n == 0), spanned_test!(3, true, 6));
         }
 
         #[test]
         fn as_ref_works_as_expected() {
-            let spanned = spanned!(3, 0, 6);
+            let spanned = spanned_test!(3, 0, 6);
 
-            assert_eq!(spanned.as_ref(), spanned!(3, &0, 6));
+            assert_eq!(spanned.as_ref(), spanned_test!(3, &0, 6));
         }
 
         #[test]
         fn transpose_option_some_case() {
-            let spanned = spanned!(3, Some(0), 6);
+            let spanned = spanned_test!(3, Some(0), 6);
 
-            assert_eq!(spanned.transpose(), Some(spanned!(3, 0, 6)));
+            assert_eq!(spanned.transpose(), Some(spanned_test!(3, 0, 6)));
         }
 
         #[test]
         fn transpose_option_none_case() {
-            let spanned: Spanned<Option<()>> = spanned!(3, None, 6);
+            let spanned: Spanned<Option<()>> = spanned_test!(3, None, 6);
 
             assert_eq!(spanned.transpose(), None);
         }
 
         #[test]
         fn transpose_result_ok_case() {
-            let spanned: Spanned<Result<i32, ()>> = spanned!(3, Ok(0), 6);
+            let spanned: Spanned<Result<i32, ()>> = spanned_test!(3, Ok(0), 6);
 
-            assert_eq!(spanned.transpose(), Ok(spanned!(3, 0, 6)));
+            assert_eq!(spanned.transpose(), Ok(spanned_test!(3, 0, 6)));
         }
 
         #[test]
         fn transpose_result_err_case() {
-            let spanned: Spanned<Result<(), i32>> = spanned!(3, Err(0), 6);
+            let spanned: Spanned<Result<(), i32>> = spanned_test!(3, Err(0), 6);
 
-            assert_eq!(spanned.transpose(), Err(spanned!(3, 0, 6)));
+            assert_eq!(spanned.transpose(), Err(spanned_test!(3, 0, 6)));
         }
     }
 
     #[test]
     fn spannable_in_span_creates_spanned() {
         assert_eq!(
-            7.in_span(Span::from_positions(3, 6)),
-            Spanned(Span(3, 6), 7),
+            7.in_span(Span::from_positions_and_file(3, 6, "<test>")),
+            Spanned(Span(3, 6, "<test>"), 7),
         );
     }
 }
