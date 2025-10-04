@@ -1,0 +1,17 @@
+=== Struct Construction Examples ===
+
+1. Named struct construction:
+Point { x: 0, y: 0 }
+Point { x: 50, y: 50 }
+
+2. Multi-field struct construction:
+Color { r: 255, g: 0, b: 0 }
+Color { r: 0, g: 255, b: 0 }
+Color { r: 0, g: 0, b: 255 }
+
+3. Using struct fields in calculations:
+Distance squared between Point { x: 3, y: 4 }
+and Point { x: 6, y: 8 }
+is 25
+
+=== All tests passed! ===

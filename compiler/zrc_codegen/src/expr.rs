@@ -590,6 +590,48 @@ pub(crate) fn cg_expr<'ctx>(
 
             bb.and(reg)
         }
+        TypedExprKind::StructConstruction(fields) => {
+            // Get the LLVM struct type
+            let struct_type = llvm_basic_type(&cg, &expr.inferred_type).0.into_struct_type();
+            
+            // Allocate space for the struct on the stack
+            let struct_ptr = cg
+                .builder
+                .build_alloca(struct_type, "struct_tmp")
+                .expect("struct allocation should have compiled successfully");
+            
+            // Initialize each field
+            let field_types = match &expr.inferred_type {
+                Type::Struct(field_map) | Type::Union(field_map) => field_map,
+                _ => unreachable!("struct construction should only be used with struct/union types"),
+            };
+            
+            for (idx, (field_name, _field_ty)) in field_types.iter().enumerate() {
+                if let Some(field_expr) = fields.get(field_name) {
+                    // Evaluate the field value
+                    let field_value = unpack!(bb = cg_expr(cg, bb, field_expr.clone()));
+                    
+                    // Get pointer to this field in the struct
+                    let field_ptr = cg
+                        .builder
+                        .build_struct_gep(struct_type, struct_ptr, idx as u32, "field_ptr")
+                        .expect("struct GEP should have compiled successfully");
+                    
+                    // Store the value
+                    cg.builder
+                        .build_store(field_ptr, field_value)
+                        .expect("store should have compiled successfully");
+                }
+            }
+            
+            // Load the complete struct value
+            let reg = cg
+                .builder
+                .build_load(struct_type, struct_ptr, "struct_val")
+                .expect("load should have compiled successfully");
+            
+            bb.and(reg)
+        }
     }
 }
 

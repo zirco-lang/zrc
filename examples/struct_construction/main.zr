@@ -1,0 +1,62 @@
+fn printf(format: *u8, ...) -> i32;
+
+struct Point {
+    x: i32,
+    y: i32
+}
+
+struct Color {
+    r: i32,
+    g: i32,
+    b: i32
+}
+
+fn print_point(p: Point) {
+    printf("Point { x: %d, y: %d }\n", p.x, p.y);
+}
+
+fn print_color(c: Color) {
+    printf("Color { r: %d, g: %d, b: %d }\n", c.r, c.g, c.b);
+}
+
+fn main() -> i32 {
+    printf("=== Struct Construction Examples ===\n");
+    
+    // Named struct construction
+    printf("\n1. Named struct construction:\n");
+    let origin = new Point { x: 0, y: 0 };
+    print_point(origin);
+    
+    let center = new Point { x: 50, y: 50 };
+    print_point(center);
+    
+    // Multiple field struct
+    printf("\n2. Multi-field struct construction:\n");
+    let red = new Color { r: 255, g: 0, b: 0 };
+    print_color(red);
+    
+    let green = new Color { r: 0, g: 255, b: 0 };
+    print_color(green);
+    
+    let blue = new Color { r: 0, g: 0, b: 255 };
+    print_color(blue);
+    
+    // Using constructed structs in expressions
+    printf("\n3. Using struct fields in calculations:\n");
+    let p1 = new Point { x: 3, y: 4 };
+    let p2 = new Point { x: 6, y: 8 };
+    
+    let dx = p2.x - p1.x;
+    let dy = p2.y - p1.y;
+    let dist_sq = dx * dx + dy * dy;
+    
+    printf("Distance squared between ");
+    print_point(p1);
+    printf("and ");
+    print_point(p2);
+    printf("is %d\n", dist_sq);
+    
+    printf("\n=== All tests passed! ===\n");
+    
+    return 0;
+}
