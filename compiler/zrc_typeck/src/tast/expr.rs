@@ -115,6 +115,112 @@ pub enum TypedExprKind<'input> {
     BooleanLiteral(bool),
 }
 
+/// Precedence level for typed expressions. Higher values bind more tightly.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+enum Precedence {
+    /// Comma operator (lowest precedence)
+    Comma = 1,
+    /// Assignment operators
+    Assignment = 2,
+    /// Ternary conditional
+    Ternary = 3,
+    /// Logical OR
+    LogicalOr = 4,
+    /// Logical AND
+    LogicalAnd = 5,
+    /// Bitwise OR
+    BitwiseOr = 6,
+    /// Bitwise XOR
+    BitwiseXor = 7,
+    /// Bitwise AND
+    BitwiseAnd = 8,
+    /// Equality operators
+    Equality = 9,
+    /// Comparison operators
+    Comparison = 10,
+    /// Bit shift operators
+    BitShift = 11,
+    /// Addition and subtraction
+    Term = 12,
+    /// Multiplication, division, modulo
+    Factor = 13,
+    /// Cast operator
+    Cast = 14,
+    /// Unary operators
+    Unary = 15,
+    /// Postfix operators (highest precedence)
+    Postfix = 16,
+    /// Primary expressions (literals, identifiers)
+    Primary = 17,
+}
+
+impl TypedExprKind<'_> {
+    /// Get the precedence level of this typed expression kind
+    const fn precedence(&self) -> Precedence {
+        match self {
+            Self::Comma(_, _) => Precedence::Comma,
+            Self::Assignment(_, _) => Precedence::Assignment,
+            Self::Ternary(_, _, _) => Precedence::Ternary,
+            Self::Logical(Logical::Or, _, _) => Precedence::LogicalOr,
+            Self::Logical(Logical::And, _, _) => Precedence::LogicalAnd,
+            Self::BinaryBitwise(BinaryBitwise::Or, _, _) => Precedence::BitwiseOr,
+            Self::BinaryBitwise(BinaryBitwise::Xor, _, _) => Precedence::BitwiseXor,
+            Self::BinaryBitwise(BinaryBitwise::And, _, _) => Precedence::BitwiseAnd,
+            Self::BinaryBitwise(BinaryBitwise::Shl | BinaryBitwise::Shr, _, _) => {
+                Precedence::BitShift
+            }
+            Self::Equality(_, _, _) => Precedence::Equality,
+            Self::Comparison(_, _, _) => Precedence::Comparison,
+            Self::Arithmetic(Arithmetic::Addition | Arithmetic::Subtraction, _, _) => {
+                Precedence::Term
+            }
+            Self::Arithmetic(
+                Arithmetic::Multiplication | Arithmetic::Division | Arithmetic::Modulo,
+                _,
+                _,
+            ) => Precedence::Factor,
+            Self::Cast(_, _) => Precedence::Cast,
+            Self::UnaryNot(_)
+            | Self::UnaryBitwiseNot(_)
+            | Self::UnaryMinus(_)
+            | Self::UnaryAddressOf(_)
+            | Self::UnaryDereference(_)
+            | Self::SizeOf(_) => Precedence::Unary,
+            Self::Index(_, _) | Self::Dot(_, _) | Self::Call(_, _) => Precedence::Postfix,
+            Self::NumberLiteral(_, _)
+            | Self::StringLiteral(_)
+            | Self::CharLiteral(_)
+            | Self::Identifier(_)
+            | Self::BooleanLiteral(_) => Precedence::Primary,
+        }
+    }
+
+    /// Format a child expression with parentheses if needed based on
+    /// precedence.
+    fn fmt_child(
+        f: &mut std::fmt::Formatter<'_>,
+        child: &TypedExpr<'_>,
+        parent_prec: Precedence,
+        is_right: bool,
+    ) -> std::fmt::Result {
+        let child_prec = child.kind.value().precedence();
+        let needs_parens = if is_right {
+            // For right children, parenthesize if precedence is lower or equal
+            // (left-associative)
+            child_prec <= parent_prec
+        } else {
+            // For left children, parenthesize if precedence is strictly lower
+            child_prec < parent_prec
+        };
+
+        if needs_parens {
+            write!(f, "({child})")
+        } else {
+            write!(f, "{child}")
+        }
+    }
+}
+
 impl Display for Place<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.kind.value())
@@ -124,10 +230,10 @@ impl Display for Place<'_> {
 impl Display for PlaceKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Deref(expr) => write!(f, "(*({expr}))"),
+            Self::Deref(expr) => write!(f, "*{expr}"),
             Self::Variable(name) => write!(f, "{name}"),
-            Self::Index(lhs, rhs) => write!(f, "({lhs})[({rhs})]"),
-            Self::Dot(place, field) => write!(f, "({place}).{field}"),
+            Self::Index(lhs, rhs) => write!(f, "{lhs}[{rhs}]"),
+            Self::Dot(place, field) => write!(f, "{place}.{field}"),
         }
     }
 }
@@ -139,34 +245,91 @@ impl Display for TypedExpr<'_> {
 }
 
 impl Display for TypedExprKind<'_> {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Comma(lhs, rhs) => write!(f, "({lhs}), ({rhs})"),
-            Self::Assignment(place, rhs) => write!(f, "({place}) = ({rhs})"),
-            Self::BinaryBitwise(op, lhs, rhs) => write!(f, "({lhs}) {op} ({rhs})"),
-            Self::Logical(op, lhs, rhs) => write!(f, "({lhs}) {op} ({rhs})"),
-            Self::Equality(op, lhs, rhs) => write!(f, "({lhs}) {op} ({rhs})"),
-            Self::Comparison(op, lhs, rhs) => write!(f, "({lhs}) {op} ({rhs})"),
-            Self::Arithmetic(op, lhs, rhs) => write!(f, "({lhs}) {op} ({rhs})"),
-            Self::UnaryNot(expr) => write!(f, "!({expr})"),
-            Self::UnaryBitwiseNot(expr) => write!(f, "~({expr})"),
-            Self::UnaryMinus(expr) => write!(f, "-({expr})"),
-            Self::UnaryAddressOf(place) => write!(f, "&({place})"),
-            Self::UnaryDereference(expr) => write!(f, "*({expr})"),
-            Self::Index(lhs, rhs) => write!(f, "({lhs})[({rhs})]"),
-            Self::Dot(place, field) => write!(f, "({place}).{field}"),
+            Self::Comma(lhs, rhs) => {
+                let prec = self.precedence();
+                Self::fmt_child(f, lhs, prec, false)?;
+                write!(f, ", ")?;
+                Self::fmt_child(f, rhs, prec, true)
+            }
+            Self::Assignment(place, rhs) => {
+                let prec = self.precedence();
+                write!(f, "{place} = ")?;
+                Self::fmt_child(f, rhs, prec, true)
+            }
+            Self::BinaryBitwise(op, lhs, rhs) => {
+                let prec = self.precedence();
+                Self::fmt_child(f, lhs, prec, false)?;
+                write!(f, " {op} ")?;
+                Self::fmt_child(f, rhs, prec, true)
+            }
+            Self::Logical(op, lhs, rhs) => {
+                let prec = self.precedence();
+                Self::fmt_child(f, lhs, prec, false)?;
+                write!(f, " {op} ")?;
+                Self::fmt_child(f, rhs, prec, true)
+            }
+            Self::Equality(op, lhs, rhs) => {
+                let prec = self.precedence();
+                Self::fmt_child(f, lhs, prec, false)?;
+                write!(f, " {op} ")?;
+                Self::fmt_child(f, rhs, prec, true)
+            }
+            Self::Comparison(op, lhs, rhs) => {
+                let prec = self.precedence();
+                Self::fmt_child(f, lhs, prec, false)?;
+                write!(f, " {op} ")?;
+                Self::fmt_child(f, rhs, prec, true)
+            }
+            Self::Arithmetic(op, lhs, rhs) => {
+                let prec = self.precedence();
+                Self::fmt_child(f, lhs, prec, false)?;
+                write!(f, " {op} ")?;
+                Self::fmt_child(f, rhs, prec, true)
+            }
+            Self::UnaryNot(expr) => {
+                write!(f, "!")?;
+                Self::fmt_child(f, expr, Precedence::Unary, true)
+            }
+            Self::UnaryBitwiseNot(expr) => {
+                write!(f, "~")?;
+                Self::fmt_child(f, expr, Precedence::Unary, true)
+            }
+            Self::UnaryMinus(expr) => {
+                write!(f, "-")?;
+                Self::fmt_child(f, expr, Precedence::Unary, true)
+            }
+            Self::UnaryAddressOf(place) => write!(f, "&{place}"),
+            Self::UnaryDereference(expr) => {
+                write!(f, "*")?;
+                Self::fmt_child(f, expr, Precedence::Unary, true)
+            }
+            Self::Index(lhs, rhs) => {
+                Self::fmt_child(f, lhs, Precedence::Postfix, false)?;
+                write!(f, "[{rhs}]")
+            }
+            Self::Dot(place, field) => write!(f, "{place}.{field}"),
             Self::Call(place, args) => write!(
                 f,
-                "({place})({})",
+                "{place}({})",
                 args.iter()
                     .map(ToString::to_string)
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
             Self::Ternary(cond, if_true, if_false) => {
-                write!(f, "({cond}) ? ({if_true}) : ({if_false})")
+                let prec = self.precedence();
+                Self::fmt_child(f, cond, prec, false)?;
+                write!(f, " ? {if_true} : ")?;
+                Self::fmt_child(f, if_false, prec, true)
             }
-            Self::Cast(expr, ty) => write!(f, "({expr}) as {ty}"),
+            Self::Cast(expr, ty) => {
+                let prec = self.precedence();
+                Self::fmt_child(f, expr, prec, false)?;
+                write!(f, " as {ty}")
+            }
             Self::SizeOf(ty) => write!(f, "sizeof {ty}"),
             Self::NumberLiteral(num, _ty) => write!(f, "{num}"),
             Self::StringLiteral(string) => write!(f, "\"{string}\""),
