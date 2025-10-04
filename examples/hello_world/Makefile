@@ -34,10 +34,10 @@ test: build
 		status=1; \
 	fi; \
 	if [ -f test/stdout.txt ]; then \
-		diff -u test/stdout.txt test/stdout.actual || (echo "stdout mismatch"; status=1; ); \
+		diff -u test/stdout.txt test/stdout.actual || { echo "stdout mismatch"; status=1; }; \
 	fi; \
 	if [ -f test/stderr.txt ]; then \
-		diff -u test/stderr.txt test/stderr.actual || (echo "stderr mismatch"; status=1; ); \
+		diff -u test/stderr.txt test/stderr.actual || { echo "stderr mismatch"; status=1; }; \
 	fi; \
 	set -e; \
 	rm test/stdout.actual test/stderr.actual; \
