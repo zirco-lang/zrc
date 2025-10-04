@@ -139,10 +139,13 @@ fn preprocess_internal(
         let trimmed = line.trim();
 
         if let Some(directive) = trimmed.strip_prefix('#') {
-            let directive = directive.trim();
+            // Strip any trailing comments from the directive
+            let directive = directive.split("//").next().unwrap_or(directive).trim();
 
             if directive == "pragma once" {
                 has_pragma_once = true;
+                // Don't add this line to chunks, it's just a directive
+                chunk_start_line = line_num + 1;
             } else if let Some(include_path) = directive.strip_prefix("include") {
                 // Flush current chunk if it has content
                 if !current_chunk_lines.is_empty() {
