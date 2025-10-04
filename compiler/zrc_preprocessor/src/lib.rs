@@ -36,6 +36,8 @@ use zrc_utils::span::Spanned;
 enum Directive {
     /// `#include "file.zrc"`
     Include(String),
+    /// `#pragma once`
+    PragmaOnce,
 }
 
 /// Parse preprocessor directives from source code
@@ -47,6 +49,15 @@ fn extract_directives(source: &str) -> (Vec<Directive>, String) {
 
     for line in source.lines() {
         let trimmed = line.trim();
+
+        // Check for #pragma once
+        if trimmed == "#pragma once" {
+            directives.push(Directive::PragmaOnce);
+            // Replace directive with empty line to maintain line numbers
+            cleaned_source.push('\n');
+            continue;
+        }
+
         if let Some(rest) = trimmed.strip_prefix("#include") {
             // Parse #include "filename"
             let rest = rest.trim();
@@ -119,6 +130,11 @@ fn process_file(
                     process_file(&include_file, parent_dir, processed, include_file_name)?;
                 all_declarations.extend(include_decls);
             }
+            Directive::PragmaOnce => {
+                // #pragma once is handled by the circular include detection
+                // The file is already in the processed set, so it won't be
+                // included again
+            }
         }
     }
 
@@ -188,5 +204,29 @@ fn main() {}
         let source = "line1\n#include \"file.zrc\"\nline3\n";
         let (_, cleaned) = extract_directives(source);
         assert_eq!(cleaned.lines().count(), source.lines().count());
+    }
+
+    #[test]
+    fn extract_directives_parses_pragma_once() {
+        let source = "
+#pragma once
+fn helper() {}
+";
+        let (directives, _) = extract_directives(source);
+        assert_eq!(directives.len(), 1);
+        assert_eq!(directives[0], Directive::PragmaOnce);
+    }
+
+    #[test]
+    fn extract_directives_parses_pragma_once_with_includes() {
+        let source = "
+#pragma once
+#include \"file1.zrc\"
+fn helper() {}
+";
+        let (directives, _) = extract_directives(source);
+        assert_eq!(directives.len(), 2);
+        assert_eq!(directives[0], Directive::PragmaOnce);
+        assert_eq!(directives[1], Directive::Include("file1.zrc".to_string()));
     }
 }
