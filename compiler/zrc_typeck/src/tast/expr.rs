@@ -194,7 +194,8 @@ impl TypedExprKind<'_> {
             | Self::StringLiteral(_)
             | Self::CharLiteral(_)
             | Self::Identifier(_)
-            | Self::BooleanLiteral(_) => Precedence::Primary,
+            | Self::BooleanLiteral(_)
+            | Self::StructConstruction(_) => Precedence::Primary,
         }
     }
 

@@ -236,13 +236,6 @@ pub enum ExprKind<'input> {
     SizeOfExpr(Box<Expr<'input>>),
 
     /// Struct construction: `new Type { field1: value1, field2: value2 }`
-    #[display(
-        "new {_0} {{ {} }}",
-        _1.value()
-            .iter()
-            .map(|kv| format!("{}: {}", kv.value().0.value(), kv.value().1))
-            .collect::<Vec<String>>()
-            .join(", "))]
     #[allow(clippy::type_complexity)]
     StructConstruction(
         Type<'input>,
@@ -301,7 +294,8 @@ impl ExprKind<'_> {
             | Self::StringLiteral(_)
             | Self::CharLiteral(_)
             | Self::Identifier(_)
-            | Self::BooleanLiteral(_) => Precedence::Primary,
+            | Self::BooleanLiteral(_)
+            | Self::StructConstruction(_, _) => Precedence::Primary,
         }
     }
 
@@ -445,6 +439,19 @@ impl std::fmt::Display for ExprKind<'_> {
             }
             Self::SizeOfType(ty) => write!(f, "sizeof {ty}"),
             Self::SizeOfExpr(expr) => write!(f, "sizeof({expr})"),
+            Self::StructConstruction(ty, fields) => {
+                write!(f, "new {ty} {{ ")?;
+                let field_list: Vec<String> = fields
+                    .value()
+                    .iter()
+                    .map(|field| {
+                        let (name, expr) = field.value();
+                        format!("{}: ({})", name.value(), expr)
+                    })
+                    .collect();
+                write!(f, "{}", field_list.join(", "))?;
+                write!(f, " }}")
+            }
             Self::NumberLiteral(num, ty) => {
                 write!(
                     f,
