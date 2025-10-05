@@ -225,6 +225,7 @@ pub fn type_expr_struct_construction<'input>(
         | TastType::Usize
         | TastType::Isize
         | TastType::Bool
+        | TastType::Int
         | TastType::Ptr(_)
         | TastType::Fn(_)
         | TastType::Opaque(_) => {
@@ -255,13 +256,21 @@ pub fn type_expr_struct_construction<'input>(
         // Type check the field value
         let typed_field_expr = type_expr(scope, field_expr.clone())?;
 
-        // Ensure the types match
-        expect(
-            &typed_field_expr.inferred_type == expected_type,
-            expected_type.to_string(),
-            typed_field_expr.inferred_type.to_string(),
-            typed_field_expr.kind.span(),
-        )?;
+        // Try to coerce the field value to the expected type
+        let typed_field_expr = if typed_field_expr.inferred_type == *expected_type {
+            typed_field_expr
+        } else if typed_field_expr
+            .inferred_type
+            .can_implicitly_cast_to(expected_type)
+        {
+            try_coerce_to(typed_field_expr, expected_type)
+        } else {
+            return Err(DiagnosticKind::ExpectedGot {
+                expected: expected_type.to_string(),
+                got: typed_field_expr.inferred_type.to_string(),
+            }
+            .error_in(typed_field_expr.kind.span()));
+        };
 
         // Check for duplicate field initialization
         if initialized_fields.contains_key(field_name_str) {
