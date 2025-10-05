@@ -13,11 +13,10 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - name: Checkout PR branch
+            - name: Checkout base branch
               uses: actions/checkout@v5
               with:
-                  ref: ${{ github.head_ref }}
-                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+                  ref: ${{ github.base_ref || 'main' }}
 
             - name: Set up Rust
               uses: actions-rs/toolchain@v1
@@ -33,26 +32,20 @@ jobs:
             - name: Use dependency cache
               uses: Swatinem/rust-cache@v2
 
-            - name: Run benchmarks on PR branch
-              run: |
-                  cargo bench --bench compilation -- --save-baseline pr
-
-            - name: Checkout base branch
-              uses: actions/checkout@v5
-              with:
-                  ref: ${{ github.base_ref || 'main' }}
-                  clean: false
-
             - name: Run benchmarks on base branch
               run: |
                   cargo bench --bench compilation -- --save-baseline base
 
-            - name: Checkout PR branch again for comparison
+            - name: Checkout PR branch
               uses: actions/checkout@v5
               with:
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
                   clean: false
+
+            - name: Run benchmarks on PR branch
+              run: |
+                  cargo bench --bench compilation -- --baseline base --save-baseline pr 2>&1 | tee benchmark_output.txt
 
             - name: Generate comparison report
               run: |
@@ -60,9 +53,6 @@ jobs:
                   echo "" >> benchmark_report.md
                   echo "Comparing performance of PR against base branch (\`${{ github.base_ref || 'main' }}\`)" >> benchmark_report.md
                   echo "" >> benchmark_report.md
-                  
-                  # Run benchmarks with comparison to base
-                  cargo bench --bench compilation -- --baseline base 2>&1 | tee benchmark_output.txt
                   
                   # Extract meaningful results - look for benchmark names and changes
                   echo "## Results" >> benchmark_report.md
