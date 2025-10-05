@@ -45,7 +45,7 @@ jobs:
 
             - name: Run benchmarks on PR branch
               run: |
-                  cargo bench --bench compilation -- --baseline base --save-baseline pr 2>&1 | tee benchmark_output.txt
+                  cargo bench --bench compilation -- --baseline base 2>&1 | tee benchmark_output.txt
 
             - name: Generate comparison report
               run: |
