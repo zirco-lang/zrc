@@ -1,0 +1,10 @@
+name: Install LLVM 16 and Polly
+steps:
+  - name: Update package index
+    run: sudo apt-get update
+  - name: Install LLVM 16 with Polly
+    run: sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
+  - name: Install Rust stable toolchain
+    run: rustup toolchain install stable
+  - name: Install Rust nightly toolchain with components
+    run: rustup toolchain install nightly --component clippy --component rustfmt

@@ -184,7 +184,7 @@ The project uses GitHub Actions with 4 workflows in `.github/workflows/`:
 -   Expected time: <30 seconds
 -   **FAILS if any files need formatting**
 
-**Critical:** ALWAYS run `cargo +nightly clippy --all-targets -- -D warnings` and `cargo +nightly fmt --check` before pushing commits, as CI will fail otherwise. Make sure to also test and update examples too!
+**Critical:** ALWAYS run `cargo +nightly clippy --all-targets -- -D warnings`, `cargo +nightly fmt --check`, and `make -C examples test` before pushing commits, as CI will fail otherwise. All examples MUST pass successfully before committing changes.
 
 ## Code Style and Linting
 
@@ -304,6 +304,9 @@ cargo build -p zrc_parser
     cargo build
     cargo test
 
+    # Test all examples (REQUIRED)
+    make -C examples test
+
     # Check formatting and lints (REQUIRED)
     cargo +nightly fmt
     cargo +nightly clippy --all-targets -- -D warnings
@@ -347,10 +350,13 @@ cargo build                                          # ~40-45s clean build, ~1-2
 # 2. Test
 cargo test                                           # ~15-20s
 
-# 3. Lint (REQUIRED before commit)
+# 3. Test examples (REQUIRED before commit)
+make -C examples test                                # varies by example count
+
+# 4. Lint (REQUIRED before commit)
 cargo +nightly clippy --all-targets -- -D warnings   # ~45-50s
 
-# 4. Format (REQUIRED before commit)
+# 5. Format (REQUIRED before commit)
 cargo +nightly fmt                                   # <1s
 ```
 
