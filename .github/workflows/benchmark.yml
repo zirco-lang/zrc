@@ -49,40 +49,66 @@ jobs:
 
             - name: Generate comparison report
               run: |
-                  echo "# Benchmark Comparison Report" > benchmark_report.md
+                  echo "# 📊 Benchmark Comparison Report" > benchmark_report.md
                   echo "" >> benchmark_report.md
                   echo "Comparing performance of PR against base branch (\`${{ github.base_ref || 'main' }}\`)" >> benchmark_report.md
                   echo "" >> benchmark_report.md
                   
-                  # Extract meaningful results - look for benchmark names and changes
-                  echo "## Results" >> benchmark_report.md
-                  echo "" >> benchmark_report.md
-                  
                   # Check if we have any benchmark output
                   if [ -s benchmark_output.txt ]; then
-                      echo "\`\`\`" >> benchmark_report.md
+                      # Extract benchmark results in a clean format
+                      echo "## Results Summary" >> benchmark_report.md
+                      echo "" >> benchmark_report.md
                       
-                      # Look for criterion output patterns - time, change, or benchmark names
-                      if grep -q -E "(time:|change:|Benchmarking|parse_|typeck_|codegen_|e2e_)" benchmark_output.txt; then
-                          # Extract benchmark results with proper formatting
-                          grep -E "(Benchmarking|time:|change:|parse_|typeck_|codegen_|e2e_)" benchmark_output.txt | head -100 >> benchmark_report.md || true
-                      else
-                          echo "Benchmark output exists but no recognizable results found." >> benchmark_report.md
-                          echo "Raw output (first 50 lines):" >> benchmark_report.md
-                          head -50 benchmark_output.txt >> benchmark_report.md
-                      fi
+                      # Create a formatted table
+                      echo "| Benchmark | Time | Change |" >> benchmark_report.md
+                      echo "|-----------|------|--------|" >> benchmark_report.md
                       
-                      echo "\`\`\`" >> benchmark_report.md
+                      # Process each benchmark - extract clean results
+                      awk '
+                      /^[a-z_]+[[:space:]]+time:/ { 
+                          bench_name = $1;
+                          # Extract the median time (middle value)
+                          match($0, /\[[0-9.]+[[:space:]][µnm]?s[[:space:]]+([0-9.]+[[:space:]][µnm]?s)[[:space:]]+[0-9.]+[[:space:]][µnm]?s\]/, time_arr);
+                          median_time = time_arr[1];
+                          # Read next line for change
+                          getline;
+                          if ($0 ~ /change:/) {
+                              match($0, /\[[+-][0-9.]+%[[:space:]]+([+-][0-9.]+%)[[:space:]]+[+-][0-9.]+%\]/, change_arr);
+                              median_change = change_arr[1];
+                              
+                              sig = "";
+                              if ($0 ~ /p = [0-9.]+ < 0\.05/) {
+                                  sig = " ⚠️";
+                              }
+                              
+                              printf("| `%s` | %s | %s%s |\n", bench_name, median_time, median_change, sig);
+                          }
+                      }
+                      ' benchmark_output.txt >> benchmark_report.md
+                      
+                      echo "" >> benchmark_report.md
+                      
+                      # Calculate summary statistics
+                      improvements=$(grep -c "change:.*\[-[0-9]" benchmark_output.txt 2>/dev/null || echo "0")
+                      regressions=$(grep -c "change:.*\[+[0-9]" benchmark_output.txt 2>/dev/null || echo "0")
+                      total_benches=$(grep -c "^[a-z_][a-z_]*[[:space:]]*time:" benchmark_output.txt 2>/dev/null || echo "0")
+                      
+                      echo "### Summary" >> benchmark_report.md
+                      echo "" >> benchmark_report.md
+                      echo "- **Total benchmarks:** $total_benches" >> benchmark_report.md
+                      echo "- **Improvements:** $improvements 🚀" >> benchmark_report.md
+                      echo "- **Regressions:** $regressions 📈" >> benchmark_report.md
+                      echo "" >> benchmark_report.md
+                      echo "> ⚠️ indicates statistically significant change (p < 0.05)" >> benchmark_report.md
                   else
-                      echo "\`\`\`" >> benchmark_report.md
-                      echo "No benchmark output captured. The benchmark run may have failed." >> benchmark_report.md
-                      echo "\`\`\`" >> benchmark_report.md
+                      echo "❌ No benchmark output captured. The benchmark run may have failed." >> benchmark_report.md
                   fi
                   
                   echo "" >> benchmark_report.md
-                  echo "📊 Full benchmark results are available in the workflow artifacts." >> benchmark_report.md
+                  echo "---" >> benchmark_report.md
                   echo "" >> benchmark_report.md
-                  echo "View detailed HTML reports by downloading the \`benchmark-results\` artifact." >> benchmark_report.md
+                  echo "📥 **[Download Full Results & HTML Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)** - Click to view detailed criterion reports with charts" >> benchmark_report.md
 
             - name: Comment PR with benchmark results
               if: github.event_name == 'pull_request'
