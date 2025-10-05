@@ -17,5 +17,12 @@ shadow-rs = "0.36.0"
 derive_more = { version = "2.0.1", features = ["display"] }
 mimalloc = "0.1.48"
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
 [build-dependencies]
 shadow-rs = "0.36.0"
+
+[[bench]]
+name = "compilation"
+harness = false
