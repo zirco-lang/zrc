@@ -603,8 +603,7 @@ pub(crate) fn cg_expr<'ctx>(
                 .expect("struct allocation should have compiled successfully");
 
             // Initialize each field
-            let (Type::Struct(field_types) | Type::Union(field_types)) = &expr.inferred_type
-            else {
+            let (Type::Struct(field_types) | Type::Union(field_types)) = &expr.inferred_type else {
                 unreachable!("struct construction should only be used with struct/union types")
             };
 
