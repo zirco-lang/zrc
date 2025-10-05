@@ -235,6 +235,13 @@ pub enum ExprKind<'input> {
     /// `sizeof(expr)`
     SizeOfExpr(Box<Expr<'input>>),
 
+    /// Struct construction: `new Type { field1: value1, field2: value2 }`
+    #[allow(clippy::type_complexity)]
+    StructConstruction(
+        Type<'input>,
+        Spanned<Vec<Spanned<(Spanned<&'input str>, Expr<'input>)>>>,
+    ),
+
     /// Any numeric literal.
     NumberLiteral(NumberLiteral<'input>, Option<Type<'input>>),
     /// Any string literal.
@@ -287,7 +294,8 @@ impl ExprKind<'_> {
             | Self::StringLiteral(_)
             | Self::CharLiteral(_)
             | Self::Identifier(_)
-            | Self::BooleanLiteral(_) => Precedence::Primary,
+            | Self::BooleanLiteral(_)
+            | Self::StructConstruction(_, _) => Precedence::Primary,
         }
     }
 
@@ -431,6 +439,19 @@ impl std::fmt::Display for ExprKind<'_> {
             }
             Self::SizeOfType(ty) => write!(f, "sizeof {ty}"),
             Self::SizeOfExpr(expr) => write!(f, "sizeof({expr})"),
+            Self::StructConstruction(ty, fields) => {
+                write!(f, "new {ty} {{ ")?;
+                let field_list: Vec<String> = fields
+                    .value()
+                    .iter()
+                    .map(|field| {
+                        let (name, expr) = field.value();
+                        format!("{}: ({})", name.value(), expr)
+                    })
+                    .collect();
+                write!(f, "{}", field_list.join(", "))?;
+                write!(f, " }}")
+            }
             Self::NumberLiteral(num, ty) => {
                 write!(
                     f,
@@ -750,6 +771,20 @@ impl<'input> Expr<'input> {
             span.start(),
             ExprKind::BooleanLiteral(lit.into_value()),
             span.end()
+        ))
+    }
+    #[must_use]
+    #[allow(clippy::type_complexity)]
+    pub fn build_struct_construction(
+        ty: Type<'input>,
+        fields: Spanned<Vec<Spanned<(Spanned<&'input str>, Self)>>>,
+    ) -> Self {
+        let start = ty.0.start();
+        let end = fields.end();
+        Self(spanned!(
+            start,
+            ExprKind::StructConstruction(ty, fields),
+            end
         ))
     }
 }

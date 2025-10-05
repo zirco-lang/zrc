@@ -347,6 +347,18 @@ ArgumentList: Vec<Expr<'input>> = {
     }
 };
 
+StructFieldInit: Spanned<(Spanned<&'input str>, Expr<'input>)> = {
+    <Spanned<(<Spanned<IDENTIFIER>> ":" <Assignment>)>>,
+};
+
+StructFieldInitList: Vec<Spanned<(Spanned<&'input str>, Expr<'input>)>> = {
+    <e:StructFieldInit> <mut v:("," <StructFieldInit>)*> => {
+        let mut new = vec![e];
+        new.append(&mut v);
+        new
+    }
+};
+
 Primary: Expr<'input> = {
     Spanned<(<NUMBER> <Spanned<IDENTIFIER>?>)> => Expr(<>.map(|(n, ty)| ExprKind::NumberLiteral(n, ty.map(|t| Type(t.map(TypeKind::Identifier)))))),
     Spanned<STRING> => Expr(<>.map(|s| ExprKind::StringLiteral(s))),
@@ -356,6 +368,12 @@ Primary: Expr<'input> = {
     Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
     Spanned<("sizeof" <Type>)> => Expr(<>.map(|t| ExprKind::SizeOfType(t))),
     Spanned<("sizeof" "(" <Expr> ")")> => Expr(<>.map(|ex| ExprKind::SizeOfExpr(Box::new(ex)))),
+    // Struct construction: new Type { fields }
+    <s:@L> "new" <ty:Type> "{" <fields:StructFieldInitList?> "}" <e:@R> => 
+        Expr(spanned!(s, ExprKind::StructConstruction(
+            ty, 
+            spanned!(s, fields.unwrap_or(Vec::new()), e)
+        ), e)),
     "(" <Expr> ")" => <>,
 };
 
@@ -437,6 +455,7 @@ extern {
         "type" => lexer::Tok::Type,
         "switch" => lexer::Tok::Switch,
         "default" => lexer::Tok::Default,
+        "new" => lexer::Tok::New,
         "->" => lexer::Tok::SmallArrow,
         "=>" => lexer::Tok::FatArrow,
         "..." => lexer::Tok::Ellipsis,

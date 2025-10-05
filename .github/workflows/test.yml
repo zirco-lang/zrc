@@ -24,6 +24,10 @@ jobs:
                   toolchain: stable
                   override: true
                   components: rustfmt, clippy
+            - name: Install LLVM dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
             - name: Install Rust problem matchers
               uses: r7kamura/rust-problem-matchers@v1
             - name: Install cargo-tarpaulin

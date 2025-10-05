@@ -72,6 +72,9 @@ pub fn type_expr<'input>(
         ExprKind::BooleanLiteral(value) => {
             literals::type_expr_boolean_literal(scope, expr_span, value)
         }
+        ExprKind::StructConstruction(ty, fields) => {
+            misc::type_expr_struct_construction(scope, expr_span, ty, &fields)?
+        }
     })
 }
 
