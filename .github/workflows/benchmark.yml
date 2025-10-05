@@ -57,18 +57,28 @@ jobs:
                   # Extract meaningful results - look for benchmark names and changes
                   echo "## Results" >> benchmark_report.md
                   echo "" >> benchmark_report.md
-                  echo "\`\`\`" >> benchmark_report.md
                   
-                  # Extract benchmark results with proper formatting
-                  if grep -q "time:" benchmark_output.txt; then
-                      grep -E "^(parse_|typeck_|codegen_|e2e_)" benchmark_output.txt >> benchmark_report.md || true
-                      echo "" >> benchmark_report.md
-                      grep -E "(time:|change:)" benchmark_output.txt | head -100 >> benchmark_report.md || true
+                  # Check if we have any benchmark output
+                  if [ -s benchmark_output.txt ]; then
+                      echo "\`\`\`" >> benchmark_report.md
+                      
+                      # Look for criterion output patterns - time, change, or benchmark names
+                      if grep -q -E "(time:|change:|Benchmarking|parse_|typeck_|codegen_|e2e_)" benchmark_output.txt; then
+                          # Extract benchmark results with proper formatting
+                          grep -E "(Benchmarking|time:|change:|parse_|typeck_|codegen_|e2e_)" benchmark_output.txt | head -100 >> benchmark_report.md || true
+                      else
+                          echo "Benchmark output exists but no recognizable results found." >> benchmark_report.md
+                          echo "Raw output (first 50 lines):" >> benchmark_report.md
+                          head -50 benchmark_output.txt >> benchmark_report.md
+                      fi
+                      
+                      echo "\`\`\`" >> benchmark_report.md
                   else
-                      echo "No benchmark results found. The benchmarks may have failed to run." >> benchmark_report.md
+                      echo "\`\`\`" >> benchmark_report.md
+                      echo "No benchmark output captured. The benchmark run may have failed." >> benchmark_report.md
+                      echo "\`\`\`" >> benchmark_report.md
                   fi
                   
-                  echo "\`\`\`" >> benchmark_report.md
                   echo "" >> benchmark_report.md
                   echo "📊 Full benchmark results are available in the workflow artifacts." >> benchmark_report.md
                   echo "" >> benchmark_report.md
