@@ -6,7 +6,7 @@ use zrc_utils::span::{Span, Spannable};
 
 use super::{
     super::scope::Scope,
-    helpers::{expect, expect_identical_types},
+    helpers::{expect, try_coerce_to},
     type_expr,
 };
 use crate::{
@@ -52,16 +52,53 @@ pub fn type_expr_ternary<'input>(
         cond_span,
     )?;
 
-    expect_identical_types(
-        &if_true_t.inferred_type,
-        &if_false_t.inferred_type,
-        expr_span,
-    )?;
+    // Handle {int} type resolution in ternary branches
+    let (result_type, if_true_final, if_false_final) =
+        if if_true_t.inferred_type == if_false_t.inferred_type {
+            // Both branches have the same type
+            if matches!(if_true_t.inferred_type, TastType::Int) {
+                // Both are {int}, resolve to i32
+                let if_true_resolved = try_coerce_to(if_true_t, &TastType::I32);
+                let if_false_resolved = try_coerce_to(if_false_t, &TastType::I32);
+                (TastType::I32, if_true_resolved, if_false_resolved)
+            } else {
+                (if_true_t.inferred_type.clone(), if_true_t, if_false_t)
+            }
+        } else if if_true_t
+            .inferred_type
+            .can_implicitly_cast_to(&if_false_t.inferred_type)
+        {
+            // if_true can coerce to if_false type
+            let if_true_coerced = try_coerce_to(if_true_t, &if_false_t.inferred_type);
+            (
+                if_false_t.inferred_type.clone(),
+                if_true_coerced,
+                if_false_t,
+            )
+        } else if if_false_t
+            .inferred_type
+            .can_implicitly_cast_to(&if_true_t.inferred_type)
+        {
+            // if_false can coerce to if_true type
+            let if_false_coerced = try_coerce_to(if_false_t, &if_true_t.inferred_type);
+            (if_true_t.inferred_type.clone(), if_true_t, if_false_coerced)
+        } else {
+            // Types don't match and can't be implicitly cast
+            return Err(DiagnosticKind::ExpectedSameType(
+                if_true_t.inferred_type.to_string(),
+                if_false_t.inferred_type.to_string(),
+            )
+            .error_in(expr_span));
+        };
 
     Ok(TypedExpr {
-        inferred_type: if_true_t.inferred_type.clone(),
-        kind: TypedExprKind::Ternary(Box::new(cond_t), Box::new(if_true_t), Box::new(if_false_t))
-            .in_span(expr_span),
+        inferred_type: result_type,
+        kind: TypedExprKind::Ternary(
+            Box::new(cond_t),
+            Box::new(if_true_final),
+            Box::new(if_false_final),
+        )
+        .in_span(expr_span),
     })
 }
 
@@ -75,6 +112,29 @@ pub fn type_expr_cast<'input>(
     let x_t = type_expr(scope, x)?;
     let ty_span = ty.0.span();
     let resolved_ty = resolve_type(scope.types, ty)?;
+
+    // Handle {int} type resolution
+    if matches!(x_t.inferred_type, TastType::Int) {
+        if resolved_ty.is_integer() {
+            // {int} -> integer cast is just a type resolution, no runtime operation needed
+            // Preserve the original cast expression span
+            return Ok(TypedExpr {
+                inferred_type: resolved_ty,
+                kind: x_t.kind.into_value().in_span(expr_span),
+            });
+        }
+        // {int} -> non-integer cast (like *T): resolve {int} to i32 first,
+        // then apply the cast
+        let x_resolved = TypedExpr {
+            inferred_type: TastType::I32,
+            kind: x_t.kind,
+        };
+        return Ok(TypedExpr {
+            inferred_type: resolved_ty.clone(),
+            kind: TypedExprKind::Cast(Box::new(x_resolved), resolved_ty.in_span(ty_span))
+                .in_span(expr_span),
+        });
+    }
 
     if x_t.inferred_type.is_integer() && resolved_ty.is_integer() {
         // int -> int cast is valid
@@ -165,6 +225,7 @@ pub fn type_expr_struct_construction<'input>(
         | TastType::Usize
         | TastType::Isize
         | TastType::Bool
+        | TastType::Int
         | TastType::Ptr(_)
         | TastType::Fn(_)
         | TastType::Opaque(_) => {
@@ -195,13 +256,21 @@ pub fn type_expr_struct_construction<'input>(
         // Type check the field value
         let typed_field_expr = type_expr(scope, field_expr.clone())?;
 
-        // Ensure the types match
-        expect(
-            &typed_field_expr.inferred_type == expected_type,
-            expected_type.to_string(),
-            typed_field_expr.inferred_type.to_string(),
-            typed_field_expr.kind.span(),
-        )?;
+        // Try to coerce the field value to the expected type
+        let typed_field_expr = if typed_field_expr.inferred_type == *expected_type {
+            typed_field_expr
+        } else if typed_field_expr
+            .inferred_type
+            .can_implicitly_cast_to(expected_type)
+        {
+            try_coerce_to(typed_field_expr, expected_type)
+        } else {
+            return Err(DiagnosticKind::ExpectedGot {
+                expected: expected_type.to_string(),
+                got: typed_field_expr.inferred_type.to_string(),
+            }
+            .error_in(typed_field_expr.kind.span()));
+        };
 
         // Check for duplicate field initialization
         if initialized_fields.contains_key(field_name_str) {
@@ -262,7 +331,7 @@ mod tests {
             ),
             Ok(TypedExpr {
                 inferred_type: TastType::Usize,
-                kind: TypedExprKind::SizeOf(TastType::I32).in_span(Span::from_positions(0, 9)),
+                kind: TypedExprKind::SizeOf(TastType::Int).in_span(Span::from_positions(0, 9)),
             })
         );
     }

@@ -4,7 +4,11 @@ use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpanExt};
 use zrc_parser::ast::expr::Expr;
 use zrc_utils::span::{Span, Spannable, Spanned};
 
-use super::{super::scope::Scope, helpers::expr_to_place, type_expr};
+use super::{
+    super::scope::Scope,
+    helpers::{expr_to_place, try_coerce_to},
+    type_expr,
+};
 use crate::tast::{
     expr::{TypedExpr, TypedExprKind},
     stmt::ArgumentDeclarationList,
@@ -59,20 +63,14 @@ pub fn type_expr_call<'input>(
             let args_with_casts = arg_types
                 .iter()
                 .zip(args_t)
-                .enumerate()
-                .map(|(i, (arg_type, arg_t))| {
+                .map(|(arg_type, arg_t)| {
                     if arg_t.inferred_type != *arg_type.ty.value()
                         && arg_t
                             .inferred_type
                             .can_implicitly_cast_to(arg_type.ty.value())
                     {
-                        // Insert implicit cast
-                        let arg_span = args.value()[i].0.span();
-                        TypedExpr {
-                            inferred_type: arg_type.ty.value().clone(),
-                            kind: TypedExprKind::Cast(Box::new(arg_t), arg_type.ty.clone())
-                                .in_span(arg_span),
-                        }
+                        // Try to coerce the argument to the parameter type
+                        try_coerce_to(arg_t, arg_type.ty.value())
                     } else {
                         arg_t
                     }
@@ -114,20 +112,14 @@ pub fn type_expr_call<'input>(
 
             // Insert implicit casts where needed for non-variadic arguments
             let mut args_with_casts = Vec::new();
-            for (i, (arg_type, arg_t)) in beginning_arg_types.iter().zip(args_t.iter()).enumerate()
-            {
+            for (arg_type, arg_t) in beginning_arg_types.iter().zip(args_t.iter()) {
                 if arg_t.inferred_type != *arg_type.ty.value()
                     && arg_t
                         .inferred_type
                         .can_implicitly_cast_to(arg_type.ty.value())
                 {
-                    // Insert implicit cast
-                    let arg_span = args.value()[i].0.span();
-                    args_with_casts.push(TypedExpr {
-                        inferred_type: arg_type.ty.value().clone(),
-                        kind: TypedExprKind::Cast(Box::new(arg_t.clone()), arg_type.ty.clone())
-                            .in_span(arg_span),
-                    });
+                    // Try to coerce the argument to the parameter type
+                    args_with_casts.push(try_coerce_to(arg_t.clone(), arg_type.ty.value()));
                 } else {
                     args_with_casts.push(arg_t.clone());
                 }

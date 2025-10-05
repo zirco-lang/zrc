@@ -26,7 +26,7 @@ pub fn type_expr_number_literal<'input>(
     let ty_resolved = ty
         .map(|ty| resolve_type(scope.types, ty))
         .transpose()?
-        .unwrap_or(TastType::I32);
+        .unwrap_or(TastType::Int);
 
     if !ty_resolved.is_integer() {
         return Err(
@@ -243,20 +243,19 @@ mod tests {
             panic!("Expected error for u8 overflow");
         }
 
-        // Test i32 default overflow
+        // Test i32 default overflow - with {int} type, this no longer overflows
+        // The {int} type can hold any integer value and will be resolved at usage
         let result = type_expr_number_literal(
             &scope,
             span,
             NumberLiteral::Decimal("5000000000"),
-            None, // defaults to i32
+            None, // defaults to {int}, not i32
         );
-        if let Err(diagnostic) = result {
-            assert!(matches!(
-                diagnostic.1.into_value(),
-                DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
-            ));
-        } else {
-            panic!("Expected error for i32 overflow");
+        // This should now succeed because {int} has no bounds
+        assert!(result.is_ok());
+        if let Ok(typed_expr) = result {
+            // Verify it's {int} type
+            assert!(matches!(typed_expr.inferred_type, TastType::Int));
         }
     }
 
