@@ -47,6 +47,13 @@ jobs:
               run: |
                   cargo bench --bench compilation -- --save-baseline base
 
+            - name: Checkout PR branch again for comparison
+              uses: actions/checkout@v5
+              with:
+                  ref: ${{ github.head_ref }}
+                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+                  clean: false
+
             - name: Generate comparison report
               run: |
                   echo "# Benchmark Comparison Report" > benchmark_report.md
@@ -54,17 +61,28 @@ jobs:
                   echo "Comparing performance of PR against base branch (\`${{ github.base_ref || 'main' }}\`)" >> benchmark_report.md
                   echo "" >> benchmark_report.md
                   
-                  # Run benchmarks again to compare
-                  cargo bench --bench compilation -- --baseline base --save-baseline pr 2>&1 | tee benchmark_output.txt
+                  # Run benchmarks with comparison to base
+                  cargo bench --bench compilation -- --baseline base 2>&1 | tee benchmark_output.txt
                   
-                  # Extract meaningful results
+                  # Extract meaningful results - look for benchmark names and changes
                   echo "## Results" >> benchmark_report.md
                   echo "" >> benchmark_report.md
                   echo "\`\`\`" >> benchmark_report.md
-                  grep -E "(time:|change:)" benchmark_output.txt | head -50 >> benchmark_report.md || echo "No significant changes detected" >> benchmark_report.md
+                  
+                  # Extract benchmark results with proper formatting
+                  if grep -q "time:" benchmark_output.txt; then
+                      grep -E "^(parse_|typeck_|codegen_|e2e_)" benchmark_output.txt >> benchmark_report.md || true
+                      echo "" >> benchmark_report.md
+                      grep -E "(time:|change:)" benchmark_output.txt | head -100 >> benchmark_report.md || true
+                  else
+                      echo "No benchmark results found. The benchmarks may have failed to run." >> benchmark_report.md
+                  fi
+                  
                   echo "\`\`\`" >> benchmark_report.md
                   echo "" >> benchmark_report.md
-                  echo "Full benchmark results are available in the workflow artifacts." >> benchmark_report.md
+                  echo "📊 Full benchmark results are available in the workflow artifacts." >> benchmark_report.md
+                  echo "" >> benchmark_report.md
+                  echo "View detailed HTML reports by downloading the \`benchmark-results\` artifact." >> benchmark_report.md
 
             - name: Comment PR with benchmark results
               if: github.event_name == 'pull_request'
