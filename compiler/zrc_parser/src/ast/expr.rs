@@ -797,10 +797,12 @@ impl<'input> Expr<'input> {
     ) -> Self {
         let start = ty.0.start();
         let end = fields.end();
+        let file_name = ty.0.span().file_name();
         Self(spanned!(
             start,
             ExprKind::StructConstruction(ty, fields),
-            end
+            end,
+            file_name
         ))
     }
 }
@@ -901,7 +903,7 @@ mod tests {
         ];
 
         for (input, expected) in test_cases {
-            let result = crate::parser::parse_expr(input)
+            let result = crate::parser::parse_expr(input, "<test>")
                 .expect("test cases should have parsed correctly")
                 .to_string();
             assert_eq!(

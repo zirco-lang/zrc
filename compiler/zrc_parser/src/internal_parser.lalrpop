@@ -372,8 +372,8 @@ Primary: Expr<'input> = {
     <s:@L> "new" <ty:Type> "{" <fields:StructFieldInitList?> "}" <e:@R> => 
         Expr(spanned!(s, ExprKind::StructConstruction(
             ty, 
-            spanned!(s, fields.unwrap_or(Vec::new()), e)
-        ), e)),
+            spanned!(s, fields.unwrap_or(Vec::new()), e, file_name)
+        ), e, file_name)),
     "(" <Expr> ")" => <>,
 };
 

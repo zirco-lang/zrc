@@ -58,7 +58,7 @@ pub fn type_block<'input, 'gs>(
     parent_scope: &Scope<'input, 'gs>,
     input_block: Spanned<Vec<Stmt<'input>>>,
     can_use_break_continue: bool,
-    return_ability: BlockReturnAbility,
+    return_ability: BlockReturnAbility<'input>,
 ) -> Result<(Vec<TypedStmt<'input>>, BlockReturnActuality), Diagnostic> {
     let mut scope: Scope<'input, 'gs> = parent_scope.clone();
 
@@ -428,7 +428,7 @@ pub fn type_block<'input, 'gs>(
                                     .clone()
                                     .map_or_else(TastType::unit, |x| x.inferred_type);
 
-                                match (resolved_value, return_ability.clone()) {
+                                match (resolved_value, &return_ability) {
                                     // expects no return
                                     (_, BlockReturnAbility::MustNotReturn) => {
                                         Err(DiagnosticKind::CannotReturnHere.error_in(stmt_span))
@@ -440,23 +440,32 @@ pub fn type_block<'input, 'gs>(
                                         BlockReturnAbility::MustReturn(return_ty)
                                         | BlockReturnAbility::MayReturn(return_ty),
                                     ) => {
-                                        if inferred_return_type == return_ty {
-                                            Ok(Some((
-                                                TypedStmt(
-                                                    TypedStmtKind::ReturnStmt(return_value)
-                                                        .in_span(stmt_span),
-                                                ),
-                                                BlockReturnActuality::AlwaysReturns,
-                                            )))
+                                        let coerced_value = if inferred_return_type == *return_ty {
+                                            return_value
+                                        } else if inferred_return_type
+                                            .can_implicitly_cast_to(return_ty)
+                                        {
+                                            // Try to coerce the return value to the expected type
+                                            return_value.map(|val| {
+                                                super::expr::try_coerce_to(val, return_ty)
+                                            })
                                         } else {
-                                            Err(Diagnostic(
+                                            return Err(Diagnostic(
                                                 Severity::Error,
                                                 stmt_span.containing(DiagnosticKind::ExpectedGot {
                                                     expected: return_ty.to_string(),
                                                     got: inferred_return_type.to_string(),
                                                 }),
-                                            ))
-                                        }
+                                            ));
+                                        };
+
+                                        Ok(Some((
+                                            TypedStmt(
+                                                TypedStmtKind::ReturnStmt(coerced_value)
+                                                    .in_span(stmt_span),
+                                            ),
+                                            BlockReturnActuality::AlwaysReturns,
+                                        )))
                                     }
                                 }
                             }
