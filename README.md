@@ -53,6 +53,18 @@ You can compile a single Zirco file to a `.o` object with `zrc --emit object -o 
 
 For more usage help, refer to `zrc --help`.
 
+## Performance Testing
+
+The compiler includes comprehensive performance benchmarks to measure and track compilation performance. The benchmarks cover parsing, type checking, code generation, and end-to-end compilation.
+
+To run the benchmarks:
+
+```bash
+cargo bench --bench compilation
+```
+
+Benchmark results are saved to `target/criterion/` with detailed HTML reports and statistical analysis. See the [zrc README](./compiler/zrc/README.md#performance-benchmarks) for more details on the benchmarking infrastructure.
+
 ## A Note on Stability
 
 So that Zirco can continue to evolve at a rapid pace, there are **NO STABILITY GUARENTEES** on the current version of Zirco and `zrc`.
