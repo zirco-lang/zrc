@@ -69,6 +69,83 @@ fn main() {
 }
 "#;
 
+/// Sample Zirco code for benchmarking - pointer operations
+const POINTER_CODE: &str = r#"
+fn printf(format: *u8, ...) -> i32;
+
+fn swap(a: *i32, b: *i32) {
+    let temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+fn main() {
+    let x = 42;
+    let y = 17;
+
+    printf("Before swap: x=%d, y=%d\n", x, y);
+    swap(&x, &y);
+    printf("After swap: x=%d, y=%d\n", x, y);
+}
+"#;
+
+/// Sample Zirco code for benchmarking - global variables
+const GLOBAL_VARS_CODE: &str = r#"
+fn printf(format: *u8, ...) -> i32;
+
+// Global constants with initializers
+let MAX_COUNT: i32 = 100;
+let ENABLED: bool = true;
+let VERSION: i8 = 1i8;
+
+// Global variable without initializer (zero-initialized)
+let counter: i32;
+
+fn increment_counter() {
+    counter = counter + 1;
+}
+
+fn get_counter() -> i32 {
+    return counter;
+}
+
+fn is_below_max() -> bool {
+    return counter < MAX_COUNT;
+}
+
+fn main() {
+    printf("Initial counter: %d\n", counter);
+    printf("Max count: %d\n", MAX_COUNT);
+    printf("Version: %d\n", VERSION);
+    printf("Enabled: %d\n", ENABLED);
+
+    increment_counter();
+    increment_counter();
+    increment_counter();
+
+    printf("After 3 increments: %d\n", get_counter());
+
+    if (is_below_max()) {
+        printf("Still below maximum\n");
+    }
+}
+"#;
+
+/// Sample Zirco code for benchmarking - loops
+const LOOP_CODE: &str = r#"
+fn printf(format: *u8, ...) -> i32;
+
+fn print_numbers(n: i32) {
+    for (let i = 1; i <= n; i = i + 1) {
+        printf("%d\n", i);
+    }
+}
+
+fn main() {
+    print_numbers(5);
+}
+"#;
+
 /// Benchmark parsing performance on simple code
 fn bench_parse_simple(c: &mut Criterion) {
     c.bench_function("parse_simple", |b| {
@@ -92,6 +169,33 @@ fn bench_parse_struct(c: &mut Criterion) {
     c.bench_function("parse_struct", |b| {
         b.iter(|| {
             let _ = zrc_parser::parser::parse_program(black_box(STRUCT_CODE));
+        });
+    });
+}
+
+/// Benchmark parsing performance on pointer operations
+fn bench_parse_pointer(c: &mut Criterion) {
+    c.bench_function("parse_pointer", |b| {
+        b.iter(|| {
+            let _ = zrc_parser::parser::parse_program(black_box(POINTER_CODE));
+        });
+    });
+}
+
+/// Benchmark parsing performance on global variables
+fn bench_parse_globals(c: &mut Criterion) {
+    c.bench_function("parse_globals", |b| {
+        b.iter(|| {
+            let _ = zrc_parser::parser::parse_program(black_box(GLOBAL_VARS_CODE));
+        });
+    });
+}
+
+/// Benchmark parsing performance on loops
+fn bench_parse_loop(c: &mut Criterion) {
+    c.bench_function("parse_loop", |b| {
+        b.iter(|| {
+            let _ = zrc_parser::parser::parse_program(black_box(LOOP_CODE));
         });
     });
 }
@@ -120,6 +224,36 @@ fn bench_typeck_fibonacci(c: &mut Criterion) {
 fn bench_typeck_struct(c: &mut Criterion) {
     let ast = zrc_parser::parser::parse_program(STRUCT_CODE).unwrap();
     c.bench_function("typeck_struct", |b| {
+        b.iter(|| {
+            let _ = zrc_typeck::typeck::type_program(black_box(ast.clone()));
+        });
+    });
+}
+
+/// Benchmark type checking performance on pointer operations
+fn bench_typeck_pointer(c: &mut Criterion) {
+    let ast = zrc_parser::parser::parse_program(POINTER_CODE).unwrap();
+    c.bench_function("typeck_pointer", |b| {
+        b.iter(|| {
+            let _ = zrc_typeck::typeck::type_program(black_box(ast.clone()));
+        });
+    });
+}
+
+/// Benchmark type checking performance on global variables
+fn bench_typeck_globals(c: &mut Criterion) {
+    let ast = zrc_parser::parser::parse_program(GLOBAL_VARS_CODE).unwrap();
+    c.bench_function("typeck_globals", |b| {
+        b.iter(|| {
+            let _ = zrc_typeck::typeck::type_program(black_box(ast.clone()));
+        });
+    });
+}
+
+/// Benchmark type checking performance on loops
+fn bench_typeck_loop(c: &mut Criterion) {
+    let ast = zrc_parser::parser::parse_program(LOOP_CODE).unwrap();
+    c.bench_function("typeck_loop", |b| {
         b.iter(|| {
             let _ = zrc_typeck::typeck::type_program(black_box(ast.clone()));
         });
@@ -185,6 +319,75 @@ fn bench_codegen_struct(c: &mut Criterion) {
                 black_box("bench.zr"),
                 black_box("zrc bench.zr"),
                 black_box(STRUCT_CODE),
+                black_box(typed_ast.clone()),
+                OptimizationLevel::None,
+                DebugLevel::None,
+                &zrc_codegen::get_native_triple(),
+                black_box("generic"),
+            );
+        });
+    });
+}
+
+/// Benchmark code generation performance on pointer operations
+fn bench_codegen_pointer(c: &mut Criterion) {
+    let ast = zrc_parser::parser::parse_program(POINTER_CODE).unwrap();
+    let typed_ast = zrc_typeck::typeck::type_program(ast).unwrap();
+
+    c.bench_function("codegen_pointer", |b| {
+        b.iter(|| {
+            let _ = zrc_codegen::cg_program_to_string(
+                black_box("bench"),
+                black_box("."),
+                black_box("bench.zr"),
+                black_box("zrc bench.zr"),
+                black_box(POINTER_CODE),
+                black_box(typed_ast.clone()),
+                OptimizationLevel::None,
+                DebugLevel::None,
+                &zrc_codegen::get_native_triple(),
+                black_box("generic"),
+            );
+        });
+    });
+}
+
+/// Benchmark code generation performance on global variables
+fn bench_codegen_globals(c: &mut Criterion) {
+    let ast = zrc_parser::parser::parse_program(GLOBAL_VARS_CODE).unwrap();
+    let typed_ast = zrc_typeck::typeck::type_program(ast).unwrap();
+
+    c.bench_function("codegen_globals", |b| {
+        b.iter(|| {
+            let _ = zrc_codegen::cg_program_to_string(
+                black_box("bench"),
+                black_box("."),
+                black_box("bench.zr"),
+                black_box("zrc bench.zr"),
+                black_box(GLOBAL_VARS_CODE),
+                black_box(typed_ast.clone()),
+                OptimizationLevel::None,
+                DebugLevel::None,
+                &zrc_codegen::get_native_triple(),
+                black_box("generic"),
+            );
+        });
+    });
+}
+
+/// Benchmark code generation performance on loops
+fn bench_codegen_loop(c: &mut Criterion) {
+    let ast = zrc_parser::parser::parse_program(LOOP_CODE).unwrap();
+    let typed_ast = zrc_typeck::typeck::type_program(ast).unwrap();
+
+    c.bench_function("codegen_loop", |b| {
+        b.iter(|| {
+            let _ = zrc_codegen::cg_program_to_string(
+                black_box("bench"),
+                black_box("."),
+                black_box("bench.zr"),
+                black_box("zrc bench.zr"),
+                black_box(LOOP_CODE),
                 black_box(typed_ast.clone()),
                 OptimizationLevel::None,
                 DebugLevel::None,
@@ -287,21 +490,30 @@ criterion_group!(
     parsing,
     bench_parse_simple,
     bench_parse_fibonacci,
-    bench_parse_struct
+    bench_parse_struct,
+    bench_parse_pointer,
+    bench_parse_globals,
+    bench_parse_loop
 );
 
 criterion_group!(
     typechecking,
     bench_typeck_simple,
     bench_typeck_fibonacci,
-    bench_typeck_struct
+    bench_typeck_struct,
+    bench_typeck_pointer,
+    bench_typeck_globals,
+    bench_typeck_loop
 );
 
 criterion_group!(
     codegen,
     bench_codegen_simple,
     bench_codegen_fibonacci,
-    bench_codegen_struct
+    bench_codegen_struct,
+    bench_codegen_pointer,
+    bench_codegen_globals,
+    bench_codegen_loop
 );
 
 criterion_group!(

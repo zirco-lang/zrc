@@ -1,0 +1,115 @@
+name: "benchmark"
+
+on:
+    pull_request:
+    workflow_dispatch:
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    benchmark:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout PR branch
+              uses: actions/checkout@v5
+              with:
+                  ref: ${{ github.head_ref }}
+                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+
+            - name: Set up Rust
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
+                  override: true
+
+            - name: Install LLVM dependencies
+              run: |
+                  sudo apt-get update -qq
+                  sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
+
+            - name: Use dependency cache
+              uses: Swatinem/rust-cache@v2
+
+            - name: Run benchmarks on PR branch
+              run: |
+                  cargo bench --bench compilation -- --save-baseline pr
+
+            - name: Checkout base branch
+              uses: actions/checkout@v5
+              with:
+                  ref: ${{ github.base_ref || 'main' }}
+                  clean: false
+
+            - name: Run benchmarks on base branch
+              run: |
+                  cargo bench --bench compilation -- --save-baseline base
+
+            - name: Generate comparison report
+              run: |
+                  echo "# Benchmark Comparison Report" > benchmark_report.md
+                  echo "" >> benchmark_report.md
+                  echo "Comparing performance of PR against base branch (\`${{ github.base_ref || 'main' }}\`)" >> benchmark_report.md
+                  echo "" >> benchmark_report.md
+                  
+                  # Run benchmarks again to compare
+                  cargo bench --bench compilation -- --baseline base --save-baseline pr 2>&1 | tee benchmark_output.txt
+                  
+                  # Extract meaningful results
+                  echo "## Results" >> benchmark_report.md
+                  echo "" >> benchmark_report.md
+                  echo "\`\`\`" >> benchmark_report.md
+                  grep -E "(time:|change:)" benchmark_output.txt | head -50 >> benchmark_report.md || echo "No significant changes detected" >> benchmark_report.md
+                  echo "\`\`\`" >> benchmark_report.md
+                  echo "" >> benchmark_report.md
+                  echo "Full benchmark results are available in the workflow artifacts." >> benchmark_report.md
+
+            - name: Comment PR with benchmark results
+              if: github.event_name == 'pull_request'
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const fs = require('fs');
+                      const report = fs.readFileSync('benchmark_report.md', 'utf8');
+                      
+                      // Find existing benchmark comment
+                      const comments = await github.rest.issues.listComments({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          issue_number: context.issue.number,
+                      });
+                      
+                      const botComment = comments.data.find(comment => 
+                          comment.user.type === 'Bot' && 
+                          comment.body.includes('Benchmark Comparison Report')
+                      );
+                      
+                      if (botComment) {
+                          // Update existing comment
+                          await github.rest.issues.updateComment({
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              comment_id: botComment.id,
+                              body: report
+                          });
+                      } else {
+                          // Create new comment
+                          await github.rest.issues.createComment({
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              issue_number: context.issue.number,
+                              body: report
+                          });
+                      }
+
+            - name: Upload benchmark results
+              uses: actions/upload-artifact@v4
+              with:
+                  name: benchmark-results
+                  path: |
+                      benchmark_report.md
+                      benchmark_output.txt
+                      target/criterion/
+                  retention-days: 30
