@@ -2,6 +2,8 @@
 
 use std::collections::HashMap;
 
+use indexmap::IndexMap;
+
 use crate::tast::ty::{FunctionDeclarationGlobalMetadata, Type as TastType};
 
 /// Represents a typing scope: a scope that contains the mapping from a type's
@@ -12,21 +14,23 @@ pub struct TypeCtx<'input> {
     mappings: HashMap<&'input str, TastType<'input>>,
 }
 /// All types namable in the global scope
-const ALL_NAMABLE_TYPES: [(&str, TastType); 11] = [
-    // all namable types
-    ("i8", TastType::I8),
-    ("u8", TastType::U8),
-    ("i16", TastType::I16),
-    ("u16", TastType::U16),
-    ("i32", TastType::I32),
-    ("u32", TastType::U32),
-    ("i64", TastType::I64),
-    ("u64", TastType::U64),
-    ("isize", TastType::Isize),
-    ("usize", TastType::Usize),
-    ("bool", TastType::Bool),
-    // void is not namable
-];
+/// Returns all types namable in the global scope
+fn all_namable_types<'input>() -> [(&'input str, TastType<'input>); 12] {
+    [
+        ("i8", TastType::I8),
+        ("u8", TastType::U8),
+        ("i16", TastType::I16),
+        ("u16", TastType::U16),
+        ("i32", TastType::I32),
+        ("u32", TastType::U32),
+        ("i64", TastType::I64),
+        ("u64", TastType::U64),
+        ("isize", TastType::Isize),
+        ("usize", TastType::Usize),
+        ("bool", TastType::Bool),
+        ("void", TastType::Struct(IndexMap::new())),
+    ]
+}
 impl<'input> TypeCtx<'input> {
     /// Create a new [`TypeScope`] containing **NOTHING** -- not even
     /// primitives.
@@ -40,7 +44,7 @@ impl<'input> TypeCtx<'input> {
     /// Create a new [`TypeScope`] containing just the primitives
     #[must_use]
     pub fn new() -> Self {
-        Self::from(ALL_NAMABLE_TYPES)
+        Self::from(all_namable_types())
     }
 
     /// Create a new [`TypeScope`] from a [`HashMap`] mapping identifier [str]s
@@ -55,7 +59,11 @@ impl<'input> TypeCtx<'input> {
     #[must_use]
     pub fn from_defaults_and_mappings(mappings: HashMap<&'input str, TastType<'input>>) -> Self {
         Self {
-            mappings: ALL_NAMABLE_TYPES.iter().cloned().chain(mappings).collect(),
+            mappings: all_namable_types()
+                .iter()
+                .cloned()
+                .chain(mappings)
+                .collect(),
         }
     }
 
