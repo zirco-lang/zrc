@@ -273,7 +273,7 @@ Zirco uses **extremely strict** clippy lints:
 
 ## Stability Notice
 
-**Important**: Zirco is pre-1.0 with **NO STABILITY GUARANTEES**. 
+**Important**: Zirco is pre-1.0 with **NO STABILITY GUARANTEES**.
 
 - Internal compiler APIs may change without warning
 - Language syntax and semantics may evolve
