@@ -43,7 +43,7 @@ If you would like to install `zrc` to your Cargo `$PATH`, run `cargo install --p
 
 ## Language Specification
 
-For a comprehensive guide to the Zirco language syntax, semantics, and behavior, see the [Language Specification](./SPEC.md).
+For a comprehensive guide to the Zirco language syntax, semantics, and behavior, see the [Language Specification](./docs/SPEC.md).
 
 ## Usage
 
