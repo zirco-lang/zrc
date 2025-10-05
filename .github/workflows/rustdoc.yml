@@ -58,9 +58,32 @@ jobs:
                       1. Download and extract the artifact
                       2. Open \`index.html\` in your browser`;
                       
-                      github.rest.issues.createComment({
+                      // Find existing comment
+                      const comments = await github.rest.issues.listComments({
                           issue_number: context.issue.number,
                           owner: context.repo.owner,
                           repo: context.repo.repo,
-                          body: message
                       });
+                      
+                      const botComment = comments.data.find(comment => 
+                          comment.user.type === 'Bot' && 
+                          comment.body.includes('📚 **Documentation Preview**')
+                      );
+                      
+                      if (botComment) {
+                          // Update existing comment
+                          await github.rest.issues.updateComment({
+                              comment_id: botComment.id,
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              body: message
+                          });
+                      } else {
+                          // Create new comment
+                          await github.rest.issues.createComment({
+                              issue_number: context.issue.number,
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              body: message
+                          });
+                      }
