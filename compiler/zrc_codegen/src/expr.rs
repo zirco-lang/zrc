@@ -603,11 +603,9 @@ pub(crate) fn cg_expr<'ctx>(
                 .expect("struct allocation should have compiled successfully");
 
             // Initialize each field
-            let field_types = match &expr.inferred_type {
-                Type::Struct(field_map) | Type::Union(field_map) => field_map,
-                _ => {
-                    unreachable!("struct construction should only be used with struct/union types")
-                }
+            let (Type::Struct(field_types) | Type::Union(field_types)) = &expr.inferred_type
+            else {
+                unreachable!("struct construction should only be used with struct/union types")
             };
 
             for (idx, (field_name, _field_ty)) in field_types.iter().enumerate() {
@@ -616,6 +614,7 @@ pub(crate) fn cg_expr<'ctx>(
                     let field_value = unpack!(bb = cg_expr(cg, bb, field_expr.clone()));
 
                     // Get pointer to this field in the struct
+                    #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
                     let field_ptr = cg
                         .builder
                         .build_struct_gep(struct_type, struct_ptr, idx as u32, "field_ptr")

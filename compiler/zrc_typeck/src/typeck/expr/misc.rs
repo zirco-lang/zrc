@@ -137,11 +137,12 @@ pub fn type_expr_size_of_expr<'input>(
 }
 
 /// Typeck a struct construction expr
+#[allow(clippy::type_complexity)]
 pub fn type_expr_struct_construction<'input>(
     scope: &Scope<'input, '_>,
     expr_span: Span,
     ty: Type<'input>,
-    fields: zrc_utils::span::Spanned<
+    fields: &zrc_utils::span::Spanned<
         Vec<zrc_utils::span::Spanned<(zrc_utils::span::Spanned<&'input str>, Expr<'input>)>>,
     >,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -153,7 +154,20 @@ pub fn type_expr_struct_construction<'input>(
     // Ensure it's a struct or union type
     let expected_fields = match &resolved_ty {
         TastType::Struct(fields) | TastType::Union(fields) => fields.clone(),
-        _ => {
+        TastType::I8
+        | TastType::U8
+        | TastType::I16
+        | TastType::U16
+        | TastType::I32
+        | TastType::U32
+        | TastType::I64
+        | TastType::U64
+        | TastType::Usize
+        | TastType::Isize
+        | TastType::Bool
+        | TastType::Ptr(_)
+        | TastType::Fn(_)
+        | TastType::Opaque(_) => {
             return Err(DiagnosticKind::ExpectedGot {
                 expected: "struct or union type".to_string(),
                 got: resolved_ty.to_string(),
@@ -173,7 +187,7 @@ pub fn type_expr_struct_construction<'input>(
         let expected_type = expected_fields.get(field_name_str).ok_or_else(|| {
             DiagnosticKind::StructOrUnionDoesNotHaveMember(
                 resolved_ty.to_string(),
-                field_name_str.to_string(),
+                (*field_name_str).to_string(),
             )
             .error_in(field_name.span())
         })?;
@@ -192,7 +206,7 @@ pub fn type_expr_struct_construction<'input>(
         // Check for duplicate field initialization
         if initialized_fields.contains_key(field_name_str) {
             return Err(
-                DiagnosticKind::DuplicateStructMember(field_name_str.to_string())
+                DiagnosticKind::DuplicateStructMember((*field_name_str).to_string())
                     .error_in(field_name.span()),
             );
         }
