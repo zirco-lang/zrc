@@ -516,7 +516,11 @@ pub fn type_block<'input, 'gs>(
             BlockReturnActuality::SometimesReturns | BlockReturnActuality::NeverReturns,
         ) if return_ty == TastType::unit() => {
             tast_block.push(TypedStmt(TypedStmtKind::ReturnStmt(None).in_span(
-                Span::from_positions(input_block_span.end() - 1, input_block_span.end()),
+                Span::from_positions_and_file(
+                    input_block_span.end() - 1,
+                    input_block_span.end(),
+                    input_block_span.file_name(),
+                ),
             )));
 
             Ok(BlockReturnActuality::AlwaysReturns)
@@ -542,7 +546,7 @@ pub fn type_block<'input, 'gs>(
 
 #[cfg(test)]
 mod tests {
-    use zrc_utils::spanned;
+    use zrc_utils::spanned_test;
 
     use super::*;
     use crate::typeck::scope::GlobalScope;
@@ -553,7 +557,8 @@ mod tests {
 
         let source = "switch (1 as i32) { 3 as i8 => {} default => {} }";
 
-        let block_ast = zrc_parser::parser::parse_stmt_list(source).expect("should parse");
+        let block_ast =
+            zrc_parser::parser::parse_stmt_list(source, "<test>").expect("should parse");
 
         let tck_result = type_block(
             &gs.create_subscope(),
@@ -570,7 +575,7 @@ mod tests {
             diagnostic,
             Diagnostic(
                 Severity::Error,
-                spanned!(
+                spanned_test!(
                     20,
                     DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string()),
                     27

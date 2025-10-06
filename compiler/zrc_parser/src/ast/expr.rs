@@ -484,7 +484,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Comma(Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            lhs.0.span().file_name()
         ))
     }
 
@@ -492,7 +493,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Assignment(assignment, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            lhs.0.span().file_name()
         ))
     }
 
@@ -530,7 +532,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::BinaryBitwise(op, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            lhs.0.span().file_name()
         ))
     }
     #[must_use]
@@ -558,7 +561,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Logical(op, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            lhs.0.span().file_name()
         ))
     }
     #[must_use]
@@ -574,7 +578,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Equality(op, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            lhs.0.span().file_name()
         ))
     }
     #[must_use]
@@ -590,7 +595,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Comparison(op, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            lhs.0.span().file_name()
         ))
     }
     #[must_use]
@@ -614,7 +620,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             lhs.0.start(),
             ExprKind::Arithmetic(op, Box::new(lhs), Box::new(rhs)),
-            rhs.0.end()
+            rhs.0.end(),
+            lhs.0.span().file_name()
         ))
     }
     #[must_use]
@@ -670,7 +677,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             expr.0.start(),
             ExprKind::Dot(Box::new(expr), prop),
-            prop.end()
+            prop.end(),
+            prop.span().file_name()
         ))
     }
     #[must_use]
@@ -678,7 +686,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             expr.0.start(),
             ExprKind::Arrow(Box::new(expr), prop),
-            prop.end()
+            prop.end(),
+            prop.span().file_name()
         ))
     }
 
@@ -691,7 +700,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             cond.0.start(),
             ExprKind::Ternary(Box::new(cond), Box::new(if_true), Box::new(if_false)),
-            if_false.0.end()
+            if_false.0.end(),
+            cond.0.span().file_name()
         ))
     }
     #[must_use]
@@ -699,7 +709,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             expr.0.start(),
             ExprKind::Cast(Box::new(expr), ty),
-            ty.0.end()
+            ty.0.end(),
+            expr.0.span().file_name()
         ))
     }
     #[must_use]
@@ -722,7 +733,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             start,
             ExprKind::NumberLiteral(lit.into_value(), ty.map(Spanned::into_value)),
-            end
+            end,
+            lit.span().file_name()
         ))
     }
     #[must_use]
@@ -743,7 +755,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             span.start(),
             ExprKind::StringLiteral(lit.into_value()),
-            span.end()
+            span.end(),
+            span.file_name()
         ))
     }
     #[must_use]
@@ -752,7 +765,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             span.start(),
             ExprKind::CharLiteral(lit.into_value()),
-            span.end()
+            span.end(),
+            span.file_name()
         ))
     }
     #[must_use]
@@ -761,7 +775,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             span.start(),
             ExprKind::Identifier(lit.into_value()),
-            span.end()
+            span.end(),
+            span.file_name()
         ))
     }
     #[must_use]
@@ -770,7 +785,8 @@ impl<'input> Expr<'input> {
         Self(spanned!(
             span.start(),
             ExprKind::BooleanLiteral(lit.into_value()),
-            span.end()
+            span.end(),
+            span.file_name()
         ))
     }
     #[must_use]
@@ -781,10 +797,12 @@ impl<'input> Expr<'input> {
     ) -> Self {
         let start = ty.0.start();
         let end = fields.end();
+        let file_name = ty.0.span().file_name();
         Self(spanned!(
             start,
             ExprKind::StructConstruction(ty, fields),
-            end
+            end,
+            file_name
         ))
     }
 }
@@ -846,7 +864,7 @@ mod tests {
 
         for input in test_cases {
             assert_eq!(
-                crate::parser::parse_expr(input)
+                crate::parser::parse_expr(input, "<test>")
                     .expect("test cases should have parsed correctly")
                     .to_string(),
                 input
@@ -885,7 +903,7 @@ mod tests {
         ];
 
         for (input, expected) in test_cases {
-            let result = crate::parser::parse_expr(input)
+            let result = crate::parser::parse_expr(input, "<test>")
                 .expect("test cases should have parsed correctly")
                 .to_string();
             assert_eq!(

@@ -114,6 +114,22 @@ pub enum DiagnosticKind {
     NumberLiteralOutOfBounds(String, String, String, String),
     #[error("global variable initializer must be a constant expression")]
     GlobalInitializerMustBeConstant,
+
+    // PREPROCESSOR ERRORS
+    #[error("unterminated include string")]
+    PreprocessorUnterminatedIncludeString,
+    #[error("unterminated include angle brackets")]
+    PreprocessorUnterminatedIncludeAngleBrackets,
+    #[error("include directive must use \"file\" or <file> syntax")]
+    PreprocessorInvalidIncludeSyntax,
+    #[error("cannot find include file: {0}")]
+    PreprocessorCannotFindIncludeFile(String),
+    #[error("cannot read include file {0}: {1}")]
+    PreprocessorCannotReadIncludeFile(String, String),
+    #[error("cannot determine parent directory for {0}")]
+    PreprocessorCannotDetermineParentDirectory(String),
+    #[error("unknown preprocessor directive: #{0}")]
+    PreprocessorUnknownDirective(String),
 }
 impl DiagnosticKind {
     /// Create a [error] diagnostic in a given [`Span`].

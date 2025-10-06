@@ -85,7 +85,7 @@ impl Error for Diagnostic {}
 
 #[cfg(test)]
 mod tests {
-    use zrc_utils::spanned;
+    use zrc_utils::spanned_test;
 
     use super::*;
     use crate::DiagnosticKind;
@@ -109,7 +109,7 @@ mod tests {
     fn diagnostic_display_includes_severity_and_kind() {
         let diagnostic = Diagnostic(
             Severity::Error,
-            spanned!(0, DiagnosticKind::InvalidToken, 4),
+            spanned_test!(0, DiagnosticKind::InvalidToken, 4),
         );
         let display = diagnostic.to_string();
         assert!(display.contains("error"));
@@ -121,7 +121,7 @@ mod tests {
         let source = "let x = 5;";
         let diagnostic = Diagnostic(
             Severity::Error,
-            spanned!(4, DiagnosticKind::InvalidToken, 5),
+            spanned_test!(4, DiagnosticKind::InvalidToken, 5),
         );
         let path = Path::new("test.zrc");
         let output = diagnostic.print_with_filename(source, path);

@@ -86,7 +86,7 @@ mod tests {
 
     use indexmap::IndexMap;
     use zrc_diagnostics::DiagnosticKind;
-    use zrc_utils::spanned;
+    use zrc_utils::spanned_test;
 
     use super::*;
     use crate::{
@@ -122,8 +122,8 @@ mod tests {
                     TastType::Fn(Fn {
                         arguments: ArgumentDeclarationList::NonVariadic(vec![
                             ArgumentDeclaration {
-                                name: spanned!(0, "x", 1),
-                                ty: spanned!(0, TastType::I32, 3),
+                                name: spanned_test!(0, "x", 1),
+                                ty: spanned_test!(0, TastType::I32, 3),
                             },
                         ]),
                         returns: Box::new(TastType::I32),
@@ -133,8 +133,8 @@ mod tests {
                     "sink",
                     TastType::Fn(Fn {
                         arguments: ArgumentDeclarationList::Variadic(vec![ArgumentDeclaration {
-                            name: spanned!(0, "i8", 3),
-                            ty: spanned!(0, TastType::I8, 3),
+                            name: spanned_test!(0, "i8", 3),
+                            ty: spanned_test!(0, TastType::I8, 3),
                         }]),
                         returns: Box::new(TastType::unit()),
                     }),
@@ -144,8 +144,8 @@ mod tests {
                     TastType::Fn(Fn {
                         arguments: ArgumentDeclarationList::NonVariadic(vec![
                             ArgumentDeclaration {
-                                name: spanned!(0, "ptr", 3),
-                                ty: spanned!(0, TastType::Ptr(Box::new(TastType::unit())), 3),
+                                name: spanned_test!(0, "ptr", 3),
+                                ty: spanned_test!(0, TastType::Ptr(Box::new(TastType::unit())), 3),
                             },
                         ]),
                         returns: Box::new(TastType::unit()),
@@ -394,7 +394,8 @@ mod tests {
             assert_eq!(
                 type_expr(
                     &scope.create_subscope(),
-                    zrc_parser::parser::parse_expr(input).expect("parsing should succeed")
+                    zrc_parser::parser::parse_expr(input, "<test>")
+                        .expect("parsing should succeed")
                 )
                 .map(|result| result.inferred_type)
                 .map_err(|diagnostic| diagnostic.1.into_value()),

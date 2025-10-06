@@ -267,7 +267,11 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
 
                     let then_else = then_else.unwrap_or_else(|| {
-                        vec![].in_span(Span::from_positions(then.end(), then.end()))
+                        vec![].in_span(Span::from_positions_and_file(
+                            then.end(),
+                            then.end(),
+                            then.span().file_name(),
+                        ))
                     });
 
                     let then_end = then.end();

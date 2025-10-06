@@ -25,6 +25,7 @@ pub struct Place<'input> {
 /// Places may be:
 /// - A variable or an property access of a place
 /// - A dereference or index into any expression yielding a pointer
+#[allow(variant_size_differences)]
 #[derive(PartialEq, Debug, Clone)]
 pub enum PlaceKind<'input> {
     /// `*x`
@@ -357,7 +358,7 @@ impl Display for TypedExprKind<'_> {
 
 #[cfg(test)]
 mod tests {
-    use zrc_utils::spanned;
+    use zrc_utils::spanned_test;
 
     use super::*;
 
@@ -385,7 +386,7 @@ mod tests {
     fn typed_expr_displays_with_type() {
         let expr = TypedExpr {
             inferred_type: Type::I32,
-            kind: spanned!(0, TypedExprKind::Identifier("x"), 1),
+            kind: spanned_test!(0, TypedExprKind::Identifier("x"), 1),
         };
         assert_eq!(expr.to_string(), "(x as i32)");
     }
@@ -394,7 +395,7 @@ mod tests {
     fn place_displays_correctly() {
         let place = Place {
             inferred_type: Type::I32,
-            kind: spanned!(0, PlaceKind::Variable("y"), 1),
+            kind: spanned_test!(0, PlaceKind::Variable("y"), 1),
         };
         assert_eq!(place.to_string(), "y");
     }

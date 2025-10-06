@@ -11,10 +11,10 @@ use super::{
     }
 };
 
-grammar<'input>;
+grammar<'input>(file_name: &'static str);
 
 Spanned<T>: Spanned<T> = {
-    <l:@L> <x:T> <r:@R> => spanned!(l, x, r),
+    <l:@L> <x:T> <r:@R> => spanned!(l, x, r, file_name),
 }
 SpannedExpr<T>: Expr<'input> = {
     <Spanned<T>> => Expr(<>),
@@ -372,8 +372,8 @@ Primary: Expr<'input> = {
     <s:@L> "new" <ty:Type> "{" <fields:StructFieldInitList?> "}" <e:@R> => 
         Expr(spanned!(s, ExprKind::StructConstruction(
             ty, 
-            spanned!(s, fields.unwrap_or(Vec::new()), e)
-        ), e)),
+            spanned!(s, fields.unwrap_or(Vec::new()), e, file_name)
+        ), e, file_name)),
     "(" <Expr> ")" => <>,
 };
 

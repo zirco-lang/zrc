@@ -187,7 +187,7 @@ mod tests {
     use zrc_parser::ast::expr::{Arithmetic, Assignment, BinaryBitwise, Expr, ExprKind};
     use zrc_utils::{
         span::{Span, Spannable},
-        spanned,
+        spanned_test,
     };
 
     use super::*;
@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn expect_identical_types_produces_proper_diagnostic() {
-        let sample_span = Span::from_positions(0, 5);
+        let sample_span = Span::from_positions_and_file(0, 5, "<test>");
         assert_eq!(
             expect_identical_types(&TastType::I32, &TastType::I8, sample_span),
             Err(Diagnostic(
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn expect_produces_proper_diagnostic() {
-        let sample_span = Span::from_positions(0, 5);
+        let sample_span = Span::from_positions_and_file(0, 5, "<test>");
         assert_eq!(
             expect(
                 false,
@@ -236,12 +236,12 @@ mod tests {
                 // a = b
                 desugar_assignment(
                     Assignment::Standard,
-                    Expr::build_ident(spanned!(0, "a", 1)),
-                    Expr::build_ident(spanned!(4, "b", 5)),
+                    Expr::build_ident(spanned_test!(0, "a", 1)),
+                    Expr::build_ident(spanned_test!(4, "b", 5)),
                 ),
                 (
-                    Expr::build_ident(spanned!(0, "a", 1)),
-                    Expr::build_ident(spanned!(4, "b", 5)),
+                    Expr::build_ident(spanned_test!(0, "a", 1)),
+                    Expr::build_ident(spanned_test!(4, "b", 5)),
                 )
             );
         }
@@ -252,18 +252,18 @@ mod tests {
                 // a += b
                 desugar_assignment(
                     Assignment::Arithmetic(Arithmetic::Addition),
-                    Expr::build_ident(spanned!(0, "a", 1)),
-                    Expr::build_ident(spanned!(5, "b", 6)),
+                    Expr::build_ident(spanned_test!(0, "a", 1)),
+                    Expr::build_ident(spanned_test!(5, "b", 6)),
                 ),
                 (
-                    Expr::build_ident(spanned!(0, "a", 1)),
+                    Expr::build_ident(spanned_test!(0, "a", 1)),
                     // An exception to the normal spanning rules applies here
-                    Expr(spanned!(
+                    Expr(spanned_test!(
                         5,
                         ExprKind::Arithmetic(
                             Arithmetic::Addition,
-                            Box::new(Expr::build_ident(spanned!(0, "a", 1))),
-                            Box::new(Expr::build_ident(spanned!(5, "b", 6)))
+                            Box::new(Expr::build_ident(spanned_test!(0, "a", 1))),
+                            Box::new(Expr::build_ident(spanned_test!(5, "b", 6)))
                         ),
                         6
                     ))
@@ -277,18 +277,18 @@ mod tests {
                 // a >>= b
                 desugar_assignment(
                     Assignment::BinaryBitwise(BinaryBitwise::Shr),
-                    Expr::build_ident(spanned!(0, "a", 1)),
-                    Expr::build_ident(spanned!(6, "b", 7)),
+                    Expr::build_ident(spanned_test!(0, "a", 1)),
+                    Expr::build_ident(spanned_test!(6, "b", 7)),
                 ),
                 (
-                    Expr::build_ident(spanned!(0, "a", 1)),
+                    Expr::build_ident(spanned_test!(0, "a", 1)),
                     // An exception to the normal spanning rules applies here
-                    Expr(spanned!(
+                    Expr(spanned_test!(
                         6,
                         ExprKind::BinaryBitwise(
                             BinaryBitwise::Shr,
-                            Box::new(Expr::build_ident(spanned!(0, "a", 1))),
-                            Box::new(Expr::build_ident(spanned!(6, "b", 7)))
+                            Box::new(Expr::build_ident(spanned_test!(0, "a", 1))),
+                            Box::new(Expr::build_ident(spanned_test!(6, "b", 7)))
                         ),
                         7
                     ))

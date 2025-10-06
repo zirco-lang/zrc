@@ -12,10 +12,13 @@ Version 0.1.0 (Draft)
    - [Character Set](#21-character-set)
    - [Whitespace](#22-whitespace)
    - [Comments](#23-comments)
-   - [Keywords](#24-keywords)
-   - [Identifiers](#25-identifiers)
-   - [Literals](#26-literals)
-   - [Operators and Punctuation](#27-operators-and-punctuation)
+   - [Preprocessor](#24-preprocessor)
+     - [Include Directive](#241-include-directive)
+     - [Pragma Once](#242-pragma-once)
+   - [Keywords](#25-keywords)
+   - [Identifiers](#26-identifiers)
+   - [Literals](#27-literals)
+   - [Operators and Punctuation](#28-operators-and-punctuation)
 3. [Type System](#3-type-system)
    - [Type Overview](#31-type-overview)
    - [Type Syntax](#32-type-syntax)
@@ -131,7 +134,57 @@ Comments start with `//` and continue to the end of the line. They are treated a
 
 **Note**: Multi-line comments are not currently supported.
 
-### 2.4 Keywords
+### 2.4 Preprocessor
+
+Zirco includes a preprocessor that processes directives before compilation. Preprocessor directives are lines that start with `#`.
+
+#### 2.4.1 Include Directive
+
+The `#include` directive inserts the contents of another file:
+
+```zirco
+#include "header.zr"
+#include <system/header.zr>
+```
+
+- Files enclosed in double quotes (`"file.zr"`) are searched relative to the current file's directory
+- Files enclosed in angle brackets (`<file.zr>`) follow the same search path as double quotes
+
+#### 2.4.2 Pragma Once
+
+The `#pragma once` directive prevents a file from being included multiple times:
+
+```zirco
+#pragma once
+
+// File contents here
+```
+
+When a file with `#pragma once` is included, the preprocessor remembers it and skips subsequent includes of the same file.
+
+**Example**:
+
+**types.zr**:
+```zirco
+#pragma once
+
+struct Point {
+    x: i32,
+    y: i32,
+}
+```
+
+**main.zr**:
+```zirco
+#include "types.zr"
+#include "types.zr"  // This include will be skipped
+
+fn main() {
+    let p: Point = Point { x: 0, y: 0 };
+}
+```
+
+### 2.5 Keywords
 
 The following identifiers are reserved keywords and cannot be used as variable or function names:
 
@@ -142,7 +195,7 @@ let         return      sizeof      struct      switch
 true        type        union       while
 ```
 
-### 2.5 Identifiers
+### 2.6 Identifiers
 
 Identifiers are used to name variables, functions, types, and other program entities.
 
@@ -165,9 +218,9 @@ _private
 value123
 ```
 
-### 2.6 Literals
+### 2.7 Literals
 
-#### 2.6.1 Integer Literals
+#### 2.8.1 Integer Literals
 
 Integer literals can be written in decimal, hexadecimal, or binary notation:
 
@@ -193,7 +246,7 @@ Integer literals can be written in decimal, hexadecimal, or binary notation:
 
 Underscores may be used as digit separators for readability and are ignored by the compiler.
 
-#### 2.6.2 Type Suffixes
+#### 2.8.2 Type Suffixes
 
 Integer literals may optionally have a type suffix to specify their type:
 
@@ -203,7 +256,7 @@ Integer literals may optionally have a type suffix to specify their type:
 100i8
 ```
 
-#### 2.6.3 Boolean Literals
+#### 2.8.3 Boolean Literals
 
 Boolean literals are `true` and `false`:
 
@@ -212,7 +265,7 @@ let x = true;
 let y = false;
 ```
 
-#### 2.6.4 String Literals
+#### 2.8.4 String Literals
 
 String literals are enclosed in double quotes and may contain escape sequences:
 
@@ -231,7 +284,7 @@ String literals are enclosed in double quotes and may contain escape sequences:
 
 String literals must be closed on the same line (multi-line strings are not supported).
 
-#### 2.6.5 Character Literals
+#### 2.8.5 Character Literals
 
 Character literals are enclosed in single quotes and represent a single character:
 
@@ -245,7 +298,7 @@ Character literals are enclosed in single quotes and represent a single characte
 
 Character literals support the same escape sequences as string literals.
 
-### 2.7 Operators and Punctuation
+### 2.8 Operators and Punctuation
 
 Zirco uses the following operators and punctuation:
 
