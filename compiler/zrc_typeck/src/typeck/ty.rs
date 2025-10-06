@@ -107,6 +107,20 @@ fn resolve_type_with_opaque<'input>(
             members,
             opaque_name,
         )?),
+        ParserTypeKind::Enum(members) => {
+            // Desugar an enum into its represented internal struct
+            TastType::Struct(IndexMap::from([
+                ("__discriminant__", TastType::Usize),
+                (
+                    "__value__",
+                    (TastType::Union(resolve_key_type_mapping_with_opaque(
+                        type_scope,
+                        members,
+                        opaque_name,
+                    )?)),
+                ),
+            ]))
+        }
     })
 }
 
@@ -346,24 +360,32 @@ mod tests {
         assert_eq!(
             resolve_type(
                 &TypeCtx::default(),
-                ParserType(spanned!(
+                ParserType(spanned_test!(
                     0,
-                    ParserTypeKind::Enum(KeyTypeMapping(spanned!(
+                    ParserTypeKind::Enum(KeyTypeMapping(spanned_test!(
                         1,
                         vec![
-                            spanned!(
+                            spanned_test!(
                                 2,
                                 (
-                                    spanned!(3, "Eight", 4),
-                                    ParserType(spanned!(5, ParserTypeKind::Identifier("i8"), 6))
+                                    spanned_test!(3, "Eight", 4),
+                                    ParserType(spanned_test!(
+                                        5,
+                                        ParserTypeKind::Identifier("i8"),
+                                        6
+                                    ))
                                 ),
                                 7
                             ),
-                            spanned!(
+                            spanned_test!(
                                 8,
                                 (
-                                    spanned!(9, "Sixteen", 10),
-                                    ParserType(spanned!(11, ParserTypeKind::Identifier("i16"), 12))
+                                    spanned_test!(9, "Sixteen", 10),
+                                    ParserType(spanned_test!(
+                                        11,
+                                        ParserTypeKind::Identifier("i16"),
+                                        12
+                                    ))
                                 ),
                                 13
                             )
