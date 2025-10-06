@@ -6,6 +6,9 @@ use zrc_utils::span::{Span, Spannable};
 use crate::{Diagnostic, Severity};
 
 /// The list of possible errors
+///
+/// Each variant represents a specific kind of diagnostic that can be
+/// raised during the compilation process.
 // These remain as Strings, not 'input str slices, to avoid circular dependencies (it's either use
 // String, or use Tok, because str would be to-string()d from some tokens)
 #[allow(missing_docs)]
@@ -113,7 +116,7 @@ pub enum DiagnosticKind {
     GlobalInitializerMustBeConstant,
 }
 impl DiagnosticKind {
-    /// Create an [error] diagnostic in a given [`Span`]
+    /// Create a [error] diagnostic in a given [`Span`].
     ///
     /// [error]: [`Severity::Error`]
     #[must_use]

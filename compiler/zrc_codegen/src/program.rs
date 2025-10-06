@@ -1,4 +1,9 @@
 //! Code generation for entire Zirco programs
+//!
+//! This module contains the LLVM code generator for the Zirco compiler. It
+//! translates the type-checked abstract syntax tree (TAST) into LLVM
+//! intermediate representation (IR), which can then be optimized and compiled
+//! to machine code.
 
 use inkwell::{
     OptimizationLevel,
@@ -30,6 +35,7 @@ use crate::{
 /// This is used for global variable initializers.
 ///
 /// # Panics
+///
 /// Panics if the expression is not a valid constant expression.
 #[allow(clippy::too_many_lines, clippy::wildcard_enum_match_arm)]
 fn eval_const_expr<'ctx>(

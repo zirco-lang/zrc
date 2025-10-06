@@ -1,4 +1,11 @@
 //! Code generation for expressions
+//!
+//! This module contains functions to generate LLVM IR for
+//! [`zrc_typeck::tast::expr::TypedExpr`] expressions, which represent
+//! all expressions in the Zirco language.
+//!
+//! The main function is [`cg_expr`], which takes a `TypedExpr` and generates
+//! the corresponding LLVM IR to compute its value.
 
 pub mod place;
 
@@ -96,7 +103,8 @@ pub fn build_arithmetic<'ctx>(
     }
 }
 
-/// Generate an expression, yielding its result.
+/// Generate LLVM IR for a [`TypedExpr`], returning a [`BasicBlockAnd`] with the
+/// resulting basic block and the computed value
 #[allow(
     clippy::redundant_pub_crate,
     clippy::too_many_lines,
