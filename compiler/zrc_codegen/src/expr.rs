@@ -257,8 +257,8 @@ pub(crate) fn cg_expr<'ctx>(
                 // REVIEW: Is this the approach we want to take?
                 #[allow(clippy::wildcard_enum_match_arm)]
                 let reg = match op {
-                    // SAFETY: this can panic if indices are used incorrectly
-                    // TODO: is this safe?
+                    // SAFETY: This can segfault if indices are used incorrectly
+                    // This is only used for pointer arithmetic, so the indices should be correct
                     Arithmetic::Addition => unsafe {
                         cg.builder.build_gep(
                             llvm_basic_type(&cg, &pointee).0,
@@ -274,8 +274,9 @@ pub(crate) fn cg_expr<'ctx>(
                             .expect("negation should have compiled successfully")
                             .as_basic_value_enum();
 
-                        // SAFETY: this can panic if indices are used incorrectly
-                        // TODO: is this safe?
+                        // SAFETY: This can segfault if indices are used incorrectly
+                        // This is only used for pointer arithmetic, so the indices should be
+                        // correct
                         unsafe {
                             cg.builder.build_gep(
                                 llvm_basic_type(&cg, &pointee).0,
