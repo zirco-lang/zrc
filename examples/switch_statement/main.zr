@@ -1,0 +1,12 @@
+fn printf(fmt: *u8, ...) -> i32;
+
+fn main() -> i32 {
+    let day: i32 = 1;
+    switch (day) {
+        1 => printf("Monday\n");
+        2 => printf("Tuesday\n");
+        3 => printf("Wednesday\n");
+        default => printf("Other day\n");
+    }
+    return 0;
+}
