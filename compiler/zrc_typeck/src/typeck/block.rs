@@ -187,7 +187,240 @@ pub fn type_block<'input, 'gs>(
                                 )))
                             }
 
-                            StmtKind::Match { .. } => todo!(), // TODO
+                            StmtKind::Match { scrutinee, cases } => {
+                                // The following code:
+                                // fn takes_i32(x: i32);
+                                // fn takes_i64(x: i64);
+                                // enum SpecialInt { I32: i32, I64: i64 }
+                                // fn gives_si() -> SpecialInt;
+                                //
+                                // fn main() {
+                                //     let si: SpecialInt = gives_si();
+                                //     match si {
+                                //         I32: x => takes_i32(x);
+                                //         I64: x => takes_i64(x);
+                                //     }
+                                // }
+
+                                // Should desugar to:
+                                // fn takes_i32(x: i32);
+                                // fn takes_i64(x: i64);
+                                // struct SpecialInt {
+                                //     __discriminant__: usize,
+                                //     __value__: union { I32: i32, I64: i64 }
+                                // }
+                                // fn gives_si() -> SpecialInt;
+                                //
+                                // fn main() {
+                                //     let si: SpecialInt = gives_si();
+                                //     switch (si.__discriminant__) {
+                                //         0 /* I32 */ => { let x =
+                                // si.__value__.I32; takes_i32(x); }
+                                //         1 /* I64 */ => { let x =
+                                // si.__value__.I64; takes_i64(x); }
+                                //     }
+                                // }
+
+                                // Semantic invariants:
+                                // * The scrutinee must be of an enum type
+                                // * There must be exactly one case per variant of the enum
+                                // * Each case introduces a new variable into scope with the type of
+                                //   the variant
+
+                                // There is no TAST Enum type, it is simply represented as a Struct
+                                // with a hidden discriminant field
+                                // and a union of all the variants
+
+                                let t_scrutinee = type_expr(&scope, scrutinee.clone())?;
+                                let scrutinee_ty = t_scrutinee.inferred_type.clone();
+                                // Clone scrutinee for AST construction (never move original)
+                                let scrutinee_ast = scrutinee.clone();
+
+                                // * The scrutinee must be of an enum type
+                                // (Bonus points: Extracts the internal `union` declaration for
+                                // later use)
+                                let enum_as_union_def = if let TastType::Struct(ref struct_def) =
+                                    scrutinee_ty
+                                    && struct_def.get("__discriminant__").is_some()
+                                    && struct_def.get("__value__").is_some()
+                                {
+                                    if let TastType::Union(union_def) = struct_def
+                                        .get("__value__")
+                                        .expect("value should exist")
+                                        .clone()
+                                    {
+                                        union_def
+                                    } else {
+                                        return Err(DiagnosticKind::MatchOnNonEnum(
+                                            scrutinee_ty.to_string(),
+                                        )
+                                        .error_in(t_scrutinee.kind.span()));
+                                    }
+                                } else {
+                                    return Err(DiagnosticKind::MatchOnNonEnum(
+                                        scrutinee_ty.to_string(),
+                                    )
+                                    .error_in(t_scrutinee.kind.span()));
+                                };
+
+                                // * There must be exactly one case per variant of the enum
+                                if enum_as_union_def.len() != cases.len() {
+                                    return Err(
+                                        DiagnosticKind::MatchCaseCountMismatch.error_in(stmt_span)
+                                    );
+                                }
+
+                                // Ensure each enum variant is covered by exactly one case
+                                // We do this by sorting both lists and comparing them
+                                let mut sorted_enum_variants: Vec<(&str, &TastType<'_>)> =
+                                    enum_as_union_def
+                                        .iter()
+                                        .map(|(name, ty)| (name.as_ref(), ty))
+                                        .collect::<Vec<_>>();
+
+                                let mut sorted_case_variants = cases
+                                    .iter()
+                                    .map(|case| case.value().variant)
+                                    .collect::<Vec<_>>();
+
+                                sorted_enum_variants.sort_by(|(a, _), (b, _)| a.cmp(b));
+                                sorted_case_variants.sort();
+
+                                if sorted_enum_variants
+                                    .iter()
+                                    .map(|(name, _)| *name)
+                                    .ne(sorted_case_variants.iter().copied())
+                                {
+                                    return Err(
+                                        DiagnosticKind::NonExhaustiveMatchCases.error_in(stmt_span)
+                                    );
+                                }
+
+                                // The index into sorted_enum_variants is the discriminant value
+                                // We sorted both, so the indices line up
+
+                                // Generate the literal AST for the desugared version
+
+                                // Desugar match into switch on discriminant (AST only)
+                                use zrc_parser::ast::{
+                                    expr::{Expr, ExprKind},
+                                    stmt::{LetDeclaration, SwitchCase, SwitchTrigger},
+                                };
+                                use zrc_utils::span::Spanned;
+
+                                // Fix borrow checker: clone scrutinee for AST construction
+                                let scrutinee_for_ast = scrutinee.clone();
+                                let scrutinee_for_cases = scrutinee.clone();
+                                // Build the scrutinee for switch: <scrutinee>.__discriminant__ (AST
+                                // Expr)
+                                let discrim_access = Expr(Spanned::from_span_and_value(
+                                    t_scrutinee.kind.span(),
+                                    ExprKind::Dot(
+                                        Box::new(scrutinee_ast.clone()),
+                                        Spanned::from_span_and_value(
+                                            t_scrutinee.kind.span(),
+                                            "__discriminant__",
+                                        ),
+                                    ),
+                                ));
+
+                                // Build switch cases for each variant
+                                let mut switch_cases = Vec::new();
+                                for (idx, case) in cases.iter().enumerate() {
+                                    let variant_name = case.value().variant;
+                                    let var_binding = case.value().var;
+                                    let body = case.value().body.clone();
+                                    let case_span = case.span();
+
+                                    // Build let binding: let <var_binding> =
+                                    // <scrutinee>.__value__.<variant_name>;
+                                    let value_access = Expr(Spanned::from_span_and_value(
+                                        t_scrutinee.kind.span(),
+                                        ExprKind::Dot(
+                                            Box::new(Expr(Spanned::from_span_and_value(
+                                                t_scrutinee.kind.span(),
+                                                ExprKind::Dot(
+                                                    Box::new(scrutinee_ast.clone()),
+                                                    Spanned::from_span_and_value(
+                                                        t_scrutinee.kind.span(),
+                                                        "__value__",
+                                                    ),
+                                                ),
+                                            ))),
+                                            Spanned::from_span_and_value(
+                                                t_scrutinee.kind.span(),
+                                                variant_name,
+                                            ),
+                                        ),
+                                    ));
+                                    let let_decl = LetDeclaration {
+                                        name: Spanned::from_span_and_value(case_span, var_binding),
+                                        ty: None,
+                                        value: Some(value_access),
+                                    };
+                                    let let_stmt = Stmt(Spanned::from_span_and_value(
+                                        case_span,
+                                        StmtKind::DeclarationList(Spanned::from_span_and_value(
+                                            case_span,
+                                            vec![Spanned::from_span_and_value(case_span, let_decl)],
+                                        )),
+                                    ));
+
+                                    // Build block: { let <var_binding> = ...; <body> }
+                                    let block_stmts = vec![let_stmt, body.clone()];
+                                    let block = Stmt(Spanned::from_span_and_value(
+                                        case_span,
+                                        StmtKind::BlockStmt(block_stmts),
+                                    ));
+
+                                    // Switch trigger: discriminant value
+                                    let trigger_expr = Expr(Spanned::from_span_and_value(
+                                        case_span,
+                                        ExprKind::NumberLiteral(
+                                            // SAFETY: We leak this string because the AST
+                                            // requires a &str for number literals and we need
+                                            // it to live long enough
+                                            zrc_parser::lexer::NumberLiteral::Decimal(Box::leak(
+                                                Box::new(idx.to_string()),
+                                            )),
+                                            None,
+                                        ),
+                                    ));
+                                    let trigger = SwitchTrigger::Expr(trigger_expr);
+
+                                    switch_cases.push(Spanned::from_span_and_value(
+                                        case_span,
+                                        SwitchCase(trigger, block),
+                                    ));
+                                }
+
+                                // Build the switch statement AST
+                                let switch_stmt = Stmt(Spanned::from_span_and_value(
+                                    stmt_span,
+                                    StmtKind::SwitchCase {
+                                        scrutinee: discrim_access,
+                                        cases: switch_cases,
+                                    },
+                                ));
+
+                                // Recursively type check the desugared switch statement
+                                let (typed_switch, switch_return_actuality) = type_block(
+                                    &scope,
+                                    Spanned::from_span_and_value(
+                                        stmt_span,
+                                        vec![switch_stmt.clone()],
+                                    ),
+                                    can_use_break_continue,
+                                    return_ability.clone(),
+                                )?;
+
+                                Ok(Some((
+                                    TypedStmt(
+                                        TypedStmtKind::BlockStmt(typed_switch).in_span(stmt_span),
+                                    ),
+                                    switch_return_actuality,
+                                )))
+                            }
 
                             StmtKind::DeclarationList(declarations) => Ok(Some((
                                 TypedStmt(
