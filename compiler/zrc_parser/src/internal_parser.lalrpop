@@ -100,6 +100,10 @@ SimpleStmt: StmtKind<'input> = {
         scrutinee,
         cases,
     },
+    "match" "(" <scrutinee:Expr> ")" "{" <cases:Spanned<MatchCase>*> "}" => StmtKind::Match {
+        scrutinee,
+        cases,
+    },
     <FlowStmt>,
     <Spanned<LetDeclaration>> => StmtKind::DeclarationList(<>),
 };
@@ -108,6 +112,14 @@ SwitchCase: SwitchCase<'input> = {
     <e:Expr> "=>" <s:Stmt> => SwitchCase(SwitchTrigger::Expr(e), s),
     "default" "=>" <s:Stmt> => SwitchCase(SwitchTrigger::Default, s),
 };
+
+MatchCase: MatchCase<'input> = {
+    <variant:IDENTIFIER> ":" <var:IDENTIFIER> "=>" <body:Stmt> => MatchCase {
+        variant,
+        var,
+        body,
+    }
+}
 
 // For declarations at the global scope
 Declaration: Declaration<'input> = {
@@ -165,6 +177,10 @@ StructOrUnionDeclaration: Declaration<'input> = {
         name: <>.value().0,
         ty: Type(<>.map(|(_, values)| TypeKind::Union(values))),
     },
+    Spanned<("enum" <Spanned<IDENTIFIER>> <KeyTypeMapping>)> => Declaration::TypeAliasDeclaration {
+        name: <>.value().0,
+        ty: Type(<>.map(|(_, values)| TypeKind::Enum(values))),
+    },
 };
 
 ArgumentDeclarationList: ArgumentDeclarationList<'input> = {
@@ -196,6 +212,8 @@ pub Type: Type<'input> = {
         Type(<>.map(TypeKind::Struct)),
     Spanned<("union" <KeyTypeMapping>)> =>
         Type(<>.map(TypeKind::Union)),
+    Spanned<("enum" <KeyTypeMapping>)> =>
+        Type(<>.map(TypeKind::Enum)),
 }
 
 TypeOrParenthesizedType: Type<'input> = {
@@ -334,18 +352,11 @@ _Postfix: ExprKind<'input> = {
     <x:Postfix> "[" <i:Expr> "]" => ExprKind::Index(Box::new(x), Box::new(i)),
     <l:Postfix> "." <r:Spanned<IDENTIFIER>> => ExprKind::Dot(Box::new(l), r),
     <l:Postfix> "->" <r:Spanned<IDENTIFIER>> => ExprKind::Arrow(Box::new(l), r),
-    <i:Postfix> <c:Spanned<("(" ")")>> => ExprKind::Call(Box::new(i), c.map(|_| Vec::new())),
-    <i:Postfix> <c:Spanned<("(" <ArgumentList> ")")>> => ExprKind::Call(Box::new(i), c.map(|x| x)),
+    <i:Postfix> <c:Spanned<("(" <ArgumentList?> ")")>> => ExprKind::Call(Box::new(i), c.map(|x| x.unwrap_or(Vec::new()))),
 };
 Postfix: Expr<'input> = ExprPrecedenceTier<_Postfix, Primary>;
 
-ArgumentList: Vec<Expr<'input>> = {
-    <Assignment> => vec![<>],
-    <mut v:ArgumentList> "," <e:Assignment> => {
-        v.push(e);
-        v
-    }
-};
+ArgumentList: Vec<Expr<'input>> = CommaSeparated<Assignment>;
 
 StructFieldInit: Spanned<(Spanned<&'input str>, Expr<'input>)> = {
     <Spanned<(<Spanned<IDENTIFIER>> ":" <Assignment>)>>,
@@ -451,6 +462,8 @@ extern {
         "as" => lexer::Tok::As,
         "struct" => lexer::Tok::Struct,
         "union" => lexer::Tok::Union,
+        "enum" => lexer::Tok::Enum,
+        "match" => lexer::Tok::Match,
         "sizeof" => lexer::Tok::SizeOf,
         "type" => lexer::Tok::Type,
         "switch" => lexer::Tok::Switch,
