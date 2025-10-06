@@ -1,0 +1,18 @@
+=== Switch Statement Example ===
+
+1. Day names:
+Day 1: Monday
+Day 4: Thursday
+Day 7: Sunday
+Day 9: Invalid day
+
+2. Number classification:
+Number 0 is: zero
+Number 1 is: one
+Number 2 is: two
+Number 5 is: greater than two
+
+3. Grade evaluation:
+Grade 85: Good (B)
+
+=== All tests passed! ===

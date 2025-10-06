@@ -1,0 +1,14 @@
+=== Union Types Example ===
+
+1. Union with i32:
+Value.i = 42
+
+2. Union with u8:
+Value.b = 255
+
+3. Union size:
+Size of union Value: 4 bytes
+Size of i32: 4 bytes
+Size of u8: 1 bytes
+
+=== All tests passed! ===

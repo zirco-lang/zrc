@@ -1,0 +1,15 @@
+=== Break and Continue Example ===
+
+1. Finding first number divisible by 7:
+Found: 7
+
+2. Print odd numbers from 1 to 10:
+1 3 5 7 9 
+
+3. Print multiples of 3, stop at 20:
+3 6 9 12 15 18 
+
+4. Search for target value in range:
+Target 42 found!
+
+=== All tests passed! ===

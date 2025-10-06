@@ -1,0 +1,57 @@
+fn printf(format: *u8, ...) -> i32;
+
+fn get_day_name(day: i32) {
+    printf("Day %d: ", day);
+    switch (day) {
+        1 as i32 => printf("Monday\n");
+        2 as i32 => printf("Tuesday\n");
+        3 as i32 => printf("Wednesday\n");
+        4 as i32 => printf("Thursday\n");
+        5 as i32 => printf("Friday\n");
+        6 as i32 => printf("Saturday\n");
+        7 as i32 => printf("Sunday\n");
+        default => printf("Invalid day\n");
+    }
+}
+
+fn classify_number(n: i32) {
+    printf("Number %d is: ", n);
+    switch (n) {
+        0 as i32 => printf("zero\n");
+        1 as i32 => printf("one\n");
+        2 as i32 => printf("two\n");
+        default => printf("greater than two\n");
+    }
+}
+
+fn main() {
+    printf("=== Switch Statement Example ===\n\n");
+    
+    // Example 1: Simple switch with integers
+    printf("1. Day names:\n");
+    get_day_name(1);
+    get_day_name(4);
+    get_day_name(7);
+    get_day_name(9);
+    
+    // Example 2: Switch with default case
+    printf("\n2. Number classification:\n");
+    classify_number(0);
+    classify_number(1);
+    classify_number(2);
+    classify_number(5);
+    
+    // Example 3: Direct switch in main
+    printf("\n3. Grade evaluation:\n");
+    let grade = 85;
+    printf("Grade %d: ", grade);
+    switch (grade / 10) {
+        10 as i32 => printf("Perfect!\n");
+        9 as i32 => printf("Excellent (A)\n");
+        8 as i32 => printf("Good (B)\n");
+        7 as i32 => printf("Fair (C)\n");
+        default => printf("Needs improvement\n");
+    }
+    
+    printf("\n=== All tests passed! ===\n");
+}

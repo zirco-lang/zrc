@@ -1,0 +1,31 @@
+fn printf(format: *u8, ...) -> i32;
+
+// Define a union to hold either a 32-bit or 8-bit integer
+union Value {
+    i: i32,
+    b: u8
+}
+
+fn main() {
+    printf("=== Union Types Example ===\n\n");
+    
+    // Example 1: Using union with i32 field
+    printf("1. Union with i32:\n");
+    let val1: Value;
+    val1.i = 42;
+    printf("Value.i = %d\n", val1.i);
+    
+    // Example 2: Using union with u8 field
+    printf("\n2. Union with u8:\n");
+    let val2: Value;
+    val2.b = 255 as u8;
+    printf("Value.b = %u\n", val2.b as u32);
+    
+    // Example 3: Demonstrating union size
+    printf("\n3. Union size:\n");
+    printf("Size of union Value: %llu bytes\n", sizeof Value);
+    printf("Size of i32: %llu bytes\n", sizeof i32);
+    printf("Size of u8: %llu bytes\n", sizeof u8);
+    
+    printf("\n=== All tests passed! ===\n");
+}

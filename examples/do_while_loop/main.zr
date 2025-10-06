@@ -1,0 +1,32 @@
+fn printf(format: *u8, ...) -> i32;
+
+fn main() {
+    printf("=== Do-While Loop Example ===\n\n");
+    
+    // Example 1: Basic do-while loop
+    printf("1. Counting from 1 to 5:\n");
+    let i = 1;
+    do {
+        printf("%d\n", i);
+        i = i + 1;
+    } while (i <= 5);
+    
+    // Example 2: Do-while ensures at least one execution
+    printf("\n2. Loop executes at least once (condition is false):\n");
+    let j = 10;
+    do {
+        printf("This runs once even though j=%d > 5\n", j);
+        j = j + 1;
+    } while (j < 5);
+    
+    // Example 3: User input simulation (countdown)
+    printf("\n3. Countdown from 5:\n");
+    let countdown = 5;
+    do {
+        printf("%d...\n", countdown);
+        countdown = countdown - 1;
+    } while (countdown > 0);
+    printf("Blast off!\n");
+    
+    printf("\n=== All tests passed! ===\n");
+}

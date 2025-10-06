@@ -1,0 +1,43 @@
+fn printf(format: *u8, ...) -> i32;
+
+// Type alias for a pointer to u8 (string type)
+type String = *u8;
+
+// Type alias for a callback function type
+type Callback = *u8;
+
+// Type alias for a struct type
+struct Point {
+    x: i32,
+    y: i32
+}
+
+type Position = Point;
+
+fn greet(name: String) {
+    printf("Hello, %s!\n", name);
+}
+
+fn main() {
+    printf("=== Type Aliases Example ===\n\n");
+    
+    // Example 1: Using type alias for string
+    printf("1. Type alias for strings:\n");
+    let name: String = "Alice";
+    greet(name);
+    greet("Bob");
+    
+    // Example 2: Using type alias for struct
+    printf("\n2. Type alias for struct:\n");
+    let pos: Position;
+    pos.x = 10;
+    pos.y = 20;
+    printf("Position: (%d, %d)\n", pos.x, pos.y);
+    
+    // Example 3: Type alias with struct construction
+    printf("\n3. Struct construction with type alias:\n");
+    let origin: Position = new Point { x: 0, y: 0 };
+    printf("Origin: (%d, %d)\n", origin.x, origin.y);
+    
+    printf("\n=== All tests passed! ===\n");
+}

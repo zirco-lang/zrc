@@ -1,0 +1,64 @@
+fn printf(format: *u8, ...) -> i32;
+
+struct Point {
+    x: i32,
+    y: i32
+}
+
+struct Rectangle {
+    top_left: Point,
+    bottom_right: Point
+}
+
+struct Person {
+    age: i32,
+    name: *u8
+}
+
+struct Company {
+    ceo: Person,
+    employee_count: i32
+}
+
+fn main() {
+    printf("=== Nested Structs Example ===\n\n");
+    
+    // Example 1: Rectangle with nested Points
+    printf("1. Rectangle with nested Points:\n");
+    let rect: Rectangle;
+    rect.top_left.x = 0;
+    rect.top_left.y = 10;
+    rect.bottom_right.x = 20;
+    rect.bottom_right.y = 0;
+    
+    printf("Rectangle from (%d, %d) to (%d, %d)\n",
+           rect.top_left.x, rect.top_left.y,
+           rect.bottom_right.x, rect.bottom_right.y);
+    
+    let width = rect.bottom_right.x - rect.top_left.x;
+    let height = rect.top_left.y - rect.bottom_right.y;
+    let area = width * height;
+    printf("Width: %d, Height: %d, Area: %d\n", width, height, area);
+    
+    // Example 2: Company with nested Person
+    printf("\n2. Company with nested Person:\n");
+    let company: Company;
+    company.ceo.name = "Alice";
+    company.ceo.age = 45;
+    company.employee_count = 100;
+    
+    printf("CEO: %s, Age: %d\n", company.ceo.name, company.ceo.age);
+    printf("Employees: %d\n", company.employee_count);
+    
+    // Example 3: Using struct construction with nested structs
+    printf("\n3. Struct construction with nesting:\n");
+    let p1 = new Point { x: 5, y: 5 };
+    let p2 = new Point { x: 15, y: 15 };
+    let rect2 = new Rectangle { top_left: p1, bottom_right: p2 };
+    
+    printf("Rectangle 2 from (%d, %d) to (%d, %d)\n",
+           rect2.top_left.x, rect2.top_left.y,
+           rect2.bottom_right.x, rect2.bottom_right.y);
+    
+    printf("\n=== All tests passed! ===\n");
+}

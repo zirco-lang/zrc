@@ -1,0 +1,21 @@
+=== Do-While Loop Example ===
+
+1. Counting from 1 to 5:
+1
+2
+3
+4
+5
+
+2. Loop executes at least once (condition is false):
+This runs once even though j=10 > 5
+
+3. Countdown from 5:
+5...
+4...
+3...
+2...
+1...
+Blast off!
+
+=== All tests passed! ===

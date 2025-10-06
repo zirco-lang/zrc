@@ -1,0 +1,14 @@
+=== Nested Structs Example ===
+
+1. Rectangle with nested Points:
+Rectangle from (0, 10) to (20, 0)
+Width: 20, Height: 10, Area: 200
+
+2. Company with nested Person:
+CEO: Alice, Age: 45
+Employees: 100
+
+3. Struct construction with nesting:
+Rectangle 2 from (5, 5) to (15, 15)
+
+=== All tests passed! ===

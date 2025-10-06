@@ -1,0 +1,60 @@
+fn printf(format: *u8, ...) -> i32;
+
+fn main() {
+    printf("=== Break and Continue Example ===\n\n");
+    
+    // Example 1: Using break to exit a loop early
+    printf("1. Finding first number divisible by 7:\n");
+    let n = 1;
+    while (n <= 100) {
+        if (n % 7 == 0) {
+            printf("Found: %d\n", n);
+            break;
+        }
+        n = n + 1;
+    }
+    
+    // Example 2: Using continue to skip even numbers
+    printf("\n2. Print odd numbers from 1 to 10:\n");
+    let i = 0;
+    while (i < 10) {
+        i = i + 1;
+        if (i % 2 == 0) {
+            continue;
+        }
+        printf("%d ", i);
+    }
+    printf("\n");
+    
+    // Example 3: Using break and continue together
+    printf("\n3. Print multiples of 3, stop at 20:\n");
+    for (let j = 1; j <= 30; j = j + 1) {
+        if (j > 20) {
+            break;
+        }
+        if (j % 3 != 0) {
+            continue;
+        }
+        printf("%d ", j);
+    }
+    printf("\n");
+    
+    // Example 4: Break in nested context
+    printf("\n4. Search for target value in range:\n");
+    let target = 42;
+    let found = 0;
+    let k = 30;
+    while (k < 50) {
+        if (k == target) {
+            printf("Target %d found!\n", target);
+            found = 1;
+            break;
+        }
+        k = k + 1;
+    }
+    if (found == 0) {
+        printf("Target not found\n");
+    }
+    
+    printf("\n=== All tests passed! ===\n");
+}

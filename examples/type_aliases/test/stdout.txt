@@ -1,0 +1,13 @@
+=== Type Aliases Example ===
+
+1. Type alias for strings:
+Hello, Alice!
+Hello, Bob!
+
+2. Type alias for struct:
+Position: (10, 20)
+
+3. Struct construction with type alias:
+Origin: (0, 0)
+
+=== All tests passed! ===
