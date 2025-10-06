@@ -238,6 +238,63 @@ cargo test -- --nocapture
 -   Integration tests: none currently
 -   Doc tests: in doc comments, tested with `cargo test --doc`
 
+### Example Testing Framework
+
+All examples in the `examples/` directory follow a standardized test framework:
+
+**Directory Structure:**
+```
+examples/
+  example_name/
+    main.zr                 # The example source code
+    Makefile                # Standard Makefile (see below)
+    test/
+      stdout.txt            # Expected stdout output
+      stderr.txt            # Expected stderr output (optional)
+      exitcode.txt          # Expected exit code (optional, defaults to 0)
+      args.txt              # Command-line arguments (optional)
+      stdin.txt             # Standard input (optional)
+```
+
+**Standard Makefile Test Target:**
+
+All examples MUST use this exact test implementation:
+
+```makefile
+.PHONY: test
+test: build
+	set +e; \
+	if [ -f test/args.txt ]; then args=$$(xargs < test/args.txt); else args=""; fi; \
+	if [ -f test/stdin.txt ]; then stdin_file=test/stdin.txt; else stdin_file=/dev/null; fi; \
+	./$(OUTDIR)/run $$args < $$stdin_file > test/stdout.actual 2> test/stderr.actual; \
+	if [ -f test/exitcode.txt ]; then expected_exitcode=$$(cat test/exitcode.txt); else expected_exitcode=0; fi; \
+	exitcode=$$?; \
+	status=0; \
+	if [ $$exitcode -ne $$expected_exitcode ]; then \
+		echo "Expected exit code $$expected_exitcode but got $$exitcode"; \
+		status=1; \
+	fi; \
+	if [ -f test/stdout.txt ]; then \
+		diff -u test/stdout.txt test/stdout.actual || { echo "stdout mismatch"; status=1; }; \
+	fi; \
+	if [ -f test/stderr.txt ]; then \
+		diff -u test/stderr.txt test/stderr.actual || { echo "stderr mismatch"; status=1; }; \
+	fi; \
+	set -e; \
+	rm test/stdout.actual test/stderr.actual; \
+	exit $$status
+```
+
+**How it works:**
+1. Runs the compiled example with optional arguments from `test/args.txt`
+2. Provides optional stdin from `test/stdin.txt` (defaults to /dev/null)
+3. Captures stdout to `test/stdout.actual` and stderr to `test/stderr.actual`
+4. Compares actual output with expected files using `diff -u`
+5. Checks exit code matches `test/exitcode.txt` (defaults to 0)
+6. Cleans up temporary files and reports status
+
+**Do NOT create custom test implementations** - always use the standard framework above. Reference examples: `hello_world`, `fibonacci`, `struct_example`.
+
 ## Common Issues and Workarounds
 
 ### LLVM-related Build Failures

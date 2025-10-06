@@ -20,20 +20,25 @@ build: $(ZR_OUTPUTS)
 clean:
 	rm -rf $(OUTDIR)
 
-# Test that the example builds and runs correctly
 .PHONY: test
 test: build
-	@echo "Testing struct construction example..."
-	@./$(OUTDIR)/run > $(OUTDIR)/output.txt 2>&1
-	@if grep -q "=== Struct Construction Examples ===" $(OUTDIR)/output.txt && \
-	    grep -q "Point { x: 0, y: 0 }" $(OUTDIR)/output.txt && \
-	    grep -q "Color { r: 255, g: 0, b: 0 }" $(OUTDIR)/output.txt && \
-	    grep -q "Distance squared" $(OUTDIR)/output.txt; then \
-		echo "✓ Test passed: Example runs correctly"; \
-		cat $(OUTDIR)/output.txt; \
-		exit 0; \
-	else \
-		echo "✗ Test failed: Expected output not found"; \
-		cat $(OUTDIR)/output.txt; \
-		exit 1; \
-	fi
+	set +e; \
+	if [ -f test/args.txt ]; then args=$$(xargs < test/args.txt); else args=""; fi; \
+	if [ -f test/stdin.txt ]; then stdin_file=test/stdin.txt; else stdin_file=/dev/null; fi; \
+	./$(OUTDIR)/run $$args < $$stdin_file > test/stdout.actual 2> test/stderr.actual; \
+	if [ -f test/exitcode.txt ]; then expected_exitcode=$$(cat test/exitcode.txt); else expected_exitcode=0; fi; \
+	exitcode=$$?; \
+	status=0; \
+	if [ $$exitcode -ne $$expected_exitcode ]; then \
+		echo "Expected exit code $$expected_exitcode but got $$exitcode"; \
+		status=1; \
+	fi; \
+	if [ -f test/stdout.txt ]; then \
+		diff -u test/stdout.txt test/stdout.actual || { echo "stdout mismatch"; status=1; }; \
+	fi; \
+	if [ -f test/stderr.txt ]; then \
+		diff -u test/stderr.txt test/stderr.actual || { echo "stderr mismatch"; status=1; }; \
+	fi; \
+	set -e; \
+	rm test/stdout.actual test/stderr.actual; \
+	exit $$status
