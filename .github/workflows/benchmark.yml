@@ -1,0 +1,168 @@
+name: "benchmark"
+
+on:
+    pull_request:
+    workflow_dispatch:
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    benchmark:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout base branch
+              uses: actions/checkout@v5
+              with:
+                  ref: ${{ github.base_ref || 'main' }}
+
+            - name: Set up Rust
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
+                  override: true
+
+            - name: Install LLVM dependencies
+              run: |
+                  sudo apt-get update -qq
+                  sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
+
+            - name: Use dependency cache
+              uses: Swatinem/rust-cache@v2
+
+            - name: Run benchmarks on base branch
+              run: |
+                  cargo bench --bench compilation -- --save-baseline base
+
+            - name: Checkout PR branch
+              uses: actions/checkout@v5
+              with:
+                  ref: ${{ github.head_ref }}
+                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+                  clean: false
+
+            - name: Run benchmarks on PR branch
+              run: |
+                  cargo bench --bench compilation -- --baseline base 2>&1 | tee benchmark_output.txt
+
+            - name: Generate comparison report
+              run: |
+                  echo "# 📊 Benchmark Comparison Report" > benchmark_report.md
+                  echo "" >> benchmark_report.md
+                  echo "Comparing performance of PR against base branch (\`${{ github.base_ref || 'main' }}\`)" >> benchmark_report.md
+                  echo "" >> benchmark_report.md
+                  
+                  # Check if we have any benchmark output
+                  if [ -s benchmark_output.txt ]; then
+                      # Extract benchmark results in diff format
+                      echo "## Results" >> benchmark_report.md
+                      echo "" >> benchmark_report.md
+                      echo '```diff' >> benchmark_report.md
+                      
+                      # Process each benchmark - extract clean results in diff format
+                      # Only highlight changes >= 5%
+                      awk '
+                      /^[a-z_]+[[:space:]]+time:/ { 
+                          bench_name = $1;
+                          # Extract the median time (middle value)
+                          match($0, /\[[0-9.]+[[:space:]][µnm]?s[[:space:]]+([0-9.]+[[:space:]][µnm]?s)[[:space:]]+[0-9.]+[[:space:]][µnm]?s\]/, time_arr);
+                          median_time = time_arr[1];
+                          # Read next line for change
+                          getline;
+                          if ($0 ~ /change:/) {
+                              match($0, /\[[+-][0-9.]+%[[:space:]]+([+-][0-9.]+%)[[:space:]]+[+-][0-9.]+%\]/, change_arr);
+                              median_change = change_arr[1];
+                              
+                              # Extract numeric value from change percentage
+                              match(median_change, /[+-]([0-9.]+)%/, num_arr);
+                              change_value = num_arr[1] + 0;  # Convert to number
+                              
+                              # Only highlight if change >= 5%
+                              prefix = " ";
+                              if (change_value >= 5.0) {
+                                  if (median_change ~ /^[+]/) {
+                                      prefix = "-";  # Regression (slower) - shows in red
+                                  } else if (median_change ~ /^[-]/) {
+                                      prefix = "+";  # Improvement (faster) - shows in green
+                                  }
+                              }
+                              
+                              # Format: diff-style with change percentage
+                              printf("%s %-25s %12s  (%s)\n", prefix, bench_name, median_time, median_change);
+                          }
+                      }
+                      ' benchmark_output.txt >> benchmark_report.md
+                      
+                      echo '```' >> benchmark_report.md
+                      echo "" >> benchmark_report.md
+                      
+                      # Calculate summary statistics
+                      improvements=$(grep -c "change:.*\[-[0-9]" benchmark_output.txt 2>/dev/null || echo "0")
+                      regressions=$(grep -c "change:.*\[+[0-9]" benchmark_output.txt 2>/dev/null || echo "0")
+                      total_benches=$(grep -c "^[a-z_][a-z_]*[[:space:]]*time:" benchmark_output.txt 2>/dev/null || echo "0")
+                      
+                      echo "### Summary" >> benchmark_report.md
+                      echo "" >> benchmark_report.md
+                      echo "- **Total benchmarks:** $total_benches" >> benchmark_report.md
+                      echo "- **Improvements (faster):** $improvements 🚀" >> benchmark_report.md
+                      echo "- **Regressions (slower):** $regressions 📉" >> benchmark_report.md
+                      echo "" >> benchmark_report.md
+                      echo "> **Note:** Only changes ≥5% are highlighted in the diff. Smaller changes are shown but not color-coded, as they often represent normal variance." >> benchmark_report.md
+                  else
+                      echo "❌ No benchmark output captured. The benchmark run may have failed." >> benchmark_report.md
+                  fi
+                  
+                  echo "" >> benchmark_report.md
+                  echo "---" >> benchmark_report.md
+                  echo "" >> benchmark_report.md
+                  echo "📥 **[Download Full Results & HTML Report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)** - Click to view detailed criterion reports with charts" >> benchmark_report.md
+
+            - name: Comment PR with benchmark results
+              if: github.event_name == 'pull_request'
+              uses: actions/github-script@v7
+              with:
+                  script: |
+                      const fs = require('fs');
+                      const report = fs.readFileSync('benchmark_report.md', 'utf8');
+                      
+                      // Find existing benchmark comment
+                      const comments = await github.rest.issues.listComments({
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          issue_number: context.issue.number,
+                      });
+                      
+                      const botComment = comments.data.find(comment => 
+                          comment.user.type === 'Bot' && 
+                          comment.body.includes('Benchmark Comparison Report')
+                      );
+                      
+                      if (botComment) {
+                          // Update existing comment
+                          await github.rest.issues.updateComment({
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              comment_id: botComment.id,
+                              body: report
+                          });
+                      } else {
+                          // Create new comment
+                          await github.rest.issues.createComment({
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              issue_number: context.issue.number,
+                              body: report
+                          });
+                      }
+
+            - name: Upload benchmark results
+              uses: actions/upload-artifact@v4
+              with:
+                  name: benchmark-results
+                  path: |
+                      benchmark_report.md
+                      benchmark_output.txt
+                      target/criterion/
+                  retention-days: 30
