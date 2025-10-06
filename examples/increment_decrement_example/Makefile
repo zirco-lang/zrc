@@ -1,11 +1,22 @@
-OUTDIR = out
+ZRC ?= ../../target/debug/zrc
+ZRFLAGS ?= 
+LDFLAGS ?= -lc
+OUTDIR ?= ./out
 
-.PHONY: build clean test
+ZR_SOURCES := $(wildcard *.zr)
+ZR_OUTPUTS := $(ZR_SOURCES:%.zr=$(OUTDIR)/%.o)
 
-build:
+all: $(ZR_OUTPUTS)
+
+$(OUTDIR)/%.o: %.zr
 	@mkdir -p $(OUTDIR)
-	../../target/debug/zrc --emit object  -o $(OUTDIR)/main.o main.zr
-	clang -o ./$(OUTDIR)/run ./$(OUTDIR)/main.o -lc
+	$(ZRC) --emit object $(ZRFLAGS) -o $@ $<
+
+.PHONY: build
+build: $(ZR_OUTPUTS)
+	clang -o $(OUTDIR)/run $(ZR_OUTPUTS) $(LDFLAGS)
+
+.PHONY: clean test
 
 clean:
 	rm -rf $(OUTDIR)
