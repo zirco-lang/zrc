@@ -39,10 +39,14 @@ pub fn type_expr<'input>(
         ExprKind::UnaryMinus(x) => unary::type_expr_unary_minus(scope, expr_span, *x)?,
         ExprKind::UnaryAddressOf(x) => unary::type_expr_unary_address_of(scope, expr_span, *x)?,
         ExprKind::UnaryDereference(x) => unary::type_expr_unary_dereference(scope, expr_span, *x)?,
+        ExprKind::PrefixIncrement(x) => unary::type_expr_prefix_increment(scope, expr_span, *x)?,
+        ExprKind::PrefixDecrement(x) => unary::type_expr_prefix_decrement(scope, expr_span, *x)?,
         ExprKind::Index(ptr, offset) => access::type_expr_index(scope, expr_span, *ptr, *offset)?,
         ExprKind::Dot(obj, key) => access::type_expr_dot(scope, expr_span, *obj, key)?,
         ExprKind::Arrow(obj, key) => access::type_expr_arrow(scope, expr_span, obj, key)?,
         ExprKind::Call(f, args) => call::type_expr_call(scope, expr_span, *f, args)?,
+        ExprKind::PostfixIncrement(x) => unary::type_expr_postfix_increment(scope, expr_span, *x)?,
+        ExprKind::PostfixDecrement(x) => unary::type_expr_postfix_decrement(scope, expr_span, *x)?,
         ExprKind::Ternary(cond, if_true, if_false) => {
             misc::type_expr_ternary(scope, expr_span, *cond, *if_true, *if_false)?
         }

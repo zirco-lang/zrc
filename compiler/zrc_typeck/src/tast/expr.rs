@@ -84,6 +84,10 @@ pub enum TypedExprKind<'input> {
     UnaryAddressOf(Box<Place<'input>>),
     /// `*x`
     UnaryDereference(Box<TypedExpr<'input>>),
+    /// `++x` - prefix increment (increments then returns new value)
+    PrefixIncrement(Box<Place<'input>>),
+    /// `--x` - prefix decrement (decrements then returns new value)
+    PrefixDecrement(Box<Place<'input>>),
 
     /// `a[b]`
     Index(Box<TypedExpr<'input>>, Box<TypedExpr<'input>>),
@@ -91,6 +95,10 @@ pub enum TypedExprKind<'input> {
     Dot(Box<Place<'input>>, Spanned<&'input str>),
     /// `a(b, c, d, ...)`
     Call(Box<Place<'input>>, Vec<TypedExpr<'input>>),
+    /// `x++` - postfix increment (returns old value then increments)
+    PostfixIncrement(Box<Place<'input>>),
+    /// `x--` - postfix decrement (returns old value then decrements)
+    PostfixDecrement(Box<Place<'input>>),
 
     /// `a ? b : c`
     Ternary(
@@ -189,8 +197,14 @@ impl TypedExprKind<'_> {
             | Self::UnaryMinus(_)
             | Self::UnaryAddressOf(_)
             | Self::UnaryDereference(_)
+            | Self::PrefixIncrement(_)
+            | Self::PrefixDecrement(_)
             | Self::SizeOf(_) => Precedence::Unary,
-            Self::Index(_, _) | Self::Dot(_, _) | Self::Call(_, _) => Precedence::Postfix,
+            Self::Index(_, _)
+            | Self::Dot(_, _)
+            | Self::Call(_, _)
+            | Self::PostfixIncrement(_)
+            | Self::PostfixDecrement(_) => Precedence::Postfix,
             Self::NumberLiteral(_, _)
             | Self::StringLiteral(_)
             | Self::CharLiteral(_)
@@ -311,6 +325,8 @@ impl Display for TypedExprKind<'_> {
                 write!(f, "*")?;
                 Self::fmt_child(f, expr, Precedence::Unary, true)
             }
+            Self::PrefixIncrement(place) => write!(f, "++{place}"),
+            Self::PrefixDecrement(place) => write!(f, "--{place}"),
             Self::Index(lhs, rhs) => {
                 Self::fmt_child(f, lhs, Precedence::Postfix, false)?;
                 write!(f, "[{rhs}]")
@@ -324,6 +340,8 @@ impl Display for TypedExprKind<'_> {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
+            Self::PostfixIncrement(place) => write!(f, "{place}++"),
+            Self::PostfixDecrement(place) => write!(f, "{place}--"),
             Self::Ternary(cond, if_true, if_false) => {
                 let prec = self.precedence();
                 Self::fmt_child(f, cond, prec, false)?;

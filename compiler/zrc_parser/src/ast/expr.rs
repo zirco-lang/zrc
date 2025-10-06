@@ -215,6 +215,10 @@ pub enum ExprKind<'input> {
     UnaryAddressOf(Box<Expr<'input>>),
     /// `*x`
     UnaryDereference(Box<Expr<'input>>),
+    /// `++x`
+    PrefixIncrement(Box<Expr<'input>>),
+    /// `--x`
+    PrefixDecrement(Box<Expr<'input>>),
 
     /// `a[b]`
     Index(Box<Expr<'input>>, Box<Expr<'input>>),
@@ -224,6 +228,10 @@ pub enum ExprKind<'input> {
     Arrow(Box<Expr<'input>>, Spanned<&'input str>),
     /// `a(b, c, d, ...)`
     Call(Box<Expr<'input>>, Spanned<Vec<Expr<'input>>>),
+    /// `x++`
+    PostfixIncrement(Box<Expr<'input>>),
+    /// `x--`
+    PostfixDecrement(Box<Expr<'input>>),
 
     /// `a ? b : c`
     Ternary(Box<Expr<'input>>, Box<Expr<'input>>, Box<Expr<'input>>),
@@ -285,11 +293,16 @@ impl ExprKind<'_> {
             | Self::UnaryMinus(_)
             | Self::UnaryAddressOf(_)
             | Self::UnaryDereference(_)
+            | Self::PrefixIncrement(_)
+            | Self::PrefixDecrement(_)
             | Self::SizeOfType(_)
             | Self::SizeOfExpr(_) => Precedence::Unary,
-            Self::Index(_, _) | Self::Dot(_, _) | Self::Arrow(_, _) | Self::Call(_, _) => {
-                Precedence::Postfix
-            }
+            Self::Index(_, _)
+            | Self::Dot(_, _)
+            | Self::Arrow(_, _)
+            | Self::Call(_, _)
+            | Self::PostfixIncrement(_)
+            | Self::PostfixDecrement(_) => Precedence::Postfix,
             Self::NumberLiteral(_, _)
             | Self::StringLiteral(_)
             | Self::CharLiteral(_)
@@ -395,6 +408,14 @@ impl std::fmt::Display for ExprKind<'_> {
                 write!(f, "*")?;
                 Self::fmt_child(f, expr, Precedence::Unary, true)
             }
+            Self::PrefixIncrement(expr) => {
+                write!(f, "++")?;
+                Self::fmt_child(f, expr, Precedence::Unary, true)
+            }
+            Self::PrefixDecrement(expr) => {
+                write!(f, "--")?;
+                Self::fmt_child(f, expr, Precedence::Unary, true)
+            }
             Self::Index(lhs, rhs) => {
                 Self::fmt_child(f, lhs, Precedence::Postfix, false)?;
                 write!(f, "[")?;
@@ -422,6 +443,14 @@ impl std::fmt::Display for ExprKind<'_> {
                         .collect::<Vec<String>>()
                         .join(", ")
                 )
+            }
+            Self::PostfixIncrement(expr) => {
+                Self::fmt_child(f, expr, Precedence::Postfix, false)?;
+                write!(f, "++")
+            }
+            Self::PostfixDecrement(expr) => {
+                Self::fmt_child(f, expr, Precedence::Postfix, false)?;
+                write!(f, "--")
             }
             Self::Ternary(cond, if_true, if_false) => {
                 let prec = self.precedence();
@@ -666,6 +695,14 @@ impl<'input> Expr<'input> {
     pub fn build_deref(sp: Span, expr: Self) -> Self {
         Self(ExprKind::UnaryDereference(Box::new(expr)).in_span(sp))
     }
+    #[must_use]
+    pub fn build_prefix_increment(sp: Span, expr: Self) -> Self {
+        Self(ExprKind::PrefixIncrement(Box::new(expr)).in_span(sp))
+    }
+    #[must_use]
+    pub fn build_prefix_decrement(sp: Span, expr: Self) -> Self {
+        Self(ExprKind::PrefixDecrement(Box::new(expr)).in_span(sp))
+    }
 
     /// Span is needed for right brace
     #[must_use]
@@ -694,6 +731,24 @@ impl<'input> Expr<'input> {
     #[must_use]
     pub fn build_call(span: Span, f: Self, params: Spanned<Vec<Self>>) -> Self {
         Self(ExprKind::Call(Box::new(f), params).in_span(span))
+    }
+    #[must_use]
+    pub fn build_postfix_increment(expr: Self, end: usize) -> Self {
+        Self(spanned!(
+            expr.0.start(),
+            ExprKind::PostfixIncrement(Box::new(expr)),
+            end,
+            expr.0.span().file_name()
+        ))
+    }
+    #[must_use]
+    pub fn build_postfix_decrement(expr: Self, end: usize) -> Self {
+        Self(spanned!(
+            expr.0.start(),
+            ExprKind::PostfixDecrement(Box::new(expr)),
+            end,
+            expr.0.span().file_name()
+        ))
     }
     #[must_use]
     pub fn build_ternary(cond: Self, if_true: Self, if_false: Self) -> Self {
@@ -847,10 +902,14 @@ mod tests {
             "-a",
             "&a",
             "*a",
+            "++a",
+            "--a",
             "a[b]",
             "a.b",
             "a->b",
             "a(b, c)",
+            "a++",
+            "a--",
             "a ? b : c",
             "a as T",
             "sizeof T",
@@ -897,9 +956,15 @@ mod tests {
             // Unary operators
             ("!a && b", "!a && b"),
             ("!(a && b)", "!(a && b)"),
+            // Prefix increment/decrement have unary precedence
+            ("++a + b", "++a + b"),
+            ("--a * b", "--a * b"),
+            ("++(a + b)", "++(a + b)"),
             // Postfix operators have highest precedence
             ("a.b + c", "a.b + c"),
             ("a + b.c", "a + b.c"),
+            ("a++ + b", "a++ + b"),
+            ("a + b++", "a + b++"),
         ];
 
         for (input, expected) in test_cases {

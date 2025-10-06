@@ -378,6 +378,68 @@ pub(crate) fn cg_expr<'ctx>(
             bb.and(reg.as_basic_value_enum())
         }
 
+        TypedExprKind::PrefixIncrement(place) => {
+            let place_ptr = unpack!(bb = cg_place(cg, bb, *place));
+
+            // Load current value
+            let current = cg
+                .builder
+                .build_load(
+                    llvm_basic_type(&cg, &expr.inferred_type).0,
+                    place_ptr,
+                    "load",
+                )
+                .expect("prefix increment load should have compiled successfully");
+
+            // Add 1
+            let one = llvm_int_type(&cg, &expr.inferred_type)
+                .0
+                .const_int(1, false);
+            let new_value = cg
+                .builder
+                .build_int_add(current.into_int_value(), one, "inc")
+                .expect("prefix increment add should have compiled successfully");
+
+            // Store back
+            cg.builder
+                .build_store(place_ptr, new_value)
+                .expect("prefix increment store should have compiled successfully");
+
+            // Return new value
+            bb.and(new_value.as_basic_value_enum())
+        }
+
+        TypedExprKind::PrefixDecrement(place) => {
+            let place_ptr = unpack!(bb = cg_place(cg, bb, *place));
+
+            // Load current value
+            let current = cg
+                .builder
+                .build_load(
+                    llvm_basic_type(&cg, &expr.inferred_type).0,
+                    place_ptr,
+                    "load",
+                )
+                .expect("prefix decrement load should have compiled successfully");
+
+            // Subtract 1
+            let one = llvm_int_type(&cg, &expr.inferred_type)
+                .0
+                .const_int(1, false);
+            let new_value = cg
+                .builder
+                .build_int_sub(current.into_int_value(), one, "dec")
+                .expect("prefix decrement sub should have compiled successfully");
+
+            // Store back
+            cg.builder
+                .build_store(place_ptr, new_value)
+                .expect("prefix decrement store should have compiled successfully");
+
+            // Return new value
+            bb.and(new_value.as_basic_value_enum())
+        }
+
         TypedExprKind::Index(ptr, idx) => {
             let ptr = unpack!(
                 bb = cg_place(
@@ -443,6 +505,69 @@ pub(crate) fn cg_expr<'ctx>(
                 cg.ctx.i8_type().get_undef().as_basic_value_enum()
             })
         }
+
+        TypedExprKind::PostfixIncrement(place) => {
+            let place_ptr = unpack!(bb = cg_place(cg, bb, *place));
+
+            // Load current value
+            let current = cg
+                .builder
+                .build_load(
+                    llvm_basic_type(&cg, &expr.inferred_type).0,
+                    place_ptr,
+                    "load",
+                )
+                .expect("postfix increment load should have compiled successfully");
+
+            // Add 1
+            let one = llvm_int_type(&cg, &expr.inferred_type)
+                .0
+                .const_int(1, false);
+            let new_value = cg
+                .builder
+                .build_int_add(current.into_int_value(), one, "inc")
+                .expect("postfix increment add should have compiled successfully");
+
+            // Store back
+            cg.builder
+                .build_store(place_ptr, new_value)
+                .expect("postfix increment store should have compiled successfully");
+
+            // Return old value
+            bb.and(current)
+        }
+
+        TypedExprKind::PostfixDecrement(place) => {
+            let place_ptr = unpack!(bb = cg_place(cg, bb, *place));
+
+            // Load current value
+            let current = cg
+                .builder
+                .build_load(
+                    llvm_basic_type(&cg, &expr.inferred_type).0,
+                    place_ptr,
+                    "load",
+                )
+                .expect("postfix decrement load should have compiled successfully");
+
+            // Subtract 1
+            let one = llvm_int_type(&cg, &expr.inferred_type)
+                .0
+                .const_int(1, false);
+            let new_value = cg
+                .builder
+                .build_int_sub(current.into_int_value(), one, "dec")
+                .expect("postfix decrement sub should have compiled successfully");
+
+            // Store back
+            cg.builder
+                .build_store(place_ptr, new_value)
+                .expect("postfix decrement store should have compiled successfully");
+
+            // Return old value
+            bb.and(current)
+        }
+
         TypedExprKind::Ternary(cond, lhs, rhs) => {
             let cond = cg_expr(cg, bb, *cond).into_value();
 
