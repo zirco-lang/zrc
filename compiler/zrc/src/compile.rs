@@ -1,4 +1,7 @@
 //! Zirco compiler driver
+//!
+//! This module contains the main driver function for the Zirco compiler,
+//! which orchestrates the parsing, type checking, and code generation phases.
 
 use std::path::Path;
 
@@ -7,11 +10,26 @@ use zrc_codegen::{DebugLevel, OptimizationLevel};
 use crate::OutputFormat;
 
 /// Drive the compilation process.
-#[allow(
-    clippy::too_many_arguments,
-    clippy::wildcard_enum_match_arm,
-    clippy::result_large_err
-)]
+///
+/// This function takes the source code as input and processes it through
+/// the various stages of compilation: parsing, type checking, and code
+/// generation. Depending on the specified output format, it can return the AST,
+/// TAST, LLVM IR, assembly, or object code.
+///
+/// # Arguments
+///
+/// * `frontend_version_string` - A string representing the version of the
+///   frontend, obtained from [`crate::build_info::version()`].
+/// * `emit` - The desired output format.
+/// * `parent_directory` - The parent directory of the source file.
+/// * `file_name` - The name of the source file.
+/// * `cli_args` - The command line arguments passed to the compiler.
+/// * `content` - The source code content to be compiled.
+/// * `optimization_level` - The optimization level for code generation.
+/// * `debug_mode` - The debug level for code generation.
+/// * `triple` - The target triple for code generation.
+/// * `cpu` - The target CPU for code generation.
+#[allow(clippy::too_many_arguments, clippy::wildcard_enum_match_arm)]
 pub fn compile(
     frontend_version_string: &str,
     emit: &OutputFormat,

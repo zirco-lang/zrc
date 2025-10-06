@@ -1,4 +1,4 @@
-//! Defines the zrc command line interface
+//! Command line interface declarations for the Zirco compiler
 
 use std::path::PathBuf;
 

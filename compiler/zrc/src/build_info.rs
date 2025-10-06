@@ -1,4 +1,18 @@
-//! Build information module
+//! Build information for the Zirco compiler.
+//!
+//! This module is responsible for generating and providing access to build
+//! information such as the version number, commit hash, build time, and
+//! whether the build was made from a clean git state.
+//!
+//! This information is generated at compile time and embedded into the
+//! binary, allowing the compiler to report its own version and build details.
+//! This is useful for debugging, user support, and ensuring compatibility
+//! between different versions of the compiler and its components.
+//!
+//! The build information is generated using a build script (`build.rs`)
+//! that runs before the main compilation process. The script gathers the
+//! necessary data from the environment and git repository, then writes it
+//! to a Rust source file that is included in the compilation.
 
 use std::fmt::Write as FmtWrite;
 
@@ -11,11 +25,18 @@ use std::fmt::Write as FmtWrite;
     clippy::missing_docs_in_private_items,
     clippy::restriction
 )]
+/// Internal module containing build information constants.
 pub mod build {
     include!(concat!(env!("OUT_DIR"), "/shadow.rs"));
 }
 
-/// Returns the string which represents the current Zirco version
+/// Returns the string representation of the Zirco compiler's version and build
+/// information.
+///
+/// This includes the version number, commit hash, build target, build time,
+/// Rust version, and whether the build was made from a clean git state.
+/// If the build was made from a tainted state (i.e., there were uncommitted
+/// changes), it also lists the modified files.
 pub fn version() -> String {
     format!(
         concat!(
