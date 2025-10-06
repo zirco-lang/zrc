@@ -877,6 +877,6 @@ Depending on `--emit` flag:
 
 ---
 
-**Last Updated:** 2024
+**Last Updated:** 2025
 
 For questions or clarifications, please open an issue on the [GitHub repository](https://github.com/zirco-lang/zrc).
