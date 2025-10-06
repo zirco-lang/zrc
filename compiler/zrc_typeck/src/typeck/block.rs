@@ -6,7 +6,10 @@ mod block_utils;
 pub use block_return::{BlockReturnAbility, BlockReturnActuality};
 pub use block_utils::{coerce_stmt_into_block, has_duplicates};
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
-use zrc_parser::ast::stmt::{Stmt, StmtKind, SwitchCase, SwitchTrigger};
+use zrc_parser::ast::{
+    expr::{Expr, ExprKind},
+    stmt::{LetDeclaration, Stmt, StmtKind, SwitchCase, SwitchTrigger},
+};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{declaration::process_let_declaration, scope::Scope, type_expr};
@@ -272,19 +275,21 @@ pub fn type_block<'input, 'gs>(
 
                                 // Ensure each enum variant is covered by exactly one case
                                 // We do this by sorting both lists and comparing them
-                                let mut sorted_enum_variants: Vec<(&str, &TastType<'_>)> =
-                                    enum_as_union_def
-                                        .iter()
-                                        .map(|(name, ty)| (name.as_ref(), ty))
-                                        .collect::<Vec<_>>();
+                                #[allow(clippy::useless_asref)]
+                                let mut sorted_enum_variants: Vec<
+                                    (&str, &TastType<'_>),
+                                > = enum_as_union_def
+                                    .iter()
+                                    .map(|(name, ty)| (name.as_ref(), ty))
+                                    .collect::<Vec<_>>();
 
                                 let mut sorted_case_variants = cases
                                     .iter()
                                     .map(|case| case.value().variant)
                                     .collect::<Vec<_>>();
 
-                                sorted_enum_variants.sort_by(|(a, _), (b, _)| a.cmp(b));
-                                sorted_case_variants.sort();
+                                sorted_enum_variants.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+                                sorted_case_variants.sort_unstable();
 
                                 if sorted_enum_variants
                                     .iter()
@@ -302,15 +307,7 @@ pub fn type_block<'input, 'gs>(
                                 // Generate the literal AST for the desugared version
 
                                 // Desugar match into switch on discriminant (AST only)
-                                use zrc_parser::ast::{
-                                    expr::{Expr, ExprKind},
-                                    stmt::{LetDeclaration, SwitchCase, SwitchTrigger},
-                                };
-                                use zrc_utils::span::Spanned;
 
-                                // Fix borrow checker: clone scrutinee for AST construction
-                                let scrutinee_for_ast = scrutinee.clone();
-                                let scrutinee_for_cases = scrutinee.clone();
                                 // Build the scrutinee for switch: <scrutinee>.__discriminant__ (AST
                                 // Expr)
                                 let discrim_access = Expr(Spanned::from_span_and_value(
