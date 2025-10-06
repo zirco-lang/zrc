@@ -8,5 +8,14 @@ fn main() -> i32 {
         3 => printf("Wednesday\n");
         default => printf("Other day\n");
     }
+    
+    // Test with u8 scrutinee and {int} cases
+    let small_num: u8 = 5;
+    switch (small_num) {
+        5 => printf("Five\n");
+        10 => printf("Ten\n");
+        default => printf("Other\n");
+    }
+    
     return 0;
 }
