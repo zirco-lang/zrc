@@ -189,7 +189,17 @@ impl Display for StmtKind<'_> {
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
-            Self::Match { .. } => todo!(), // TODO
+            Self::Match { scrutinee, cases } => {
+                write!(
+                    f,
+                    "match ({scrutinee}) {{ {} }}",
+                    cases
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            }
         }
     }
 }
