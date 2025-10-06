@@ -1,4 +1,19 @@
 //! Code generation for statements
+//!
+//! This module contains functions to generate LLVM IR for
+//! [`zrc_typeck::tast::stmt::TypedStmt`] statements, which
+//! represent all statements in the Zirco language.
+//!
+//! The main function is [`cg_block`], which takes a vector of
+//! `TypedStmt`s (a block) and generates the corresponding LLVM IR
+//! to execute the statements in order.
+//!
+//! It also contains helper functions for generating specific
+//! statement types, such as [`cg_let_declaration`]
+//! which handles `let` declarations.
+//!
+//! The code generator maintains a [`CgScope`] to track variable
+//! bindings and their corresponding LLVM values.
 
 use inkwell::{
     basic_block::BasicBlock,

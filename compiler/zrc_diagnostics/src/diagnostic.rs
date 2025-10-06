@@ -1,4 +1,9 @@
 //! Defines types for Zirco compile time diagnostics.
+//!
+//! This module defines the structure and kinds of diagnostics
+//! that can be produced during the compilation process. It includes
+//! the [`Diagnostic`] struct, which encapsulates a diagnostic message along
+//! with its severity and span.
 
 use std::{error::Error, path::Path};
 

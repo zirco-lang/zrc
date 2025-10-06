@@ -1,4 +1,15 @@
-//! Defines the `CgScope` struct and related utilities
+//! Defines the [`CgScope`] struct and related utilities
+//!
+//! This module contains the definition of the `CgScope` struct, which
+//! represents the code generation scope, or the mapping from identifiers
+//! to their LLVM [`PointerValue`]s. It also includes methods for creating,
+//! accessing, and modifying the scope.
+//!
+//! The `CgScope` is similar to the `ValueScope` used during type checking,
+//! but it maps identifiers to LLVM `PointerValue`s instead of type information.
+//!
+//! The `CgScope` is used during code generation to keep track of
+//! variable bindings and their corresponding LLVM values.
 
 use std::collections::HashMap;
 

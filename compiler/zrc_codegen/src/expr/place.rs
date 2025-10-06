@@ -1,4 +1,13 @@
 //! Code generation for Place types
+//!
+//! This module contains functions to generate LLVM IR for
+//! [`zrc_typeck::tast::expr::Place`] expressions, which represent locations
+//! that can be assigned to, such as variables, dereferences, and indexed
+//! accesses.
+//!
+//! The main function is [`cg_place`], which takes a `Place` and generates
+//! the corresponding LLVM IR to obtain a pointer to the location represented
+//! by the `Place`.
 
 use inkwell::{
     basic_block::BasicBlock,
@@ -18,7 +27,7 @@ use crate::{
     unpack,
 };
 
-/// Resolve a place to its pointer
+/// Resolve a place to its LLVM [`PointerValue`]
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn cg_place<'ctx>(
     cg: BlockCtx<'ctx, '_, '_>,

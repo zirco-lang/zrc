@@ -1,4 +1,12 @@
 //! Resolution from [`Type`] instances to LLVM types.
+//!
+//! This module contains functions to convert Zirco types
+//! ([`zrc_typeck::tast::ty::Type`]) to their corresponding
+//! LLVM types ([`inkwell::types::AnyTypeEnum`]).
+//!
+//! The main function is [`llvm_type`], which takes a Zirco type and
+//! returns the corresponding LLVM type. There are also helper functions
+//! for creating pointers and function types.
 
 use inkwell::{
     AddressSpace,
