@@ -238,6 +238,13 @@ If you're curious, here's our test coverage represented as a cool little chart:
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/thetayloredman"><img src="https://avatars.githubusercontent.com/u/26350849?v=4?s=100" width="100px;" alt="Logan Devine"/><br /><sub><b>Logan Devine</b></sub></a><br /><a href="#code-thetayloredman" title="Code">💻</a> <a href="#design-thetayloredman" title="Design">🎨</a> <a href="#ideas-thetayloredman" title="Ideas, Planning, & Feedback">🤔</a> <a href="#maintenance-thetayloredman" title="Maintenance">🚧</a></td>
+    </tr>
+  </tbody>
+</table>
 
 <!-- markdownlint-restore -->
 <!-- prettier-ignore-end -->
