@@ -65,8 +65,8 @@ pub fn cg_place<'ctx>(
             let ptr = unpack!(bb = cg_expr(cg, bb, *ptr));
             let idx = unpack!(bb = cg_expr(cg, bb, *idx));
 
-            // SAFETY: If indices are used incorrectly this may segfault
-            // TODO: Is this actually safely used?
+            // SAFETY: This can segfault if indices are used incorrectly
+            // This is only used for pointer arithmetic, so the indices should be correct
             let reg = unsafe {
                 cg.builder.build_gep(
                     llvm_basic_type(&cg, &place.inferred_type).0,
