@@ -22,24 +22,48 @@ This repository contains the entire Zirco compiler and all of its development wo
 
 ## Getting Started
 
-### Prerequisites
+**New to Zirco?** Check out our comprehensive [Getting Started Guide](./docs/GETTING_STARTED.md) for step-by-step instructions on:
+- Installing prerequisites
+- Building the compiler
+- Writing and compiling your first program
+- Using compiler options and output formats
+- Troubleshooting common issues
 
-To function, Zirco has a few prerequisite programs that must be available. We recommend using Zirco on a Linux or WSL system, but it should work on Windows.
+### Quick Start
 
-- **a copy of `zrc`'s source code**  
-  Git is the primary tool used for development of Zirco, so the preferred method of obtaining this is by using [Git](https://git-scm.com/) and cloning our repository. There are alternative methods, but these are not listed as they make updating much more difficult.
-- **an up-to-date stable Rust toolchain**  
-  Zirco is implemented in Rust, so an up-to-date version of `rustc` and `cargo` is required. These can be obtained with `rustup`, which you can [install here](https://rustup.rs).
-- **the LLVM static or dynamic library**  
-  Zirco's code generator (`zrc_codegen`) relies on [LLVM](https://llvm.org/) to allow efficient and simple code generation. For this reason, you need the static or dynamic LLVM library. If you link with the static library, the dynamic library will not be needed at runtime. If you do not use the static library, all hosts running your built compiler will need the dynamic library. The installation of these libraries depends on your platform — in the future we will document this better.
+For experienced developers who want to get running quickly:
 
-### Compilation
+1. **Install prerequisites:**
+   ```bash
+   # Rust toolchain (if not already installed)
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   
+   # LLVM 16 with Polly (Ubuntu/Debian)
+   sudo apt-get update
+   sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
+   ```
 
-If you decided to use Git to download the repository, run `git clone https://github.com/zirco-lang/zrc` in a command line. Then, run `cd zrc` to move into that directory. Otherwise, obtain a terminal within our codebase in your preferred method.
+2. **Clone and build:**
+   ```bash
+   git clone https://github.com/zirco-lang/zrc
+   cd zrc
+   cargo build
+   ```
 
-Then, to compile `zrc` and all of its dependencies in debug mode, simply run `cargo build`. You can execute the built compiler with `cargo run -- ARGS`. If you are wanting to produce a release build, run `cargo build --release` and an optimized executable will be found in `target/release/zrc`.
+3. **Install system-wide (optional):**
+   ```bash
+   cargo install --path compiler/zrc
+   ```
 
-If you would like to install `zrc` to your Cargo `$PATH`, run `cargo install --path compiler/zrc`. This will allow you to use `zrc` just like other executables on your system.
+4. **Compile your first program:**
+   ```bash
+   # Create hello.zr with your favorite editor, then:
+   zrc --emit object -o hello.o hello.zr
+   clang -o hello hello.o -lc
+   ./hello
+   ```
+
+For detailed instructions and troubleshooting, see the [Getting Started Guide](./docs/GETTING_STARTED.md).
 
 ## Language Specification
 
