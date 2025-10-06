@@ -83,9 +83,9 @@ jobs:
                               prefix = " ";
                               if (change_value >= 5.0) {
                                   if (median_change ~ /^[+]/) {
-                                      prefix = "+";  # Regression (slower) - shows in red
+                                      prefix = "-";  # Regression (slower) - shows in red
                                   } else if (median_change ~ /^[-]/) {
-                                      prefix = "-";  # Improvement (faster) - shows in green
+                                      prefix = "+";  # Improvement (faster) - shows in green
                                   }
                               }
                               
