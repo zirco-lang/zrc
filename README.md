@@ -161,6 +161,8 @@ A: The compiler follows a traditional pipeline:
 3. **Type Checker** (`zrc_typeck`) - Semantic analysis producing a Typed AST (TAST)
 4. **Code Generator** (`zrc_codegen`) - LLVM IR generation using inkwell
 
+For a detailed explanation of each stage, see [docs/COMPILER_PIPELINE.md](./docs/COMPILER_PIPELINE.md).
+
 **Q: Where can I find the language specification?**  
 A: See [docs/SPEC.md](./docs/SPEC.md) for a comprehensive guide to Zirco's syntax, semantics, and behavior.
 
