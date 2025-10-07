@@ -26,8 +26,9 @@ Version 0.1.0 (Draft)
    - [Pointer Types](#34-pointer-types)
    - [Struct Types](#35-struct-types)
    - [Union Types](#36-union-types)
-   - [Type Aliases](#37-type-aliases)
-   - [Type Inference and Implicit Conversions](#38-type-inference-and-implicit-conversions)
+   - [Enum Types](#37-enum-types)
+   - [Type Aliases](#38-type-aliases)
+   - [Type Inference and Implicit Conversions](#39-type-inference-and-implicit-conversions)
 4. [Expressions](#4-expressions)
    - [Expression Overview](#41-expression-overview)
    - [Operator Precedence](#42-operator-precedence)
@@ -59,8 +60,9 @@ Version 0.1.0 (Draft)
    - [Continue Statement](#511-continue-statement)
    - [Return Statement](#512-return-statement)
    - [Switch Statement](#513-switch-statement)
-   - [Optimization Hints](#514-optimization-hints)
-     - [Unreachable Statement](#5141-unreachable-statement)
+   - [Match Statement](#514-match-statement]
+   - [Optimization Hints](#515-optimization-hints)
+     - [Unreachable Statement](#5151-unreachable-statement)
 6. [Declarations](#6-declarations)
    - [Declaration Overview](#61-declaration-overview)
    - [Function Declarations](#62-function-declarations)
@@ -459,7 +461,23 @@ type Value = union { i: i32, f: f32 };
 - Fields are accessed using the `.` operator
 - Reading an inactive field is undefined behavior
 
-### 3.7 Type Aliases
+### 3.7 Enum Types
+
+Enums are tagged unions, or sum types where a value must be _verified_ to be one of
+several types before use.
+
+**Union Declaration:**
+```zirco
+union MyUnion {
+   // name each variant here...
+   Variant1: i32,
+   Variant2: struct { x: i32, y: i64 },
+}
+```
+
+These variants are used in the match statements.
+
+### 3.8 Type Aliases
 
 Type aliases create alternate names for existing types:
 
@@ -473,7 +491,7 @@ type ComplexStruct = struct { a: i32, b: *u8 };
 
 Type aliases are transparent - they create a new name but not a new type. The alias and the original type are interchangeable.
 
-### 3.8 Type Inference and Implicit Conversions
+### 3.9 Type Inference and Implicit Conversions
 
 **Type Inference**:
 
@@ -1034,11 +1052,30 @@ switch (x) {
 - No fall-through between cases
 - Each case body is a single statement (use blocks for multiple statements)
 
-### 5.14 Optimization Hints
+### 5.14 Match Statement
+
+Multi-way branch based on the discriminant of an enum:
+
+```zirco
+match (x) {
+   // these represent variants of enum [typeof x]
+   VariantA: x => f(x),
+   VariantB: y => g(y),
+   VariantC: x => h(x), // same names can be used
+}
+```
+
+**Rules**:
+- Each case uses `=>` syntax (fat arrow)
+- No fall-through between cases
+- Each case body is a single statement (use blocks for multiple statements)
+- There must be exactly one case per variant
+
+### 5.15 Optimization Hints
 
 Optimization hints provide additional information to the compiler. If used incorrectly, they may lead to undefined behavior.
 
-#### 5.14.1 Unreachable Statement
+#### 5.15.1 Unreachable Statement
 
 The `unreachable` statement indicates that a certain point in the code should never be reached:
 
