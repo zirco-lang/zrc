@@ -338,6 +338,7 @@ pub fn type_block<'input, 'gs>(
 
                                 // Build switch cases for each variant
                                 let mut switch_cases = Vec::new();
+
                                 for (idx, case) in cases.iter().enumerate() {
                                     let variant_name = case.value().variant;
                                     let var_binding = case.value().var;
@@ -405,6 +406,14 @@ pub fn type_block<'input, 'gs>(
                                         SwitchCase(trigger, block),
                                     ));
                                 }
+
+                                switch_cases.push(Spanned::from_span_and_value(
+                                    stmt_span,
+                                    SwitchCase(
+                                        SwitchTrigger::Default,
+                                        Stmt(StmtKind::UnreachableStmt.in_span(stmt_span)),
+                                    ),
+                                ));
 
                                 // Build the switch statement AST
                                 let switch_stmt = Stmt(Spanned::from_span_and_value(
