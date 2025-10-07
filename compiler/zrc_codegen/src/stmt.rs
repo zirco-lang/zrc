@@ -891,4 +891,27 @@ mod tests {
             }
         "});
     }
+
+    #[test]
+    fn enum_match_generates_as_expected() {
+        cg_snapshot_test!(indoc! {"
+            enum VarInt {
+                I32: i32,
+                I64: i64,
+            }
+
+            fn f() -> VarInt;
+            fn fi32(x: i32);
+            fn fi64(x: i64);
+
+            fn main() {
+                let vi = f();
+
+                match (vi) {
+                    I32: x => fi32(x);
+                    I64: y => fi64(y);
+                }
+            }
+        "});
+    }
 }
