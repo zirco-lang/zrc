@@ -230,7 +230,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         .expect("switch should generate successfully");
 
                     cg.builder.position_at_end(default_bb);
-                    cg_block(
+                    let default_bb = cg_block(
                         cg,
                         default_bb,
                         &scope,
@@ -238,9 +238,11 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         default.in_span(stmt_span),
                         breakaway,
                     );
-                    cg.builder
-                        .build_unconditional_branch(return_bb)
-                        .expect("br should generate successfully");
+                    if default_bb.is_some() {
+                        cg.builder
+                            .build_unconditional_branch(return_bb)
+                            .expect("br should generate successfully");
+                    }
 
                     for (case_bb, _, stmt) in cases {
                         cg.builder.position_at_end(case_bb);
