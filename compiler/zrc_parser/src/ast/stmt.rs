@@ -81,6 +81,8 @@ pub enum StmtKind<'input> {
     BreakStmt,
     /// `return;` or `return x;`
     ReturnStmt(Option<Expr<'input>>),
+    /// `unreachable;`
+    UnreachableStmt,
     /// A let declaration
     DeclarationList(Spanned<Vec<Spanned<LetDeclaration<'input>>>>),
     /// A switch case
@@ -146,6 +148,7 @@ impl Display for StmtKind<'_> {
             Self::BreakStmt => write!(f, "break;"),
             Self::ReturnStmt(Some(expr)) => write!(f, "return {expr};",),
             Self::ReturnStmt(None) => write!(f, "return;"),
+            Self::UnreachableStmt => write!(f, "unreachable;"),
             Self::DeclarationList(list) => {
                 write!(
                     f,

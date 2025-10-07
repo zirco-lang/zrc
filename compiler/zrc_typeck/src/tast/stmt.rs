@@ -73,6 +73,8 @@ pub enum TypedStmtKind<'input> {
     /// `return;` or `return x;`. `return;` is the same as a `return
     /// CONST_UNIT;`
     ReturnStmt(Option<TypedExpr<'input>>),
+    /// `unreachable;`
+    UnreachableStmt,
     /// A let declaration
     DeclarationList(Vec<Spanned<LetDeclaration<'input>>>),
 }
@@ -319,6 +321,7 @@ impl Display for TypedStmtKind<'_> {
             Self::BreakStmt => write!(f, "break;"),
             Self::ReturnStmt(Some(expr)) => write!(f, "return {expr};"),
             Self::ReturnStmt(None) => write!(f, "return;"),
+            Self::UnreachableStmt => write!(f, "unreachable;"),
             Self::DeclarationList(list) => {
                 write!(
                     f,

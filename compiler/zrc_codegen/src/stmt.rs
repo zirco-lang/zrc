@@ -187,6 +187,14 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
             cg.builder.set_current_debug_location(debug_location);
 
             match stmt.0.into_value() {
+                TypedStmtKind::UnreachableStmt => {
+                    cg.builder
+                        .build_unreachable()
+                        .expect("unreachable should generate successfully");
+
+                    None
+                }
+
                 TypedStmtKind::SwitchCase {
                     scrutinee,
                     default,
@@ -671,6 +679,17 @@ mod tests {
                 let y: i32 = x + 1;  // uses first x (5)
                 let x: i32 = 10;     // shadows x
                 let z: i32 = x + 1;  // uses second x (10)
+            }
+        "});
+    }
+
+    #[test]
+    fn unreachable_statement_generates_properly() {
+        cg_snapshot_test!(indoc! {"
+            fn test(cond: bool) {
+                let x = 7;
+                if (x == 6) unreachable;
+                else return;
             }
         "});
     }
