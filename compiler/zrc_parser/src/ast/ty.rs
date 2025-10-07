@@ -47,6 +47,9 @@ pub enum TypeKind<'input> {
     /// A direct union type
     #[display("union {{ {_0} }}")]
     Union(KeyTypeMapping<'input>),
+    /// A tagged union type
+    #[display("enum {{ {_0} }}")]
+    Enum(KeyTypeMapping<'input>),
 }
 
 // AST builder. We are able to infer the spans of many based on the start of
@@ -77,6 +80,11 @@ impl<'input> Type<'input> {
     }
 
     #[must_use]
+    pub fn build_enum_from_contents(span: Span, keys: KeyTypeMapping<'input>) -> Self {
+        Self(TypeKind::Enum(keys).in_span(span))
+    }
+
+    #[must_use]
     pub fn build_ptr(span: Span, ty: Self) -> Self {
         Self(TypeKind::Ptr(Box::new(ty)).in_span(span))
     }
@@ -94,6 +102,7 @@ mod tests {
             "*i32",
             "struct { a: i32, b: i32 }",
             "union { a: i32, b: i32 }",
+            "enum { Eight: i8, Sixteen: i16 }",
         ];
 
         for input in test_cases {

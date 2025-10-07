@@ -500,6 +500,14 @@ pub enum Tok<'input> {
     #[token("union")]
     #[display("union")]
     Union,
+    /// The keyword `enum`
+    #[token("enum")]
+    #[display("enum")]
+    Enum,
+    /// The keyword `match`
+    #[token("match")]
+    #[display("match")]
+    Match,
     /// The keyword `sizeof`
     #[token("sizeof")]
     #[display("sizeof")]
@@ -758,7 +766,8 @@ mod tests {
         let input = concat!(
             "+ - * / % == != > >= < <= && || ! & | ^ ~ << >> = += -= *= /= %= &= |= ^= <<= >>= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
-            r#" struct union sizeof type switch default -> => "str" 7_000 0xF_A 0b1_0 abc"#
+            r#" struct union enum match sizeof type switch default -> => "str" 7_000 0xF_A"#,
+            " 0b1_0 abc"
         );
         let tokens: Vec<Tok> = vec![
             Tok::Plus,
@@ -819,6 +828,8 @@ mod tests {
             Tok::As,
             Tok::Struct,
             Tok::Union,
+            Tok::Enum,
+            Tok::Match,
             Tok::SizeOf,
             Tok::Type,
             Tok::Switch,

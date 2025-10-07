@@ -43,6 +43,22 @@ impl<'input> SwitchTrigger<'input> {
 #[display("{_0} => {_1}")]
 pub struct SwitchCase<'input>(pub SwitchTrigger<'input>, pub Stmt<'input>);
 
+/// Represents a matcher within a `match` statement.
+#[derive(PartialEq, Debug, Clone)]
+pub struct MatchCase<'input> {
+    /// The variant to be matched over
+    pub variant: &'input str,
+    /// The variable binding for the value within the variant
+    pub var: &'input str,
+    /// The body to execute if this case is matched
+    pub body: Stmt<'input>,
+}
+impl Display for MatchCase<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {} => {}", self.variant, self.var, self.body)
+    }
+}
+
 /// The enum representing all the different kinds of statements in Zirco
 ///
 /// This enum represents all the different kinds of statements in Zirco. It is
@@ -91,6 +107,13 @@ pub enum StmtKind<'input> {
         scrutinee: Expr<'input>,
         /// The list of value => stmt pairs
         cases: Vec<Spanned<SwitchCase<'input>>>,
+    },
+    /// A match stmt
+    Match {
+        /// The value to be matched over
+        scrutinee: Expr<'input>,
+        /// The list of id: value => stmt pairs
+        cases: Vec<Spanned<MatchCase<'input>>>,
     },
 }
 impl Display for StmtKind<'_> {
@@ -169,6 +192,17 @@ impl Display for StmtKind<'_> {
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
+            Self::Match { scrutinee, cases } => {
+                write!(
+                    f,
+                    "match ({scrutinee}) {{ {} }}",
+                    cases
+                        .iter()
+                        .map(ToString::to_string)
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            }
         }
     }
 }
