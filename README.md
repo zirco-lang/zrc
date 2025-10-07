@@ -1,4 +1,4 @@
-![Build Status](https://img.shields.io/github/actions/workflow/status/zirco-lang/zrc/build.yml?style=flat-square) ![Coverage](https://img.shields.io/codecov/c/github/zirco-lang/zrc?style=flat-square) ![Test Status](https://img.shields.io/github/actions/workflow/status/zirco-lang/zrc/test.yml?label=tests&style=flat-square) ![Repo Size](https://img.shields.io/github/repo-size/zirco-lang/zrc?style=flat-square) ![open issues](https://img.shields.io/github/issues-raw/zirco-lang/zrc?style=flat-square) ![open PRs](https://img.shields.io/github/issues-pr-raw/zirco-lang/zrc?style=flat-square) ![license](https://img.shields.io/github/license/zirco-lang/zrc?style=flat-square)
+![Build Status](https://img.shields.io/github/actions/workflow/status/zirco-lang/zrc/build.yml?style=flat-square) ![Coverage](https://img.shields.io/codecov/c/github/zirco-lang/zrc?style=flat-square) ![Test Status](https://img.shields.io/github/actions/workflow/status/zirco-lang/zrc/test.yml?label=tests&style=flat-square) ![Repo Size](https://img.shields.io/github/repo-size/zirco-lang/zrc?style=flat-square) ![open issues](https://img.shields.io/github/issues-raw/zirco-lang/zrc?style=flat-square) ![open PRs](https://img.shields.io/github/issues-pr-raw/zirco-lang/zrc?style=flat-square) ![license](https://img.shields.io/github/license/zirco-lang/zrc?style=flat-square) [![All Contributors](https://img.shields.io/github/all-contributors/zirco-lang/zrc?color=ee8449&style=flat-square)](#contributors)
 
 <div align="center">
 
@@ -23,45 +23,49 @@ This repository contains the entire Zirco compiler and all of its development wo
 ## Getting Started
 
 **New to Zirco?** Check out our comprehensive [Getting Started Guide](./docs/GETTING_STARTED.md) for step-by-step instructions on:
-- Installing prerequisites
-- Building the compiler
-- Writing and compiling your first program
-- Using compiler options and output formats
-- Troubleshooting common issues
+
+-   Installing prerequisites
+-   Building the compiler
+-   Writing and compiling your first program
+-   Using compiler options and output formats
+-   Troubleshooting common issues
 
 ### Quick Start
 
 For experienced developers who want to get running quickly:
 
 1. **Install prerequisites:**
-   ```bash
-   # Rust toolchain (if not already installed)
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   
-   # LLVM 16 with Polly (Ubuntu/Debian)
-   sudo apt-get update
-   sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
-   ```
+
+    ```bash
+    # Rust toolchain (if not already installed)
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+    # LLVM 16 with Polly (Ubuntu/Debian)
+    sudo apt-get update
+    sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
+    ```
 
 2. **Clone and build:**
-   ```bash
-   git clone https://github.com/zirco-lang/zrc
-   cd zrc
-   cargo build
-   ```
+
+    ```bash
+    git clone https://github.com/zirco-lang/zrc
+    cd zrc
+    cargo build
+    ```
 
 3. **Install system-wide (optional):**
-   ```bash
-   cargo install --path compiler/zrc
-   ```
+
+    ```bash
+    cargo install --path compiler/zrc
+    ```
 
 4. **Compile your first program:**
-   ```bash
-   # Create hello.zr with your favorite editor, then:
-   zrc --emit object -o hello.o hello.zr
-   clang -o hello hello.o -lc
-   ./hello
-   ```
+    ```bash
+    # Create hello.zr with your favorite editor, then:
+    zrc --emit object -o hello.o hello.zr
+    clang -o hello hello.o -lc
+    ./hello
+    ```
 
 For detailed instructions and troubleshooting, see the [Getting Started Guide](./docs/GETTING_STARTED.md).
 
@@ -106,24 +110,28 @@ A: Zirco is primarily developed and tested on Linux and WSL, but it should work 
 
 **Q: What are the prerequisites for building Zirco?**  
 A: You need:
-- Git (to clone the repository)
-- An up-to-date stable Rust toolchain (`rustc` and `cargo` via [rustup](https://rustup.rs))
-- LLVM 16 static or dynamic library (including Polly)
-- For linting/formatting: Rust nightly toolchain with clippy and rustfmt components
+
+-   Git (to clone the repository)
+-   An up-to-date stable Rust toolchain (`rustc` and `cargo` via [rustup](https://rustup.rs))
+-   LLVM 16 static or dynamic library (including Polly)
+-   For linting/formatting: Rust nightly toolchain with clippy and rustfmt components
 
 **Q: I'm getting a "could not find native static library `Polly`" error. How do I fix it?**  
 A: Install the LLVM 16 development libraries with Polly support:
+
 ```bash
 sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
 ```
 
 **Q: How do I build the compiler?**  
 A: Clone the repository and run:
+
 ```bash
 git clone https://github.com/zirco-lang/zrc
 cd zrc
 cargo build
 ```
+
 For a release build, use `cargo build --release`.
 
 **Q: How do I install `zrc` to my system?**  
@@ -131,6 +139,7 @@ A: Run `cargo install --path compiler/zrc` to install `zrc` to your Cargo `$PATH
 
 **Q: LLVM is not being found. What should I do?**  
 A: If LLVM 16 is installed but not found, try setting the environment variable:
+
 ```bash
 export LLVM_SYS_160_PREFIX=/usr/lib/llvm-16
 cargo build
@@ -140,6 +149,7 @@ cargo build
 
 **Q: How do I compile a Zirco program?**  
 A: Use `zrc` (or `cargo run --` if not installed):
+
 ```bash
 zrc main.zr                    # Emits LLVM IR to stdout
 zrc --emit object -o main.o main.zr  # Compiles to object file
@@ -147,11 +157,12 @@ zrc --emit object -o main.o main.zr  # Compiles to object file
 
 **Q: What output formats does the compiler support?**  
 A: The compiler supports multiple output formats via the `--emit` flag:
-- `llvm` (default) - LLVM IR
-- `object` - Object file (.o)
-- `asm` - Assembly
-- `ast`, `ast-debug`, `ast-debug-pretty` - AST representations
-- `tast-debug`, `tast-debug-pretty` - Typed AST representations
+
+-   `llvm` (default) - LLVM IR
+-   `object` - Object file (.o)
+-   `asm` - Assembly
+-   `ast`, `ast-debug`, `ast-debug-pretty` - AST representations
+-   `tast-debug`, `tast-debug-pretty` - Typed AST representations
 
 **Q: How can I see available compiler options?**  
 A: Run `zrc --help` for a complete list of options, including optimization levels, target selection, and debugging flags.
@@ -166,10 +177,12 @@ A: Run `cargo test` to execute all tests.
 
 **Q: How do I lint and format my code?**  
 A: The project requires nightly Rust for linting and formatting:
+
 ```bash
 cargo +nightly clippy --all-targets -- -D warnings
 cargo +nightly fmt
 ```
+
 Both commands must pass before committing.
 
 **Q: CI is failing on clippy or fmt. What should I do?**  
@@ -180,6 +193,7 @@ A: The project uses extremely strict clippy lints, including requirements for do
 
 **Q: How does the compiler pipeline work?**  
 A: The compiler follows a traditional pipeline:
+
 1. **Lexer** (`zrc_parser`) - Tokenization
 2. **Parser** (`zrc_parser`) - AST generation using LALRPOP
 3. **Type Checker** (`zrc_typeck`) - Semantic analysis producing a Typed AST (TAST)
@@ -203,10 +217,11 @@ A: Please [create an issue](https://github.com/zirco-lang/zrc/issues/new/choose)
 
 **Q: How do I get help with the project?**  
 A: You can:
-- Open a GitHub issue for bugs or feature requests
-- Start a GitHub discussion for general questions
-- Check the [CONTRIBUTING.md](./CONTRIBUTING.md) guide
-- For sensitive matters, email [zirco@0xlogn.dev](mailto:zirco@0xlogn.dev)
+
+-   Open a GitHub issue for bugs or feature requests
+-   Start a GitHub discussion for general questions
+-   Check the [CONTRIBUTING.md](./CONTRIBUTING.md) guide
+-   For sensitive matters, email [zirco@0xlogn.dev](mailto:zirco@0xlogn.dev)
 
 ## Licence & Contact
 
@@ -218,3 +233,20 @@ If you're curious, here's our test coverage represented as a cool little chart:
 
 ![coverage report](https://codecov.io/gh/zirco-lang/zrc/graphs/icicle.svg?token=TI3EP0UNKH)
 
+## Contributors
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/thetayloredman"><img src="https://avatars.githubusercontent.com/u/26350849?v=4?s=100" width="100px;" alt="Logan Devine"/><br /><sub><b>Logan Devine</b></sub></a><br /><a href="#code-thetayloredman" title="Code">💻</a> <a href="#design-thetayloredman" title="Design">🎨</a> <a href="#ideas-thetayloredman" title="Ideas, Planning, & Feedback">🤔</a> <a href="#maintenance-thetayloredman" title="Maintenance">🚧</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->

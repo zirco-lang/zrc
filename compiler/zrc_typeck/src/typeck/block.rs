@@ -12,7 +12,7 @@ use zrc_parser::ast::{
 };
 use zrc_utils::span::{Span, Spannable, Spanned};
 
-use super::{declaration::process_let_declaration, scope::Scope, type_expr};
+use super::{declaration::process_let_declaration, expr::try_coerce_to, scope::Scope, type_expr};
 use crate::tast::{
     expr::TypedExpr,
     stmt::{TypedStmt, TypedStmtKind},
@@ -143,13 +143,28 @@ pub fn type_block<'input, 'gs>(
                                                 .expect("default was already popped/de-duped"),
                                         )?;
 
-                                        if trigger.inferred_type != scrutinee_ty {
+                                        // Try to coerce trigger to scrutinee type if they don't
+                                        // match
+                                        let trigger = if trigger.inferred_type == scrutinee_ty {
+                                            trigger
+                                        } else if trigger
+                                            .inferred_type
+                                            .can_implicitly_cast_to(&scrutinee_ty)
+                                        {
+                                            try_coerce_to(trigger, &scrutinee_ty)
+                                        } else if scrutinee_ty
+                                            .can_implicitly_cast_to(&trigger.inferred_type)
+                                        {
+                                            // This shouldn't happen often, but handle it for
+                                            // consistency
+                                            trigger
+                                        } else {
                                             return Err(DiagnosticKind::ExpectedSameType(
                                                 scrutinee_ty.to_string(),
                                                 trigger.inferred_type.to_string(),
                                             )
                                             .error_in(trigger.kind.span()));
-                                        }
+                                        };
 
                                         let (exec, return_status) = type_block(
                                             &scope,
@@ -419,6 +434,13 @@ pub fn type_block<'input, 'gs>(
                                 )))
                             }
 
+                            StmtKind::UnreachableStmt => Ok(Some((
+                                TypedStmt(TypedStmtKind::UnreachableStmt.in_span(stmt_span)),
+                                // this may create some weird UB if used incorrectly, but it's on
+                                // the user to ensure they don't do that
+                                BlockReturnActuality::AlwaysReturns,
+                            ))),
+
                             StmtKind::DeclarationList(declarations) => Ok(Some((
                                 TypedStmt(
                                     TypedStmtKind::DeclarationList(process_let_declaration(
@@ -678,9 +700,7 @@ pub fn type_block<'input, 'gs>(
                                             .can_implicitly_cast_to(return_ty)
                                         {
                                             // Try to coerce the return value to the expected type
-                                            return_value.map(|val| {
-                                                super::expr::try_coerce_to(val, return_ty)
-                                            })
+                                            return_value.map(|val| try_coerce_to(val, return_ty))
                                         } else {
                                             return Err(Diagnostic(
                                                 Severity::Error,
