@@ -202,6 +202,13 @@ pub fn type_block<'input, 'gs>(
                                 )))
                             }
 
+                            StmtKind::UnreachableStmt => Ok(Some((
+                                TypedStmt(TypedStmtKind::UnreachableStmt.in_span(stmt_span)),
+                                // this may create some weird UB if used incorrectly, but it's on
+                                // the user to ensure they don't do that
+                                BlockReturnActuality::AlwaysReturns,
+                            ))),
+
                             StmtKind::DeclarationList(declarations) => Ok(Some((
                                 TypedStmt(
                                     TypedStmtKind::DeclarationList(process_let_declaration(

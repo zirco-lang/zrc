@@ -207,6 +207,7 @@ FlowStmt: StmtKind<'input> = {
     "continue" ";" => StmtKind::ContinueStmt,
     "break" ";" => StmtKind::BreakStmt,
     "return" <e:Expr?> ";" => StmtKind::ReturnStmt(e),
+    "unreachable" ";" => StmtKind::UnreachableStmt,
 };
 
 pub StmtList: Vec<Stmt<'input>> = Stmt+;
@@ -456,6 +457,7 @@ extern {
         "switch" => lexer::Tok::Switch,
         "default" => lexer::Tok::Default,
         "new" => lexer::Tok::New,
+        "unreachable" => lexer::Tok::Unreachable,
         "->" => lexer::Tok::SmallArrow,
         "=>" => lexer::Tok::FatArrow,
         "..." => lexer::Tok::Ellipsis,

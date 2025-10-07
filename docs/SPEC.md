@@ -59,6 +59,8 @@ Version 0.1.0 (Draft)
    - [Continue Statement](#511-continue-statement)
    - [Return Statement](#512-return-statement)
    - [Switch Statement](#513-switch-statement)
+   - [Optimization Hints](#514-optimization-hints)
+     - [Unreachable Statement](#5141-unreachable-statement)
 6. [Declarations](#6-declarations)
    - [Declaration Overview](#61-declaration-overview)
    - [Function Declarations](#62-function-declarations)
@@ -1031,6 +1033,28 @@ switch (x) {
 - `default` case handles all unmatched values
 - No fall-through between cases
 - Each case body is a single statement (use blocks for multiple statements)
+
+### 5.14 Optimization Hints
+
+Optimization hints provide additional information to the compiler. If used incorrectly, they may lead to undefined behavior.
+
+#### 5.14.1 Unreachable Statement
+
+The `unreachable` statement indicates that a certain point in the code should never be reached:
+
+```zirco
+fn example(x: i32) -> i32 {
+    if (x >= 0) {
+        return x;
+    } else if (x < 0) {
+        return -x;
+    } else {
+        unreachable;  // x cannot be anything other than >0, <0, or ==0
+    }
+}
+```
+
+Reaching an `unreachable` statement results in undefined behavior.
 
 ---
 
