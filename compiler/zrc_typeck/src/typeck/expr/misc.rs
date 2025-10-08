@@ -245,6 +245,10 @@ pub fn type_expr_struct_construction<'input>(
         false
     };
 
+    // Check if this is a union construction with variant syntax
+    let is_union_variant_construction =
+        matches!(resolved_ty, TastType::Union(_)) && fields.value().len() == 1;
+
     // If it's an enum and we have exactly one field being initialized
     if is_enum_construction
         && fields.value().len() == 1
@@ -262,11 +266,13 @@ pub fn type_expr_struct_construction<'input>(
                 // Check if the variant exists in the union
                 if let Some(variant_type) = union_fields.get(variant_name_str) {
                     // This is enum variant construction!
-                    // Find the discriminant value (index in the union)
-                    let discriminant_value: usize = union_fields
-                        .keys()
-                        .enumerate()
-                        .find_map(|(idx, key)| (key == variant_name_str).then_some(idx))
+                    // Find the discriminant value (index in the SORTED union, to match codegen)
+                    let mut sorted_variants: Vec<&str> = union_fields.keys().copied().collect();
+                    sorted_variants.sort_unstable();
+
+                    let discriminant_value: usize = sorted_variants
+                        .iter()
+                        .position(|&key| key == *variant_name_str)
                         .expect("variant should exist in union");
 
                     // Type check the variant value
@@ -330,6 +336,45 @@ pub fn type_expr_struct_construction<'input>(
                     });
                 }
             }
+        }
+    }
+
+    // Handle union variant construction (similar to enum but simpler)
+    if is_union_variant_construction && let Some(field_init) = fields.value().first() {
+        let (variant_name, variant_value) = field_init.value();
+        let variant_name_str = variant_name.value();
+
+        if let TastType::Union(ref union_fields) = resolved_ty
+            && let Some(variant_type) = union_fields.get(variant_name_str)
+        {
+            // Type check the variant value
+            let typed_variant_expr = type_expr(scope, variant_value.clone())?;
+
+            // Try to coerce the variant value to the expected type
+            let typed_variant_expr = if typed_variant_expr.inferred_type == *variant_type {
+                typed_variant_expr
+            } else if typed_variant_expr
+                .inferred_type
+                .can_implicitly_cast_to(variant_type)
+            {
+                try_coerce_to(typed_variant_expr, variant_type)
+            } else {
+                return Err(DiagnosticKind::ExpectedGot {
+                    expected: variant_type.to_string(),
+                    got: typed_variant_expr.inferred_type.to_string(),
+                }
+                .error_in(typed_variant_expr.kind.span()));
+            };
+
+            // For unions, we just cast the value to the union type
+            return Ok(TypedExpr {
+                inferred_type: resolved_ty.clone(),
+                kind: TypedExprKind::Cast(
+                    Box::new(typed_variant_expr),
+                    Spanned::from_span_and_value(fields.span(), resolved_ty.clone()),
+                )
+                .in_span(expr_span),
+            });
         }
     }
 
