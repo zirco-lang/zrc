@@ -43,7 +43,7 @@ attributes #1 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !llvm.dbg.cu = !{!1}
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc version 0.1.0 (f058844893a7eaddc734768a333b92f25f38c6cd, tainted!) built for x86_64-unknown-linux-gnu on 2025-10-08T17:55:57Z (debug mode)\0Arustc 1.90.0 (1159e78c4 2025-09-14) (stable-x86_64-unknown-linux-gnu on linux-x86_64)\0Acargo 1.90.0 (840b83a10 2025-07-30)\0Atainted files:\0A  * compiler/zrc_typeck/src/typeck/expr/misc.rs", isOptimized: false, flags: "../../target/debug/zrc main.zr", runtimeVersion: 0, emissionKind: NoDebug, splitDebugInlining: false)
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc version 0.1.0 (f7330b8567bd8196253250b7780794de676f71dd, tainted!) built for x86_64-unknown-linux-gnu on 2025-10-08T18:04:46Z (debug mode)\0Arustc 1.90.0 (1159e78c4 2025-09-14) (stable-x86_64-unknown-linux-gnu on linux-x86_64)\0Acargo 1.90.0 (840b83a10 2025-07-30)\0Atainted files:\0A  * compiler/zrc_typeck/src/typeck/expr/misc.rs", isOptimized: false, flags: "../../target/debug/zrc main.zr", runtimeVersion: 0, emissionKind: NoDebug, splitDebugInlining: false)
 !2 = !DIFile(filename: "main.zr", directory: "/home/runner/work/zrc/zrc/examples/enum_construction")
 !3 = distinct !DISubprogram(name: "divide", linkageName: "divide", scope: null, file: !2, line: 15, type: !4, scopeLine: 15, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !14)
 !4 = !DISubroutineType(types: !5)

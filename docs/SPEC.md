@@ -419,8 +419,20 @@ The second form is syntactic sugar for:
 type Point = struct { x: i32, y: i32 };
 ```
 
+**Struct Construction**:
+
+Structs are constructed using the `new` keyword:
+
+```zirco
+let origin = new Point { x: 0i32, y: 0i32 };
+let point = new struct { x: i32, y: i32 } { x: 10i32, y: 20i32 };
+```
+
+**Syntax**: `new StructType { field1: value1, field2: value2, ... }`
+
 **Rules**:
 - Field names must be unique within a struct
+- All fields must be initialized when constructing a struct
 - Fields are accessed using the `.` operator
 - Structs can be nested
 
@@ -435,6 +447,9 @@ struct Company {
     ceo: Person,
     employee_count: i32
 }
+
+let ceo = new Person { name: "John", age: 45i32 };
+let company = new Company { ceo: ceo, employee_count: 100i32 };
 ```
 
 ### 3.6 Union Types
@@ -456,8 +471,20 @@ The second form is syntactic sugar for:
 type Value = union { i: i32, f: f32 };
 ```
 
+**Union Construction**:
+
+Unions are constructed using the `new` keyword with a single field:
+
+```zirco
+let int_value = new Value { i: 42i32 };
+let float_value = new Value { f: 3.14f32 };  // Note: f32 not yet implemented
+```
+
+**Syntax**: `new UnionType { field_name: value }`
+
 **Rules**:
 - Only one field is active at a time
+- Only one field should be initialized when constructing a union
 - Fields are accessed using the `.` operator
 - Reading an inactive field is undefined behavior
 
@@ -466,16 +493,37 @@ type Value = union { i: i32, f: f32 };
 Enums are tagged unions, or sum types where a value must be _verified_ to be one of
 several types before use.
 
-**Union Declaration:**
+**Enum Declaration:**
 ```zirco
-union MyUnion {
+enum MyEnum {
    // name each variant here...
    Variant1: i32,
    Variant2: struct { x: i32, y: i64 },
 }
 ```
 
-These variants are used in the match statements.
+**Enum Construction:**
+
+Enums are constructed using the `new` keyword with variant syntax:
+
+```zirco
+let value1 = new MyEnum { Variant1: 42i32 };
+let value2 = new MyEnum { Variant2: new struct { x: i32, y: i64 } { x: 10i32, y: 20i64 } };
+```
+
+**Syntax**: `new EnumType { VariantName: value }`
+
+Internally, enums are represented as structs with:
+- `__discriminant__`: A `usize` field indicating which variant is active (0-indexed)
+- `__value__`: A union containing all possible variant values
+
+These internal fields can be accessed directly if needed:
+```zirco
+let disc = value1.__discriminant__;  // 0 for first variant
+let val = value1.__value__.Variant1;  // Access the actual value
+```
+
+Enum variants are used in match statements for pattern matching.
 
 ### 3.8 Type Aliases
 
