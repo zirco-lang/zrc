@@ -46,6 +46,7 @@ Version 0.1.0 (Draft)
    - [Ternary Conditional Expression](#414-ternary-conditional-expression)
    - [Sizeof Expressions](#415-sizeof-expressions)
    - [Comma Expression](#416-comma-expression)
+   - [Increment and Decrement Expressions](#417-increment-and-decrement-expressions)
 5. [Statements](#5-statements)
    - [Statement Overview](#51-statement-overview)
    - [Expression Statements](#52-expression-statements)
@@ -308,7 +309,7 @@ Zirco uses the following operators and punctuation:
 
 **Arithmetic Operators**:
 ```
-+   -   *   /   %
++   -   *   /   %   ++  --
 ```
 
 **Comparison Operators**:
@@ -528,8 +529,8 @@ Operators are listed from highest to lowest precedence:
 
 | Precedence | Operators | Description | Associativity |
 |------------|-----------|-------------|---------------|
-| 1 | `x()` `x[]` `x.y` `x->y` | Function call, array index, member access | Left-to-right |
-| 2 | `!x` `-x` `~x` `&x` `*x` | Unary operators | Right-to-left |
+| 1 | `x()` `x[]` `x.y` `x->y` `x++` `x--` | Function call, array index, member access, postfix increment/decrement | Left-to-right |
+| 2 | `!x` `-x` `~x` `&x` `*x` `++x` `--x` | Unary operators, prefix increment/decrement | Right-to-left |
 | 3 | `as` | Type cast | Left-to-right |
 | 4 | `*` `/` `%` | Multiplication, division, modulo | Left-to-right |
 | 5 | `+` `-` | Addition, subtraction | Left-to-right |
@@ -809,6 +810,44 @@ let x = (a = 5, b = 10, a + b);  // x is 15
 - Expressions are evaluated left-to-right
 - Result is the value of the rightmost expression
 - Primarily used for side effects
+
+### 4.17 Increment and Decrement Expressions
+
+Zirco supports both prefix and postfix increment and decrement operators for integer types.
+
+**Postfix Operators**:
+- `x++` - Postfix increment: returns the current value of `x`, then increments `x`
+- `x--` - Postfix decrement: returns the current value of `x`, then decrements `x`
+
+**Prefix Operators**:
+- `++x` - Prefix increment: increments `x`, then returns the new value
+- `--x` - Prefix decrement: decrements `x`, then returns the new value
+
+**Example**:
+```zirco
+let x = 5;
+
+let a = x++;  // a is 5, x is now 6
+let b = x--;  // b is 6, x is now 5
+let c = ++x;  // x is now 6, c is 6
+let d = --x;  // x is now 5, d is 5
+
+// Common use in loops
+for (let i = 0; i < 10; i++) {
+    printf("%d\n", i);
+}
+```
+
+**Rules**:
+- Operand must be an integer lvalue (a modifiable variable)
+- Cannot be used on constants or expressions
+- Prefix operators have unary precedence (level 2)
+- Postfix operators have the highest precedence (level 1)
+- The value is incremented or decremented by 1
+
+**Parsing Disambiguation**:
+- `a+++b` is parsed as `(a++) + b` (maximal munch rule)
+- Use spacing to disambiguate: `a+ ++b` parses as `a + (++b)`
 
 ---
 

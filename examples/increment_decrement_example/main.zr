@@ -1,0 +1,50 @@
+// Example demonstrating prefix and postfix increment/decrement operators
+
+fn putchar(c: i32) -> i32;
+
+fn print_num(n: i32) {
+    let neg = n < 0;
+    if (neg) {
+        putchar(45); // '-'
+        n = -n;
+    }
+    
+    if (n >= 10) {
+        print_num(n / 10);
+    }
+    
+    putchar(48 + n % 10);
+}
+
+fn println_num(n: i32) {
+    print_num(n);
+    putchar(10); // newline
+}
+
+fn main() -> i32 {
+    let x = 5;
+    
+    // Demonstrate postfix increment
+    println_num(x++); // Prints 5, x becomes 6
+    println_num(x);   // Prints 6
+    
+    // Demonstrate prefix increment
+    println_num(++x); // Prints 7, x is now 7
+    println_num(x);   // Prints 7
+    
+    // Demonstrate postfix decrement
+    println_num(x--); // Prints 7, x becomes 6
+    println_num(x);   // Prints 6
+    
+    // Demonstrate prefix decrement
+    println_num(--x); // Prints 5, x is now 5
+    println_num(x);   // Prints 5
+    
+    // Demonstrate in a loop
+    let i = 0;
+    for (; i < 3; i++) {
+        println_num(i);
+    }
+    
+    return 0;
+}

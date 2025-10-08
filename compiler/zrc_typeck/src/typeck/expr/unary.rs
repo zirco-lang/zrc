@@ -104,3 +104,75 @@ pub fn type_expr_unary_dereference<'input>(
         )
     }
 }
+
+/// Typeck a prefix increment (++x)
+pub fn type_expr_prefix_increment<'input>(
+    scope: &Scope<'input, '_>,
+    expr_span: Span,
+    x: Expr<'input>,
+) -> Result<TypedExpr<'input>, Diagnostic> {
+    let x_span = x.0.span();
+    let x_ty = type_expr(scope, x)?;
+    let place = expr_to_place(expr_span, x_ty)?;
+
+    expect_is_integer(&place.inferred_type, x_span)?;
+
+    Ok(TypedExpr {
+        inferred_type: place.inferred_type.clone(),
+        kind: TypedExprKind::PrefixIncrement(Box::new(place)).in_span(expr_span),
+    })
+}
+
+/// Typeck a prefix decrement (--x)
+pub fn type_expr_prefix_decrement<'input>(
+    scope: &Scope<'input, '_>,
+    expr_span: Span,
+    x: Expr<'input>,
+) -> Result<TypedExpr<'input>, Diagnostic> {
+    let x_span = x.0.span();
+    let x_ty = type_expr(scope, x)?;
+    let place = expr_to_place(expr_span, x_ty)?;
+
+    expect_is_integer(&place.inferred_type, x_span)?;
+
+    Ok(TypedExpr {
+        inferred_type: place.inferred_type.clone(),
+        kind: TypedExprKind::PrefixDecrement(Box::new(place)).in_span(expr_span),
+    })
+}
+
+/// Typeck a postfix increment (x++)
+pub fn type_expr_postfix_increment<'input>(
+    scope: &Scope<'input, '_>,
+    expr_span: Span,
+    x: Expr<'input>,
+) -> Result<TypedExpr<'input>, Diagnostic> {
+    let x_span = x.0.span();
+    let x_ty = type_expr(scope, x)?;
+    let place = expr_to_place(expr_span, x_ty)?;
+
+    expect_is_integer(&place.inferred_type, x_span)?;
+
+    Ok(TypedExpr {
+        inferred_type: place.inferred_type.clone(),
+        kind: TypedExprKind::PostfixIncrement(Box::new(place)).in_span(expr_span),
+    })
+}
+
+/// Typeck a postfix decrement (x--)
+pub fn type_expr_postfix_decrement<'input>(
+    scope: &Scope<'input, '_>,
+    expr_span: Span,
+    x: Expr<'input>,
+) -> Result<TypedExpr<'input>, Diagnostic> {
+    let x_span = x.0.span();
+    let x_ty = type_expr(scope, x)?;
+    let place = expr_to_place(expr_span, x_ty)?;
+
+    expect_is_integer(&place.inferred_type, x_span)?;
+
+    Ok(TypedExpr {
+        inferred_type: place.inferred_type.clone(),
+        kind: TypedExprKind::PostfixDecrement(Box::new(place)).in_span(expr_span),
+    })
+}

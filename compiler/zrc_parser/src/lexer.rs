@@ -243,6 +243,14 @@ pub enum Tok<'input> {
     // Read the doc comment above handle_block_comment_start for more information.
     #[token("/*", handle_block_comment_start)]
     // === ARITHMETIC OPERATORS ===
+    /// The token `++`
+    #[token("++")]
+    #[display("++")]
+    PlusPlus,
+    /// The token `--`
+    #[token("--")]
+    #[display("--")]
+    MinusMinus,
     /// The token `+`
     #[token("+")]
     #[display("+")]
@@ -764,12 +772,15 @@ mod tests {
     #[test]
     fn all_tokens_lex_and_display_correctly() {
         let input = concat!(
-            "+ - * / % == != > >= < <= && || ! & | ^ ~ << >> = += -= *= /= %= &= |= ^= <<= >>= ; ,",
+            "++ -- + - * / % == != > >= < <= && || ! & | ^ ~ << >> ",
+            "= += -= *= /= %= &= |= ^= <<= >>= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
             r#" struct union enum match sizeof type switch default -> => "str" 7_000 0xF_A"#,
             " 0b1_0 abc"
         );
         let tokens: Vec<Tok> = vec![
+            Tok::PlusPlus,
+            Tok::MinusMinus,
             Tok::Plus,
             Tok::Minus,
             Tok::Star,

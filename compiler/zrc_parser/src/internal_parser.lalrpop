@@ -346,6 +346,8 @@ _Unary: ExprKind<'input> = {
     "~" <Unary> => ExprKind::UnaryBitwiseNot(Box::new(<>)),
     "&" <Unary> => ExprKind::UnaryAddressOf(Box::new(<>)),
     "*" <Unary> => ExprKind::UnaryDereference(Box::new(<>)),
+    "++" <Unary> => ExprKind::PrefixIncrement(Box::new(<>)),
+    "--" <Unary> => ExprKind::PrefixDecrement(Box::new(<>)),
 };
 Unary: Expr<'input> = ExprPrecedenceTier<_Unary, Postfix>;
 
@@ -354,6 +356,8 @@ _Postfix: ExprKind<'input> = {
     <l:Postfix> "." <r:Spanned<IDENTIFIER>> => ExprKind::Dot(Box::new(l), r),
     <l:Postfix> "->" <r:Spanned<IDENTIFIER>> => ExprKind::Arrow(Box::new(l), r),
     <i:Postfix> <c:Spanned<("(" <ArgumentList?> ")")>> => ExprKind::Call(Box::new(i), c.map(|x| x.unwrap_or(Vec::new()))),
+    <x:Postfix> "++" => ExprKind::PostfixIncrement(Box::new(x)),
+    <x:Postfix> "--" => ExprKind::PostfixDecrement(Box::new(x)),
 };
 Postfix: Expr<'input> = ExprPrecedenceTier<_Postfix, Primary>;
 
@@ -394,6 +398,8 @@ extern {
     type Error = Spanned<lexer::LexicalError<'input>>;
 
     enum lexer::Tok<'input> {
+        "++" => lexer::Tok::PlusPlus,
+        "--" => lexer::Tok::MinusMinus,
         "+" => lexer::Tok::Plus,
         "-" => lexer::Tok::Minus,
         "*" => lexer::Tok::Star,
