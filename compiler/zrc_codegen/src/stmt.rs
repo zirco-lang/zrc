@@ -187,6 +187,14 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
             cg.builder.set_current_debug_location(debug_location);
 
             match stmt.0.into_value() {
+                TypedStmtKind::UnreachableStmt => {
+                    cg.builder
+                        .build_unreachable()
+                        .expect("unreachable should generate successfully");
+
+                    None
+                }
+
                 TypedStmtKind::SwitchCase {
                     scrutinee,
                     default,
@@ -222,7 +230,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         .expect("switch should generate successfully");
 
                     cg.builder.position_at_end(default_bb);
-                    cg_block(
+                    let default_bb = cg_block(
                         cg,
                         default_bb,
                         &scope,
@@ -230,9 +238,11 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         default.in_span(stmt_span),
                         breakaway,
                     );
-                    cg.builder
-                        .build_unconditional_branch(return_bb)
-                        .expect("br should generate successfully");
+                    if default_bb.is_some() {
+                        cg.builder
+                            .build_unconditional_branch(return_bb)
+                            .expect("br should generate successfully");
+                    }
 
                     for (case_bb, _, stmt) in cases {
                         cg.builder.position_at_end(case_bb);
@@ -675,6 +685,17 @@ mod tests {
         "});
     }
 
+    #[test]
+    fn unreachable_statement_generates_properly() {
+        cg_snapshot_test!(indoc! {"
+            fn test(cond: bool) {
+                let x = 7;
+                if (x == 6) unreachable;
+                else return;
+            }
+        "});
+    }
+
     mod cg_block {
         use super::*;
 
@@ -867,6 +888,29 @@ mod tests {
                 let head: *Node;
                 let tree: TreeNode;
                 head = create_node(42);
+            }
+        "});
+    }
+
+    #[test]
+    fn enum_match_generates_as_expected() {
+        cg_snapshot_test!(indoc! {"
+            enum VarInt {
+                I32: i32,
+                I64: i64,
+            }
+
+            fn f() -> VarInt;
+            fn fi32(x: i32);
+            fn fi64(x: i64);
+
+            fn main() {
+                let vi = f();
+
+                match (vi) {
+                    I32: x => fi32(x);
+                    I64: y => fi64(y);
+                }
             }
         "});
     }

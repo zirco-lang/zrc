@@ -35,6 +35,16 @@ pub fn resolve_type<'input>(
         ParserTypeKind::Union(members) => {
             TastType::Union(resolve_key_type_mapping(type_scope, members)?)
         }
+        ParserTypeKind::Enum(members) => {
+            // Desugar an enum into its represented internal struct
+            TastType::Struct(IndexMap::from([
+                ("__discriminant__", TastType::Usize),
+                (
+                    "__value__",
+                    (TastType::Union(resolve_key_type_mapping(type_scope, members)?)),
+                ),
+            ]))
+        }
     })
 }
 
@@ -97,6 +107,20 @@ fn resolve_type_with_opaque<'input>(
             members,
             opaque_name,
         )?),
+        ParserTypeKind::Enum(members) => {
+            // Desugar an enum into its represented internal struct
+            TastType::Struct(IndexMap::from([
+                ("__discriminant__", TastType::Usize),
+                (
+                    "__value__",
+                    (TastType::Union(resolve_key_type_mapping_with_opaque(
+                        type_scope,
+                        members,
+                        opaque_name,
+                    )?)),
+                ),
+            ]))
+        }
     })
 }
 
@@ -326,6 +350,60 @@ mod tests {
             Ok(TastType::Struct(IndexMap::from([
                 ("x", TastType::I32),
                 ("y", TastType::I32)
+            ])))
+        );
+    }
+
+    #[test]
+    fn enums_resolve_as_expected() {
+        // enum { Eight: i8, Sixteen: i16 }
+        assert_eq!(
+            resolve_type(
+                &TypeCtx::default(),
+                ParserType(spanned_test!(
+                    0,
+                    ParserTypeKind::Enum(KeyTypeMapping(spanned_test!(
+                        1,
+                        vec![
+                            spanned_test!(
+                                2,
+                                (
+                                    spanned_test!(3, "Eight", 4),
+                                    ParserType(spanned_test!(
+                                        5,
+                                        ParserTypeKind::Identifier("i8"),
+                                        6
+                                    ))
+                                ),
+                                7
+                            ),
+                            spanned_test!(
+                                8,
+                                (
+                                    spanned_test!(9, "Sixteen", 10),
+                                    ParserType(spanned_test!(
+                                        11,
+                                        ParserTypeKind::Identifier("i16"),
+                                        12
+                                    ))
+                                ),
+                                13
+                            )
+                        ],
+                        14
+                    ))),
+                    15
+                ))
+            ),
+            Ok(TastType::Struct(IndexMap::from([
+                ("__discriminant__", TastType::Usize),
+                (
+                    "__value__",
+                    TastType::Union(IndexMap::from([
+                        ("Eight", TastType::I8),
+                        ("Sixteen", TastType::I16)
+                    ]))
+                )
             ])))
         );
     }

@@ -303,3 +303,34 @@ pub fn llvm_type<'ctx: 'a, 'a>(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    // Please read the "Common patterns in tests" section of crate::test_utils for
+    // more information on how code generator tests are structured.
+
+    use indoc::indoc;
+
+    use crate::cg_snapshot_test;
+
+    #[test]
+    fn tagged_unions_are_properly_typed() {
+        cg_snapshot_test!(indoc! {"
+            enum VariableInt {
+                Eight: i8,
+                Sixteen: i16,
+            }
+
+            fn test() -> VariableInt {
+                // TEST: should generate a { usize, i16 (largest of values) }
+                let x: VariableInt;
+
+                // internal parameters
+                let y = x.__discriminant__;
+                let z = x.__value__;
+
+                return x;
+            }
+        "});
+    }
+}

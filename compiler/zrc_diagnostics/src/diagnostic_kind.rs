@@ -114,6 +114,12 @@ pub enum DiagnosticKind {
     NumberLiteralOutOfBounds(String, String, String, String),
     #[error("global variable initializer must be a constant expression")]
     GlobalInitializerMustBeConstant,
+    #[error("match on non-enum type `{0}`")]
+    MatchOnNonEnum(String),
+    #[error("there must be exactly one match arm for every enum variant")]
+    MatchCaseCountMismatch,
+    #[error("there must be a match arm for every enum variant")]
+    NonExhaustiveMatchCases,
 
     // PREPROCESSOR ERRORS
     #[error("unterminated include string")]
