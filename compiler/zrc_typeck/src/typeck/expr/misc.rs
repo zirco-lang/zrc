@@ -2,7 +2,7 @@
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::{expr::Expr, ty::Type};
-use zrc_utils::span::{Span, Spannable};
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{
     super::scope::Scope,
@@ -237,6 +237,103 @@ pub fn type_expr_struct_construction<'input>(
         }
     };
 
+    // Check if this is an enum construction (struct with __discriminant__ and __value__ fields)
+    // and the user is using variant syntax
+    let is_enum_construction = if let TastType::Struct(ref struct_fields) = resolved_ty {
+        struct_fields.len() == 2
+            && struct_fields.contains_key("__discriminant__")
+            && struct_fields.contains_key("__value__")
+    } else {
+        false
+    };
+
+    // If it's an enum and we have exactly one field being initialized
+    if is_enum_construction && fields.value().len() == 1 {
+        if let Some(field_init) = fields.value().first() {
+            let (variant_name, variant_value) = field_init.value();
+            let variant_name_str = variant_name.value();
+            
+            // Check if the provided name is a variant (not __discriminant__ or __value__)
+            if !expected_fields.contains_key(variant_name_str) {
+                // Try to find it in the union of variants
+                if let TastType::Struct(ref struct_fields) = resolved_ty {
+                    if let Some(TastType::Union(union_fields)) = struct_fields.get("__value__") {
+                        // Check if the variant exists in the union
+                        if let Some(variant_type) = union_fields.get(variant_name_str) {
+                            // This is enum variant construction!
+                            // Find the discriminant value (index in the union)
+                            let discriminant_value: usize = union_fields
+                                .keys()
+                                .enumerate()
+                                .find_map(|(idx, key)| if key == variant_name_str { Some(idx) } else { None })
+                                .expect("variant should exist in union");
+
+                            // Type check the variant value
+                            let typed_variant_expr = type_expr(scope, variant_value.clone())?;
+
+                            // Try to coerce the variant value to the expected type
+                            let typed_variant_expr = if typed_variant_expr.inferred_type == *variant_type {
+                                typed_variant_expr
+                            } else if typed_variant_expr
+                                .inferred_type
+                                .can_implicitly_cast_to(variant_type)
+                            {
+                                try_coerce_to(typed_variant_expr, variant_type)
+                            } else {
+                                return Err(DiagnosticKind::ExpectedGot {
+                                    expected: variant_type.to_string(),
+                                    got: typed_variant_expr.inferred_type.to_string(),
+                                }
+                                .error_in(typed_variant_expr.kind.span()));
+                            };
+
+                            // Construct the enum as a struct with __discriminant__ and __value__
+                            let mut enum_fields: IndexMap<&'input str, TypedExpr<'input>> = IndexMap::new();
+
+                            // Add discriminant field
+                            // We need to create a string that represents the discriminant value
+                            use std::string::ToString;
+                            let discriminant_str = discriminant_value.to_string();
+                            let discriminant_str_leaked = Box::leak(discriminant_str.into_boxed_str());
+                            
+                            enum_fields.insert(
+                                "__discriminant__",
+                                TypedExpr {
+                                    inferred_type: TastType::Usize,
+                                    kind: TypedExprKind::NumberLiteral(
+                                        zrc_parser::lexer::NumberLiteral::Decimal(discriminant_str_leaked),
+                                        TastType::Usize
+                                    ).in_span(variant_name.span()),
+                                },
+                            );
+
+                            // Add __value__ field as a cast of the variant value to the union type
+                            enum_fields.insert(
+                                "__value__",
+                                TypedExpr {
+                                    inferred_type: TastType::Union(union_fields.clone()),
+                                    kind: TypedExprKind::Cast(
+                                        Box::new(typed_variant_expr),
+                                        Spanned::from_span_and_value(
+                                            fields.span(),
+                                            TastType::Union(union_fields.clone())
+                                        )
+                                    ).in_span(fields.span()),
+                                },
+                            );
+
+                            return Ok(TypedExpr {
+                                inferred_type: resolved_ty,
+                                kind: TypedExprKind::StructConstruction(enum_fields).in_span(expr_span),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Regular struct/union construction
     // Type check each field initialization
     let mut initialized_fields: IndexMap<&'input str, TypedExpr<'input>> = IndexMap::new();
 
