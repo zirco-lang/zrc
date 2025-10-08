@@ -1,0 +1,42 @@
+// Enum Construction Example
+// Demonstrates how to create enum instances using variant syntax
+
+enum Result {
+    Ok: i32,
+    Error: i32
+}
+
+enum IntSize {
+    Small: i32,
+    Large: i64
+}
+
+// Helper function to simulate success/failure
+fn divide(a: i32, b: i32) -> Result {
+    if (b == 0i32) {
+        return new Result { Error: -1i32 };
+    } else {
+        return new Result { Ok: a / b };
+    }
+}
+
+fn main() -> i32 {
+    // Create enum instances using variant syntax
+    let success = new Result { Ok: 42i32 };
+    let failure = new Result { Error: 404i32 };
+    
+    // Use in function calls
+    let div_result = divide(10i32, 2i32);
+    let div_error = divide(10i32, 0i32);
+    
+    // Create IntSize enums
+    let small_val = new IntSize { Small: 100i32 };
+    let large_val = new IntSize { Large: 1000000i64 };
+    
+    // Access discriminant to check which variant
+    let success_discriminant = success.__discriminant__;
+    let failure_discriminant = failure.__discriminant__;
+    
+    // Return success
+    return 0i32;
+}
