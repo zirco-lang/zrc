@@ -295,6 +295,10 @@ test: build
 
 **Do NOT create custom test implementations** - always use the standard framework above. Reference examples: `hello_world`, `fibonacci`, `struct_example`.
 
+## Specification Updates
+
+Whenever adding or changing language semantics, update SPEC.md. You can also read SPEC.md to better understand Zirco syntax.
+
 ## Common Issues and Workarounds
 
 ### LLVM-related Build Failures
