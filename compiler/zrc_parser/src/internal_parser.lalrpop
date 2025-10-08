@@ -356,8 +356,6 @@ _Postfix: ExprKind<'input> = {
     <l:Postfix> "." <r:Spanned<IDENTIFIER>> => ExprKind::Dot(Box::new(l), r),
     <l:Postfix> "->" <r:Spanned<IDENTIFIER>> => ExprKind::Arrow(Box::new(l), r),
     <i:Postfix> <c:Spanned<("(" <ArgumentList?> ")")>> => ExprKind::Call(Box::new(i), c.map(|x| x.unwrap_or(Vec::new()))),
-    <i:Postfix> <c:Spanned<("(" ")")>> => ExprKind::Call(Box::new(i), c.map(|_| Vec::new())),
-    <i:Postfix> <c:Spanned<("(" <ArgumentList> ")")>> => ExprKind::Call(Box::new(i), c.map(|x| x)),
     <x:Postfix> "++" => ExprKind::PostfixIncrement(Box::new(x)),
     <x:Postfix> "--" => ExprKind::PostfixDecrement(Box::new(x)),
 };
