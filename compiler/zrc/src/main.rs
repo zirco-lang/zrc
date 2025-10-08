@@ -49,6 +49,8 @@
     clippy::module_name_repetitions,
     clippy::doc_comment_double_space_linebreaks
 )]
+// criterion is only used in benchmarks, not in the main binary or tests
+#![cfg_attr(test, allow(unused_crate_dependencies))]
 
 use mimalloc::MiMalloc;
 /// Use the mimalloc allocator as the global allocator, as LLVM is heavy on heap
