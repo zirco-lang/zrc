@@ -1134,11 +1134,15 @@ Reaching an `unreachable` statement results in undefined behavior.
 
 ### 5.16 Inline Assembly
 
-Inline assembly allows embedding assembly code within Zirco functions.
+Inline assembly allows embedding assembly code within Zirco functions with support for inputs, outputs, and clobbers.
 
-**Syntax**: `asm("assembly_code");`
+**Basic Syntax**: `asm("assembly_code");`
 
-**Example**:
+**Extended Syntax**: `asm("template" : outputs : inputs : clobbers);`
+
+**Examples**:
+
+Simple inline assembly without operands:
 ```zirco
 fn example() {
     // Execute a NOP (no operation) instruction
@@ -1146,13 +1150,32 @@ fn example() {
 }
 ```
 
+Inline assembly with inputs:
+```zirco
+fn add_with_asm(a: i32, b: i32) {
+    // Pass values as inputs to the assembly block
+    asm("nop" : : "r"(a), "r"(b));
+}
+```
+
+**Constraint Format**:
+- Outputs: `"=r"(variable)` - write to register, store result in variable
+- Inputs: `"r"(expression)` - read from register
+- Inputs with early clobber: `"0"(expression)` - use same register as operand 0
+- Clobbers: `"cc"` - condition codes modified, `"memory"` - memory modified
+
+**Operand References**:
+- In the assembly template, operands are referenced as `$0`, `$1`, `$2`, etc.
+- Outputs are numbered first, followed by inputs
+
 **Rules**:
 - Assembly code must be provided as a string literal
+- Constraints must be string literals
 - The assembly syntax follows the target platform's assembler conventions (typically AT&T syntax on x86-64 Linux)
 - Inline assembly statements have side effects and are not optimized away
 - Use with caution as incorrect assembly can cause undefined behavior or crashes
 
-**Note**: Advanced features like input/output operands and clobber lists are planned for future versions but not yet implemented.
+**Note**: Full output support with proper register allocation is under development. Current implementation supports inputs and basic constraint syntax similar to GCC/Clang inline assembly.
 
 ---
 

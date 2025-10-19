@@ -1,0 +1,17 @@
+// Example demonstrating inline assembly with inputs
+// This example uses inline assembly to perform a simple operation
+
+fn printf(format: *u8, ...) -> i32;
+
+fn main() {
+    let a: i32 = 10;
+    let b: i32 = 20;
+    
+    printf("a = %d, b = %d\n", a, b);
+    
+    // For now, just demonstrate that inputs work
+    // We pass values to the asm block
+    asm("nop" : : "r"(a), "r"(b));
+    
+    printf("Inline assembly with inputs executed successfully\n");
+}

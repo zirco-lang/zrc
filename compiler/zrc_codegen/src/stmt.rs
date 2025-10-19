@@ -649,35 +649,128 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     Some(exit)
                 }
 
-                TypedStmtKind::InlineAsm { template, .. } => {
-                    // For now, we'll implement a simple version that just takes the template
-                    // Extract the string from the template expression
+                TypedStmtKind::InlineAsm {
+                    template,
+                    outputs,
+                    inputs,
+                    clobbers,
+                } => {
+                    // Extract string literals from the template and constraints
                     use zrc_typeck::tast::expr::TypedExprKind;
 
                     let template_str =
                         if let TypedExprKind::StringLiteral(string) = template.kind.value() {
                             string.to_string()
                         } else {
-                            // If it's not a string literal, we can't compile it
                             panic!("inline assembly template must be a string literal");
                         };
 
-                    // Create inline assembly using inkwell
-                    // For now, use basic constraints - no inputs, no outputs
-                    let inline_asm_ty = cg.ctx.void_type().fn_type(&[], false);
+                    // Build constraint string and collect input operand values
+                    let mut constraint_parts = Vec::new();
+                    let mut input_values = Vec::new();
+
+                    // Process output constraints (for now, we only track constraints)
+                    for output in &outputs {
+                        let constraint_str = if let TypedExprKind::StringLiteral(string) =
+                            output.constraint.kind.value()
+                        {
+                            string.to_string()
+                        } else {
+                            panic!("inline assembly constraint must be a string literal");
+                        };
+                        constraint_parts.push(constraint_str);
+                    }
+
+                    // Process input constraints and values
+                    for input in &inputs {
+                        let constraint_str = if let TypedExprKind::StringLiteral(string) =
+                            input.constraint.kind.value()
+                        {
+                            string.to_string()
+                        } else {
+                            panic!("inline assembly constraint must be a string literal");
+                        };
+                        constraint_parts.push(constraint_str);
+
+                        // Evaluate the input expression
+                        let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+                        let value = unpack!(bb = cg_expr(expr_cg, bb, input.expr.clone()));
+                        input_values.push(value);
+                    }
+
+                    // Build clobber list
+                    let mut clobber_strings = Vec::new();
+                    for clobber in &clobbers {
+                        if let TypedExprKind::StringLiteral(string) = clobber.kind.value() {
+                            clobber_strings.push(string.to_string());
+                        } else {
+                            panic!("inline assembly clobber must be a string literal");
+                        }
+                    }
+
+                    // Combine all constraints with clobbers
+                    let constraints = if clobber_strings.is_empty() {
+                        constraint_parts.join(",")
+                    } else {
+                        format!(
+                            "{},~{{{}}}",
+                            constraint_parts.join(","),
+                            clobber_strings.join(",")
+                        )
+                    };
+
+                    // Create function type for inline asm
+                    // For now, we'll use a simplified approach:
+                    // - No outputs or multiple outputs: void return
+                    // - Single output: i32 return (simplified)
+                    let param_types: Vec<_> =
+                        input_values.iter().map(|val| val.get_type().into()).collect();
+
+                    let (has_output, inline_asm_ty) = if outputs.len() == 1 {
+                        // Single output - return i32 for simplicity
+                        let fn_ty = cg.ctx.i32_type().fn_type(&param_types, false);
+                        (Some(()), fn_ty)
+                    } else {
+                        // No outputs or multiple outputs - void return
+                        let fn_ty = cg.ctx.void_type().fn_type(&param_types, false);
+                        (None, fn_ty)
+                    };
+
+                    // Create inline assembly
                     let inline_asm = cg.ctx.create_inline_asm(
                         inline_asm_ty,
                         template_str,
-                        String::new(), // constraints
-                        true,          // has side effects
-                        false,         // align stack
-                        None,          // dialect (None = AT&T)
-                        false,         // can throw
+                        constraints,
+                        true,  // has side effects
+                        false, // align stack
+                        None,  // dialect (None = AT&T)
+                        false, // can throw
                     );
 
-                    cg.builder
-                        .build_indirect_call(inline_asm_ty, inline_asm, &[], "inline_asm")
+                    // Build the call with input operands
+                    let call_args: Vec<_> = input_values.iter().map(|val| (*val).into()).collect();
+
+                    let result = cg
+                        .builder
+                        .build_indirect_call(inline_asm_ty, inline_asm, &call_args, "inline_asm")
                         .expect("inline asm call should generate successfully");
+
+                    // If there's a single output, try to store the result
+                    if let (Some(()), Some(result_value)) =
+                        (has_output, result.try_as_basic_value().left())
+                    {
+                        // Evaluate the output expression to get its location
+                        let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+                        let out_place =
+                            unpack!(bb = cg_expr(expr_cg, bb, outputs[0].expr.clone()));
+
+                        // Try to store if it's a pointer
+                        if out_place.is_pointer_value() {
+                            cg.builder
+                                .build_store(out_place.into_pointer_value(), result_value)
+                                .expect("should store result");
+                        }
+                    }
 
                     Some(bb)
                 }

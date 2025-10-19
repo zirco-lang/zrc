@@ -7,6 +7,21 @@ use zrc_utils::{code_fmt::indent_lines, span::Spanned};
 
 use super::{expr::TypedExpr, ty::Type};
 
+/// Represents a typed operand in inline assembly
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypedAsmOperand<'input> {
+    /// The constraint string (e.g., "=r", "r", "m")
+    pub constraint: TypedExpr<'input>,
+    /// The expression being constrained
+    pub expr: TypedExpr<'input>,
+}
+
+impl Display for TypedAsmOperand<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}({})", self.constraint, self.expr)
+    }
+}
+
 /// A declaration created with `let`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LetDeclaration<'input> {
@@ -81,13 +96,11 @@ pub enum TypedStmtKind<'input> {
     InlineAsm {
         /// The assembly template string
         template: TypedExpr<'input>,
-        /// Assembly options/constraints string (optional)
-        options: Option<TypedExpr<'input>>,
-        /// Input operands (optional)
-        inputs: Vec<TypedExpr<'input>>,
-        /// Output operands (optional)
-        outputs: Vec<TypedExpr<'input>>,
-        /// Clobbered registers (optional)
+        /// Output operands with constraints
+        outputs: Vec<TypedAsmOperand<'input>>,
+        /// Input operands with constraints
+        inputs: Vec<TypedAsmOperand<'input>>,
+        /// Clobbered registers (string literals)
         clobbers: Vec<TypedExpr<'input>>,
     },
 }
@@ -352,31 +365,27 @@ impl Display for TypedStmtKind<'_> {
             }
             Self::InlineAsm {
                 template,
-                options,
-                inputs,
                 outputs,
+                inputs,
                 clobbers,
             } => {
                 write!(f, "asm({template}")?;
-                if let Some(opts) = options {
-                    write!(f, ", {opts}")?;
-                }
-                if !inputs.is_empty() {
+                if !outputs.is_empty() {
                     write!(
                         f,
-                        ", {}",
-                        inputs
+                        " : {}",
+                        outputs
                             .iter()
                             .map(ToString::to_string)
                             .collect::<Vec<_>>()
                             .join(", ")
                     )?;
                 }
-                if !outputs.is_empty() {
+                if !inputs.is_empty() {
                     write!(
                         f,
-                        ", {}",
-                        outputs
+                        " : {}",
+                        inputs
                             .iter()
                             .map(ToString::to_string)
                             .collect::<Vec<_>>()
@@ -386,7 +395,7 @@ impl Display for TypedStmtKind<'_> {
                 if !clobbers.is_empty() {
                     write!(
                         f,
-                        ", {}",
+                        " : {}",
                         clobbers
                             .iter()
                             .map(ToString::to_string)

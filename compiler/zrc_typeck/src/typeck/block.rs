@@ -465,29 +465,40 @@ pub fn type_block<'input, 'gs>(
 
                             StmtKind::InlineAsm {
                                 template,
-                                options,
-                                inputs,
                                 outputs,
+                                inputs,
                                 clobbers,
                             } => {
+                                use zrc_parser::ast::stmt::AsmOperand;
+
+                                use crate::tast::stmt::TypedAsmOperand;
+
                                 // Type check the template (must be a string literal)
                                 let typed_template = type_expr(&scope, template)?;
 
-                                // Type check options if present
-                                let typed_options =
-                                    options.map(|opt| type_expr(&scope, opt)).transpose()?;
-
-                                // Type check all input/output/clobber lists
-                                let typed_inputs = inputs
-                                    .into_iter()
-                                    .map(|expr| type_expr(&scope, expr))
-                                    .collect::<Result<Vec<_>, _>>()?;
-
+                                // Type check output operands
                                 let typed_outputs = outputs
                                     .into_iter()
-                                    .map(|expr| type_expr(&scope, expr))
+                                    .map(|AsmOperand { constraint, expr }| {
+                                        Ok(TypedAsmOperand {
+                                            constraint: type_expr(&scope, constraint)?,
+                                            expr: type_expr(&scope, expr)?,
+                                        })
+                                    })
                                     .collect::<Result<Vec<_>, _>>()?;
 
+                                // Type check input operands
+                                let typed_inputs = inputs
+                                    .into_iter()
+                                    .map(|AsmOperand { constraint, expr }| {
+                                        Ok(TypedAsmOperand {
+                                            constraint: type_expr(&scope, constraint)?,
+                                            expr: type_expr(&scope, expr)?,
+                                        })
+                                    })
+                                    .collect::<Result<Vec<_>, _>>()?;
+
+                                // Type check clobbers (should be string literals)
                                 let typed_clobbers = clobbers
                                     .into_iter()
                                     .map(|expr| type_expr(&scope, expr))
@@ -497,9 +508,8 @@ pub fn type_block<'input, 'gs>(
                                     TypedStmt(
                                         TypedStmtKind::InlineAsm {
                                             template: typed_template,
-                                            options: typed_options,
-                                            inputs: typed_inputs,
                                             outputs: typed_outputs,
+                                            inputs: typed_inputs,
                                             clobbers: typed_clobbers,
                                         }
                                         .in_span(stmt_span),

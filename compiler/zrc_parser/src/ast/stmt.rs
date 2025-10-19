@@ -11,6 +11,21 @@ use zrc_utils::{code_fmt::indent_lines, span::Spanned};
 
 use super::{expr::Expr, ty::Type};
 
+/// Represents an operand in inline assembly (constraint + expression)
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct AsmOperand<'input> {
+    /// The constraint string (e.g., "=r", "r", "m")
+    pub constraint: Expr<'input>,
+    /// The expression being constrained (variable or value)
+    pub expr: Expr<'input>,
+}
+
+impl Display for AsmOperand<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}({})", self.constraint, self.expr)
+    }
+}
+
 /// A Zirco statement
 #[derive(PartialEq, Debug, Clone, Display)]
 #[display("{_0}")]
@@ -116,17 +131,15 @@ pub enum StmtKind<'input> {
         cases: Vec<Spanned<MatchCase<'input>>>,
     },
     /// Inline assembly statement
-    /// `asm(template, options, inputs, outputs, clobbers);`
+    /// `asm("template" : outputs : inputs : clobbers);`
     InlineAsm {
         /// The assembly template string
         template: Expr<'input>,
-        /// Assembly options/constraints string (optional)
-        options: Option<Expr<'input>>,
-        /// Input operands (optional)
-        inputs: Vec<Expr<'input>>,
-        /// Output operands (optional)
-        outputs: Vec<Expr<'input>>,
-        /// Clobbered registers (optional)
+        /// Output operands with constraints
+        outputs: Vec<AsmOperand<'input>>,
+        /// Input operands with constraints
+        inputs: Vec<AsmOperand<'input>>,
+        /// Clobbered registers (string literals)
         clobbers: Vec<Expr<'input>>,
     },
 }
@@ -220,31 +233,27 @@ impl Display for StmtKind<'_> {
             }
             Self::InlineAsm {
                 template,
-                options,
-                inputs,
                 outputs,
+                inputs,
                 clobbers,
             } => {
                 write!(f, "asm({template}")?;
-                if let Some(opts) = options {
-                    write!(f, ", {opts}")?;
-                }
-                if !inputs.is_empty() {
+                if !outputs.is_empty() {
                     write!(
                         f,
-                        ", {}",
-                        inputs
+                        " : {}",
+                        outputs
                             .iter()
                             .map(ToString::to_string)
                             .collect::<Vec<_>>()
                             .join(", ")
                     )?;
                 }
-                if !outputs.is_empty() {
+                if !inputs.is_empty() {
                     write!(
                         f,
-                        ", {}",
-                        outputs
+                        " : {}",
+                        inputs
                             .iter()
                             .map(ToString::to_string)
                             .collect::<Vec<_>>()
@@ -254,7 +263,7 @@ impl Display for StmtKind<'_> {
                 if !clobbers.is_empty() {
                     write!(
                         f,
-                        ", {}",
+                        " : {}",
                         clobbers
                             .iter()
                             .map(ToString::to_string)

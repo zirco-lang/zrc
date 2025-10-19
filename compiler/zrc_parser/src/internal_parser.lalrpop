@@ -123,14 +123,48 @@ MatchCase: MatchCase<'input> = {
 }
 
 InlineAsmStmt: StmtKind<'input> = {
+    // Simple form: just template
     "asm" "(" <template:Primary> ")" ";" => {
         StmtKind::InlineAsm {
             template,
-            options: None,
-            inputs: Vec::new(),
             outputs: Vec::new(),
+            inputs: Vec::new(),
             clobbers: Vec::new(),
         }
+    },
+    // Full form: template : outputs : inputs : clobbers
+    "asm" "(" <template:Primary> ":" <outputs:CommaSeparated<AsmOperand>?> ":" <inputs:CommaSeparated<AsmOperand>?> ":" <clobbers:CommaSeparated<Primary>?> ")" ";" => {
+        StmtKind::InlineAsm {
+            template,
+            outputs: outputs.unwrap_or_default(),
+            inputs: inputs.unwrap_or_default(),
+            clobbers: clobbers.unwrap_or_default(),
+        }
+    },
+    // Partial form: template : outputs
+    "asm" "(" <template:Primary> ":" <outputs:CommaSeparated<AsmOperand>?> ")" ";" => {
+        StmtKind::InlineAsm {
+            template,
+            outputs: outputs.unwrap_or_default(),
+            inputs: Vec::new(),
+            clobbers: Vec::new(),
+        }
+    },
+    // Partial form: template : outputs : inputs
+    "asm" "(" <template:Primary> ":" <outputs:CommaSeparated<AsmOperand>?> ":" <inputs:CommaSeparated<AsmOperand>?> ")" ";" => {
+        StmtKind::InlineAsm {
+            template,
+            outputs: outputs.unwrap_or_default(),
+            inputs: inputs.unwrap_or_default(),
+            clobbers: Vec::new(),
+        }
+    },
+}
+
+AsmOperand: AsmOperand<'input> = {
+    <constraint:Primary> "(" <expr:Primary> ")" => AsmOperand {
+        constraint,
+        expr,
     },
 }
 
