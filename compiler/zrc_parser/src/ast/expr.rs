@@ -250,6 +250,9 @@ pub enum ExprKind<'input> {
         Spanned<Vec<Spanned<(Spanned<&'input str>, Expr<'input>)>>>,
     ),
 
+    /// Array literal: `[expr1, expr2, ...] :: Type`
+    ArrayLiteral(Vec<Expr<'input>>, Option<Type<'input>>),
+
     /// Any numeric literal.
     NumberLiteral(NumberLiteral<'input>, Option<Type<'input>>),
     /// Any string literal.
@@ -308,7 +311,8 @@ impl ExprKind<'_> {
             | Self::CharLiteral(_)
             | Self::Identifier(_)
             | Self::BooleanLiteral(_)
-            | Self::StructConstruction(_, _) => Precedence::Primary,
+            | Self::StructConstruction(_, _)
+            | Self::ArrayLiteral(_, _) => Precedence::Primary,
         }
     }
 
@@ -480,6 +484,17 @@ impl std::fmt::Display for ExprKind<'_> {
                     .collect();
                 write!(f, "{}", field_list.join(", "))?;
                 write!(f, " }}")
+            }
+            Self::ArrayLiteral(elements, ty) => {
+                write!(f, "[")?;
+                let element_strs: Vec<String> =
+                    elements.iter().map(ToString::to_string).collect();
+                write!(f, "{}", element_strs.join(", "))?;
+                write!(f, "]")?;
+                if let Some(t) = ty {
+                    write!(f, " :: {t}")?;
+                }
+                Ok(())
             }
             Self::NumberLiteral(num, ty) => {
                 write!(
@@ -858,6 +873,19 @@ impl<'input> Expr<'input> {
             ExprKind::StructConstruction(ty, fields),
             end,
             file_name
+        ))
+    }
+    #[must_use]
+    pub fn build_array_literal(
+        span: Span,
+        elements: Vec<Self>,
+        ty: Option<Type<'input>>,
+    ) -> Self {
+        Self(spanned!(
+            span.start(),
+            ExprKind::ArrayLiteral(elements, ty),
+            span.end(),
+            span.file_name()
         ))
     }
 }

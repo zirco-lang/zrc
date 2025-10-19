@@ -302,6 +302,63 @@ pub fn type_expr_struct_construction<'input>(
     })
 }
 
+/// Typeck an array literal
+///
+/// Array literals like `[1, 2, 3] :: *i32` are typed as follows:
+/// 1. All elements must have compatible types
+/// 2. The type annotation (if present) specifies the result pointer type
+/// 3. Without type annotation, we infer from the first element
+pub fn type_expr_array_literal<'input>(
+    scope: &Scope<'input, '_>,
+    expr_span: Span,
+    elements: Vec<Expr<'input>>,
+    ty_annotation: Option<Type<'input>>,
+) -> Result<TypedExpr<'input>, Diagnostic> {
+    // Type check all elements
+    let mut typed_elements = Vec::new();
+    let mut element_type: Option<TastType<'input>> = None;
+
+    for element in elements {
+        let element_span = element.0.span();
+        let typed_element = type_expr(scope, element)?;
+
+        if let Some(ref expected_type) = element_type {
+            // All elements must have the same type
+            if typed_element.inferred_type != *expected_type {
+                return Err(DiagnosticKind::ExpectedSameType(
+                    expected_type.to_string(),
+                    typed_element.inferred_type.to_string(),
+                )
+                .error_in(element_span));
+            }
+        } else {
+            // First element sets the type
+            element_type = Some(typed_element.inferred_type.clone());
+        }
+
+        typed_elements.push(typed_element);
+    }
+
+    // Determine the result type (pointer to element type)
+    let result_type = if let Some(ty_ann) = ty_annotation {
+        // Type annotation provided - resolve it
+        resolve_type(scope.types, ty_ann)?
+    } else {
+        // No type annotation - infer pointer to element type
+        if let Some(elem_ty) = element_type {
+            TastType::Ptr(Box::new(elem_ty))
+        } else {
+            // Empty array without type annotation - error
+            return Err(DiagnosticKind::NoTypeNoValue.error_in(expr_span));
+        }
+    };
+
+    Ok(TypedExpr {
+        inferred_type: result_type,
+        kind: TypedExprKind::ArrayLiteral(typed_elements).in_span(expr_span),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use zrc_parser::{ast::expr::Expr, lexer::NumberLiteral};
