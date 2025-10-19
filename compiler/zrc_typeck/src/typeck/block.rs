@@ -472,28 +472,27 @@ pub fn type_block<'input, 'gs>(
                             } => {
                                 // Type check the template (must be a string literal)
                                 let typed_template = type_expr(&scope, template)?;
-                                
+
                                 // Type check options if present
-                                let typed_options = options
-                                    .map(|opt| type_expr(&scope, opt))
-                                    .transpose()?;
-                                
+                                let typed_options =
+                                    options.map(|opt| type_expr(&scope, opt)).transpose()?;
+
                                 // Type check all input/output/clobber lists
                                 let typed_inputs = inputs
                                     .into_iter()
-                                    .map(|e| type_expr(&scope, e))
+                                    .map(|expr| type_expr(&scope, expr))
                                     .collect::<Result<Vec<_>, _>>()?;
-                                
+
                                 let typed_outputs = outputs
                                     .into_iter()
-                                    .map(|e| type_expr(&scope, e))
+                                    .map(|expr| type_expr(&scope, expr))
                                     .collect::<Result<Vec<_>, _>>()?;
-                                
+
                                 let typed_clobbers = clobbers
                                     .into_iter()
-                                    .map(|e| type_expr(&scope, e))
+                                    .map(|expr| type_expr(&scope, expr))
                                     .collect::<Result<Vec<_>, _>>()?;
-                                
+
                                 Ok(Some((
                                     TypedStmt(
                                         TypedStmtKind::InlineAsm {

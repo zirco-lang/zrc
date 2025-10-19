@@ -350,7 +350,7 @@ pub fn process_declaration<'input>(
             // Type check the assembly expression (should be a string literal)
             let scope = global_scope.create_subscope();
             let typed_assembly = type_expr(&scope, assembly)?;
-            
+
             Some(TypedDeclaration::ModuleAsm {
                 assembly: typed_assembly,
             })

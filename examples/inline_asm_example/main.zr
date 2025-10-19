@@ -1,0 +1,13 @@
+// Example demonstrating inline assembly in Zirco
+// This example uses inline assembly to perform a NOP (no operation)
+
+fn printf(format: *u8, ...) -> i32;
+
+fn main() {
+    printf("Before inline assembly\n");
+    
+    // Inline assembly - NOP instruction
+    asm("nop");
+    
+    printf("After inline assembly\n");
+}

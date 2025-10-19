@@ -131,6 +131,7 @@ pub enum StmtKind<'input> {
     },
 }
 impl Display for StmtKind<'_> {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::IfStmt(cond, if_true, None) => write!(f, "if ({cond}) {if_true}"),
@@ -229,13 +230,37 @@ impl Display for StmtKind<'_> {
                     write!(f, ", {opts}")?;
                 }
                 if !inputs.is_empty() {
-                    write!(f, ", {}", inputs.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                    write!(
+                        f,
+                        ", {}",
+                        inputs
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )?;
                 }
                 if !outputs.is_empty() {
-                    write!(f, ", {}", outputs.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                    write!(
+                        f,
+                        ", {}",
+                        outputs
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )?;
                 }
                 if !clobbers.is_empty() {
-                    write!(f, ", {}", clobbers.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                    write!(
+                        f,
+                        ", {}",
+                        clobbers
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )?;
                 }
                 write!(f, ");")
             }

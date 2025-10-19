@@ -362,13 +362,37 @@ impl Display for TypedStmtKind<'_> {
                     write!(f, ", {opts}")?;
                 }
                 if !inputs.is_empty() {
-                    write!(f, ", {}", inputs.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                    write!(
+                        f,
+                        ", {}",
+                        inputs
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )?;
                 }
                 if !outputs.is_empty() {
-                    write!(f, ", {}", outputs.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                    write!(
+                        f,
+                        ", {}",
+                        outputs
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )?;
                 }
                 if !clobbers.is_empty() {
-                    write!(f, ", {}", clobbers.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                    write!(
+                        f,
+                        ", {}",
+                        clobbers
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )?;
                 }
                 write!(f, ");")
             }
