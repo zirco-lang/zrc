@@ -8,5 +8,5 @@ edition = "2024"
 [dependencies]
 ariadne = "0.5.1"
 derive_more = { version = "2.0.1", features = ["display"] }
-thiserror = "1.0.58"
+thiserror = "2.0.0"
 zrc_utils = { version = "0.1.0", path = "../zrc_utils" }

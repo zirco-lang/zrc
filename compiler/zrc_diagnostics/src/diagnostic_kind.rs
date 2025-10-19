@@ -32,9 +32,9 @@ pub enum DiagnosticKind {
     /// Generic parser error
     #[error("invalid token")]
     InvalidToken,
-    #[error("unexpected end of file, expected one of: {}", .0.join(", "))]
+    #[error("unexpected end of file, expected one of: {x}", x = .0.join(", "))]
     UnexpectedEof(Vec<String>),
-    #[error("unrecognized token `{0}`, expected one of: {}", .1.join(", "))]
+    #[error("unrecognized token `{0}`, expected one of: {x}", x = .1.join(", "))]
     UnrecognizedToken(String, Vec<String>),
     #[error("extra token `{0}`")]
     ExtraToken(String),
