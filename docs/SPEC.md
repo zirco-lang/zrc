@@ -1134,7 +1134,7 @@ Reaching an `unreachable` statement results in undefined behavior.
 
 ### 5.16 Inline Assembly
 
-Inline assembly allows embedding assembly code within Zirco functions with support for inputs, outputs, and clobbers.
+Inline assembly allows embedding assembly code within Zirco functions with full support for inputs, outputs, and clobbers.
 
 **Basic Syntax**: `asm("assembly_code");`
 
@@ -1150,32 +1150,41 @@ fn example() {
 }
 ```
 
-Inline assembly with inputs:
+Inline assembly with inputs and outputs:
 ```zirco
-fn add_with_asm(a: i32, b: i32) {
-    // Pass values as inputs to the assembly block
-    asm("nop" : : "r"(a), "r"(b));
+fn add_numbers(a: i32, b: i32) -> i32 {
+    let result: i32 = 0;
+    // Add two numbers using inline assembly
+    asm("addl $2, $0" : "=r"(result) : "0"(a), "r"(b));
+    return result;
 }
 ```
 
 **Constraint Format**:
 - Outputs: `"=r"(variable)` - write to register, store result in variable
-- Inputs: `"r"(expression)` - read from register
-- Inputs with early clobber: `"0"(expression)` - use same register as operand 0
+- Inputs: `"r"(expression)` - read value from register
+- Inputs with matching: `"0"(expression)` - use same register as operand 0
 - Clobbers: `"cc"` - condition codes modified, `"memory"` - memory modified
 
 **Operand References**:
 - In the assembly template, operands are referenced as `$0`, `$1`, `$2`, etc.
 - Outputs are numbered first, followed by inputs
+- Example: `"addl $2, $0"` adds operand 2 (second input) to operand 0 (first output)
 
 **Rules**:
 - Assembly code must be provided as a string literal
 - Constraints must be string literals
+- Output operands must be lvalues (variables, dereferences, or indexed accesses)
 - The assembly syntax follows the target platform's assembler conventions (typically AT&T syntax on x86-64 Linux)
 - Inline assembly statements have side effects and are not optimized away
 - Use with caution as incorrect assembly can cause undefined behavior or crashes
 
-**Note**: Full output support with proper register allocation is under development. Current implementation supports inputs and basic constraint syntax similar to GCC/Clang inline assembly.
+**Features**:
+- ✅ Single output support with proper type inference
+- ✅ Multiple outputs support (returns struct, extracts and stores each)
+- ✅ Full input operand support with any expression
+- ✅ Clobber list support
+- ✅ All standard constraint types: `r` (register), `m` (memory), `=r` (write register), etc.
 
 ---
 

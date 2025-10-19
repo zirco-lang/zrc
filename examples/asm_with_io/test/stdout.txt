@@ -1,2 +1,2 @@
 a = 10, b = 20
-Inline assembly with inputs executed successfully
+Result: 30

@@ -29,7 +29,7 @@ use zrc_utils::span::{Span, Spannable, Spanned};
 use crate::{
     bb::BasicBlockAnd,
     ctx::{BlockCtx, FunctionCtx},
-    expr::cg_expr,
+    expr::{cg_expr, place::cg_place},
     scope::CgScope,
     ty::llvm_basic_type,
     unpack,
@@ -656,6 +656,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     clobbers,
                 } => {
                     // Extract string literals from the template and constraints
+                    use inkwell::types::BasicType;
                     use zrc_typeck::tast::expr::TypedExprKind;
 
                     let template_str =
@@ -665,11 +666,13 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                             panic!("inline assembly template must be a string literal");
                         };
 
-                    // Build constraint string and collect input operand values
+                    // Build constraint string and collect operand information
                     let mut constraint_parts = Vec::new();
+                    let mut output_places = Vec::new();
+                    let mut output_types = Vec::new();
                     let mut input_values = Vec::new();
 
-                    // Process output constraints (for now, we only track constraints)
+                    // Process output constraints and get their places
                     for output in &outputs {
                         let constraint_str = if let TypedExprKind::StringLiteral(string) =
                             output.constraint.kind.value()
@@ -679,6 +682,47 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                             panic!("inline assembly constraint must be a string literal");
                         };
                         constraint_parts.push(constraint_str);
+
+                        // Convert output expression to a place to get its pointer
+                        // The output expression should be an Identifier (variable reference)
+                        let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+
+                        // Try to extract a place from the expression
+                        #[allow(clippy::wildcard_enum_match_arm)]
+                        let place_opt = match output.expr.kind.value() {
+                            TypedExprKind::Identifier(var) => Some(Place {
+                                inferred_type: output.expr.inferred_type.clone(),
+                                kind: output.expr.kind.span().containing(PlaceKind::Variable(var)),
+                            }),
+                            TypedExprKind::UnaryDereference(inner) => Some(Place {
+                                inferred_type: output.expr.inferred_type.clone(),
+                                kind: output
+                                    .expr
+                                    .kind
+                                    .span()
+                                    .containing(PlaceKind::Deref(inner.clone())),
+                            }),
+                            TypedExprKind::Index(ptr, idx) => Some(Place {
+                                inferred_type: output.expr.inferred_type.clone(),
+                                kind: output.expr.kind.span().containing(PlaceKind::Index(
+                                    ptr.clone(),
+                                    idx.clone(),
+                                )),
+                            }),
+                            _ => None,
+                        };
+
+                        if let Some(place) = place_opt {
+                            let place_ptr = unpack!(bb = cg_place(expr_cg, bb, place));
+                            output_places.push(place_ptr);
+                            let (ty, _) = llvm_basic_type(&expr_cg, &output.expr.inferred_type);
+                            output_types.push(ty);
+                        } else {
+                            panic!(
+                                "inline assembly output must be an lvalue (variable, \
+                                 dereference, or index)"
+                            );
+                        }
                     }
 
                     // Process input constraints and values
@@ -719,21 +763,23 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         )
                     };
 
-                    // Create function type for inline asm
-                    // For now, we'll use a simplified approach:
-                    // - No outputs or multiple outputs: void return
-                    // - Single output: i32 return (simplified)
-                    let param_types: Vec<_> =
-                        input_values.iter().map(|val| val.get_type().into()).collect();
+                    // Create function type for inline asm based on outputs and inputs
+                    let param_types: Vec<_> = input_values
+                        .iter()
+                        .map(|val| val.get_type().into())
+                        .collect();
 
-                    let (has_output, inline_asm_ty) = if outputs.len() == 1 {
-                        // Single output - return i32 for simplicity
-                        let fn_ty = cg.ctx.i32_type().fn_type(&param_types, false);
-                        (Some(()), fn_ty)
+                    let inline_asm_ty = if outputs.is_empty() {
+                        // No outputs - void return
+                        cg.ctx.void_type().fn_type(&param_types, false)
+                    } else if outputs.len() == 1 {
+                        // Single output - return the actual output type
+                        output_types[0].fn_type(&param_types, false)
                     } else {
-                        // No outputs or multiple outputs - void return
-                        let fn_ty = cg.ctx.void_type().fn_type(&param_types, false);
-                        (None, fn_ty)
+                        // Multiple outputs - return a struct of output types
+                        cg.ctx
+                            .struct_type(&output_types, false)
+                            .fn_type(&param_types, false)
                     };
 
                     // Create inline assembly
@@ -755,20 +801,33 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         .build_indirect_call(inline_asm_ty, inline_asm, &call_args, "inline_asm")
                         .expect("inline asm call should generate successfully");
 
-                    // If there's a single output, try to store the result
-                    if let (Some(()), Some(result_value)) =
-                        (has_output, result.try_as_basic_value().left())
-                    {
-                        // Evaluate the output expression to get its location
-                        let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
-                        let out_place =
-                            unpack!(bb = cg_expr(expr_cg, bb, outputs[0].expr.clone()));
-
-                        // Try to store if it's a pointer
-                        if out_place.is_pointer_value() {
-                            cg.builder
-                                .build_store(out_place.into_pointer_value(), result_value)
-                                .expect("should store result");
+                    // Store results to output places
+                    #[allow(clippy::collapsible_if)]
+                    if !outputs.is_empty() {
+                        if let Some(result_value) = result.try_as_basic_value().left() {
+                            if outputs.len() == 1 {
+                                // Single output - store directly
+                                cg.builder
+                                    .build_store(output_places[0], result_value)
+                                    .expect("should store result");
+                            } else {
+                                // Multiple outputs - extract from struct and store each
+                                let result_struct = result_value.into_struct_value();
+                                for (i, place_ptr) in output_places.iter().enumerate() {
+                                    let extracted = cg
+                                        .builder
+                                        .build_extract_value(
+                                            result_struct,
+                                            u32::try_from(i)
+                                                .expect("output index should fit in u32"),
+                                            &format!("out{i}"),
+                                        )
+                                        .expect("should extract output value");
+                                    cg.builder
+                                        .build_store(*place_ptr, extracted)
+                                        .expect("should store output value");
+                                }
+                            }
                         }
                     }
 

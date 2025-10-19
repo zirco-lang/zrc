@@ -1,17 +1,23 @@
-// Example demonstrating inline assembly with inputs
-// This example uses inline assembly to perform a simple operation
+// Example demonstrating inline assembly with inputs and outputs
+// This example adds two numbers using inline assembly
 
 fn printf(format: *u8, ...) -> i32;
 
 fn main() {
     let a: i32 = 10;
     let b: i32 = 20;
+    let result: i32 = 0;
     
     printf("a = %d, b = %d\n", a, b);
     
-    // For now, just demonstrate that inputs work
-    // We pass values to the asm block
-    asm("nop" : : "r"(a), "r"(b));
+    // Add two numbers using inline assembly with proper output support
+    // In LLVM inline asm: $0, $1, $2 reference operands (not %0, %1, %2)
+    // Constraints:
+    //   "=r" (result) - output: $0 - write to register, store in result  
+    //   "0" (a)       - input: $1 - use same register as operand 0, initialize with a
+    //   "r" (b)       - input: $2 - read b from register
+    // Assembly: addl $2, $0  means: add operand 2 to operand 0
+    asm("addl $2, $0" : "=r"(result) : "0"(a), "r"(b));
     
-    printf("Inline assembly with inputs executed successfully\n");
+    printf("Result: %d\n", result);
 }
