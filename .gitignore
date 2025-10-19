@@ -1,3 +1,4 @@
 /target
 lcov.info
 /examples/**/out
+/examples/**/build
