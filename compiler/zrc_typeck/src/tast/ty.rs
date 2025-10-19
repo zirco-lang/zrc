@@ -65,13 +65,13 @@ pub enum Type<'input> {
     /// without explicit type annotation.
     Int,
     /// `*T`
-    Ptr(Box<Type<'input>>),
+    Ptr(Box<Self>),
     /// `fn(A, B) -> T`
     Fn(Fn<'input>),
     /// Struct type literals. Ordered by declaration order.
-    Struct(IndexMap<&'input str, Type<'input>>),
+    Struct(IndexMap<&'input str, Self>),
     /// Union type literals. Ordered by declaration order.
-    Union(IndexMap<&'input str, Type<'input>>),
+    Union(IndexMap<&'input str, Self>),
     /// Opaque type placeholder used during type resolution for self-referential
     /// types. This is a temporary type that should be replaced with a void
     /// pointer (`*struct{}`) after the type definition is fully resolved.
