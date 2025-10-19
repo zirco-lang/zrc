@@ -77,6 +77,19 @@ pub enum TypedStmtKind<'input> {
     UnreachableStmt,
     /// A let declaration
     DeclarationList(Vec<Spanned<LetDeclaration<'input>>>),
+    /// Inline assembly statement
+    InlineAsm {
+        /// The assembly template string
+        template: TypedExpr<'input>,
+        /// Assembly options/constraints string (optional)
+        options: Option<TypedExpr<'input>>,
+        /// Input operands (optional)
+        inputs: Vec<TypedExpr<'input>>,
+        /// Output operands (optional)
+        outputs: Vec<TypedExpr<'input>>,
+        /// Clobbered registers (optional)
+        clobbers: Vec<TypedExpr<'input>>,
+    },
 }
 
 /// A struct or function declaration at the top level of a file
@@ -97,6 +110,11 @@ pub enum TypedDeclaration<'input> {
     },
     /// A global let declaration
     GlobalLetDeclaration(Vec<Spanned<LetDeclaration<'input>>>),
+    /// Module-level assembly declaration
+    ModuleAsm {
+        /// The assembly code
+        assembly: TypedExpr<'input>,
+    },
 }
 
 /// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]
@@ -332,6 +350,28 @@ impl Display for TypedStmtKind<'_> {
                         .join(", ")
                 )
             }
+            Self::InlineAsm {
+                template,
+                options,
+                inputs,
+                outputs,
+                clobbers,
+            } => {
+                write!(f, "asm({template}")?;
+                if let Some(opts) = options {
+                    write!(f, ", {opts}")?;
+                }
+                if !inputs.is_empty() {
+                    write!(f, ", {}", inputs.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                }
+                if !outputs.is_empty() {
+                    write!(f, ", {}", outputs.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                }
+                if !clobbers.is_empty() {
+                    write!(f, ", {}", clobbers.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                }
+                write!(f, ");")
+            }
         }
     }
 }
@@ -369,6 +409,7 @@ impl Display for TypedDeclaration<'_> {
                         .join(", ")
                 )
             }
+            Self::ModuleAsm { assembly } => write!(f, "asm {assembly};"),
         }
     }
 }

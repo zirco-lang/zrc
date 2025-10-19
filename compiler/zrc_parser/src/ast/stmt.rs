@@ -115,6 +115,20 @@ pub enum StmtKind<'input> {
         /// The list of id: value => stmt pairs
         cases: Vec<Spanned<MatchCase<'input>>>,
     },
+    /// Inline assembly statement
+    /// `asm(template, options, inputs, outputs, clobbers);`
+    InlineAsm {
+        /// The assembly template string
+        template: Expr<'input>,
+        /// Assembly options/constraints string (optional)
+        options: Option<Expr<'input>>,
+        /// Input operands (optional)
+        inputs: Vec<Expr<'input>>,
+        /// Output operands (optional)
+        outputs: Vec<Expr<'input>>,
+        /// Clobbered registers (optional)
+        clobbers: Vec<Expr<'input>>,
+    },
 }
 impl Display for StmtKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -203,6 +217,28 @@ impl Display for StmtKind<'_> {
                         .join(" ")
                 )
             }
+            Self::InlineAsm {
+                template,
+                options,
+                inputs,
+                outputs,
+                clobbers,
+            } => {
+                write!(f, "asm({template}")?;
+                if let Some(opts) = options {
+                    write!(f, ", {opts}")?;
+                }
+                if !inputs.is_empty() {
+                    write!(f, ", {}", inputs.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                }
+                if !outputs.is_empty() {
+                    write!(f, ", {}", outputs.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                }
+                if !clobbers.is_empty() {
+                    write!(f, ", {}", clobbers.iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))?;
+                }
+                write!(f, ");")
+            }
         }
     }
 }
@@ -233,6 +269,12 @@ pub enum Declaration<'input> {
     },
     /// A global let declaration
     GlobalLetDeclaration(Spanned<Vec<Spanned<LetDeclaration<'input>>>>),
+    /// Module-level assembly declaration
+    /// `asm "assembly code";`
+    ModuleAsm {
+        /// The assembly code string
+        assembly: Expr<'input>,
+    },
 }
 impl Display for Declaration<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -289,6 +331,8 @@ impl Display for Declaration<'_> {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+
+            Self::ModuleAsm { assembly } => write!(f, "asm {assembly};"),
         }
     }
 }

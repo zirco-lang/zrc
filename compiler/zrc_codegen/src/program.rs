@@ -427,6 +427,20 @@ fn cg_program<'ctx>(
                     global_scope.insert(let_declaration.name.value(), global.as_pointer_value());
                 }
             }
+            TypedDeclaration::ModuleAsm { assembly } => {
+                // Extract the string from the assembly expression
+                use zrc_typeck::tast::expr::TypedExprKind;
+                
+                let asm_str = if let TypedExprKind::StringLiteral(s) = assembly.kind.value() {
+                    s.to_string()
+                } else {
+                    // If it's not a string literal, we can't compile it
+                    panic!("module-level assembly must be a string literal");
+                };
+
+                // Add module-level assembly to the LLVM module
+                module.set_inline_assembly(&asm_str);
+            }
         }
     }
 

@@ -648,6 +648,49 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
 
                     Some(exit)
                 }
+
+                TypedStmtKind::InlineAsm {
+                    template,
+                    options: _,
+                    inputs: _,
+                    outputs: _,
+                    clobbers: _,
+                } => {
+                    // For now, we'll implement a simple version that just takes the template
+                    // Extract the string from the template expression
+                    use zrc_typeck::tast::expr::TypedExprKind;
+                    
+                    let template_str = if let TypedExprKind::StringLiteral(s) = template.kind.value() {
+                        s.to_string()
+                    } else {
+                        // If it's not a string literal, we can't compile it
+                        panic!("inline assembly template must be a string literal");
+                    };
+
+                    // Create inline assembly using inkwell
+                    // For now, use basic constraints - no inputs, no outputs
+                    let inline_asm_ty = cg.ctx.void_type().fn_type(&[], false);
+                    let inline_asm = cg.ctx.create_inline_asm(
+                        inline_asm_ty,
+                        template_str.clone(),
+                        "".to_string(), // constraints
+                        true,  // has side effects
+                        false, // align stack
+                        None,  // dialect (None = AT&T)
+                        false, // can throw
+                    );
+
+                    cg.builder
+                        .build_indirect_call(
+                            inline_asm_ty,
+                            inline_asm,
+                            &[],
+                            "inline_asm",
+                        )
+                        .expect("inline asm call should generate successfully");
+
+                    Some(bb)
+                }
             }
         })
 }

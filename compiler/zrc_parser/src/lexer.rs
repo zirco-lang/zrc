@@ -540,6 +540,10 @@ pub enum Tok<'input> {
     #[token("unreachable")]
     #[display("unreachable")]
     Unreachable,
+    /// The keyword `asm`
+    #[token("asm")]
+    #[display("asm")]
+    Asm,
     /// The operator `->`
     #[token("->")]
     #[display("->")]

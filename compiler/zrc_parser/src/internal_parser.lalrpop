@@ -106,6 +106,7 @@ SimpleStmt: StmtKind<'input> = {
     },
     <FlowStmt>,
     <Spanned<LetDeclaration>> => StmtKind::DeclarationList(<>),
+    <InlineAsmStmt>,
 };
 
 SwitchCase: SwitchCase<'input> = {
@@ -121,12 +122,25 @@ MatchCase: MatchCase<'input> = {
     }
 }
 
+InlineAsmStmt: StmtKind<'input> = {
+    "asm" "(" <template:Primary> ")" ";" => {
+        StmtKind::InlineAsm {
+            template,
+            options: None,
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+            clobbers: Vec::new(),
+        }
+    },
+}
+
 // For declarations at the global scope
 Declaration: Declaration<'input> = {
     <FunctionDeclaration>,
     <StructOrUnionDeclaration>,
     <TypeAliasDeclaration>,
     <GlobalLetDeclaration>,
+    <ModuleAsmDeclaration>,
 };
 
 FunctionDeclaration: Declaration<'input> = {
@@ -154,6 +168,10 @@ TypeAliasDeclaration: Declaration<'input> = {
 
 GlobalLetDeclaration: Declaration<'input> = {
     <Spanned<LetDeclaration>> => Declaration::GlobalLetDeclaration(<>),
+}
+
+ModuleAsmDeclaration: Declaration<'input> = {
+    "asm" <assembly:Expr> ";" => Declaration::ModuleAsm { assembly },
 }
 
 // Type that allows parentheses - use in declaration contexts
@@ -477,6 +495,7 @@ extern {
         "default" => lexer::Tok::Default,
         "new" => lexer::Tok::New,
         "unreachable" => lexer::Tok::Unreachable,
+        "asm" => lexer::Tok::Asm,
         "->" => lexer::Tok::SmallArrow,
         "=>" => lexer::Tok::FatArrow,
         "..." => lexer::Tok::Ellipsis,

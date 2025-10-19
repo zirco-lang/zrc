@@ -463,6 +463,52 @@ pub fn type_block<'input, 'gs>(
                                                                      * return */
                             ))),
 
+                            StmtKind::InlineAsm {
+                                template,
+                                options,
+                                inputs,
+                                outputs,
+                                clobbers,
+                            } => {
+                                // Type check the template (must be a string literal)
+                                let typed_template = type_expr(&scope, template)?;
+                                
+                                // Type check options if present
+                                let typed_options = options
+                                    .map(|opt| type_expr(&scope, opt))
+                                    .transpose()?;
+                                
+                                // Type check all input/output/clobber lists
+                                let typed_inputs = inputs
+                                    .into_iter()
+                                    .map(|e| type_expr(&scope, e))
+                                    .collect::<Result<Vec<_>, _>>()?;
+                                
+                                let typed_outputs = outputs
+                                    .into_iter()
+                                    .map(|e| type_expr(&scope, e))
+                                    .collect::<Result<Vec<_>, _>>()?;
+                                
+                                let typed_clobbers = clobbers
+                                    .into_iter()
+                                    .map(|e| type_expr(&scope, e))
+                                    .collect::<Result<Vec<_>, _>>()?;
+                                
+                                Ok(Some((
+                                    TypedStmt(
+                                        TypedStmtKind::InlineAsm {
+                                            template: typed_template,
+                                            options: typed_options,
+                                            inputs: typed_inputs,
+                                            outputs: typed_outputs,
+                                            clobbers: typed_clobbers,
+                                        }
+                                        .in_span(stmt_span),
+                                    ),
+                                    BlockReturnActuality::NeverReturns,
+                                )))
+                            }
+
                             StmtKind::IfStmt(cond, then, then_else) => {
                                 // TODO: if `cond` is always true at compile-time, we can prove the
                                 // if branch is always taken (hence
