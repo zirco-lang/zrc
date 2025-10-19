@@ -457,8 +457,21 @@ The second form is syntactic sugar for:
 type Value = union { i: i32, f: f32 };
 ```
 
+**Union Construction**:
+Unions must be constructed with exactly one variant specified using the `new` keyword:
+```zirco
+union Number {
+    Int: i32,
+    Long: i64
+}
+
+let x = new Number { Int: 42 };      // Construct with Int variant
+let y = new Number { Long: 100000 }; // Construct with Long variant
+```
+
 **Rules**:
 - Only one field is active at a time
+- When constructing a union, exactly one variant must be initialized
 - Fields are accessed using the `.` operator
 - Reading an inactive field is undefined behavior
 

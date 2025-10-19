@@ -296,6 +296,24 @@ pub fn type_expr_struct_construction<'input>(
         }
     }
 
+    // For unions, verify exactly one variant is initialized
+    if matches!(resolved_ty, TastType::Union(_)) {
+        if initialized_fields.is_empty() {
+            return Err(DiagnosticKind::ExpectedGot {
+                expected: "exactly one variant to be initialized".to_string(),
+                got: "no variants initialized".to_string(),
+            }
+            .error_in(fields.span()));
+        }
+        if initialized_fields.len() > 1 {
+            return Err(DiagnosticKind::ExpectedGot {
+                expected: "exactly one variant to be initialized".to_string(),
+                got: format!("{} variants initialized", initialized_fields.len()),
+            }
+            .error_in(fields.span()));
+        }
+    }
+
     Ok(TypedExpr {
         inferred_type: resolved_ty,
         kind: TypedExprKind::StructConstruction(initialized_fields).in_span(expr_span),

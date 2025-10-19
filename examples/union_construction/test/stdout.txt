@@ -1,0 +1,17 @@
+=== Union Construction Examples ===
+
+1. Union with Int variant:
+Number { Int: 42, Long: 42 }
+Accessing as Int: 42
+
+2. Union with Long variant:
+Number { Int: 1286608618, Long: 9876543210 }
+Accessing as Long: 9876543210
+
+3. Union with pointer variant:
+Text: Hello, Union!
+
+4. Union with number variant:
+Number: 100
+
+=== All tests passed! ===
