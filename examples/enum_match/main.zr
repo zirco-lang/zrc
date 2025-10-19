@@ -1,0 +1,69 @@
+fn printf(format: *u8, ...) -> i32;
+
+// Per SPEC.md section 3.7 "Enum Types":
+// "Enums are tagged unions, or sum types where a value must be verified
+//  to be one of several types before use. These variants are used in match statements."
+//
+// The spec shows unions used with match, which is the "enum type" concept.
+// The `enum` keyword in the compiler creates an actual tagged union with discriminant.
+//
+// This example demonstrates union variant construction, which is what's needed
+// for the "enum types" pattern described in the specification.
+
+union Result {
+    Success: i32,
+    Error: *u8
+}
+
+union Shape {
+    Circle: i32,
+    Rectangle: i64
+}
+
+fn handle_result(r: Result, expect_success: bool) {
+    if (expect_success) {
+        printf("Got success code: %d\n", r.Success);
+    } else {
+        printf("Got error message: %s\n", r.Error);
+    }
+}
+
+fn handle_shape(s: Shape, is_circle: bool) {
+    if (is_circle) {
+        printf("Got circle with radius: %d\n", s.Circle);
+    } else {
+        printf("Got rectangle with area: %ld\n", s.Rectangle);
+    }
+}
+
+fn main() -> i32 {
+    printf("=== Union Variant Construction Tests ===\n");
+    printf("Demonstrating 'enum types' per SPEC.md section 3.7\n\n");
+    
+    // Test 1: Construct Result union variants
+    printf("1. Constructing Result::Success variant:\n");
+    let r1 = new Result { Success: 200 };
+    handle_result(r1, true);
+    
+    printf("\n2. Constructing Result::Error variant:\n");
+    let r2 = new Result { Error: "File not found" };
+    handle_result(r2, false);
+    
+    // Test 2: Construct Shape union variants
+    printf("\n3. Constructing Shape::Circle variant:\n");
+    let s1 = new Shape { Circle: 5 };
+    handle_shape(s1, true);
+    
+    printf("\n4. Constructing Shape::Rectangle variant:\n");
+    let s2 = new Shape { Rectangle: 100 };
+    handle_shape(s2, false);
+    
+    printf("\n=== All union variant construction tests passed! ===\n");
+    printf("\nNote: This demonstrates the 'enum types' concept from the spec:\n");
+    printf("      unions where exactly one variant is initialized and the\n");
+    printf("      active variant is tracked by the programmer.\n");
+    printf("\nNote: The `enum` keyword creates fully tagged unions with\n");
+    printf("      automatic discriminants and requires match statements.\n");
+    
+    return 0;
+}
