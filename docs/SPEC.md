@@ -569,6 +569,38 @@ Expressions can be wrapped in parentheses to control evaluation order:
 (1 + 2) * 3
 ```
 
+#### 4.3.4 Array Literals
+
+Array literals create arrays on the stack and return a pointer to the first element:
+
+```zirco
+[1, 2, 3] :: *i32
+[10, 20, 30, 40, 50] :: *i32
+```
+
+**Syntax**: `[expr1, expr2, ...] :: *Type`
+
+**Rules**:
+- All elements must have compatible types
+- The type annotation `:: *Type` is optional if the element type can be inferred
+- Without type annotation, untyped integer literals default to `i32`
+- Returns a pointer to the first element
+- The array is allocated on the stack
+
+**Examples**:
+```zirco
+// Explicit type annotation
+let arr = [1, 2, 3] :: *i32;
+printf("%d\n", arr[0]);  // prints 1
+
+// Inferred type (defaults to *i32 for integer literals)
+let nums = [10, 20, 30];
+printf("%d\n", nums[1]);  // prints 20
+
+// Modifying elements
+arr[0] = 100;
+```
+
 ### 4.4 Arithmetic Expressions
 
 **Binary Arithmetic Operators**:

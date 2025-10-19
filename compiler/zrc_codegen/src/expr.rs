@@ -769,33 +769,41 @@ pub(crate) fn cg_expr<'ctx>(
             bb.and(reg)
         }
         TypedExprKind::ArrayLiteral(elements) => {
-            // Array literals allocate stack space for N elements and return a pointer to the first
-            // For example: [1, 2, 3] :: *i32 creates an i32[3] on the stack and returns *i32
-            
+            // Array literals allocate stack space for N elements and return a pointer to
+            // the first For example: [1, 2, 3] :: *i32 creates an i32[3] on the
+            // stack and returns *i32
+
             // Get the element type by dereferencing the pointer type
             let Type::Ptr(ref element_type) = expr.inferred_type else {
                 unreachable!("array literal should always have pointer type")
             };
-            
+
             let element_llvm_type = llvm_basic_type(&cg, element_type).0;
             let element_count = elements.len();
-            
+
             // Create array type
-            let array_type = element_llvm_type.array_type(element_count.try_into().expect("array size should fit in u32"));
-            
+            let array_type = element_llvm_type.array_type(
+                element_count
+                    .try_into()
+                    .expect("array size should fit in u32"),
+            );
+
             // Allocate space for the array on the stack
             let array_ptr = cg
                 .builder
                 .build_alloca(array_type, "array_tmp")
                 .expect("array allocation should have compiled successfully");
-            
+
             // Initialize each element
             for (idx, element_expr) in elements.into_iter().enumerate() {
                 // Evaluate the element value
                 let element_value = unpack!(bb = cg_expr(cg, bb, element_expr));
-                
+
                 // Get pointer to this element in the array
                 #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
+                // SAFETY: GEP operation is safe because we're indexing into an array we just
+                // allocated with the correct size, and idx is guaranteed to be
+                // within bounds
                 let element_ptr = unsafe {
                     cg.builder
                         .build_in_bounds_gep(
@@ -809,14 +817,16 @@ pub(crate) fn cg_expr<'ctx>(
                         )
                         .expect("array GEP should have compiled successfully")
                 };
-                
+
                 // Store the value
                 cg.builder
                     .build_store(element_ptr, element_value)
                     .expect("store should have compiled successfully");
             }
-            
+
             // Cast array pointer to element pointer (pointer to first element)
+            // SAFETY: GEP operation is safe because we're getting a pointer to the first
+            // element of an array we just allocated
             let element_ptr = unsafe {
                 cg.builder
                     .build_in_bounds_gep(
@@ -830,7 +840,7 @@ pub(crate) fn cg_expr<'ctx>(
                     )
                     .expect("GEP to first element should have compiled successfully")
             };
-            
+
             bb.and(element_ptr.as_basic_value_enum())
         }
     }

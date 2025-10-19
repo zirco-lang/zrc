@@ -1,0 +1,25 @@
+fn printf(format: *u8, ...) -> i32;
+
+fn main() {
+    // Array literal with explicit type annotation
+    let numbers = [10, 20, 30, 40, 50] :: *i32;
+    
+    printf("Array elements:\n");
+    printf("  numbers[0] = %d\n", numbers[0]);
+    printf("  numbers[1] = %d\n", numbers[1]);
+    printf("  numbers[2] = %d\n", numbers[2]);
+    printf("  numbers[3] = %d\n", numbers[3]);
+    printf("  numbers[4] = %d\n", numbers[4]);
+    
+    // Array literal without type annotation (inferred as *i32)
+    let more = [100, 200, 300];
+    printf("\nMore numbers:\n");
+    printf("  more[0] = %d\n", more[0]);
+    printf("  more[1] = %d\n", more[1]);
+    printf("  more[2] = %d\n", more[2]);
+    
+    // Modifying array elements
+    numbers[2] = 35;
+    printf("\nAfter modification:\n");
+    printf("  numbers[2] = %d\n", numbers[2]);
+}

@@ -371,8 +371,7 @@ impl Display for TypedExprKind<'_> {
             }
             Self::ArrayLiteral(elements) => {
                 write!(f, "[")?;
-                let element_strs: Vec<String> =
-                    elements.iter().map(ToString::to_string).collect();
+                let element_strs: Vec<String> = elements.iter().map(ToString::to_string).collect();
                 write!(f, "{}]", element_strs.join(", "))
             }
             Self::NumberLiteral(num, _ty) => write!(f, "{num}"),

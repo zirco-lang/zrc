@@ -314,39 +314,126 @@ pub fn type_expr_array_literal<'input>(
     elements: Vec<Expr<'input>>,
     ty_annotation: Option<Type<'input>>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    // Type check all elements
+    // Determine the target element type
+    let (result_type, target_element_type) = if let Some(ty_ann) = ty_annotation {
+        // Type annotation provided - resolve it
+        let resolved_type = resolve_type(scope.types, ty_ann)?;
+
+        // The type annotation must be a pointer type
+        let element_type = match &resolved_type {
+            TastType::Ptr(elem_ty) => (**elem_ty).clone(),
+            TastType::I8
+            | TastType::U8
+            | TastType::I16
+            | TastType::U16
+            | TastType::I32
+            | TastType::U32
+            | TastType::I64
+            | TastType::U64
+            | TastType::Usize
+            | TastType::Isize
+            | TastType::Bool
+            | TastType::Int
+            | TastType::Fn(_)
+            | TastType::Struct(_)
+            | TastType::Union(_)
+            | TastType::Opaque(_) => {
+                return Err(DiagnosticKind::ExpectedGot {
+                    expected: "pointer type".to_string(),
+                    got: resolved_type.to_string(),
+                }
+                .error_in(expr_span));
+            }
+        };
+
+        (resolved_type, Some(element_type))
+    } else {
+        // No type annotation - will infer from first element
+        (TastType::Int, None) // placeholder, will be updated
+    };
+
+    // Type check all elements and coerce to target type
     let mut typed_elements = Vec::new();
-    let mut element_type: Option<TastType<'input>> = None;
+    let mut inferred_element_type: Option<TastType<'input>> = None;
 
     for element in elements {
         let element_span = element.0.span();
-        let typed_element = type_expr(scope, element)?;
+        let mut typed_element = type_expr(scope, element)?;
 
-        if let Some(ref expected_type) = element_type {
-            // All elements must have the same type
-            if typed_element.inferred_type != *expected_type {
-                return Err(DiagnosticKind::ExpectedSameType(
-                    expected_type.to_string(),
-                    typed_element.inferred_type.to_string(),
-                )
-                .error_in(element_span));
+        if let Some(ref target_type) = target_element_type {
+            // Type annotation provided - coerce elements to target type
+            if typed_element.inferred_type != *target_type {
+                if typed_element
+                    .inferred_type
+                    .can_implicitly_cast_to(target_type)
+                {
+                    typed_element = try_coerce_to(typed_element, target_type);
+                } else {
+                    return Err(DiagnosticKind::ExpectedGot {
+                        expected: target_type.to_string(),
+                        got: typed_element.inferred_type.to_string(),
+                    }
+                    .error_in(element_span));
+                }
             }
         } else {
-            // First element sets the type
-            element_type = Some(typed_element.inferred_type.clone());
+            // No type annotation - infer from elements
+            if let Some(ref expected_type) = inferred_element_type {
+                // All elements must have compatible types
+                if typed_element.inferred_type != *expected_type {
+                    if typed_element
+                        .inferred_type
+                        .can_implicitly_cast_to(expected_type)
+                    {
+                        typed_element = try_coerce_to(typed_element, expected_type);
+                    } else if expected_type.can_implicitly_cast_to(&typed_element.inferred_type) {
+                        // Update inferred type to wider type
+                        inferred_element_type = Some(typed_element.inferred_type.clone());
+                    } else {
+                        return Err(DiagnosticKind::ExpectedSameType(
+                            expected_type.to_string(),
+                            typed_element.inferred_type.to_string(),
+                        )
+                        .error_in(element_span));
+                    }
+                }
+            } else {
+                // First element sets the inferred type
+                inferred_element_type = Some(typed_element.inferred_type.clone());
+            }
         }
 
         typed_elements.push(typed_element);
     }
 
-    // Determine the result type (pointer to element type)
-    let result_type = if let Some(ty_ann) = ty_annotation {
-        // Type annotation provided - resolve it
-        resolve_type(scope.types, ty_ann)?
+    // Determine final result type
+    let final_result_type = if target_element_type.is_some() {
+        result_type
     } else {
         // No type annotation - infer pointer to element type
-        if let Some(elem_ty) = element_type {
-            TastType::Ptr(Box::new(elem_ty))
+        if let Some(elem_ty) = inferred_element_type {
+            // Resolve {int} type to i32
+            let resolved_elem_ty = if matches!(elem_ty, TastType::Int) {
+                TastType::I32
+            } else {
+                elem_ty
+            };
+
+            // Coerce all elements to the resolved type if needed
+            if matches!(resolved_elem_ty, TastType::I32) {
+                typed_elements = typed_elements
+                    .into_iter()
+                    .map(|element| {
+                        if element.inferred_type == TastType::Int {
+                            try_coerce_to(element, &TastType::I32)
+                        } else {
+                            element
+                        }
+                    })
+                    .collect();
+            }
+
+            TastType::Ptr(Box::new(resolved_elem_ty))
         } else {
             // Empty array without type annotation - error
             return Err(DiagnosticKind::NoTypeNoValue.error_in(expr_span));
@@ -354,7 +441,7 @@ pub fn type_expr_array_literal<'input>(
     };
 
     Ok(TypedExpr {
-        inferred_type: result_type,
+        inferred_type: final_result_type,
         kind: TypedExprKind::ArrayLiteral(typed_elements).in_span(expr_span),
     })
 }

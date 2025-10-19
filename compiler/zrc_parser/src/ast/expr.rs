@@ -487,12 +487,11 @@ impl std::fmt::Display for ExprKind<'_> {
             }
             Self::ArrayLiteral(elements, ty) => {
                 write!(f, "[")?;
-                let element_strs: Vec<String> =
-                    elements.iter().map(ToString::to_string).collect();
+                let element_strs: Vec<String> = elements.iter().map(ToString::to_string).collect();
                 write!(f, "{}", element_strs.join(", "))?;
                 write!(f, "]")?;
-                if let Some(t) = ty {
-                    write!(f, " :: {t}")?;
+                if let Some(type_annotation) = ty {
+                    write!(f, " :: {type_annotation}")?;
                 }
                 Ok(())
             }
@@ -876,11 +875,7 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    pub fn build_array_literal(
-        span: Span,
-        elements: Vec<Self>,
-        ty: Option<Type<'input>>,
-    ) -> Self {
+    pub fn build_array_literal(span: Span, elements: Vec<Self>, ty: Option<Type<'input>>) -> Self {
         Self(spanned!(
             span.start(),
             ExprKind::ArrayLiteral(elements, ty),
