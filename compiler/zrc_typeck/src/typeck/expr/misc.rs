@@ -196,8 +196,109 @@ pub fn type_expr_size_of_expr<'input>(
     })
 }
 
-/// Typeck a struct construction expr
+/// Typeck an enum construction expr (enum is desugared to struct with
+/// discriminant)
 #[allow(clippy::type_complexity)]
+fn type_expr_enum_construction<'input>(
+    scope: &Scope<'input, '_>,
+    expr_span: Span,
+    enum_ty: TastType<'input>,
+    variants: indexmap::IndexMap<&'input str, TastType<'input>>,
+    fields: &zrc_utils::span::Spanned<
+        Vec<zrc_utils::span::Spanned<(zrc_utils::span::Spanned<&'input str>, Expr<'input>)>>,
+    >,
+) -> Result<TypedExpr<'input>, Diagnostic> {
+    use indexmap::IndexMap;
+
+    // Enum construction should have exactly one variant
+    if fields.value().is_empty() {
+        return Err(DiagnosticKind::ExpectedGot {
+            expected: "exactly one variant to be initialized".to_string(),
+            got: "no variants initialized".to_string(),
+        }
+        .error_in(fields.span()));
+    }
+    if fields.value().len() > 1 {
+        return Err(DiagnosticKind::ExpectedGot {
+            expected: "exactly one variant to be initialized".to_string(),
+            got: format!("{} variants initialized", fields.value().len()),
+        }
+        .error_in(fields.span()));
+    }
+
+    // Get the single variant being initialized
+    let (variant_name, variant_expr) = fields.value()[0].value();
+    let variant_name_str = variant_name.value();
+
+    // Find the variant in the enum and get its index (discriminant)
+    let (discriminant, variant_type) = variants
+        .iter()
+        .enumerate()
+        .find(|(_, (name, _))| *name == variant_name_str)
+        .ok_or_else(|| {
+            DiagnosticKind::StructOrUnionDoesNotHaveMember(
+                enum_ty.to_string(),
+                (*variant_name_str).to_string(),
+            )
+            .error_in(variant_name.span())
+        })?;
+
+    // Type check the variant value
+    let typed_variant_expr = type_expr(scope, variant_expr.clone())?;
+
+    // Try to coerce the variant value to the expected type
+    let typed_variant_expr = if typed_variant_expr.inferred_type == *variant_type.1 {
+        typed_variant_expr
+    } else if typed_variant_expr
+        .inferred_type
+        .can_implicitly_cast_to(variant_type.1)
+    {
+        try_coerce_to(typed_variant_expr, variant_type.1)
+    } else {
+        return Err(DiagnosticKind::ExpectedGot {
+            expected: variant_type.1.to_string(),
+            got: typed_variant_expr.inferred_type.to_string(),
+        }
+        .error_in(typed_variant_expr.kind.span()));
+    };
+
+    // Construct the internal representation:
+    // { __discriminant__: <index>, __value__: { <variant>: <value> } }
+    let mut internal_fields = IndexMap::new();
+
+    // Add discriminant field
+    #[allow(clippy::cast_possible_truncation)]
+    let discriminant_expr = TypedExpr {
+        inferred_type: TastType::Usize,
+        kind: TypedExprKind::NumberLiteral(
+            zrc_parser::lexer::NumberLiteral::Decimal(
+                // We need to create a string representation of the discriminant
+                // This is a bit of a hack but works for our purposes
+                Box::leak(discriminant.to_string().into_boxed_str()),
+            ),
+            TastType::Usize,
+        )
+        .in_span(expr_span),
+    };
+    internal_fields.insert("__discriminant__", discriminant_expr);
+
+    // Add union value field
+    let mut union_fields = IndexMap::new();
+    union_fields.insert(*variant_name_str, typed_variant_expr);
+    let union_expr = TypedExpr {
+        inferred_type: TastType::Union(variants),
+        kind: TypedExprKind::StructConstruction(union_fields).in_span(expr_span),
+    };
+    internal_fields.insert("__value__", union_expr);
+
+    Ok(TypedExpr {
+        inferred_type: enum_ty,
+        kind: TypedExprKind::StructConstruction(internal_fields).in_span(expr_span),
+    })
+}
+
+/// Typeck a struct construction expr
+#[allow(clippy::type_complexity, clippy::too_many_lines)]
 pub fn type_expr_struct_construction<'input>(
     scope: &Scope<'input, '_>,
     expr_span: Span,
@@ -210,6 +311,24 @@ pub fn type_expr_struct_construction<'input>(
 
     // Resolve the type being constructed
     let resolved_ty = resolve_type(scope.types, ty)?;
+
+    // Check if this is an enum type (struct with __discriminant__ and __value__
+    // fields)
+    if let TastType::Struct(struct_fields) = &resolved_ty
+        && struct_fields.len() == 2
+        && struct_fields.contains_key("__discriminant__")
+        && struct_fields.contains_key("__value__")
+        && let Some(TastType::Union(variants)) = struct_fields.get("__value__")
+    {
+        // This is an enum! Handle variant construction specially
+        return type_expr_enum_construction(
+            scope,
+            expr_span,
+            resolved_ty.clone(),
+            variants.clone(),
+            fields,
+        );
+    }
 
     // Ensure it's a struct or union type
     let expected_fields = match &resolved_ty {
