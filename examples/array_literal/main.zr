@@ -1,8 +1,8 @@
 fn printf(format: *u8, ...) -> i32;
 
 fn main() {
-    // Array literal with explicit type annotation
-    let numbers = [10, 20, 30, 40, 50] :: *i32;
+    // Array literal (type inferred as *i32)
+    let numbers = [10, 20, 30, 40, 50];
     
     printf("Array elements:\n");
     printf("  numbers[0] = %d\n", numbers[0]);
@@ -11,7 +11,7 @@ fn main() {
     printf("  numbers[3] = %d\n", numbers[3]);
     printf("  numbers[4] = %d\n", numbers[4]);
     
-    // Array literal without type annotation (inferred as *i32)
+    // Another array literal
     let more = [100, 200, 300];
     printf("\nMore numbers:\n");
     printf("  more[0] = %d\n", more[0]);

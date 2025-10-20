@@ -115,7 +115,7 @@ pub enum TypedExprKind<'input> {
     /// `new Type { field1: value1, field2: value2, ... }`
     StructConstruction(indexmap::IndexMap<&'input str, TypedExpr<'input>>),
 
-    /// `[expr1, expr2, ...] :: Type`
+    /// `[expr1, expr2, ...]`
     ArrayLiteral(Vec<TypedExpr<'input>>),
 
     /// Any numeric literal.

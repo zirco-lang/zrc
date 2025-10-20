@@ -390,9 +390,9 @@ Primary: Expr<'input> = {
             ty, 
             spanned!(s, fields.unwrap_or(Vec::new()), e, file_name)
         ), e, file_name)),
-    // Array literal: [elem1, elem2, ...] :: Type (type annotation optional)
-    <s:@L> "[" <elements:ArgumentList?> "]" <ty:("::" <Type>)?> <e:@R> =>
-        Expr(spanned!(s, ExprKind::ArrayLiteral(elements.unwrap_or(Vec::new()), ty), e, file_name)),
+    // Array literal: [elem1, elem2, ...]
+    <s:@L> "[" <elements:ArgumentList?> "]" <e:@R> =>
+        Expr(spanned!(s, ExprKind::ArrayLiteral(elements.unwrap_or(Vec::new())), e, file_name)),
     "(" <Expr> ")" => <>,
 };
 

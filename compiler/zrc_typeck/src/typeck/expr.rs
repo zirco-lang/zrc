@@ -80,8 +80,8 @@ pub fn type_expr<'input>(
         ExprKind::StructConstruction(ty, fields) => {
             misc::type_expr_struct_construction(scope, expr_span, ty, &fields)?
         }
-        ExprKind::ArrayLiteral(elements, ty) => {
-            misc::type_expr_array_literal(scope, expr_span, elements, ty)?
+        ExprKind::ArrayLiteral(elements) => {
+            misc::type_expr_array_literal(scope, expr_span, elements)?
         }
     })
 }
