@@ -95,7 +95,7 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
             }
         }
 
-        let (ty, dbg_ty) = llvm_basic_type(&cg, &let_declaration.ty);
+        let (ty, _dbg_ty) = llvm_basic_type(&cg, &let_declaration.ty);
 
         let ptr = entry_block_builder
             .build_alloca(ty, &format!("let_{}", let_declaration.name))
@@ -103,19 +103,20 @@ fn cg_let_declaration<'ctx, 'input, 'a>(
 
         scope.insert(let_declaration.name.value(), ptr);
 
-        let decl = cg.dbg_builder.create_auto_variable(
-            dbg_scope.as_debug_info_scope(),
-            let_declaration.name.value(),
-            cg.compilation_unit.get_file(),
-            cg.line_lookup.lookup_from_index(span.start()).line,
-            dbg_ty,
-            true,
-            0,
-            0,
-        );
+        // let decl = cg.dbg_builder.create_auto_variable(
+        //     dbg_scope.as_debug_info_scope(),
+        //     let_declaration.name.value(),
+        //     cg.compilation_unit.get_file(),
+        //     cg.line_lookup.lookup_from_index(span.start()).line,
+        //     dbg_ty,
+        //     true,
+        //     0,
+        //     0,
+        // );
 
-        cg.dbg_builder
-            .insert_declare_at_end(ptr, Some(decl), None, debug_location, first_bb);
+        // FIXME: Re-enable this when Inkwell resolves TheDan64/inkwell#613
+        // cg.dbg_builder
+        //     .insert_declare_at_end(ptr, Some(decl), None, debug_location, first_bb);
 
         if let Some(value) = let_declaration.value {
             let expr_cg = BlockCtx::new(cg, scope, dbg_scope);

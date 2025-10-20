@@ -11,7 +11,6 @@ use inkwell::{
     debug_info::{AsDIScope, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage},
     memory_buffer::MemoryBuffer,
     module::{FlagBehavior, Module},
-    passes::{PassManager, PassManagerBuilder},
     targets::{
         CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
     },
@@ -191,29 +190,35 @@ pub fn cg_init_fn<'ctx>(
 }
 
 /// Run optimizations on the given program.
-fn optimize_module(module: &Module<'_>, optimization_level: OptimizationLevel) {
-    let pmb = PassManagerBuilder::create();
-    pmb.set_optimization_level(optimization_level);
-    let pm = PassManager::<Module>::create(());
-    pmb.populate_module_pass_manager(&pm);
-    pm.run_on(module);
+fn optimize_module(module: &Module<'_>, tm: &TargetMachine, optimization_level: OptimizationLevel) {
+    // SAFETY: This is safe because we ensure that the module is valid and
+    // properly constructed before passing it to the optimizer.
+    //
+    // We must use FFI here because Inkwell does not expose the LLVM
+    // optimization passes directly.
+    unsafe {
+        #[allow(clippy::as_conversions)]
+        crate::zrc_codegen_optimize_module(
+            module.as_mut_ptr(),
+            tm.as_mut_ptr(),
+            optimization_level as u32,
+        );
+    }
 }
 
 /// Code generate and verify a program given a [`Context`] and return the final
-/// LLVM [`Module`] as a result, fully optimized and ready for printing as an IR
-/// or compiling to assembly/native code.
+/// LLVM [`Module`] as a result, sans optimization.
 ///
 /// # Panics
 /// Panics if code generation fails. This can be caused by an invalid TAST being
 /// passed, so make sure to type check it so invariants are upheld.
 #[must_use]
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
-fn cg_program<'ctx>(
+fn cg_program_without_optimization<'ctx>(
     frontend_version_string: &str,
     cli_args: &str,
     ctx: &'ctx Context,
     target_machine: &TargetMachine,
-    optimization_level: OptimizationLevel,
     debug_level: DWARFEmissionKind,
     parent_directory: &str,
     file_name: &str,
@@ -325,7 +330,7 @@ fn cg_program<'ctx>(
                         builder.position_at_end(entry);
                     }
 
-                    let (ty, dbg_ty) = llvm_basic_type(&unit, ty.value());
+                    let (ty, _dbg_ty) = llvm_basic_type(&unit, ty.value());
 
                     let alloc = builder
                         .build_alloca(ty, &format!("arg_{name}"))
@@ -345,35 +350,36 @@ fn cg_program<'ctx>(
                         )
                         .expect("store should generate successfully");
 
-                    let ident_line_col = line_lookup.lookup_from_index(name.start());
+                    // let ident_line_col = line_lookup.lookup_from_index(name.start());
 
-                    let id_debug_location = dbg_builder.create_debug_location(
-                        ctx,
-                        ident_line_col.line,
-                        ident_line_col.col,
-                        lexical_block.as_debug_info_scope(),
-                        None,
-                    );
+                    // let id_debug_location = dbg_builder.create_debug_location(
+                    //     ctx,
+                    //     ident_line_col.line,
+                    //     ident_line_col.col,
+                    //     lexical_block.as_debug_info_scope(),
+                    //     None,
+                    // );
 
-                    let decl = dbg_builder.create_parameter_variable(
-                        fn_subprogram.as_debug_info_scope(),
-                        name.value(),
-                        u32::try_from(n)
-                            .expect("should not be more than u32::MAX args in a function"),
-                        compilation_unit.get_file(),
-                        ident_line_col.line,
-                        dbg_ty,
-                        true,
-                        0,
-                    );
+                    // let decl = dbg_builder.create_parameter_variable(
+                    //     fn_subprogram.as_debug_info_scope(),
+                    //     name.value(),
+                    //     u32::try_from(n)
+                    //         .expect("should not be more than u32::MAX args in a function"),
+                    //     compilation_unit.get_file(),
+                    //     ident_line_col.line,
+                    //     dbg_ty,
+                    //     true,
+                    //     0,
+                    // );
 
-                    dbg_builder.insert_declare_at_end(
-                        alloc,
-                        Some(decl),
-                        None,
-                        id_debug_location,
-                        entry,
-                    );
+                    // FIXME: Re-enable this when Inkwell resolves TheDan64/inkwell#613
+                    // dbg_builder.insert_declare_at_end(
+                    //     alloc,
+                    //     Some(decl),
+                    //     None,
+                    //     id_debug_location,
+                    //     entry,
+                    // );
 
                     fn_scope.insert(name.value(), alloc);
                 }
@@ -444,7 +450,43 @@ fn cg_program<'ctx>(
         }
     }
 
-    optimize_module(&module, optimization_level);
+    module
+}
+
+/// Code generate and verify a program given a [`Context`] and return the final
+/// LLVM [`Module`] as a result, fully optimized and ready for printing as an IR
+/// or compiling to assembly/native code.
+///
+/// # Panics
+/// Panics if code generation fails. This can be caused by an invalid TAST being
+/// passed, so make sure to type check it so invariants are upheld.
+#[must_use]
+#[allow(clippy::too_many_arguments)]
+fn cg_program<'ctx>(
+    frontend_version_string: &str,
+    cli_args: &str,
+    ctx: &'ctx Context,
+    target_machine: &TargetMachine,
+    optimization_level: OptimizationLevel,
+    debug_level: DWARFEmissionKind,
+    parent_directory: &str,
+    file_name: &str,
+    line_lookup: &LineLookup,
+    program: Vec<Spanned<TypedDeclaration<'_>>>,
+) -> Module<'ctx> {
+    let module = cg_program_without_optimization(
+        frontend_version_string,
+        cli_args,
+        ctx,
+        target_machine,
+        debug_level,
+        parent_directory,
+        file_name,
+        line_lookup,
+        program,
+    );
+
+    optimize_module(&module, target_machine, optimization_level);
 
     module
 }
@@ -491,6 +533,60 @@ pub fn cg_program_to_string(
         &ctx,
         &target_machine,
         optimization_level,
+        debug_level,
+        parent_directory,
+        file_name,
+        &LineLookup::new(source),
+        program,
+    );
+
+    module.print_to_string().to_string()
+}
+
+/// Code generate a LLVM program to a string, sans any optimization passes.
+///
+/// # Panics
+/// Panics on internal code generation failure.
+#[must_use]
+#[allow(clippy::too_many_arguments)]
+// this function is currently only used in tests because the LLVM optimizer
+// doesn't handle well when multithreaded.
+#[cfg(test)]
+pub fn cg_program_to_string_without_optimization(
+    frontend_version_string: &str,
+    parent_directory: &str,
+    file_name: &str,
+    cli_args: &str,
+    source: &str,
+    program: Vec<Spanned<TypedDeclaration>>,
+    debug_level: DWARFEmissionKind,
+    triple: &TargetTriple,
+    cpu: &str,
+) -> String {
+    let ctx = Context::create();
+
+    Target::initialize_all(&InitializationConfig::default());
+    let target = Target::from_triple(triple).expect("target should be ready and exist");
+
+    let target_machine = target
+        .create_target_machine(
+            triple,
+            cpu,
+            "",
+            // FIXME: Technically this function doesn't run optimizations, but we
+            // do run them later in the cg_program function. Does this mean we're making
+            // an invalid target?
+            OptimizationLevel::None,
+            RelocMode::PIC,
+            CodeModel::Default,
+        )
+        .expect("target machine should be created successfully");
+
+    let module = cg_program_without_optimization(
+        frontend_version_string,
+        cli_args,
+        &ctx,
+        &target_machine,
         debug_level,
         parent_directory,
         file_name,
