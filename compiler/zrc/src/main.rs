@@ -116,7 +116,10 @@ fn main() -> anyhow::Result<()> {
     );
 
     match result {
-        Err(diagnostic) => eprintln!("{}", diagnostic.print_with_filename(&source_content, &path)),
+        Err(diagnostic) => {
+            eprintln!("{}", diagnostic.print_with_filename(&source_content, &path));
+            std::process::exit(1);
+        }
         Ok(x) => {
             io::open_output(&cli.out_file)?.write_all(&x)?;
         }
