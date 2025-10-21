@@ -22,8 +22,7 @@ pub struct Fn<'input> {
     pub returns: Box<Type<'input>>,
 }
 
-/// Auxillary data attached to a [`Fn`] in the
-/// [`crate::typeck::scope::GlobalScope`]
+/// Auxillary data attached to a [`Fn`] in the Global Scope
 #[derive(Debug)]
 pub struct FunctionDeclarationGlobalMetadata<'input> {
     /// The corresponding [`Fn`] we wrap

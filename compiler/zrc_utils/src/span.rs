@@ -18,7 +18,7 @@ use std::{fmt::Display, ops::RangeInclusive};
 ///
 /// These are often found within the [`Spanned<T>`] type. They can be obtained
 /// in a few ways:
-/// - Direct construction ([`Span::from_positions`])
+/// - Direct construction ([`Span::from_positions_and_file`])
 /// - Methods on another Span ([`Span::intersect`])
 /// - Stripping the value from a [`Spanned<T>`] ([`Spanned::span`])
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

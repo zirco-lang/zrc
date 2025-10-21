@@ -9,8 +9,8 @@
 //!
 //! # Error handling
 //! The parser returns a [`Result`] that either yields the parsed
-//! [AST](super::ast) or a [`ZircoParserError`]. For more information, read the
-//! documentation of [`ZircoParserError`].
+//! [AST](super::ast) or a [`Diagnostic`]. For more information, read the
+//! documentation of [`Diagnostic`].
 //!
 //! # Example
 //! For more examples, read the documentation for the corresponding parser
@@ -18,7 +18,6 @@
 //! ```
 //! use zrc_parser::parser::parse_program;
 //! let ast = parse_program("fn main() {}", "<test>");
-//! ```
 //! ```
 
 use lalrpop_util::ParseError;
@@ -95,7 +94,7 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 ///
 /// This function runs an **entire program** through the Zirco parser and
 /// returns either a complete [AST](super::ast) consisting of root
-/// [`Declaration`] nodes, or a list of [`ZircoParserError`]s in the case of a
+/// [`Declaration`] nodes, or a list of [`Diagnostic`]s in the case of a
 /// syntax error.
 ///
 /// # Example
@@ -106,7 +105,7 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 /// ```
 ///
 /// # Errors
-/// This function returns [`Err`] with a [`ZircoParserError`] if any error was
+/// This function returns [`Err`] with a [`Diagnostic`] if any error was
 /// encountered while parsing the input program.
 #[allow(clippy::result_large_err)]
 pub fn parse_program<'input>(
@@ -137,7 +136,7 @@ pub fn parse_program<'input>(
 /// ```
 ///
 /// # Errors
-/// This function returns [`Err`] with a [`ZircoParserError`] if any error was
+/// This function returns [`Err`] with a [`Diagnostic`] if any error was
 /// encountered while parsing the input statement list.
 #[allow(clippy::result_large_err)]
 pub fn parse_stmt_list<'input>(
@@ -170,7 +169,7 @@ pub fn parse_stmt_list<'input>(
 /// ```
 ///
 /// # Errors
-/// This function returns [`Err`] with a [`ZircoParserError`] if any error was
+/// This function returns [`Err`] with a [`Diagnostic`] if any error was
 /// encountered while parsing the input expression.
 #[allow(clippy::result_large_err)]
 pub fn parse_type<'input>(
@@ -200,7 +199,7 @@ pub fn parse_type<'input>(
 /// ```
 ///
 /// # Errors
-/// This function returns [`Err`] with a [`ZircoParserError`] if any error was
+/// This function returns [`Err`] with a [`Diagnostic`] if any error was
 /// encountered while parsing the input expression.
 #[allow(clippy::result_large_err)]
 pub fn parse_expr<'input>(

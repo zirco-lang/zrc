@@ -25,7 +25,7 @@ pub struct LineLookup {
 }
 
 impl LineLookup {
-    /// Creates a new [`CgLineLookup`] over a string
+    /// Creates a new [`LineLookup`] over a string
     #[must_use]
     pub fn new(input: &str) -> Self {
         let mut line_start = 0;
