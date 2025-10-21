@@ -14,7 +14,7 @@ use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{declaration::process_let_declaration, expr::try_coerce_to, scope::Scope, type_expr};
 use crate::tast::{
-    expr::TypedExpr,
+    expr::{TypedExpr, TypedExprKind},
     stmt::{TypedStmt, TypedStmtKind},
     ty::Type as TastType,
 };
@@ -476,12 +476,49 @@ pub fn type_block<'input, 'gs>(
                                 // Type check the template (must be a string literal)
                                 let typed_template = type_expr(&scope, template)?;
 
+                                // Validate it's a string literal
+                                if !matches!(
+                                    typed_template.kind.value(),
+                                    TypedExprKind::StringLiteral(_)
+                                ) {
+                                    return Err(Diagnostic(
+                                        Severity::Error,
+                                        typed_template.kind.span().containing(
+                                            DiagnosticKind::ExpectedGot {
+                                                expected: "string literal".to_string(),
+                                                got: typed_template.inferred_type.to_string(),
+                                            },
+                                        ),
+                                    ));
+                                }
+
                                 // Type check output operands
                                 let typed_outputs = outputs
                                     .into_iter()
                                     .map(|AsmOperand { constraint, expr }| {
+                                        // Validate constraint is a string literal
+                                        let typed_constraint = type_expr(&scope, constraint)?;
+                                        let constraint_str =
+                                            if let TypedExprKind::StringLiteral(string) =
+                                                typed_constraint.kind.value()
+                                            {
+                                                string.as_bytes()
+                                            } else {
+                                                return Err(Diagnostic(
+                                                    Severity::Error,
+                                                    typed_constraint.kind.span().containing(
+                                                        DiagnosticKind::ExpectedGot {
+                                                            expected: "string literal".to_string(),
+                                                            got: typed_constraint
+                                                                .inferred_type
+                                                                .to_string(),
+                                                        },
+                                                    ),
+                                                ));
+                                            };
+
                                         Ok(TypedAsmOperand {
-                                            constraint: type_expr(&scope, constraint)?,
+                                            constraint: constraint_str,
                                             expr: type_expr(&scope, expr)?,
                                         })
                                     })
@@ -491,14 +528,35 @@ pub fn type_block<'input, 'gs>(
                                 let typed_inputs = inputs
                                     .into_iter()
                                     .map(|AsmOperand { constraint, expr }| {
+                                        // Validate constraint is a string literal
+                                        let typed_constraint = type_expr(&scope, constraint)?;
+                                        let constraint_str =
+                                            if let TypedExprKind::StringLiteral(string) =
+                                                typed_constraint.kind.value()
+                                            {
+                                                string.as_bytes()
+                                            } else {
+                                                return Err(Diagnostic(
+                                                    Severity::Error,
+                                                    typed_constraint.kind.span().containing(
+                                                        DiagnosticKind::ExpectedGot {
+                                                            expected: "string literal".to_string(),
+                                                            got: typed_constraint
+                                                                .inferred_type
+                                                                .to_string(),
+                                                        },
+                                                    ),
+                                                ));
+                                            };
+
                                         Ok(TypedAsmOperand {
-                                            constraint: type_expr(&scope, constraint)?,
+                                            constraint: constraint_str,
                                             expr: type_expr(&scope, expr)?,
                                         })
                                     })
                                     .collect::<Result<Vec<_>, _>>()?;
 
-                                // Type check clobbers (should be string literals)
+                                // Clobbers are already string literals from parser
                                 let typed_clobbers = clobbers
                                     .into_iter()
                                     .map(|expr| type_expr(&scope, expr))

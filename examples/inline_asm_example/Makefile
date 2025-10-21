@@ -1,7 +1,7 @@
 # Makefile for inline_asm_example
 
 ZRC := ../../target/debug/zrc
-OUTDIR := build
+OUTDIR := out
 
 .PHONY: build clean test
 

@@ -1,7 +1,7 @@
 # Makefile for asm_with_io
 
 ZRC := ../../target/debug/zrc
-OUTDIR := build
+OUTDIR := out
 
 .PHONY: build clean test
 

@@ -11,8 +11,8 @@ use super::{expr::TypedExpr, ty::Type};
 #[derive(Debug, Clone, PartialEq)]
 pub struct TypedAsmOperand<'input> {
     /// The constraint string (e.g., "=r", "r", "m")
-    pub constraint: TypedExpr<'input>,
-    /// The expression being constrained
+    pub constraint: String,
+    /// The expression being constrained (for outputs, must be a place)
     pub expr: TypedExpr<'input>,
 }
 
@@ -126,7 +126,7 @@ pub enum TypedDeclaration<'input> {
     /// Module-level assembly declaration
     ModuleAsm {
         /// The assembly code
-        assembly: TypedExpr<'input>,
+        assembly: String,
     },
 }
 

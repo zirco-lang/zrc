@@ -18,6 +18,7 @@
 use inkwell::{
     basic_block::BasicBlock,
     debug_info::{AsDIScope, DILexicalBlock},
+    types::BasicType,
 };
 use zrc_typeck::tast::{
     expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
@@ -655,16 +656,14 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     inputs,
                     clobbers,
                 } => {
-                    // Extract string literals from the template and constraints
-                    use inkwell::types::BasicType;
-                    use zrc_typeck::tast::expr::TypedExprKind;
-
-                    let template_str =
-                        if let TypedExprKind::StringLiteral(string) = template.kind.value() {
-                            string.to_string()
-                        } else {
-                            panic!("inline assembly template must be a string literal");
-                        };
+                    // Extract the template string (already validated as string literal in typeck)
+                    let template_str = if let TypedExprKind::StringLiteral(string) =
+                        template.kind.value()
+                    {
+                        string.as_bytes()
+                    } else {
+                        unreachable!("template should be a string literal (validated at typeck)")
+                    };
 
                     // Build constraint string and collect operand information
                     let mut constraint_parts = Vec::new();
@@ -674,19 +673,9 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
 
                     // Process output constraints and get their places
                     for output in &outputs {
-                        let constraint_str = if let TypedExprKind::StringLiteral(string) =
-                            output.constraint.kind.value()
-                        {
-                            string.to_string()
-                        } else {
-                            panic!("inline assembly constraint must be a string literal");
-                        };
-                        constraint_parts.push(constraint_str);
+                        constraint_parts.push(output.constraint.as_str());
 
                         // Convert output expression to a place to get its pointer
-                        // The output expression should be an Identifier (variable reference)
-                        let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
-
                         // Try to extract a place from the expression
                         #[allow(clippy::wildcard_enum_match_arm)]
                         let place_opt = match output.expr.kind.value() {
@@ -714,28 +703,22 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         };
 
                         if let Some(place) = place_opt {
+                            let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
                             let place_ptr = unpack!(bb = cg_place(expr_cg, bb, place));
                             output_places.push(place_ptr);
                             let (ty, _) = llvm_basic_type(&expr_cg, &output.expr.inferred_type);
                             output_types.push(ty);
                         } else {
-                            panic!(
-                                "inline assembly output must be an lvalue (variable, \
-                                 dereference, or index)"
+                            unreachable!(
+                                "inline assembly output must be an lvalue (should be validated at \
+                                 typeck)"
                             );
                         }
                     }
 
                     // Process input constraints and values
                     for input in &inputs {
-                        let constraint_str = if let TypedExprKind::StringLiteral(string) =
-                            input.constraint.kind.value()
-                        {
-                            string.to_string()
-                        } else {
-                            panic!("inline assembly constraint must be a string literal");
-                        };
-                        constraint_parts.push(constraint_str);
+                        constraint_parts.push(input.constraint.as_str());
 
                         // Evaluate the input expression
                         let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
@@ -747,15 +730,21 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     let mut clobber_strings = Vec::new();
                     for clobber in &clobbers {
                         if let TypedExprKind::StringLiteral(string) = clobber.kind.value() {
-                            clobber_strings.push(string.to_string());
+                            clobber_strings.push(string.as_bytes());
                         } else {
-                            panic!("inline assembly clobber must be a string literal");
+                            unreachable!(
+                                "clobber should be a string literal (validated at typeck)"
+                            );
                         }
                     }
 
                     // Combine all constraints with clobbers
-                    let constraints = if clobber_strings.is_empty() {
+                    let constraints = if constraint_parts.is_empty() && clobber_strings.is_empty() {
+                        String::new()
+                    } else if clobber_strings.is_empty() {
                         constraint_parts.join(",")
+                    } else if constraint_parts.is_empty() {
+                        format!("~{{{}}}", clobber_strings.join(","))
                     } else {
                         format!(
                             "{},~{{{}}}",
@@ -803,31 +792,31 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                         .expect("inline asm call should generate successfully");
 
                     // Store results to output places
-                    #[allow(clippy::collapsible_if)]
-                    if !outputs.is_empty() {
-                        if let Some(result_value) = result.try_as_basic_value().left() {
-                            if outputs.len() == 1 {
-                                // Single output - store directly
+                    if !outputs.is_empty() && result.try_as_basic_value().left().is_some() {
+                        let result_value = result
+                            .try_as_basic_value()
+                            .left()
+                            .expect("result should be a basic value");
+                        if outputs.len() == 1 {
+                            // Single output - store directly
+                            cg.builder
+                                .build_store(output_places[0], result_value)
+                                .expect("should store result");
+                        } else {
+                            // Multiple outputs - extract from struct and store each
+                            let result_struct = result_value.into_struct_value();
+                            for (i, place_ptr) in output_places.iter().enumerate() {
+                                let extracted = cg
+                                    .builder
+                                    .build_extract_value(
+                                        result_struct,
+                                        u32::try_from(i).expect("output index should fit in u32"),
+                                        &format!("out{i}"),
+                                    )
+                                    .expect("should extract output value");
                                 cg.builder
-                                    .build_store(output_places[0], result_value)
-                                    .expect("should store result");
-                            } else {
-                                // Multiple outputs - extract from struct and store each
-                                let result_struct = result_value.into_struct_value();
-                                for (i, place_ptr) in output_places.iter().enumerate() {
-                                    let extracted = cg
-                                        .builder
-                                        .build_extract_value(
-                                            result_struct,
-                                            u32::try_from(i)
-                                                .expect("output index should fit in u32"),
-                                            &format!("out{i}"),
-                                        )
-                                        .expect("should extract output value");
-                                    cg.builder
-                                        .build_store(*place_ptr, extracted)
-                                        .expect("should store output value");
-                                }
+                                    .build_store(*place_ptr, extracted)
+                                    .expect("should store output value");
                             }
                         }
                     }

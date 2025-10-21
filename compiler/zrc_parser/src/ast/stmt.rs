@@ -14,7 +14,7 @@ use super::{expr::Expr, ty::Type};
 /// Represents an operand in inline assembly (constraint + expression)
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct AsmOperand<'input> {
-    /// The constraint string (e.g., "=r", "r", "m")
+    /// The constraint string (e.g., "=r", "r", "m") - must be a string literal
     pub constraint: Expr<'input>,
     /// The expression being constrained (variable or value)
     pub expr: Expr<'input>,
@@ -304,7 +304,7 @@ pub enum Declaration<'input> {
     /// A global let declaration
     GlobalLetDeclaration(Spanned<Vec<Spanned<LetDeclaration<'input>>>>),
     /// Module-level assembly declaration
-    /// `asm "assembly code";`
+    /// `asm "assembly code";` - assembly must be a string literal
     ModuleAsm {
         /// The assembly code string
         assembly: Expr<'input>,

@@ -1,6 +1,6 @@
 //! For declarations
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpannedExt};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity, SpannedExt};
 use zrc_parser::ast::stmt::{
     ArgumentDeclarationList, Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration,
 };
@@ -347,13 +347,26 @@ pub fn process_declaration<'input>(
             Some(TypedDeclaration::GlobalLetDeclaration(typed_declarations))
         }
         AstDeclaration::ModuleAsm { assembly } => {
-            // Type check the assembly expression (should be a string literal)
+            // Type check and validate module assembly is a string literal
             let scope = global_scope.create_subscope();
             let typed_assembly = type_expr(&scope, assembly)?;
+            let asm_str = if let TypedExprKind::StringLiteral(string) = typed_assembly.kind.value()
+            {
+                string.as_bytes()
+            } else {
+                return Err(Diagnostic(
+                    Severity::Error,
+                    typed_assembly
+                        .kind
+                        .span()
+                        .containing(DiagnosticKind::ExpectedGot {
+                            expected: "string literal".to_string(),
+                            got: typed_assembly.inferred_type.to_string(),
+                        }),
+                ));
+            };
 
-            Some(TypedDeclaration::ModuleAsm {
-                assembly: typed_assembly,
-            })
+            Some(TypedDeclaration::ModuleAsm { assembly: asm_str })
         }
     })
 }
