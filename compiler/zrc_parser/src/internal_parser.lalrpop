@@ -391,7 +391,7 @@ Primary: Expr<'input> = {
             spanned!(s, fields.unwrap_or(Vec::new()), e, file_name)
         ), e, file_name)),
     // Array literal: [elem1, elem2, ...]
-    <s:@L> "[" <elements:ArgumentList?> "]" <e:@R> =>
+    <s:@L> "[" <elements:CommaSeparated<Assignment>?> "]" <e:@R> =>
         Expr(spanned!(s, ExprKind::ArrayLiteral(elements.unwrap_or(Vec::new())), e, file_name)),
     "(" <Expr> ")" => <>,
 };
