@@ -36,6 +36,7 @@ use crate::OutputFormat;
 )]
 pub fn compile(
     frontend_version_string: &str,
+    include_paths: Vec<&'static Path>,
     emit: &OutputFormat,
     parent_directory: &str,
     file_name: &str,
@@ -47,7 +48,12 @@ pub fn compile(
     cpu: &str,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
     // === PREPROCESSOR ===
-    let chunks = zrc_preprocessor::preprocess(Path::new(parent_directory), file_name, content)?;
+    let chunks = zrc_preprocessor::preprocess(
+        Path::new(parent_directory),
+        include_paths,
+        file_name,
+        content,
+    )?;
 
     // === PARSER ===
     let mut ast = Vec::new();

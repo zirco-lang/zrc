@@ -79,11 +79,11 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let Some(path) = cli.path else {
+    let Some(ref path) = cli.path else {
         bail!("no input file provided");
     };
 
-    let (directory_name, file_name, mut input) = io::open_input(&path)?;
+    let (directory_name, file_name, mut input) = io::open_input(path)?;
 
     let mut source_content = String::new();
     input.read_to_string(&mut source_content)?;
@@ -97,6 +97,7 @@ fn main() -> anyhow::Result<()> {
 
     let result = compile::compile(
         &build_info::version(),
+        cli::get_include_paths(&cli),
         &cli.emit,
         &directory_name,
         &file_name,
@@ -117,7 +118,7 @@ fn main() -> anyhow::Result<()> {
 
     match result {
         Err(diagnostic) => {
-            eprintln!("{}", diagnostic.print_with_filename(&source_content, &path));
+            eprintln!("{}", diagnostic.print_with_filename(&source_content, path));
             std::process::exit(1);
         }
         Ok(x) => {

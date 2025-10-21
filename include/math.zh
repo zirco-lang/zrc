@@ -1,0 +1,57 @@
+fn fabs(x: i64) -> i64;
+fn fmod(x: i64, y: i64) -> i64;
+fn remainder(x: i64, y: i64) -> i64;
+fn remquo(x: i64, y: i64, quo: *i32) -> i64;
+fn fma(x: i64, y: i64, z: i64) -> i64;  // fused multiply-add
+fn sqrt(x: i64) -> i64;
+fn cbrt(x: i64) -> i64;
+fn hypot(x: i64, y: i64) -> i64;     // √(x² + y²)
+fn pow(x: i64, y: i64) -> i64;
+fn exp(x: i64) -> i64;
+fn exp2(x: i64) -> i64;
+fn expm1(x: i64) -> i64;               // exp(x) − 1
+fn log(x: i64) -> i64;
+fn log10(x: i64) -> i64;
+fn log2(x: i64) -> i64;
+fn log1p(x: i64) -> i64;               // log(1 + x)
+fn sin(x: i64) -> i64;
+fn cos(x: i64) -> i64;
+fn tan(x: i64) -> i64;
+fn asin(x: i64) -> i64;
+fn acos(x: i64) -> i64;
+fn atan(x: i64) -> i64;
+fn atan2(y: i64, x: i64) -> i64;
+fn sinh(x: i64) -> i64;
+fn cosh(x: i64) -> i64;
+fn tanh(x: i64) -> i64;
+fn asinh(x: i64) -> i64;
+fn acosh(x: i64) -> i64;
+fn atanh(x: i64) -> i64;
+fn ceil(x: i64) -> i64;
+fn floor(x: i64) -> i64;
+fn trunc(x: i64) -> i64;
+fn round(x: i64) -> i64;
+fn lround(x: i64) -> i64;
+fn llround(x: i64) -> i64;
+fn nearbyint(x: i64) -> i64;
+fn rint(x: i64) -> i64;
+fn lrint(x: i64) -> i64;
+fn llrint(x: i64) -> i64;
+fn modf(x: i64, iptr: *i64) -> i64;
+fn frexp(x: i64, exp: *i32) -> i64;
+fn ldexp(x: i64, exp: i32) -> i64;
+fn scalbn(x: i64, n: i32) -> i64;
+fn scalbln(x: i64, n: i64) -> i64;
+fn isfinite(x: i64) -> i32;
+fn isinf(x: i64) -> i32;
+fn isnan(x: i64) -> i32;
+fn isnormal(x: i64) -> i32;
+fn signbit(x: i64) -> i32;
+fn isgreater(x: i64, y: i64) -> i32;
+fn isgreaterequal(x: i64, y: i64) -> i32;
+fn isless(x: i64, y: i64) -> i32;
+fn islessequal(x: i64, y: i64) -> i32;
+fn islessgreater(x: i64, y: i64) -> i32;
+fn isunordered(x: i64, y: i64) -> i32;
+fn copysign(x: i64, y: i64) -> i64;
+fn nan(tagp: *u8) -> i64;  // quiet NaN with tag

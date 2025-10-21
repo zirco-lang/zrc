@@ -1,0 +1,19 @@
+fn memcpy(dest: *void, src: *void, n: usize) -> *void;
+fn memmove(dest: *void, src: *void, n: usize) -> *void;
+fn memset(s: *void, c: i32, n: usize) -> *void;
+fn memcmp(s1: *void, s2: *void, n: usize) -> i32;
+fn memchr(s: *void, c: i32, n: usize) -> *void;
+
+fn strcpy(dest: *u8, src: *u8) -> *u8;
+fn strncpy(dest: *u8, src: *u8, n: usize) -> *u8;
+fn strcat(dest: *u8, src: *u8) -> *u8;
+fn strncat(dest: *u8, src: *u8, n: usize) -> *u8;
+fn strcmp(s1: *u8, s2: *u8) -> i32;
+fn strncmp(s1: *u8, s2: *u8, n: usize) -> i32;
+fn strchr(s: *u8, c: i32) -> *u8;
+fn strrchr(s: *u8, c: i32) -> *u8;
+fn strstr(haystack: *u8, needle: *u8) -> *u8;
+fn strpbrk(s: *u8, accept: *u8) -> *u8;
+fn strspn(s: *u8, accept: *u8) -> usize;
+fn strcspn(s: *u8, reject: *u8) -> usize;
+fn strlen(s: *u8) -> usize;
