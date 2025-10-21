@@ -1183,5 +1183,19 @@ mod tests {
                 }
             "});
         }
+
+        #[test]
+        fn multiple_module_level_asm_statements_accumulate() {
+            cg_snapshot_test!(indoc! {"
+                // TEST: multiple module-level assembly directives should be accumulated
+                asm \"# First assembly block\";
+                asm \"# Second assembly block\";
+                asm \"# Third assembly block\";
+
+                fn test() {
+                    let x: i32 = 5;
+                }
+            "});
+        }
     }
 }

@@ -262,6 +262,7 @@ fn cg_program<'ctx>(
     };
 
     let mut global_scope = CgScope::new();
+    let mut module_asm_parts = Vec::new();
 
     for declaration in program {
         let span = declaration.span();
@@ -428,12 +429,16 @@ fn cg_program<'ctx>(
                 }
             }
             TypedDeclaration::ModuleAsm { assembly } => {
-                // Add module-level assembly to the LLVM module
-                // Note: Multiple module asm statements will overwrite each other
-                // TODO: Accumulate assembly strings if needed
-                module.set_inline_assembly(&assembly);
+                // Accumulate module-level assembly - will be set at the end
+                module_asm_parts.push(assembly);
             }
         }
+    }
+
+    // Set all accumulated module-level assembly at once
+    if !module_asm_parts.is_empty() {
+        let combined_asm = module_asm_parts.join("\n");
+        module.set_inline_assembly(&combined_asm);
     }
 
     dbg_builder.finalize();
