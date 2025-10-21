@@ -95,16 +95,30 @@ struct PreprocessorCtx {
     pragma_once_files: HashSet<PathBuf>,
     /// Collected source chunks
     chunks: Vec<SourceChunk>,
+    /// The paths to search for bracket includes
+    search_paths: Vec<&'static Path>,
 }
 
 impl PreprocessorCtx {
     /// Create a new preprocessor context
-    fn new() -> Self {
+    fn new(search_paths: Vec<&'static Path>) -> Self {
         Self {
             pragma_once_files: HashSet::new(),
             chunks: Vec::new(),
+            search_paths,
         }
     }
+}
+
+/// Search for an include file in the provided search paths
+fn find_include_file(ctx: &PreprocessorCtx, include_file: &str) -> Option<PathBuf> {
+    for search_path in &ctx.search_paths {
+        let candidate = search_path.join(include_file);
+        if candidate.exists() {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 /// Process a Zirco source file with preprocessing directives
@@ -122,10 +136,11 @@ impl PreprocessorCtx {
 #[allow(clippy::result_large_err)]
 pub fn preprocess(
     base_path: &Path,
+    search_paths: Vec<&'static Path>,
     file_name: &str,
     content: &str,
 ) -> Result<Vec<SourceChunk>, Diagnostic> {
-    let mut ctx = PreprocessorCtx::new();
+    let mut ctx = PreprocessorCtx::new(search_paths);
     preprocess_internal(base_path, file_name, content, &mut ctx)?;
     Ok(ctx.chunks)
 }
@@ -171,22 +186,33 @@ fn preprocess_internal(
 
                 // Parse include path
                 let include_path = include_path.trim();
-                let include_file = if let Some(path) = include_path.strip_prefix('"') {
-                    path.strip_suffix('"')
-                        .ok_or_else(|| {
-                            DiagnosticKind::PreprocessorUnterminatedIncludeString.error_in(
-                                Span::from_positions_and_file(0, line.len(), "<preprocessor>"),
-                            )
-                        })?
-                        .to_string()
+                let (mut include_file, do_search_path) = if let Some(path) =
+                    include_path.strip_prefix('"')
+                {
+                    (
+                        path.strip_suffix('"')
+                            .ok_or_else(|| {
+                                DiagnosticKind::PreprocessorUnterminatedIncludeString.error_in(
+                                    Span::from_positions_and_file(0, line.len(), "<preprocessor>"),
+                                )
+                            })?
+                            .to_string(),
+                        false,
+                    )
                 } else if let Some(path) = include_path.strip_prefix('<') {
-                    path.strip_suffix('>')
-                        .ok_or_else(|| {
-                            DiagnosticKind::PreprocessorUnterminatedIncludeAngleBrackets.error_in(
-                                Span::from_positions_and_file(0, line.len(), "<preprocessor>"),
-                            )
-                        })?
-                        .to_string()
+                    (
+                        path.strip_suffix('>')
+                            .ok_or_else(|| {
+                                DiagnosticKind::PreprocessorUnterminatedIncludeAngleBrackets
+                                    .error_in(Span::from_positions_and_file(
+                                        0,
+                                        line.len(),
+                                        "<preprocessor>",
+                                    ))
+                            })?
+                            .to_string(),
+                        true,
+                    )
                 } else {
                     return Err(DiagnosticKind::PreprocessorInvalidIncludeSyntax.error_in(
                         Span::from_positions_and_file(0, line.len(), "<preprocessor>"),
@@ -194,6 +220,21 @@ fn preprocess_internal(
                 };
 
                 // Resolve the include file path
+
+                if do_search_path {
+                    include_file = find_include_file(ctx, &include_file)
+                        .ok_or_else(|| {
+                            DiagnosticKind::PreprocessorCannotFindIncludeFile(include_file.clone())
+                                .error_in(Span::from_positions_and_file(
+                                    0,
+                                    line.len(),
+                                    "<preprocessor>",
+                                ))
+                        })?
+                        .to_string_lossy()
+                        .to_string();
+                }
+
                 let include_full_path = base_path.join(&include_file);
                 let canonical_path = include_full_path.canonicalize().map_err(|_| {
                     DiagnosticKind::PreprocessorCannotFindIncludeFile(include_file.clone())
@@ -272,7 +313,8 @@ mod tests {
     #[test]
     fn preprocess_simple_file_without_directives() {
         let content = "fn main() {\n    printf(\"Hello\");\n}";
-        let chunks = preprocess(Path::new("."), "test.zr", content).expect("preprocessing failed");
+        let chunks =
+            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].file_name, "test.zr");
@@ -283,7 +325,8 @@ mod tests {
     #[test]
     fn preprocess_with_pragma_once() {
         let content = "#pragma once\nfn test() {}";
-        let chunks = preprocess(Path::new("."), "test.zr", content).expect("preprocessing failed");
+        let chunks =
+            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].content, "fn test() {}");

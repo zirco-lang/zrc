@@ -1,0 +1,12 @@
+fn printf(a: *u8, ...) -> i32;
+fn scanf(a: *u8, ...) -> i32;
+fn sscanf(a: *u8, b: *u8, ...) -> i32;
+fn vprintf(a: *u8, ...) -> i32;
+fn vsprintf(a: *u8, b: *u8, ...) -> i32;
+fn vsnprintf(a: *u8, b: usize, c: *u8, ...) -> i32;
+fn getchar() -> i32;
+fn gets(a: *u8) -> *u8;
+fn putchar(a: i32) -> i32;
+fn puts(a: *u8) -> i32;
+fn sprintf(a: *u8, b: *u8, ...) -> i32;
+fn snprintf(a: *u8, b: usize, c: *u8, ...) -> i32;
