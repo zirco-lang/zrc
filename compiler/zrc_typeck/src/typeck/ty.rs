@@ -8,7 +8,7 @@ use zrc_utils::span::Span;
 use super::scope::TypeCtx;
 use crate::tast::ty::Type as TastType;
 
-/// Resolve an identifier to its corresponding [`tast::ty::Type`].
+/// Resolve an identifier to its corresponding [`TastType`].
 ///
 /// # Errors
 /// Errors if the identifier is not found in the type scope or a key is
