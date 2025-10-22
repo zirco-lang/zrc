@@ -1,4 +1,4 @@
-fn printf(format: *u8, ...) -> i32;
+#include <stdio.zh>
 
 #include "point.zr"
 #include "point.zr"

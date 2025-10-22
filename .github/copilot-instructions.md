@@ -8,7 +8,7 @@
 
 -   Language: Rust (stable toolchain required, nightly for linting/formatting)
 -   Build System: Cargo workspace
--   Backend: LLVM 16 (via inkwell)
+-   Backend: LLVM 20 (via inkwell)
 -   Testing: cargo test + insta snapshot testing (in zrc_codegen)
 -   CI/CD: GitHub Actions (build, test, clippy, fmt)
 
@@ -18,11 +18,11 @@
 
 **ALWAYS install these before building:**
 
-1. **LLVM 16 with Polly** - Required for compilation to succeed
+1. **LLVM 20 with Polly** - Required for compilation to succeed
 
     ```bash
     sudo apt-get update
-    sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
+    sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20
     ```
 
 2. **Rust Stable Toolchain** - For building and testing (required for CI)
@@ -59,8 +59,8 @@ cargo +nightly fmt --check
 
 **Important Notes:**
 
--   The build may automatically find LLVM 16 if installed system-wide
--   If build fails with "could not find native static library `Polly`", install `libpolly-16-dev`
+-   The build may automatically find LLVM 20 if installed system-wide
+-   If build fails with "could not find native static library `Polly`", install `libpolly-20-dev`
 -   Debug builds go to `target/debug/zrc`
 
 ### Running the Compiler
@@ -243,6 +243,7 @@ cargo test -- --nocapture
 All examples in the `examples/` directory follow a standardized test framework:
 
 **Directory Structure:**
+
 ```
 examples/
   example_name/
@@ -286,6 +287,7 @@ test: build
 ```
 
 **How it works:**
+
 1. Runs the compiled example with optional arguments from `test/args.txt`
 2. Provides optional stdin from `test/stdin.txt` (defaults to /dev/null)
 3. Captures stdout to `test/stdout.actual` and stderr to `test/stderr.actual`
@@ -304,19 +306,19 @@ Whenever adding or changing language semantics, update SPEC.md. You can also rea
 ### LLVM-related Build Failures
 
 **Problem:** `error: could not find native static library 'Polly'`
-**Solution:** Install `libpolly-16-dev`:
+**Solution:** Install `libpolly-20-dev`:
 
 ```bash
-sudo apt-get install -y libpolly-16-dev
+sudo apt-get install -y libpolly-20-dev
 ```
 
 **Problem:** LLVM not found
-**Solution:** Install LLVM 16 and set environment variable if needed:
+**Solution:** Install LLVM 20 and set environment variable if needed:
 
 ```bash
-sudo apt-get install -y llvm-16 llvm-16-dev
+sudo apt-get install -y llvm-20 llvm-20-dev
 # If still failing, try:
-export LLVM_SYS_160_PREFIX=/usr/lib/llvm-16
+export LLVM_SYS_201_PREFIX=/usr/lib/llvm-20
 cargo build
 ```
 

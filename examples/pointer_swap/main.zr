@@ -1,4 +1,4 @@
-fn printf(format: *u8, ...) -> i32;
+#include <stdio.zh>
 
 fn swap(a: *i32, b: *i32) {
     let temp = *a;

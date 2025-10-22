@@ -24,7 +24,7 @@
 #[macro_export]
 macro_rules! cg_snapshot_test {
     ($source:expr) => {
-        let resulting_ir = $crate::cg_program_to_string(
+        let resulting_ir = $crate::program::cg_program_to_string_without_optimization(
             "zrc test runner",
             "/fake/path",
             "test.zr",
@@ -37,7 +37,6 @@ macro_rules! cg_snapshot_test {
                     .expect("parsing should succeed"),
             )
             .expect("typeck should succeed"),
-            ::inkwell::OptimizationLevel::None,
             ::inkwell::debug_info::DWARFEmissionKind::Full,
             &$crate::get_native_triple(),
             "",

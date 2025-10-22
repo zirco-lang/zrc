@@ -1,5 +1,5 @@
 ZRC ?= ../../target/debug/zrc
-ZRFLAGS ?= 
+ZRFLAGS ?= -I../../include/
 LDFLAGS ?= -lc
 OUTDIR ?= ./out
 

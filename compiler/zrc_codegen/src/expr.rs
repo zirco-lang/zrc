@@ -650,7 +650,7 @@ pub(crate) fn cg_expr<'ctx>(
             ) {
                 (true, true) => cg
                     .builder
-                    .build_bitcast(
+                    .build_bit_cast(
                         x.into_pointer_value(),
                         llvm_basic_type(&cg, ty.value()).0,
                         "cast",
@@ -703,7 +703,7 @@ pub(crate) fn cg_expr<'ctx>(
                 (false, false) => {
                     // Other casts are just bitcasts
                     cg.builder
-                        .build_bitcast(
+                        .build_bit_cast(
                             x.into_int_value(),
                             llvm_basic_type(&cg, ty.value()).0,
                             "cast",

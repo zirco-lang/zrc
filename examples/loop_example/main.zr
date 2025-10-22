@@ -1,4 +1,4 @@
-fn printf(format: *u8, ...) -> i32;
+#include <stdio.zh>
 
 fn print_numbers(n: i32) {
     for (let i = 1; i <= n; i = i + 1) {
