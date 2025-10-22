@@ -100,6 +100,16 @@ fn escaped_byte_slice<'input>(lex: &Lexer<'input, StringTok<'input>>) -> &'input
     &slice[2..]
 }
 
+/// Extracts the hexadecimal-encoded codepoint number from a
+/// `\u{X}` to `\u{XXXXXX}` unicode escape
+fn escaped_unicode<'input>(lex: &Lexer<'input, StringTok<'input>>) -> &'input str {
+    lex.slice()
+        .strip_prefix("\\u{")
+        .expect("unicode escape should start with \\u{")
+        .strip_suffix('}')
+        .expect("unicode escape should end with '}'")
+}
+
 /// A lexer callback header to convert a captured span to a [`Vec`]tor of
 /// [`StringTok`]s.
 fn lex_string_contents<'input>(
@@ -618,6 +628,11 @@ pub enum StringTok<'input> {
     #[display("\\x{_0}")]
     EscapedHexByte(&'input str),
 
+    /// '\u{X...} with `X...` being a hex literal from `0`..`10FFFF`
+    #[regex(r"\\u\{[0-9a-fA-F]{1,6}\}", escaped_unicode)]
+    #[display("\\u{{{_0}}}")]
+    EscapedUnicode(&'input str),
+
     /// `\\`
     #[token("\\\\")]
     #[display("\\\\")]
@@ -647,7 +662,12 @@ impl StringTok<'_> {
             StringTok::EscapedTab => '\t',
             StringTok::EscapedNull => '\0',
             StringTok::EscapedHexByte(byte) => {
-                char::from_u32(byte.parse::<u32>().expect("invalid byte")).expect("invalid char")
+                char::from_u32(u32::from_str_radix(byte, 16).expect("invalid byte"))
+                    .expect("invalid char")
+            }
+            StringTok::EscapedUnicode(hex) => {
+                char::from_u32(u32::from_str_radix(hex, 16).expect("Invalid hex"))
+                    .expect("invalid char")
             }
             StringTok::EscapedDoubleQuote => '"',
             StringTok::Text(text) => {
