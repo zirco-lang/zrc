@@ -895,7 +895,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "currently fails due to limitations in enum handling"]
+    #[ignore = "currently fails due to #451"]
     fn enum_match_generates_as_expected() {
         cg_snapshot_test!(indoc! {"
             enum VarInt {
