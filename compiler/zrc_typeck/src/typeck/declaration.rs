@@ -270,6 +270,48 @@ pub fn process_declaration<'input>(
                 },
             );
 
+            if *name.value() == "main" {
+                // main() can be either
+                // fn() -> i32
+                // fn(usize, **u8) -> i32
+
+                if resolved_return_type != TastType::I32 {
+                    return Err(name.error(|_| {
+                        DiagnosticKind::MainFunctionMustReturnI32(resolved_return_type.to_string())
+                    }));
+                }
+
+                match &parameters.value() {
+                    ArgumentDeclarationList::NonVariadic(params) if params.is_empty() => {
+                        // can be either empty or (usize, **u8)
+                    }
+
+                    ArgumentDeclarationList::NonVariadic(params) if params.len() == 2 => {
+                        let first_param_type =
+                            resolve_type(&global_scope.types, params[0].value().ty.clone())?;
+                        let second_param_type =
+                            resolve_type(&global_scope.types, params[1].value().ty.clone())?;
+
+                        if first_param_type != TastType::Usize
+                            || second_param_type.into_pointee().map(|x| x.into_pointee())
+                                != Some(Some(TastType::U8))
+                        {
+                            return Err(
+                                name.error(|_| DiagnosticKind::MainFunctionInvalidParameters)
+                            );
+                        }
+                    }
+
+                    ArgumentDeclarationList::NonVariadic(_) => {
+                        return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
+                    }
+
+                    ArgumentDeclarationList::Variadic(_) => {
+                        return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
+                    }
+                }
+            }
+
             Some(TypedDeclaration::FunctionDeclaration {
                 name,
                 parameters: match parameters.value() {

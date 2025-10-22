@@ -20,7 +20,7 @@ fn is_below_max() -> bool {
     return counter < MAX_COUNT;
 }
 
-fn main() {
+fn main() -> i32 {
     printf("Initial counter: %d\n", counter);
     printf("Max count: %d\n", MAX_COUNT);
     printf("Version: %d\n", VERSION);
@@ -35,4 +35,6 @@ fn main() {
     if (is_below_max()) {
         printf("Still below maximum\n");
     }
+
+    return 0;
 }

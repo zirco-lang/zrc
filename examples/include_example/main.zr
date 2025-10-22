@@ -3,7 +3,9 @@ fn printf(format: *u8, ...) -> i32;
 #include "point.zr"
 #include "point.zr"
 
-fn main() {
+fn main() -> i32 {
     let result: i32 = multiply(add(5, 3), 2);
     printf("Result: %d\n", result);
+
+    return 0;
 }

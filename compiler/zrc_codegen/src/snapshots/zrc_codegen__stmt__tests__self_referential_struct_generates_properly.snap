@@ -1,8 +1,7 @@
 ---
 source: compiler/zrc_codegen/src/stmt.rs
-description: "// TEST: self-referential struct types should compile to LLVM IR\n// with pointers to empty structs as placeholders\nstruct Node {\n    value: i32,\n    next: *Node\n}\n\nstruct TreeNode {\n    value: i32,\n    left: *TreeNode,\n    right: *TreeNode\n}\n\nfn create_node(val: i32) -> *Node {\n    let node: *Node;\n    return node;\n}\n\nfn main() {\n    let head: *Node;\n    let tree: TreeNode;\n    head = create_node(42);\n}\n"
+description: "// TEST: self-referential struct types should compile to LLVM IR\n// with pointers to empty structs as placeholders\nstruct Node {\n    value: i32,\n    next: *Node\n}\n\nstruct TreeNode {\n    value: i32,\n    left: *TreeNode,\n    right: *TreeNode\n}\n\nfn create_node(val: i32) -> *Node {\n    let node: *Node;\n    return node;\n}\n\nfn main() -> i32 {\n    let head: *Node;\n    let tree: TreeNode;\n    head = create_node(42);\n\n    return 0;\n}\n"
 expression: resulting_ir
-snapshot_kind: text
 ---
 ; ModuleID = 'test.zr'
 source_filename = "test.zr"
@@ -21,7 +20,7 @@ entry:
 ; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
 declare void @llvm.dbg.declare(metadata, metadata, metadata) #0
 
-define {} @main() !dbg !24 {
+define i32 @main() !dbg !24 {
 entry:
   %let_tree = alloca { i32, ptr, ptr }, align 8
   %let_head = alloca ptr, align 8
@@ -29,7 +28,7 @@ entry:
   call void @llvm.dbg.declare(metadata ptr %let_tree, metadata !31, metadata !DIExpression()), !dbg !37
   %call = call ptr @create_node(i32 42), !dbg !38
   store ptr %call, ptr %let_head, align 8, !dbg !39
-  ret {} zeroinitializer, !dbg !40
+  ret i32 0, !dbg !40
 }
 
 attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
@@ -63,11 +62,11 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !23 = !DILocation(line: 16, column: 12, scope: !18)
 !24 = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: !2, line: 19, type: !25, scopeLine: 19, spFlags: DISPFlagDefinition, unit: !1, retainedNodes: !27)
 !25 = !DISubroutineType(types: !26)
-!26 = !{!13}
+!26 = !{!10}
 !27 = !{!28, !31}
 !28 = !DILocalVariable(name: "head", scope: !29, file: !2, line: 20, type: !6)
-!29 = distinct !DILexicalBlock(scope: !30, file: !2, line: 19, column: 11)
-!30 = distinct !DILexicalBlock(scope: !24, file: !2, line: 19, column: 11)
+!29 = distinct !DILexicalBlock(scope: !30, file: !2, line: 19, column: 18)
+!30 = distinct !DILexicalBlock(scope: !24, file: !2, line: 19, column: 18)
 !31 = !DILocalVariable(name: "tree", scope: !29, file: !2, line: 21, type: !32)
 !32 = !DICompositeType(tag: DW_TAG_structure_type, name: "struct { value: i32, left: *struct {}, right: *struct {} }", scope: !2, file: !2, elements: !33)
 !33 = !{!9, !34, !35}
@@ -77,4 +76,4 @@ attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memo
 !37 = !DILocation(line: 21, column: 9, scope: !29)
 !38 = !DILocation(line: 22, column: 24, scope: !29)
 !39 = !DILocation(line: 22, column: 5, scope: !29)
-!40 = !DILocation(line: 23, column: 1, scope: !29)
+!40 = !DILocation(line: 24, column: 12, scope: !29)

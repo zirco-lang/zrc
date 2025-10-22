@@ -11,7 +11,7 @@ fn distance_squared(p1: Point, p2: Point) -> i32 {
     return dx * dx + dy * dy;
 }
 
-fn main() {
+fn main() -> i32 {
     let p1: Point;
     p1.x = 0;
     p1.y = 0;
@@ -22,4 +22,6 @@ fn main() {
     
     let dist_sq = distance_squared(p1, p2);
     printf("Distance squared: %d\n", dist_sq);
+
+    return 0;
 }
