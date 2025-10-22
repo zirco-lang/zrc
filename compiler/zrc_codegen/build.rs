@@ -16,5 +16,5 @@ fn main() {
     println!("cargo:rerun-if-changed=cpp/optimize_module.cpp");
     println!("cargo:rerun-if-env-changed=LLVM_SYS_201_PREFIX");
     println!("cargo:rustc-link-search=native={}/lib", llvm_sys_root);
-    println!("cargo:rustc-link-lib=dylib=LLVM");
+    println!("cargo:rustc-link-lib=dylib=LLVM-20");
 }
