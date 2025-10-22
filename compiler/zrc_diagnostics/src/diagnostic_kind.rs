@@ -120,6 +120,12 @@ pub enum DiagnosticKind {
     MatchCaseCountMismatch,
     #[error("there must be a match arm for every enum variant")]
     NonExhaustiveMatchCases,
+    #[error("main() function must have return type `i32`, got `{0}`")]
+    MainFunctionMustReturnI32(String),
+    #[error(
+        "main() function may either have no parameters or two parameters, a `usize` and a `**u8`"
+    )]
+    MainFunctionInvalidParameters,
 
     // PREPROCESSOR ERRORS
     #[error("unterminated include string")]

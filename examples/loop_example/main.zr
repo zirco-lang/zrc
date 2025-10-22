@@ -6,6 +6,8 @@ fn print_numbers(n: i32) {
     }
 }
 
-fn main() {
+fn main() -> i32 {
     print_numbers(5);
+
+    return 0;
 }

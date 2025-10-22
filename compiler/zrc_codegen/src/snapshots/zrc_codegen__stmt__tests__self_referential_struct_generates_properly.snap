@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/stmt.rs
-description: "// TEST: self-referential struct types should compile to LLVM IR\n// with pointers to empty structs as placeholders\nstruct Node {\n    value: i32,\n    next: *Node\n}\n\nstruct TreeNode {\n    value: i32,\n    left: *TreeNode,\n    right: *TreeNode\n}\n\nfn create_node(val: i32) -> *Node {\n    let node: *Node;\n    return node;\n}\n\nfn main() {\n    let head: *Node;\n    let tree: TreeNode;\n    head = create_node(42);\n}\n"
+description: "// TEST: self-referential struct types should compile to LLVM IR\n// with pointers to empty structs as placeholders\nstruct Node {\n    value: i32,\n    next: *Node\n}\n\nstruct TreeNode {\n    value: i32,\n    left: *TreeNode,\n    right: *TreeNode\n}\n\nfn create_node(val: i32) -> *Node {\n    let node: *Node;\n    return node;\n}\n\nfn main() -> i32 {\n    let head: *Node;\n    let tree: TreeNode;\n    head = create_node(42);\n\n    return 0;\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -15,13 +15,13 @@ entry:
   ret ptr %load, !dbg !10
 }
 
-define {} @main() !dbg !12 {
+define i32 @main() !dbg !12 {
 entry:
   %let_tree = alloca { i32, ptr, ptr }, align 8
   %let_head = alloca ptr, align 8
-  %call = call ptr @create_node(i32 42), !dbg !17
-  store ptr %call, ptr %let_head, align 8, !dbg !20
-  ret {} zeroinitializer, !dbg !21
+  %call = call ptr @create_node(i32 42), !dbg !15
+  store ptr %call, ptr %let_head, align 8, !dbg !18
+  ret i32 0, !dbg !19
 }
 
 !llvm.module.flags = !{!0}
@@ -41,11 +41,9 @@ entry:
 !11 = distinct !DILexicalBlock(scope: !9, file: !2, line: 14, column: 35)
 !12 = distinct !DISubprogram(name: "main", linkageName: "main", scope: null, file: !2, line: 19, type: !13, scopeLine: 19, spFlags: DISPFlagDefinition, unit: !1)
 !13 = !DISubroutineType(types: !14)
-!14 = !{!15}
-!15 = !DICompositeType(tag: DW_TAG_structure_type, name: "struct {}", scope: !2, file: !2, elements: !16)
-!16 = !{}
-!17 = !DILocation(line: 22, column: 24, scope: !18)
-!18 = distinct !DILexicalBlock(scope: !19, file: !2, line: 19, column: 11)
-!19 = distinct !DILexicalBlock(scope: !12, file: !2, line: 19, column: 11)
-!20 = !DILocation(line: 22, column: 5, scope: !18)
-!21 = !DILocation(line: 23, column: 1, scope: !18)
+!14 = !{!7}
+!15 = !DILocation(line: 22, column: 24, scope: !16)
+!16 = distinct !DILexicalBlock(scope: !17, file: !2, line: 19, column: 18)
+!17 = distinct !DILexicalBlock(scope: !12, file: !2, line: 19, column: 18)
+!18 = !DILocation(line: 22, column: 5, scope: !16)
+!19 = !DILocation(line: 24, column: 12, scope: !16)

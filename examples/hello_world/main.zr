@@ -1,5 +1,7 @@
 #include <stdio.zh>
 
-fn main() {
+fn main() -> i32 {
     printf("Hello, World!\n");
+
+    return 0;
 }
