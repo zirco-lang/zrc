@@ -293,7 +293,7 @@ pub fn process_declaration<'input>(
                             resolve_type(&global_scope.types, params[1].value().ty.clone())?;
 
                         if first_param_type != TastType::Usize
-                            || second_param_type.into_pointee().map(|x| x.into_pointee())
+                            || second_param_type.into_pointee().map(super::super::tast::ty::Type::into_pointee)
                                 != Some(Some(TastType::U8))
                         {
                             return Err(
