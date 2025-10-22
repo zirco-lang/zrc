@@ -59,6 +59,7 @@
 mod bb;
 
 use inkwell::targets::TargetMachine;
+use llvm_sys::{prelude::LLVMModuleRef, target_machine::LLVMTargetMachineRef};
 
 mod ctx;
 mod expr;
@@ -75,6 +76,10 @@ pub use inkwell::{
     targets::{FileType, TargetTriple},
 };
 pub use program::{cg_program_to_buffer, cg_program_to_string};
+
+unsafe extern "C" {
+    fn zrc_codegen_optimize_module(module: LLVMModuleRef, tm: LLVMTargetMachineRef, opt_level: u32);
+}
 
 /// Gets the native [`TargetTriple`].
 #[must_use]

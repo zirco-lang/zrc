@@ -40,9 +40,9 @@ For experienced developers who want to get running quickly:
     # Rust toolchain (if not already installed)
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-    # LLVM 16 with Polly (Ubuntu/Debian)
+    # LLVM 20 with Polly (Ubuntu/Debian)
     sudo apt-get update
-    sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
+    sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20
     ```
 
 2. **Clone and build:**
@@ -113,14 +113,14 @@ A: You need:
 
 -   Git (to clone the repository)
 -   An up-to-date stable Rust toolchain (`rustc` and `cargo` via [rustup](https://rustup.rs))
--   LLVM 16 static or dynamic library (including Polly)
+-   LLVM 20 static or dynamic library (including Polly)
 -   For linting/formatting: Rust nightly toolchain with clippy and rustfmt components
 
 **Q: I'm getting a "could not find native static library `Polly`" error. How do I fix it?**  
-A: Install the LLVM 16 development libraries with Polly support:
+A: Install the LLVM 20 development libraries with Polly support:
 
 ```bash
-sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
+sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20
 ```
 
 **Q: How do I build the compiler?**  
@@ -138,10 +138,10 @@ For a release build, use `cargo build --release`.
 A: Run `cargo install --path compiler/zrc` to install `zrc` to your Cargo `$PATH`.
 
 **Q: LLVM is not being found. What should I do?**  
-A: If LLVM 16 is installed but not found, try setting the environment variable:
+A: If LLVM 20 is installed but not found, try setting the environment variable:
 
 ```bash
-export LLVM_SYS_160_PREFIX=/usr/lib/llvm-16
+export LLVM_SYS_201_PREFIX=/usr/lib/llvm-20
 cargo build
 ```
 

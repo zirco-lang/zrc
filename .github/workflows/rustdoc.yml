@@ -12,6 +12,7 @@ jobs:
         runs-on: ubuntu-latest
         env:
             RUSTDOCFLAGS: "-D warnings"
+            LLVM_SYS_201_PREFIX: /usr/lib/llvm-20
 
         steps:
             - name: Checkout
@@ -27,6 +28,10 @@ jobs:
                   override: true
             - name: Install Rust problem matchers
               uses: r7kamura/rust-problem-matchers@v1
+            - name: Install LLVM dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20
             - name: Use dependency cache
               uses: Swatinem/rust-cache@v2
             - name: cargo doc
