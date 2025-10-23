@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
+source: compiler/zrc_codegen/src/expr/control.rs
 description: "fn get_bool() -> bool;\nfn get_int() -> i32;\nfn take_int(x: i32);\nfn test() {\n    // TEST: should produce a proper diamond-shaped cfg\n    let num = get_bool() ? get_int() : 3;\n    take_int(num);\n}\n"
 expression: resulting_ir
 ---

@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
+source: compiler/zrc_codegen/src/expr/mem.rs
 description: "union U { x: i32, y: i8 }\nfn take_i32(x: i32);\nfn take_i8(x: i8);\n\nfn test() {\n    let x: U;\n\n    // TEST: the pointer is cast and then read from as an i32\n    take_i32(x.x);\n\n    // TEST: the pointer is cast and then read from as an i8\n    take_i8(x.y);\n}\n"
 expression: resulting_ir
 ---

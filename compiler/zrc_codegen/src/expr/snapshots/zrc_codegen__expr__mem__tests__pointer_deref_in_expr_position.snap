@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
+source: compiler/zrc_codegen/src/expr/mem.rs
 description: "fn test() -> i32 {\n    let x: *i32;\n\n    // TEST: should load twice, once to read the value of `x` and once to read what\n    // it points to\n    return *x;\n}\n"
 expression: resulting_ir
 ---
