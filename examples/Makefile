@@ -3,16 +3,17 @@ EXAMPLES := $(wildcard */)
 .PHONY: all test clean $(EXAMPLES)
 
 all: $(EXAMPLES)
-test: $(EXAMPLES)
-	for dir in $(EXAMPLES); do \
-		$(MAKE) -C $$dir test || exit 1; \
-	done
 
-# Build each example by invoking its Makefile
 $(EXAMPLES):
-	$(MAKE) -C $@ build
+	$(MAKE) -C $@
 
-clean:
-	for dir in $(EXAMPLES); do \
-		$(MAKE) -C $$dir clean; \
-	done
+test: $(EXAMPLES:%=%_test)
+	@echo "All examples passed!"
+
+clean: $(EXAMPLES:%=%_clean)
+
+%_test:
+	$(MAKE) -C $* test
+
+%_clean:
+	$(MAKE) -C $* clean

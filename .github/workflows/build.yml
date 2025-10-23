@@ -64,4 +64,4 @@ jobs:
             - name: Add zrc to PATH
               run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
             - name: Build and test all examples
-              run: make -C examples test ZRC=zrc
+              run: make -j2 -C examples test ZRC=zrc
