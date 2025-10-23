@@ -1,0 +1,2 @@
+[92mHello, ASCII![0m
+Hello, unicode! ␀
