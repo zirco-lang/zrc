@@ -2,10 +2,9 @@
 
 use std::fmt::Display;
 
-use zrc_parser::lexer::ZrcString;
 pub use zrc_parser::{
     ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Logical},
-    lexer::{NumberLiteral, StringTok},
+    lexer::{NumberLiteral, StringTok, ZrcString},
 };
 use zrc_utils::span::Spanned;
 

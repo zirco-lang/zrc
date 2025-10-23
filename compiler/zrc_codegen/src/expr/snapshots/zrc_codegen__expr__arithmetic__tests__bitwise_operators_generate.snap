@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
+source: compiler/zrc_codegen/src/expr/arithmetic.rs
 description: "fn get_int() -> i32;\nfn get_uint() -> u32;\n\nfn test() {\n    let x = get_int();\n    let y = get_int();\n    let u = get_uint();\n\n    // TEST: should create a `not i32` instruction\n    let not = ~x;\n\n    // TEST: should create a `and i32` instruction\n    let and = x & y;\n\n    // TEST: should create a `or i32` instruction\n    let or = x | y;\n\n    // TEST: should create a `xor i32` instruction\n    let xor = x ^ y;\n\n    // TEST: should create a `shl i32` instruction\n    let shl = x << u;\n\n    // TEST: should create a `lshr i32` instruction\n    let lshr = u >> u;\n\n    // TEST: should create a `ashr i32` instruction (as the lhs is signed)\n    let ashr = x >> u;\n}\n"
 expression: resulting_ir
 ---

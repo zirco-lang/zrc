@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
+source: compiler/zrc_codegen/src/expr/literals.rs
 description: "fn test() -> i8 {\n    // TEST: returns `i8`\n    return 4i8;\n}\n"
 expression: resulting_ir
 ---

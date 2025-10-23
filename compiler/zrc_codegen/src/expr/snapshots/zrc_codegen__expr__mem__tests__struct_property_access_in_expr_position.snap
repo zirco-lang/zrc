@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
+source: compiler/zrc_codegen/src/expr/mem.rs
 description: "struct S { x: i32, y: i32 }\nfn take_int(x: i32);\n\nfn test() {\n    let x: S;\n\n    // TEST: should GEP into `x` to get the second property (`y`) and then\n    // load that value and call take_int\n    take_int(x.y);\n}\n"
 expression: resulting_ir
 ---

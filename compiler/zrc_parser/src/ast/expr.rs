@@ -20,7 +20,7 @@ use crate::lexer::{NumberLiteral, StringTok, ZrcString};
 /// - The result type is the same as the operand types (or a pointer, for
 ///   pointer arithmetic)
 /// - Performs some mathematical operation
-#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Display)]
 pub enum Arithmetic {
     /// `+`
     #[display("+")]
@@ -42,7 +42,7 @@ pub enum Arithmetic {
 /// Assignment operators
 ///
 /// All possible forms of assignments with operational variations.
-#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Display)]
 pub enum Assignment {
     /// `=`
     #[display("=")]
@@ -63,7 +63,7 @@ pub enum Assignment {
 /// - Both operands must be the same type
 /// - The result type is the same as the operand types
 /// - Performs some bitwise operation
-#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Display)]
 pub enum BinaryBitwise {
     /// `&`
     #[display("&")]
@@ -89,7 +89,7 @@ pub enum BinaryBitwise {
 /// - Operates on two booleans
 /// - The result type is a boolean
 /// - Performs some logical operation
-#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Display)]
 pub enum Logical {
     /// `&&`
     #[display("&&")]
@@ -106,7 +106,7 @@ pub enum Logical {
 /// - Operates on two values of the same type
 /// - The result type is a boolean
 /// - Performs some equality or inequality check
-#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Display)]
 pub enum Equality {
     /// `==`
     #[display("==")]
@@ -124,7 +124,7 @@ pub enum Equality {
 /// - Both operands must be the same type
 /// - The result type is a boolean
 /// - Performs some comparison or order check
-#[derive(PartialEq, Eq, Debug, Clone, Display)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Display)]
 pub enum Comparison {
     /// `>`
     #[display(">")]

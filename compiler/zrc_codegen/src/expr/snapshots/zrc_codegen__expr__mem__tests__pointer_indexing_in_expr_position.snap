@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
+source: compiler/zrc_codegen/src/expr/mem.rs
 description: "fn take_int(x: i32);\n\nfn test() {\n    let x: *i32;\n\n    // TEST: `x` is *i32, so %let_x is a **i32 (ptr to the stack).\n    // %let_x needs to be GEP'd into and the value `i32` at idx 4 must be loaded.\n    take_int(x[4 as usize]);\n}\n"
 expression: resulting_ir
 ---

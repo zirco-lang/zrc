@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
+source: compiler/zrc_codegen/src/expr/control.rs
 description: "fn f();\nfn g() -> i32;\n\nfn test() -> i32 {\n    // TEST: f() is run, g() is run and used as the return value\n    return f(), g();\n}\n"
 expression: resulting_ir
 ---

@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
+source: compiler/zrc_codegen/src/expr/arithmetic.rs
 description: "fn test() {\n    let x: *i32;\n\n    // TEST: should create a GEP that is the same as \"x[4]\"\n    let y = x + 4 as usize;\n    // TEST: and the same, with -4:\n    let z = x - 4 as usize;\n}\n"
 expression: resulting_ir
 ---

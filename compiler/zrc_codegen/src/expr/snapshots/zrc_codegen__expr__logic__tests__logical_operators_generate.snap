@@ -1,6 +1,6 @@
 ---
-source: compiler/zrc_codegen/src/expr.rs
-description: "fn get_bool() -> bool;\n\nfn test() {\n    let a = get_bool();\n    let b = get_bool();\n\n    // TEST: should create an `icmp eq` instruction\n    let eq = a == b;\n\n    // TEST: should create an `icmp ne` instruction\n    let ne = a != b;\n}\n"
+source: compiler/zrc_codegen/src/expr/logic.rs
+description: "fn get_bool() -> bool;\n\nfn test() {\n    let a = get_bool();\n    let b = get_bool();\n\n    // TEST: should create a bit AND\n    let and = a && b;\n\n    // TEST: should create a bit OR\n    let or = a || b;\n\n    // TEST: should create a bit NOT\n    let not = !a;\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -10,8 +10,9 @@ declare i1 @get_bool()
 
 define {} @test() !dbg !3 {
 entry:
-  %let_ne = alloca i1, align 1
-  %let_eq = alloca i1, align 1
+  %let_not = alloca i1, align 1
+  %let_or = alloca i1, align 1
+  %let_and = alloca i1, align 1
   %let_b = alloca i1, align 1
   %let_a = alloca i1, align 1
   %call = call i1 @get_bool(), !dbg !8
@@ -20,13 +21,16 @@ entry:
   store i1 %call1, ptr %let_b, align 1, !dbg !13
   %load = load i1, ptr %let_a, align 1, !dbg !14
   %load2 = load i1, ptr %let_b, align 1, !dbg !15
-  %cmp = icmp eq i1 %load, %load2, !dbg !15
-  store i1 %cmp, ptr %let_eq, align 1, !dbg !16
+  %and = and i1 %load, %load2, !dbg !15
+  store i1 %and, ptr %let_and, align 1, !dbg !16
   %load3 = load i1, ptr %let_a, align 1, !dbg !17
   %load4 = load i1, ptr %let_b, align 1, !dbg !18
-  %cmp5 = icmp ne i1 %load3, %load4, !dbg !18
-  store i1 %cmp5, ptr %let_ne, align 1, !dbg !19
-  ret {} zeroinitializer, !dbg !20
+  %or = or i1 %load3, %load4, !dbg !18
+  store i1 %or, ptr %let_or, align 1, !dbg !19
+  %load5 = load i1, ptr %let_a, align 1, !dbg !20
+  %not = xor i1 %load5, true, !dbg !20
+  store i1 %not, ptr %let_not, align 1, !dbg !21
+  ret {} zeroinitializer, !dbg !22
 }
 
 !llvm.module.flags = !{!0}
@@ -46,10 +50,12 @@ entry:
 !11 = !DILocation(line: 4, column: 9, scope: !9)
 !12 = !DILocation(line: 5, column: 13, scope: !9)
 !13 = !DILocation(line: 5, column: 9, scope: !9)
-!14 = !DILocation(line: 8, column: 14, scope: !9)
-!15 = !DILocation(line: 8, column: 19, scope: !9)
+!14 = !DILocation(line: 8, column: 15, scope: !9)
+!15 = !DILocation(line: 8, column: 20, scope: !9)
 !16 = !DILocation(line: 8, column: 9, scope: !9)
 !17 = !DILocation(line: 11, column: 14, scope: !9)
 !18 = !DILocation(line: 11, column: 19, scope: !9)
 !19 = !DILocation(line: 11, column: 9, scope: !9)
-!20 = !DILocation(line: 12, column: 1, scope: !9)
+!20 = !DILocation(line: 14, column: 16, scope: !9)
+!21 = !DILocation(line: 14, column: 9, scope: !9)
+!22 = !DILocation(line: 15, column: 1, scope: !9)
