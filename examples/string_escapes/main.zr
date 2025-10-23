@@ -1,7 +1,6 @@
 #include <stdio.zh>
-//! Demonstrates escape sequences in strings
 
-fn main () -> i32 {
+fn main() -> i32 {
     printf("\x1b[92mHello, \x41SCII!\x1b[0m\n");
     printf("Hello, unicode! \u{2400}\n");
     return 0;
