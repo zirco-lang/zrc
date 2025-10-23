@@ -15,24 +15,26 @@
 //! The code generator maintains a [`CgScope`] to track variable
 //! bindings and their corresponding LLVM values.
 
+mod branch;
+mod let_decl;
+mod loops;
+mod switch;
+
 use inkwell::{
     basic_block::BasicBlock,
     debug_info::{AsDIScope, DILexicalBlock},
 };
 use zrc_typeck::tast::{
-    expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
-    stmt::{LetDeclaration, TypedStmt, TypedStmtKind},
+    stmt::{TypedStmt, TypedStmtKind},
     ty::Type,
 };
-use zrc_utils::span::{Span, Spannable, Spanned};
+use zrc_utils::span::{Spannable, Spanned};
 
 use crate::{
-    bb::BasicBlockAnd,
     ctx::{BlockCtx, FunctionCtx},
     expr::cg_expr,
     scope::CgScope,
     ty::llvm_basic_type,
-    unpack,
 };
 
 /// Consists of the [`BasicBlock`]s to `br` to when encountering certain
@@ -46,101 +48,6 @@ pub(crate) struct LoopBreakaway<'ctx> {
     /// For `for` loops, points to the latch. For `while` loops, points to the
     /// header.
     on_continue: BasicBlock<'ctx>,
-}
-
-/// Generates the `alloca`tion, `store` instruction, and adds a new identifier
-/// to the [`CgScope`].
-///
-/// # Panics
-/// Panics if an internal code generation error is encountered.
-#[allow(clippy::too_many_arguments)]
-fn cg_let_declaration<'ctx, 'input, 'a>(
-    cg: FunctionCtx<'ctx, 'a>,
-    mut bb: BasicBlock<'ctx>,
-    scope: &'a mut CgScope<'input, 'ctx>,
-    dbg_scope: DILexicalBlock<'ctx>,
-    declarations: Vec<Spanned<LetDeclaration<'input>>>,
-) -> BasicBlock<'ctx> {
-    for spanned_let_declaration in declarations {
-        let span = spanned_let_declaration.span();
-        let let_declaration = spanned_let_declaration.into_value();
-
-        let stmt_line_col = cg.line_lookup.lookup_from_index(span.start());
-        let debug_location = cg.dbg_builder.create_debug_location(
-            cg.ctx,
-            stmt_line_col.line,
-            stmt_line_col.col,
-            dbg_scope.as_debug_info_scope(),
-            None,
-        );
-        cg.builder.set_current_debug_location(debug_location);
-
-        // we create our own builder here because we need to insert the alloca
-        // at the beginning of the entry block, and that is easier than trying to
-        // somehow save our position.
-
-        let entry_block_builder = cg.ctx.create_builder();
-        let first_bb = cg
-            .fn_value
-            .get_first_basic_block()
-            .expect("function should have at least one basic block");
-
-        #[allow(clippy::option_if_let_else)]
-        match first_bb.get_first_instruction() {
-            Some(first_instruction) => {
-                entry_block_builder.position_before(&first_instruction);
-            }
-            None => {
-                entry_block_builder.position_at_end(first_bb);
-            }
-        }
-
-        let (ty, _dbg_ty) = llvm_basic_type(&cg, &let_declaration.ty);
-
-        let ptr = entry_block_builder
-            .build_alloca(ty, &format!("let_{}", let_declaration.name))
-            .expect("alloca should generate successfully");
-
-        scope.insert(let_declaration.name.value(), ptr);
-
-        // let decl = cg.dbg_builder.create_auto_variable(
-        //     dbg_scope.as_debug_info_scope(),
-        //     let_declaration.name.value(),
-        //     cg.compilation_unit.get_file(),
-        //     cg.line_lookup.lookup_from_index(span.start()).line,
-        //     dbg_ty,
-        //     true,
-        //     0,
-        //     0,
-        // );
-
-        // FIXME: Re-enable this when Inkwell resolves TheDan64/inkwell#613
-        // cg.dbg_builder
-        //     .insert_declare_at_end(ptr, Some(decl), None, debug_location, first_bb);
-
-        if let Some(value) = let_declaration.value {
-            let expr_cg = BlockCtx::new(cg, scope, dbg_scope);
-
-            bb = cg_expr(
-                expr_cg,
-                bb,
-                TypedExpr {
-                    inferred_type: let_declaration.ty.clone(),
-                    kind: value.kind.span().containing(TypedExprKind::Assignment(
-                        Box::new(Place {
-                            inferred_type: let_declaration.ty,
-                            kind: PlaceKind::Variable(let_declaration.name.value())
-                                .in_span(let_declaration.name.span()),
-                        }),
-                        Box::new(value),
-                    )),
-                },
-            )
-            .bb;
-        }
-    }
-
-    bb
 }
 
 /// Process a vector of [`TypedStmt`]s (a block) and handle each statement.
@@ -175,7 +82,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
     block
         .into_value()
         .into_iter()
-        .try_fold(bb, |mut bb, stmt| -> Option<BasicBlock> {
+        .try_fold(bb, |bb, stmt| -> Option<BasicBlock> {
             let stmt_span = stmt.0.span();
             let stmt_line_col = cg.line_lookup.lookup_from_index(stmt_span.start());
             let debug_location = cg.dbg_builder.create_debug_location(
@@ -200,73 +107,17 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     scrutinee,
                     default,
                     cases,
-                } => {
-                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
-
-                    let scrutinee = unpack!(bb = cg_expr(expr_cg, bb, scrutinee));
-
-                    let default_bb = cg.ctx.append_basic_block(cg.fn_value, "default");
-                    let return_bb = cg.ctx.append_basic_block(cg.fn_value, "post");
-
-                    let cases: Vec<_> = cases
-                        .into_iter()
-                        .map(|(trigger, stmt)| {
-                            (
-                                cg.ctx.append_basic_block(cg.fn_value, "case"),
-                                unpack!(bb = cg_expr(expr_cg, bb, trigger)),
-                                stmt,
-                            )
-                        })
-                        .collect();
-
-                    cg.builder
-                        .build_switch(
-                            scrutinee.into_int_value(),
-                            default_bb,
-                            &cases
-                                .iter()
-                                .map(|(bb, val, _)| (val.into_int_value(), *bb))
-                                .collect::<Vec<_>>(),
-                        )
-                        .expect("switch should generate successfully");
-
-                    cg.builder.position_at_end(default_bb);
-                    let default_bb = cg_block(
-                        cg,
-                        default_bb,
-                        &scope,
-                        lexical_block,
-                        default.in_span(stmt_span),
-                        breakaway,
-                    );
-                    if default_bb.is_some() {
-                        cg.builder
-                            .build_unconditional_branch(return_bb)
-                            .expect("br should generate successfully");
-                    }
-
-                    for (case_bb, _, stmt) in cases {
-                        cg.builder.position_at_end(case_bb);
-                        let case_bb = cg_block(
-                            cg,
-                            case_bb,
-                            &scope,
-                            lexical_block,
-                            stmt.in_span(stmt_span),
-                            breakaway,
-                        );
-
-                        if case_bb.is_some() {
-                            cg.builder
-                                .build_unconditional_branch(return_bb)
-                                .expect("br should generate successfully");
-                        }
-                    }
-
-                    cg.builder.position_at_end(return_bb);
-
-                    Some(return_bb)
-                }
+                } => Some(switch::cg_switch_stmt(
+                    cg,
+                    bb,
+                    &scope,
+                    lexical_block,
+                    breakaway,
+                    stmt_span,
+                    scrutinee,
+                    default,
+                    cases,
+                )),
 
                 TypedStmtKind::ExprStmt(expr) => {
                     let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
@@ -274,110 +125,16 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     Some(cg_expr(expr_cg, bb, expr).bb)
                 }
 
-                TypedStmtKind::IfStmt(cond, then, then_else) => {
-                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
-
-                    let then_else = then_else.unwrap_or_else(|| {
-                        vec![].in_span(Span::from_positions_and_file(
-                            then.end(),
-                            then.end(),
-                            then.span().file_name(),
-                        ))
-                    });
-
-                    let then_end = then.end();
-                    let then_else_end = then_else.end();
-
-                    let cond = cg_expr(expr_cg, bb, cond).into_value();
-
-                    let then_bb = cg.ctx.append_basic_block(cg.fn_value, "then");
-                    let then_else_bb = cg.ctx.append_basic_block(cg.fn_value, "then_else");
-
-                    cg.builder
-                        .build_conditional_branch(cond.into_int_value(), then_bb, then_else_bb)
-                        .expect("conditional branch should generate successfully");
-
-                    cg.builder.position_at_end(then_bb);
-                    let maybe_then_bb =
-                        cg_block(cg, then_bb, &scope, lexical_block, then, breakaway);
-
-                    cg.builder.position_at_end(then_else_bb);
-                    let maybe_then_else_bb = cg_block(
-                        cg,
-                        then_else_bb,
-                        &scope,
-                        lexical_block,
-                        then_else,
-                        breakaway,
-                    );
-
-                    match (maybe_then_bb, maybe_then_else_bb) {
-                        (None, None) => None,
-                        (Some(single_bb), None) | (None, Some(single_bb)) => {
-                            let end = cg.ctx.append_basic_block(cg.fn_value, "end");
-
-                            let then_end_line_col = cg.line_lookup.lookup_from_index(then_end);
-                            let terminating_debug_location = cg.dbg_builder.create_debug_location(
-                                cg.ctx,
-                                then_end_line_col.line,
-                                then_end_line_col.col,
-                                lexical_block.as_debug_info_scope(),
-                                None,
-                            );
-
-                            cg.builder
-                                .set_current_debug_location(terminating_debug_location);
-
-                            cg.builder.position_at_end(single_bb);
-                            cg.builder
-                                .build_unconditional_branch(end)
-                                .expect("branch should generate successfully");
-
-                            cg.builder.position_at_end(end);
-                            Some(end)
-                        }
-                        (Some(then_bb), Some(then_else_bb)) => {
-                            let end = cg.ctx.append_basic_block(cg.fn_value, "end");
-
-                            let then_end_line_col = cg.line_lookup.lookup_from_index(then_end);
-                            let then_terminating_debug_location =
-                                cg.dbg_builder.create_debug_location(
-                                    cg.ctx,
-                                    then_end_line_col.line,
-                                    then_end_line_col.col,
-                                    lexical_block.as_debug_info_scope(),
-                                    None,
-                                );
-                            cg.builder
-                                .set_current_debug_location(then_terminating_debug_location);
-                            cg.builder.position_at_end(then_bb);
-                            cg.builder
-                                .build_unconditional_branch(end)
-                                .expect("branch should generate successfully");
-
-                            let then_else_end_line_col =
-                                cg.line_lookup.lookup_from_index(then_else_end);
-                            let then_else_terminating_debug_location =
-                                cg.dbg_builder.create_debug_location(
-                                    cg.ctx,
-                                    then_else_end_line_col.line,
-                                    then_else_end_line_col.col,
-                                    lexical_block.as_debug_info_scope(),
-                                    None,
-                                );
-                            cg.builder
-                                .set_current_debug_location(then_else_terminating_debug_location);
-
-                            cg.builder.position_at_end(then_else_bb);
-                            cg.builder
-                                .build_unconditional_branch(end)
-                                .expect("branch should generate successfully");
-
-                            cg.builder.position_at_end(end);
-                            Some(end)
-                        }
-                    }
-                }
+                TypedStmtKind::IfStmt(cond, then, then_else) => branch::cg_if_stmt(
+                    cg,
+                    bb,
+                    &scope,
+                    lexical_block,
+                    breakaway,
+                    cond,
+                    then,
+                    then_else,
+                ),
 
                 TypedStmtKind::BlockStmt(block) => cg_block(
                     cg,
@@ -436,7 +193,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     None
                 }
 
-                TypedStmtKind::DeclarationList(declarations) => Some(cg_let_declaration(
+                TypedStmtKind::DeclarationList(declarations) => Some(let_decl::cg_let_declaration(
                     cg,
                     bb,
                     &mut scope,
@@ -449,206 +206,28 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                     cond,
                     post,
                     body,
-                } => {
-                    // For loops generate a somewhat more complicated CFG, with a few parts.
-                    // The preheader, where `init` runs. Breaks to the header.
-                    // The header, where `cond` is checked and breaks to either the exit or the
-                    // body. The body, where most of the body runs. Breaks to
-                    // the latch. `break` transfers to the exit by force and `continue` transfers to
-                    // the latch by force. The latch, where `post` runs and
-                    // breaks back to the header The exit, which is the basic
-                    // block we return.
-
-                    // loops lie in an implicit subscope
-                    let mut scope = scope.clone();
-
-                    // The block we are currently in will become the preheader. Generate the `init`
-                    // code if there is any.
-                    if let Some(init) = init {
-                        cg_let_declaration(cg, bb, &mut scope, lexical_block, *init);
-                    }
-
-                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
-
-                    let header = cg.ctx.append_basic_block(cg.fn_value, "header");
-                    let body_bb = cg.ctx.append_basic_block(cg.fn_value, "body");
-                    let latch = cg.ctx.append_basic_block(cg.fn_value, "latch");
-                    let exit = cg.ctx.append_basic_block(cg.fn_value, "exit");
-
-                    // Branch to the header from the preheader.
-                    cg.builder
-                        .build_unconditional_branch(header)
-                        .expect("branch should generate successfully");
-
-                    // Generate the header.
-                    cg.builder.position_at_end(header);
-                    let header = cond.map_or_else(
-                        || {
-                            // If there is no condition, we always branch to the body.
-                            cg.builder
-                                .build_unconditional_branch(body_bb)
-                                .expect("branch should generate successfully");
-
-                            header
-                        },
-                        |cond| {
-                            let mut header = header;
-
-                            let cond = unpack!(header = cg_expr(expr_cg, header, cond));
-
-                            cg.builder
-                                .build_conditional_branch(cond.into_int_value(), body_bb, exit)
-                                .expect("branch should generate successfully");
-
-                            header
-                        },
-                    );
-
-                    // Generate the body.
-                    cg.builder.position_at_end(body_bb);
-                    let body_bb = cg_block(
-                        cg,
-                        body_bb,
-                        &scope,
-                        lexical_block,
-                        body,
-                        &Some(LoopBreakaway {
-                            on_break: exit,
-                            on_continue: latch,
-                        }),
-                    );
-
-                    // The body breaks to latch
-                    if body_bb.is_some() {
-                        cg.builder
-                            .build_unconditional_branch(latch)
-                            .expect("branch should generate successfully");
-                    }
-
-                    // Latch runs post and then breaks right back to the header.
-                    cg.builder.position_at_end(latch);
-                    if let Some(post) = post {
-                        cg_expr(expr_cg, latch, post);
-                    }
-
-                    cg.builder
-                        .build_unconditional_branch(header)
-                        .expect("branch should generate successfully");
-
-                    cg.builder.position_at_end(exit);
-
-                    Some(exit)
-                }
+                } => Some(loops::cg_for_stmt(
+                    cg,
+                    bb,
+                    &scope,
+                    lexical_block,
+                    init,
+                    cond,
+                    post,
+                    body,
+                )),
 
                 TypedStmtKind::WhileStmt(cond, body) => {
-                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
-
-                    // While loops are similar to for loops but much simpler.
-                    // The preheader simply just breaks to the header.
-                    // The header checks the condition and breaks to the exit or the body.
-                    // The body simply breaks to the header.
-                    // The exit is the continued code
-
-                    // `break` => exit
-                    // `continue` => header
-
-                    let mut header = cg.ctx.append_basic_block(cg.fn_value, "header");
-
-                    let body_bb = cg.ctx.append_basic_block(cg.fn_value, "body");
-
-                    let exit = cg.ctx.append_basic_block(cg.fn_value, "exit");
-
-                    cg.builder
-                        .build_unconditional_branch(header)
-                        .expect("branch should generate successfully");
-
-                    cg.builder.position_at_end(header);
-
-                    let cond = unpack!(header = cg_expr(expr_cg, header, cond));
-
-                    cg.builder
-                        .build_conditional_branch(cond.into_int_value(), body_bb, exit)
-                        .expect("branch should generate successfully");
-
-                    cg.builder.position_at_end(body_bb);
-
-                    let body_bb = cg_block(
-                        cg,
-                        body_bb,
-                        &scope,
-                        lexical_block,
-                        body,
-                        &Some(LoopBreakaway {
-                            on_break: exit,
-                            on_continue: header,
-                        }),
-                    );
-
-                    if body_bb.is_some() {
-                        cg.builder
-                            .build_unconditional_branch(header)
-                            .expect("branch should generate successfully");
-                    }
-
-                    cg.builder.position_at_end(exit);
-
-                    Some(exit)
+                    Some(loops::cg_while_stmt(cg, &scope, lexical_block, cond, body))
                 }
 
-                TypedStmtKind::DoWhileStmt(body, cond) => {
-                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
-
-                    // `do..while` loops are slightly different from `while` loops.
-                    // the preheader breaks directly to the *body* and forces it to run at
-                    // least once. the body can then later break to the header which checks the
-                    // condition and will loop or exit.
-
-                    // `break` => exit
-                    // `continue` => header
-
-                    let body_bb = cg.ctx.append_basic_block(cg.fn_value, "body");
-                    let body_start = body_bb;
-
-                    let header = cg.ctx.append_basic_block(cg.fn_value, "header");
-
-                    let exit = cg.ctx.append_basic_block(cg.fn_value, "exit");
-
-                    cg.builder
-                        .build_unconditional_branch(body_bb)
-                        .expect("branch should generate successfully");
-
-                    cg.builder.position_at_end(body_bb);
-
-                    let body_bb = cg_block(
-                        cg,
-                        body_bb,
-                        &scope,
-                        lexical_block,
-                        body,
-                        &Some(LoopBreakaway {
-                            on_break: exit,
-                            on_continue: header,
-                        }),
-                    );
-
-                    if body_bb.is_some() {
-                        cg.builder
-                            .build_unconditional_branch(header)
-                            .expect("branch should generate successfully");
-                    }
-
-                    cg.builder.position_at_end(header);
-
-                    let BasicBlockAnd { value: cond, .. } = cg_expr(expr_cg, header, cond);
-
-                    cg.builder
-                        .build_conditional_branch(cond.into_int_value(), body_start, exit)
-                        .expect("branch should generate successfully");
-
-                    cg.builder.position_at_end(exit);
-
-                    Some(exit)
-                }
+                TypedStmtKind::DoWhileStmt(body, cond) => Some(loops::cg_do_while_stmt(
+                    cg,
+                    &scope,
+                    lexical_block,
+                    body,
+                    cond,
+                )),
             }
         })
 }
@@ -663,260 +242,12 @@ mod tests {
     use crate::cg_snapshot_test;
 
     #[test]
-    fn let_declarations_are_properly_generated() {
-        cg_snapshot_test!(indoc! {"
-            fn test() {
-                // TEST: should allocate twice and assign to one.
-                let a: i32;
-                let b: i32 = 7;
-            }
-        "});
-    }
-
-    #[test]
-    fn variable_shadowing_generates_properly() {
-        cg_snapshot_test!(indoc! {"
-            fn test() {
-                // TEST: shadowing should work, each variable gets its own allocation
-                let x: i32 = 5;
-                let y: i32 = x + 1;  // uses first x (5)
-                let x: i32 = 10;     // shadows x
-                let z: i32 = x + 1;  // uses second x (10)
-            }
-        "});
-    }
-
-    #[test]
     fn unreachable_statement_generates_properly() {
         cg_snapshot_test!(indoc! {"
             fn test(cond: bool) {
                 let x = 7;
                 if (x == 6) unreachable;
                 else return;
-            }
-        "});
-    }
-
-    mod cg_block {
-        use super::*;
-
-        #[test]
-        fn function_parameters_are_properly_generated() {
-            cg_snapshot_test!(indoc! {"
-                fn id(x: i32) -> i32 {
-                    return x;
-                }
-            "});
-        }
-
-        mod conditionals {
-            use super::*;
-
-            #[test]
-            fn if_statements_generate_as_expected() {
-                cg_snapshot_test!(indoc! {"
-                    fn get_bool() -> bool;
-                    fn nop();
-
-                    fn test() {
-                        // TEST: properly produces a conditional break over the call result and
-                        // both code paths join at the end
-                        if (get_bool()) nop();
-
-                        // TEST: code generation properly continues in the last block
-                        nop();
-                        return;
-                    }
-                "});
-            }
-
-            #[test]
-            fn if_else_statements_generate_as_expected() {
-                cg_snapshot_test!(indoc! {"
-                    fn get_bool() -> bool;
-                    fn nop();
-
-                    fn test() {
-                        // TEST: properly produces a conditional break over the call result and
-                        // both code baths call nop().
-                        if (get_bool()) nop();
-                        else {
-                            nop();
-                            // TEST: this path diverges
-                            return;
-                        }
-
-                        // TEST: code generation properly continues from the if_true block
-                        nop();
-                    }
-                "});
-            }
-
-            #[test]
-            fn if_else_statements_where_both_blocks_terminate_do_not_continue_generating() {
-                cg_snapshot_test!(indoc! {"
-                    fn get_bool() -> bool;
-
-                    fn test() {
-                        // TEST: properly produces a conditional break over the call result
-                        // and both code paths return (diverge). there should be no %end bb.
-                        if (get_bool()) return;
-                        else return;
-                    }
-                "});
-            }
-        }
-
-        mod loops {
-            use super::*;
-
-            #[test]
-            fn while_loops_along_with_break_and_continue_generate_as_expected() {
-                cg_snapshot_test!(indoc! {"
-                    fn get_bool() -> bool;
-
-                    fn test() {
-                        // TEST: the proper while loop structure is created
-                        while (get_bool()) {
-                            // TEST: break jumps to the `end` block
-                            if (get_bool()) break;
-                            else {
-                                // TEST: continue jumps to the header block
-                                if (get_bool()) continue;
-                                // TEST: otherwise, we proceed
-                                else {}
-                            }
-
-                            // TEST: the loop jumps back to the header block
-                        }
-
-                        // TEST: ...and code generation properly continues.
-                        return;
-                    }
-                "});
-            }
-
-            #[test]
-            fn for_loops_along_with_break_and_continue_generate_as_expected() {
-                cg_snapshot_test!(indoc! {"
-                    fn get_int() -> i32;
-
-                    fn test() {
-                        // TEST: the proper while loop structure is created
-                        for (let i = 0; i < get_int(); i += 1) {
-                            // TEST: break jumps to the `end` block
-                            if (i > get_int()) break;
-                            else {
-                                // TEST: continue jumps to the latch block
-                                if (i < get_int()) continue;
-                                else {}
-                            }
-
-                            // TEST: the loop jumps to the latch block which jumps back to the
-                            // header
-                        }
-                    }
-                "});
-            }
-
-            #[test]
-            fn do_while_loops_generate_as_expected() {
-                cg_snapshot_test!(indoc! {"
-                    fn get_bool() -> bool;
-
-                    fn test() {
-                        // TEST: the proper `do..while` loop structure is created
-                        do {
-                            get_bool(); // for fake side effects
-                        } while (get_bool());
-                    }
-                "});
-            }
-
-            #[test]
-            fn switch_statements_generate_as_expected() {
-                cg_snapshot_test!(indoc! {"
-                    fn get_bool() -> bool;
-                    fn when_true();
-                    fn when_false_a();
-                    fn when_false_b();
-                    fn when_default(x: i32);
-                    fn post();
-
-
-                    fn test() {
-                        // TEST: the proper `switch` structure is created
-                        switch (get_bool()) {
-                            true => when_true();
-                            false => {
-                                when_false_a();
-                                when_false_b();
-                            }
-                            default => {
-                                let x = 2 + 2;
-                                when_default(x);
-                            }
-                        }
-                        post();
-                    }
-                "});
-            }
-        }
-    }
-
-    #[test]
-    fn self_referential_struct_generates_properly() {
-        cg_snapshot_test!(indoc! {"
-            // TEST: self-referential struct types should compile to LLVM IR
-            // with pointers to empty structs as placeholders
-            struct Node {
-                value: i32,
-                next: *Node
-            }
-
-            struct TreeNode {
-                value: i32,
-                left: *TreeNode,
-                right: *TreeNode
-            }
-
-            fn create_node(val: i32) -> *Node {
-                let node: *Node;
-                return node;
-            }
-
-            fn main() -> i32 {
-                let head: *Node;
-                let tree: TreeNode;
-                head = create_node(42);
-
-                return 0;
-            }
-        "});
-    }
-
-    #[test]
-    #[ignore = "currently fails due to #451"]
-    fn enum_match_generates_as_expected() {
-        cg_snapshot_test!(indoc! {"
-            enum VarInt {
-                I32: i32,
-                I64: i64,
-            }
-
-            fn f() -> VarInt;
-            fn fi32(x: i32);
-            fn fi64(x: i64);
-
-            fn main() -> i32 {
-                let vi = f();
-
-                match (vi) {
-                    I32: x => fi32(x);
-                    I64: y => fi64(y);
-                }
-
-                return 0;
             }
         "});
     }

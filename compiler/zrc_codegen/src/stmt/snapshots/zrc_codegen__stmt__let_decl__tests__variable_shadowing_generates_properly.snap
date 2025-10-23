@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/stmt.rs
+source: compiler/zrc_codegen/src/stmt/let_decl.rs
 description: "fn test() {\n    // TEST: shadowing should work, each variable gets its own allocation\n    let x: i32 = 5;\n    let y: i32 = x + 1;  // uses first x (5)\n    let x: i32 = 10;     // shadows x\n    let z: i32 = x + 1;  // uses second x (10)\n}\n"
 expression: resulting_ir
 ---

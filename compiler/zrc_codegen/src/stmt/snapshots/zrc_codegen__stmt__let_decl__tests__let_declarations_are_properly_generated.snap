@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/stmt.rs
+source: compiler/zrc_codegen/src/stmt/let_decl.rs
 description: "fn test() {\n    // TEST: should allocate twice and assign to one.\n    let a: i32;\n    let b: i32 = 7;\n}\n"
 expression: resulting_ir
 ---

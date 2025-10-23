@@ -1,6 +1,6 @@
 ---
-source: compiler/zrc_codegen/src/stmt.rs
-description: "fn get_bool() -> bool;\n\nfn test() {\n    // TEST: the proper `do..while` loop structure is created\n    do {\n        get_bool(); // for fake side effects\n    } while (get_bool());\n}\n"
+source: compiler/zrc_codegen/src/stmt/branch.rs
+description: "fn get_bool() -> bool;\n\nfn test() {\n    // TEST: properly produces a conditional break over the call result\n    // and both code paths return (diverge). there should be no %end bb.\n    if (get_bool()) return;\n    else return;\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -10,18 +10,14 @@ declare i1 @get_bool()
 
 define {} @test() !dbg !3 {
 entry:
-  br label %body, !dbg !8
+  %call = call i1 @get_bool(), !dbg !8
+  br i1 %call, label %then, label %then_else, !dbg !8
 
-body:                                             ; preds = %header, %entry
-  %call = call i1 @get_bool(), !dbg !11
-  br label %header, !dbg !11
+then:                                             ; preds = %entry
+  ret {} zeroinitializer, !dbg !11
 
-header:                                           ; preds = %body
-  %call1 = call i1 @get_bool(), !dbg !13
-  br i1 %call1, label %body, label %exit, !dbg !13
-
-exit:                                             ; preds = %header
-  ret {} zeroinitializer, !dbg !14
+then_else:                                        ; preds = %entry
+  ret {} zeroinitializer, !dbg !13
 }
 
 !llvm.module.flags = !{!0}
@@ -35,10 +31,10 @@ exit:                                             ; preds = %header
 !5 = !{!6}
 !6 = !DICompositeType(tag: DW_TAG_structure_type, name: "struct {}", scope: !2, file: !2, elements: !7)
 !7 = !{}
-!8 = !DILocation(line: 5, column: 5, scope: !9)
+!8 = !DILocation(line: 6, column: 9, scope: !9)
 !9 = distinct !DILexicalBlock(scope: !10, file: !2, line: 3, column: 11)
 !10 = distinct !DILexicalBlock(scope: !3, file: !2, line: 3, column: 11)
-!11 = !DILocation(line: 6, column: 9, scope: !12)
-!12 = distinct !DILexicalBlock(scope: !9, file: !2, line: 5, column: 8)
-!13 = !DILocation(line: 7, column: 14, scope: !9)
-!14 = !DILocation(line: 8, column: 1, scope: !9)
+!11 = !DILocation(line: 6, column: 21, scope: !12)
+!12 = distinct !DILexicalBlock(scope: !9, file: !2, line: 6, column: 21)
+!13 = !DILocation(line: 7, column: 10, scope: !14)
+!14 = distinct !DILexicalBlock(scope: !9, file: !2, line: 7, column: 10)

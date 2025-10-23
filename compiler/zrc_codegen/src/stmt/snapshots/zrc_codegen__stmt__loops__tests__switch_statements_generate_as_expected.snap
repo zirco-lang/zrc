@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/stmt.rs
+source: compiler/zrc_codegen/src/stmt/loops.rs
 description: "fn get_bool() -> bool;\nfn when_true();\nfn when_false_a();\nfn when_false_b();\nfn when_default(x: i32);\nfn post();\n\n\nfn test() {\n    // TEST: the proper `switch` structure is created\n    switch (get_bool()) {\n        true => when_true();\n        false => {\n            when_false_a();\n            when_false_b();\n        }\n        default => {\n            let x = 2 + 2;\n            when_default(x);\n        }\n    }\n    post();\n}\n"
 expression: resulting_ir
 ---

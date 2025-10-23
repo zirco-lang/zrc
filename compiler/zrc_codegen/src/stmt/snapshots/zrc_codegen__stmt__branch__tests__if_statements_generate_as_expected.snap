@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/stmt.rs
+source: compiler/zrc_codegen/src/stmt/branch.rs
 description: "fn get_bool() -> bool;\nfn nop();\n\nfn test() {\n    // TEST: properly produces a conditional break over the call result and\n    // both code paths join at the end\n    if (get_bool()) nop();\n\n    // TEST: code generation properly continues in the last block\n    nop();\n    return;\n}\n"
 expression: resulting_ir
 ---
