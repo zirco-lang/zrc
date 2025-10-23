@@ -310,4 +310,35 @@ mod tests {
             }
         "});
     }
+
+    #[test]
+    fn self_referential_struct_generates_properly() {
+        cg_snapshot_test!(indoc! {"
+            // TEST: self-referential struct types should compile to LLVM IR
+            // with pointers to empty structs as placeholders
+            struct Node {
+                value: i32,
+                next: *Node
+            }
+
+            struct TreeNode {
+                value: i32,
+                left: *TreeNode,
+                right: *TreeNode
+            }
+
+            fn create_node(val: i32) -> *Node {
+                let node: *Node;
+                return node;
+            }
+
+            fn main() -> i32 {
+                let head: *Node;
+                let tree: TreeNode;
+                head = create_node(42);
+
+                return 0;
+            }
+        "});
+    }
 }

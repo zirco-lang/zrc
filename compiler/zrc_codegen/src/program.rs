@@ -652,3 +652,22 @@ pub fn cg_program_to_buffer(
         .write_to_memory_buffer(&module, file_type)
         .expect("writing to memory buffer should succeed")
 }
+
+#[cfg(test)]
+mod tests {
+    // Please read the "Common patterns in tests" section of crate::test_utils for
+    // more information on how code generator tests are structured.
+
+    use indoc::indoc;
+
+    use crate::cg_snapshot_test;
+
+    #[test]
+    fn function_parameters_are_properly_generated() {
+        cg_snapshot_test!(indoc! {"
+                fn id(x: i32) -> i32 {
+                    return x;
+                }
+            "});
+    }
+}

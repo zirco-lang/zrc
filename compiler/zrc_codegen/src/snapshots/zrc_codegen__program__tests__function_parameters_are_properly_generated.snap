@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/stmt.rs
+source: compiler/zrc_codegen/src/program.rs
 description: "fn id(x: i32) -> i32 {\n    return x;\n}\n"
 expression: resulting_ir
 ---

@@ -1,34 +1,23 @@
 //! For declarations
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpannedExt};
-use zrc_parser::ast::stmt::{
-    ArgumentDeclarationList, Declaration as AstDeclaration, LetDeclaration as AstLetDeclaration,
-};
-use zrc_utils::span::{Spannable, Spanned};
+mod func;
+mod let_decl;
 
-use super::{
-    block::BlockReturnAbility,
-    expr::try_coerce_to,
-    resolve_type,
-    scope::{GlobalScope, Scope},
-    ty::resolve_type_with_self_reference,
-    type_block, type_expr,
-};
+pub use let_decl::process_let_declaration;
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpannedExt};
+use zrc_parser::ast::stmt::Declaration as AstDeclaration;
+
+use super::{scope::GlobalScope, ty::resolve_type_with_self_reference, type_block};
 use crate::tast::{
-    self,
     expr::{TypedExpr, TypedExprKind},
-    stmt::{
-        ArgumentDeclaration as TastArgumentDeclaration, LetDeclaration as TastLetDeclaration,
-        TypedDeclaration,
-    },
-    ty::{Fn, FunctionDeclarationGlobalMetadata, Type as TastType},
+    stmt::TypedDeclaration,
 };
 
 /// Check if an expression is a constant expression that can be evaluated at
 /// compile time.
 ///
 /// Currently, only literal expressions are considered constant.
-const fn is_constant_expr(expr: &TypedExpr) -> bool {
+pub const fn is_constant_expr(expr: &TypedExpr) -> bool {
     matches!(
         expr.kind.value(),
         TypedExprKind::NumberLiteral(_, _)
@@ -36,125 +25,6 @@ const fn is_constant_expr(expr: &TypedExpr) -> bool {
             | TypedExprKind::StringLiteral(_)
             | TypedExprKind::CharLiteral(_)
     )
-}
-
-/// Process a vector of [AST let declarations](AstLetDeclaration) and insert it
-/// into the scope, returning a vector of [TAST let
-/// declarations](TastLetDeclaration).
-///
-/// # Errors
-/// Errors with type checker errors.
-pub fn process_let_declaration<'input>(
-    scope: &mut Scope<'input, '_>,
-    declarations: Vec<Spanned<AstLetDeclaration<'input>>>,
-) -> Result<Vec<Spanned<TastLetDeclaration<'input>>>, Diagnostic> {
-    declarations
-        .into_iter()
-        .map(
-            |let_declaration| -> Result<Spanned<TastLetDeclaration>, Diagnostic> {
-                let let_decl_span = let_declaration.span();
-                let let_declaration = let_declaration.into_value();
-
-                let typed_expr = let_declaration
-                    .value
-                    .map(|expr| type_expr(scope, expr))
-                    .transpose()?;
-
-                let resolved_ty = let_declaration
-                    .ty
-                    .map(|ty| resolve_type(scope.types, ty))
-                    .transpose()?;
-
-                let result_decl = match (typed_expr, resolved_ty) {
-                    (None, None) => {
-                        return Err(DiagnosticKind::NoTypeNoValue.error_in(let_decl_span));
-                    }
-
-                    // Explicitly typed with no value
-                    (None, Some(ty)) => TastLetDeclaration {
-                        name: let_declaration.name,
-                        ty,
-                        value: None,
-                    },
-
-                    // Infer type from value
-                    (
-                        Some(TypedExpr {
-                            inferred_type,
-                            kind,
-                        }),
-                        None,
-                    ) => {
-                        // If the inferred type is {int}, resolve it to i32
-                        let resolved_type = if matches!(inferred_type, TastType::Int) {
-                            TastType::I32
-                        } else {
-                            inferred_type.clone()
-                        };
-
-                        let value_coerced = try_coerce_to(
-                            TypedExpr {
-                                inferred_type,
-                                kind,
-                            },
-                            &resolved_type,
-                        );
-
-                        TastLetDeclaration {
-                            name: let_declaration.name,
-                            ty: resolved_type,
-                            value: Some(value_coerced),
-                        }
-                    }
-
-                    // Both explicitly typed and inferable
-                    (
-                        Some(TypedExpr {
-                            inferred_type,
-                            kind,
-                        }),
-                        Some(resolved_ty),
-                    ) => {
-                        if inferred_type == resolved_ty {
-                            TastLetDeclaration {
-                                name: let_declaration.name,
-                                ty: inferred_type.clone(),
-                                value: Some(TypedExpr {
-                                    inferred_type,
-                                    kind,
-                                }),
-                            }
-                        } else if inferred_type.can_implicitly_cast_to(&resolved_ty) {
-                            // Insert implicit cast (e.g., {int} -> i8)
-                            let value_coerced = try_coerce_to(
-                                TypedExpr {
-                                    inferred_type,
-                                    kind,
-                                },
-                                &resolved_ty,
-                            );
-                            TastLetDeclaration {
-                                name: let_declaration.name,
-                                ty: resolved_ty,
-                                value: Some(value_coerced),
-                            }
-                        } else {
-                            return Err(DiagnosticKind::InvalidAssignmentRightHandSideType {
-                                expected: resolved_ty.to_string(),
-                                got: inferred_type.to_string(),
-                            }
-                            .error_in(let_decl_span));
-                        }
-                    }
-                };
-
-                scope
-                    .values
-                    .insert(result_decl.name.value(), result_decl.ty.clone());
-                Ok(result_decl.in_span(let_decl_span))
-            },
-        )
-        .collect::<Result<Vec<_>, Diagnostic>>()
 }
 
 /// Process a top-level [AST declaration](AstDeclaration), insert it into the
@@ -171,188 +41,12 @@ pub fn process_declaration<'input>(
 ) -> Result<Option<TypedDeclaration<'input>>, Diagnostic> {
     Ok(match declaration {
         AstDeclaration::FunctionDeclaration {
-            parameters,
-            body: Some(_),
-            ..
-        } if matches!(parameters.value(), ArgumentDeclarationList::Variadic(_)) => {
-            return Err(parameters.error(|_| DiagnosticKind::VariadicFunctionMustBeExternal));
-        }
-
-        AstDeclaration::FunctionDeclaration {
             name,
             parameters,
             return_type,
             body,
-        } => {
-            let return_type_span = return_type
-                .as_ref()
-                .map_or_else(|| name.span(), |ty| ty.0.span());
+        } => func::process_function_declaration(global_scope, name, parameters, return_type, body)?,
 
-            let resolved_return_type = return_type
-                .clone()
-                .map(|ty| resolve_type(&global_scope.types, ty))
-                .transpose()?
-                .unwrap_or_else(TastType::unit);
-
-            let (ArgumentDeclarationList::NonVariadic(inner_params)
-            | ArgumentDeclarationList::Variadic(inner_params)) = parameters.value();
-
-            let resolved_parameters = inner_params
-                .iter()
-                .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
-                    Ok(TastArgumentDeclaration {
-                        name: parameter.value().name,
-                        ty: resolve_type(&global_scope.types, parameter.value().ty.clone())?
-                            .in_span(parameter.span()),
-                    })
-                })
-                .collect::<Result<Vec<_>, Diagnostic>>()?;
-
-            let fn_type = Fn {
-                arguments: match parameters.value() {
-                    ArgumentDeclarationList::NonVariadic(_) => {
-                        tast::stmt::ArgumentDeclarationList::NonVariadic(
-                            resolved_parameters.clone(),
-                        )
-                    }
-                    ArgumentDeclarationList::Variadic(_) => {
-                        tast::stmt::ArgumentDeclarationList::Variadic(resolved_parameters.clone())
-                    }
-                },
-                returns: Box::new(resolved_return_type.clone()),
-            };
-
-            let has_existing_implementation =
-                if let Some(ty) = global_scope.global_values.resolve(name.value()) {
-                    if let TastType::Fn(_) = ty {
-                        // if a function has already been declared with this name...
-
-                        let canonical = global_scope.declarations.get(name.value()).expect(
-                            "global_scope.declarations was not populated with function properly",
-                        );
-
-                        // TODO: store and reference previous declaration's span in the error
-                        if canonical.fn_type != fn_type {
-                            return Err(name.error(|_| {
-                                DiagnosticKind::ConflictingFunctionDeclarations(
-                                    canonical.fn_type.to_string(),
-                                    fn_type.to_string(),
-                                )
-                            }));
-                        }
-
-                        // TODO: store and reference previous declaration's span in the error
-                        if body.is_some() && canonical.has_implementation {
-                            return Err(name.error(|name| {
-                                DiagnosticKind::ConflictingImplementations(name.to_string())
-                            }));
-                        }
-
-                        canonical.has_implementation
-                    } else {
-                        return Err(
-                            name.error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string()))
-                        );
-                    }
-                } else {
-                    false
-                };
-
-            global_scope
-                .global_values
-                .insert(name.into_value(), TastType::Fn(fn_type.clone()));
-
-            global_scope.declarations.insert(
-                name.into_value(),
-                FunctionDeclarationGlobalMetadata {
-                    fn_type,
-                    has_implementation: body.is_some() || has_existing_implementation,
-                },
-            );
-
-            if *name.value() == "main" {
-                // main() can be either
-                // fn() -> i32
-                // fn(usize, **u8) -> i32
-
-                if resolved_return_type != TastType::I32 {
-                    return Err(name.error(|_| {
-                        DiagnosticKind::MainFunctionMustReturnI32(resolved_return_type.to_string())
-                    }));
-                }
-
-                match &parameters.value() {
-                    ArgumentDeclarationList::NonVariadic(params) if params.is_empty() => {
-                        // can be either empty or (usize, **u8)
-                    }
-
-                    ArgumentDeclarationList::NonVariadic(params) if params.len() == 2 => {
-                        let first_param_type =
-                            resolve_type(&global_scope.types, params[0].value().ty.clone())?;
-                        let second_param_type =
-                            resolve_type(&global_scope.types, params[1].value().ty.clone())?;
-
-                        if first_param_type != TastType::Usize
-                            || second_param_type
-                                .into_pointee()
-                                .map(tast::ty::Type::into_pointee)
-                                != Some(Some(TastType::U8))
-                        {
-                            return Err(
-                                name.error(|_| DiagnosticKind::MainFunctionInvalidParameters)
-                            );
-                        }
-                    }
-
-                    ArgumentDeclarationList::NonVariadic(_) => {
-                        return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
-                    }
-
-                    ArgumentDeclarationList::Variadic(_) => {
-                        return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
-                    }
-                }
-            }
-
-            Some(TypedDeclaration::FunctionDeclaration {
-                name,
-                parameters: match parameters.value() {
-                    ArgumentDeclarationList::NonVariadic(_) => {
-                        tast::stmt::ArgumentDeclarationList::NonVariadic(
-                            resolved_parameters.clone(),
-                        )
-                    }
-                    ArgumentDeclarationList::Variadic(_) => {
-                        tast::stmt::ArgumentDeclarationList::Variadic(resolved_parameters.clone())
-                    }
-                }
-                .in_span(parameters.span()),
-                return_type: resolved_return_type.clone().in_span(return_type_span),
-                body: if let Some(body) = body {
-                    let mut function_scope = global_scope.create_subscope();
-                    for param in resolved_parameters {
-                        function_scope
-                            .values
-                            .insert(param.name.value(), param.ty.into_value());
-                    }
-
-                    // discard return actuality as it's guaranteed
-                    Some(
-                        body.span().containing(
-                            type_block(
-                                &function_scope,
-                                body,
-                                false,
-                                BlockReturnAbility::MustReturn(resolved_return_type),
-                            )?
-                            .0,
-                        ),
-                    )
-                } else {
-                    None
-                },
-            })
-        }
         AstDeclaration::TypeAliasDeclaration { name, ty } => {
             if global_scope.types.has(name.value()) {
                 return Err(name.error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())));
@@ -391,74 +85,4 @@ pub fn process_declaration<'input>(
             Some(TypedDeclaration::GlobalLetDeclaration(typed_declarations))
         }
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-
-    use tast::stmt::ArgumentDeclarationList as TastArgumentDeclarationList;
-    use zrc_parser::ast::{
-        expr::{Expr, ExprKind},
-        stmt::{
-            ArgumentDeclarationList as AstArgumentDeclarationList, Declaration as AstDeclaration,
-            Stmt, StmtKind,
-        },
-        ty::{Type, TypeKind},
-    };
-    use zrc_utils::spanned_test;
-
-    use super::*;
-    use crate::typeck::scope::{TypeCtx, ValueCtx};
-
-    #[test]
-    fn re_declaration_works_as_expected() {
-        assert!(
-            process_declaration(
-                &mut GlobalScope {
-                    global_values: ValueCtx::from([(
-                        "get_true",
-                        TastType::Fn(Fn {
-                            arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
-                            returns: Box::new(TastType::Bool)
-                        })
-                    )]),
-                    types: TypeCtx::from([("bool", TastType::Bool)]),
-                    declarations: HashMap::from([(
-                        "get_true",
-                        FunctionDeclarationGlobalMetadata {
-                            fn_type: Fn {
-                                arguments: TastArgumentDeclarationList::NonVariadic(vec![]),
-                                returns: Box::new(TastType::Bool)
-                            },
-                            has_implementation: false
-                        }
-                    )])
-                },
-                AstDeclaration::FunctionDeclaration {
-                    name: spanned_test!(0, "get_true", 0),
-                    parameters: spanned_test!(
-                        0,
-                        AstArgumentDeclarationList::NonVariadic(vec![]),
-                        0
-                    ),
-                    return_type: Some(Type(spanned_test!(0, TypeKind::Identifier("bool"), 0))),
-                    body: Some(spanned_test!(
-                        0,
-                        vec![Stmt(spanned_test!(
-                            0,
-                            StmtKind::ReturnStmt(Some(Expr(spanned_test!(
-                                0,
-                                ExprKind::BooleanLiteral(true),
-                                0
-                            )))),
-                            0
-                        ))],
-                        0
-                    ))
-                }
-            )
-            .is_ok()
-        );
-    }
 }

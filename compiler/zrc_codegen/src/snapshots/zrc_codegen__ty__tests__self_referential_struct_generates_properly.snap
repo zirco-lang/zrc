@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/stmt.rs
+source: compiler/zrc_codegen/src/ty.rs
 description: "// TEST: self-referential struct types should compile to LLVM IR\n// with pointers to empty structs as placeholders\nstruct Node {\n    value: i32,\n    next: *Node\n}\n\nstruct TreeNode {\n    value: i32,\n    left: *TreeNode,\n    right: *TreeNode\n}\n\nfn create_node(val: i32) -> *Node {\n    let node: *Node;\n    return node;\n}\n\nfn main() -> i32 {\n    let head: *Node;\n    let tree: TreeNode;\n    head = create_node(42);\n\n    return 0;\n}\n"
 expression: resulting_ir
 ---

@@ -1,5 +1,5 @@
 ---
-source: compiler/zrc_codegen/src/stmt.rs
+source: compiler/zrc_codegen/src/stmt/loops.rs
 description: "fn get_bool() -> bool;\n\nfn test() {\n    // TEST: the proper while loop structure is created\n    while (get_bool()) {\n        // TEST: break jumps to the `end` block\n        if (get_bool()) break;\n        else {\n            // TEST: continue jumps to the header block\n            if (get_bool()) continue;\n            // TEST: otherwise, we proceed\n            else {}\n        }\n\n        // TEST: the loop jumps back to the header block\n    }\n\n    // TEST: ...and code generation properly continues.\n    return;\n}\n"
 expression: resulting_ir
 ---
