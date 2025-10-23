@@ -1,0 +1,23 @@
+=== Union Variant Construction Tests ===
+Demonstrating 'enum types' per SPEC.md section 3.7
+
+1. Constructing Result::Success variant:
+Got success code: 200
+
+2. Constructing Result::Error variant:
+Got error message: File not found
+
+3. Constructing Shape::Circle variant:
+Got circle with radius: 5
+
+4. Constructing Shape::Rectangle variant:
+Got rectangle with area: 100
+
+=== All union variant construction tests passed! ===
+
+Note: This demonstrates the 'enum types' concept from the spec:
+      unions where exactly one variant is initialized and the
+      active variant is tracked by the programmer.
+
+Note: The `enum` keyword creates fully tagged unions with
+      automatic discriminants and requires match statements.

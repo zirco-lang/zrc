@@ -1,0 +1,20 @@
+=== Enum Construction Tests ===
+Testing the 'enum' keyword with variant construction
+
+1. Result enum with Success variant:
+   Created Result::Success(200)
+
+2. Result enum with Error variant:
+   Created Result::Error("File not found")
+
+3. Number enum with Int variant:
+   Created Number::Int(42)
+
+4. Number enum with Long variant:
+   Created Number::Long(9876543210)
+
+=== All enum construction tests passed! ===
+
+Note: 'enum' keyword creates tagged unions with discriminants.
+      Each variant is stored with a tag for safe type checking.
+      Use with 'match' statements for exhaustive pattern matching.

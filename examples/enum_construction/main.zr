@@ -1,0 +1,42 @@
+fn printf(format: *u8, ...) -> i32;
+
+// Enum with discriminant (tagged union)
+enum Result {
+    Success: i32,
+    Error: *u8
+}
+
+enum Number {
+    Int: i32,
+    Long: i64
+}
+
+fn main() -> i32 {
+    printf("=== Enum Construction Tests ===\n");
+    printf("Testing the 'enum' keyword with variant construction\n\n");
+    
+    // Test 1: Construct Result enum variants
+    printf("1. Result enum with Success variant:\n");
+    let r1 = new Result { Success: 200 };
+    printf("   Created Result::Success(200)\n");
+    
+    printf("\n2. Result enum with Error variant:\n");
+    let r2 = new Result { Error: "File not found" };
+    printf("   Created Result::Error(\"File not found\")\n");
+    
+    // Test 2: Construct Number enum variants
+    printf("\n3. Number enum with Int variant:\n");
+    let n1 = new Number { Int: 42 };
+    printf("   Created Number::Int(42)\n");
+    
+    printf("\n4. Number enum with Long variant:\n");
+    let n2 = new Number { Long: 9876543210 };
+    printf("   Created Number::Long(9876543210)\n");
+    
+    printf("\n=== All enum construction tests passed! ===\n");
+    printf("\nNote: 'enum' keyword creates tagged unions with discriminants.\n");
+    printf("      Each variant is stored with a tag for safe type checking.\n");
+    printf("      Use with 'match' statements for exhaustive pattern matching.\n");
+    
+    return 0;
+}

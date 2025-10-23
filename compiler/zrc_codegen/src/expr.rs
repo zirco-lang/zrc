@@ -725,48 +725,111 @@ pub(crate) fn cg_expr<'ctx>(
             bb.and(reg)
         }
         TypedExprKind::StructConstruction(fields) => {
-            // Get the LLVM struct type
-            let struct_type = llvm_basic_type(&cg, &expr.inferred_type)
-                .0
-                .into_struct_type();
+            match &expr.inferred_type {
+                Type::Struct(field_types) => {
+                    // Get the LLVM struct type
+                    let struct_type = llvm_basic_type(&cg, &expr.inferred_type)
+                        .0
+                        .into_struct_type();
 
-            // Allocate space for the struct on the stack
-            let struct_ptr = cg
-                .builder
-                .build_alloca(struct_type, "struct_tmp")
-                .expect("struct allocation should have compiled successfully");
-
-            // Initialize each field
-            let (Type::Struct(field_types) | Type::Union(field_types)) = &expr.inferred_type else {
-                unreachable!("struct construction should only be used with struct/union types")
-            };
-
-            for (idx, (field_name, _field_ty)) in field_types.iter().enumerate() {
-                if let Some(field_expr) = fields.get(field_name) {
-                    // Evaluate the field value
-                    let field_value = unpack!(bb = cg_expr(cg, bb, field_expr.clone()));
-
-                    // Get pointer to this field in the struct
-                    #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
-                    let field_ptr = cg
+                    // Allocate space for the struct on the stack
+                    let struct_ptr = cg
                         .builder
-                        .build_struct_gep(struct_type, struct_ptr, idx as u32, "field_ptr")
-                        .expect("struct GEP should have compiled successfully");
+                        .build_alloca(struct_type, "struct_tmp")
+                        .expect("struct allocation should have compiled successfully");
 
-                    // Store the value
-                    cg.builder
-                        .build_store(field_ptr, field_value)
-                        .expect("store should have compiled successfully");
+                    // Initialize each field
+                    for (idx, (field_name, _field_ty)) in field_types.iter().enumerate() {
+                        if let Some(field_expr) = fields.get(field_name) {
+                            // Evaluate the field value
+                            let field_value = unpack!(bb = cg_expr(cg, bb, field_expr.clone()));
+
+                            // Get pointer to this field in the struct
+                            #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
+                            let field_ptr = cg
+                                .builder
+                                .build_struct_gep(struct_type, struct_ptr, idx as u32, "field_ptr")
+                                .expect("struct GEP should have compiled successfully");
+
+                            // Store the value
+                            cg.builder
+                                .build_store(field_ptr, field_value)
+                                .expect("store should have compiled successfully");
+                        }
+                    }
+
+                    // Load the complete struct value
+                    let reg = cg
+                        .builder
+                        .build_load(struct_type, struct_ptr, "struct_val")
+                        .expect("load should have compiled successfully");
+
+                    bb.and(reg)
+                }
+                Type::Union(variant_types) => {
+                    // For unions, we only initialize the one specified variant
+                    // Unions are represented in LLVM as the largest field type
+                    let union_type = llvm_basic_type(&cg, &expr.inferred_type).0;
+
+                    // Allocate space for the union on the stack
+                    let union_ptr = cg
+                        .builder
+                        .build_alloca(union_type, "union_tmp")
+                        .expect("union allocation should have compiled successfully");
+
+                    // Initialize the single specified variant
+                    if let Some((variant_name, field_expr)) = fields.iter().next() {
+                        // Evaluate the variant value
+                        let variant_value = unpack!(bb = cg_expr(cg, bb, field_expr.clone()));
+
+                        // Get the type of the variant being initialized
+                        let variant_type = variant_types
+                            .get(variant_name)
+                            .expect("variant should exist in union");
+                        let variant_llvm_type = llvm_basic_type(&cg, variant_type).0;
+
+                        // Cast the union pointer to a pointer to the variant type
+                        let variant_ptr = cg
+                            .builder
+                            .build_pointer_cast(
+                                union_ptr,
+                                variant_llvm_type.ptr_type(inkwell::AddressSpace::default()),
+                                "variant_ptr",
+                            )
+                            .expect("pointer cast should have compiled successfully");
+
+                        // Store the variant value
+                        cg.builder
+                            .build_store(variant_ptr, variant_value)
+                            .expect("store should have compiled successfully");
+                    }
+
+                    // Load the complete union value
+                    let reg = cg
+                        .builder
+                        .build_load(union_type, union_ptr, "union_val")
+                        .expect("load should have compiled successfully");
+
+                    bb.and(reg)
+                }
+                Type::I8
+                | Type::U8
+                | Type::I16
+                | Type::U16
+                | Type::I32
+                | Type::U32
+                | Type::I64
+                | Type::U64
+                | Type::Usize
+                | Type::Isize
+                | Type::Bool
+                | Type::Int
+                | Type::Ptr(_)
+                | Type::Fn(_)
+                | Type::Opaque(_) => {
+                    unreachable!("struct construction should only be used with struct/union types")
                 }
             }
-
-            // Load the complete struct value
-            let reg = cg
-                .builder
-                .build_load(struct_type, struct_ptr, "struct_val")
-                .expect("load should have compiled successfully");
-
-            bb.and(reg)
         }
     }
 }

@@ -1,0 +1,43 @@
+fn printf(format: *u8, ...) -> i32;
+
+union Number {
+    Int: i32,
+    Long: i64
+}
+
+union Data {
+    Number: i32,
+    Text: *u8
+}
+
+fn print_number(n: Number) {
+    printf("Number { Int: %d, Long: %ld }\n", n.Int, n.Long);
+}
+
+fn main() -> i32 {
+    printf("=== Union Construction Examples ===\n");
+    
+    // Construct union with different variants
+    printf("\n1. Union with Int variant:\n");
+    let n1 = new Number { Int: 42 };
+    print_number(n1);
+    printf("Accessing as Int: %d\n", n1.Int);
+    
+    printf("\n2. Union with Long variant:\n");
+    let n2 = new Number { Long: 9876543210 };
+    print_number(n2);
+    printf("Accessing as Long: %ld\n", n2.Long);
+    
+    // More complex union with different types
+    printf("\n3. Union with pointer variant:\n");
+    let d1 = new Data { Text: "Hello, Union!" };
+    printf("Text: %s\n", d1.Text);
+    
+    printf("\n4. Union with number variant:\n");
+    let d2 = new Data { Number: 100 };
+    printf("Number: %d\n", d2.Number);
+    
+    printf("\n=== All tests passed! ===\n");
+    
+    return 0;
+}
