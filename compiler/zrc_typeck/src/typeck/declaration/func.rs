@@ -32,7 +32,7 @@ pub fn process_function_declaration<'input>(
     return_type: Option<Type<'input>>,
     body: Option<Spanned<Vec<Stmt<'input>>>>,
 ) -> Result<Option<TypedDeclaration<'input>>, Diagnostic> {
-    if matches!(parameters.value(), ArgumentDeclarationList::Variadic(_)) {
+    if matches!(parameters.value(), ArgumentDeclarationList::Variadic(_)) && body.is_some() {
         return Err(parameters.error(|_| DiagnosticKind::VariadicFunctionMustBeExternal));
     }
 
