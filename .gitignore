@@ -1,3 +1,4 @@
 /target
 lcov.info
+.direnv
 /examples/**/out
