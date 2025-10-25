@@ -38,7 +38,7 @@ jobs:
               with:
                   command: build
             - name: Upload build artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v5
               with:
                   name: zrc-debug
                   path: target/debug/zrc
@@ -55,7 +55,7 @@ jobs:
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
             - name: Download build artifact
-              uses: actions/download-artifact@v5
+              uses: actions/download-artifact@v6
               with:
                   name: zrc-debug
                   path: ./artifacts
