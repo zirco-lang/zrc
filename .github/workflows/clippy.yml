@@ -22,16 +22,17 @@ jobs:
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
             - name: Export LLVM_SYS_201_PREFIX
               run: echo "LLVM_SYS_201_PREFIX=/usr/lib/llvm-20" >> $GITHUB_ENV
+            - name: Install LLVM dependencies
+              uses: awalsh128/cache-apt-pkgs-action@latest
+              with:
+                  packages: llvm-20 llvm-20-dev libpolly-20-dev clang-20
+                  version: 1.0
             - name: Set up Rust
               uses: actions-rs/toolchain@v1
               with:
                   toolchain: nightly
                   override: true
                   components: rustfmt, clippy
-            - name: Install LLVM dependencies
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20
             - name: Install Rust problem matchers
               uses: r7kamura/rust-problem-matchers@v1
             - name: Use dependency cache
