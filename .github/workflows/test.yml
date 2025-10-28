@@ -20,16 +20,17 @@ jobs:
                   # Make sure the actual branch is checked out when running on pull requests
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+            - name: Install LLVM dependencies
+              uses: awalsh128/cache-apt-pkgs-action@latest
+              with:
+                  packages: llvm-20 llvm-20-dev libpolly-20-dev clang-20
+                  version: 1.0
             - name: Set up Rust
               uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
                   override: true
                   components: rustfmt, clippy
-            - name: Install LLVM dependencies
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20
             - name: Install Rust problem matchers
               uses: r7kamura/rust-problem-matchers@v1
             - name: Install cargo-tarpaulin
