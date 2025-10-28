@@ -308,6 +308,8 @@ fn preprocess_internal(
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
+
     use super::*;
 
     #[test]
@@ -330,5 +332,57 @@ mod tests {
 
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].content, "fn test() {}");
+    }
+
+    #[test]
+    fn simple_include_works() {
+        let temp_dir = std::env::temp_dir();
+        let included_file_path = temp_dir.join("included.zr");
+        fs::write(&included_file_path, "fn printf(x: *u8, ...);")
+            .expect("should write included file");
+
+        let content = indoc! {r#"
+            #include "./included.zr"
+
+            fn main() {
+                printf("Hello, World!");
+            }
+        "#};
+
+        let chunks =
+            preprocess(&temp_dir, vec![], "test.zr", content).expect("preprocessing failed");
+
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[0].content, "fn printf(x: *u8, ...);");
+        assert_eq!(
+            chunks[1].content,
+            "\nfn main() {\n    printf(\"Hello, World!\");\n}"
+        );
+    }
+
+    #[test]
+    fn search_dir_include_works() {
+        let temp_dir: &'static _ = std::env::temp_dir().leak();
+        let included_file_path = temp_dir.join("included.zr");
+        fs::write(&included_file_path, "fn printf(x: *u8, ...);")
+            .expect("should write included file");
+
+        let content = indoc! {r#"
+            #include <included.zr>
+
+            fn main() {
+                printf("Hello, World!");
+            }
+        "#};
+
+        let chunks = preprocess(temp_dir, vec![&temp_dir], "test.zr", content)
+            .expect("preprocessing failed");
+
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[0].content, "fn printf(x: *u8, ...);");
+        assert_eq!(
+            chunks[1].content,
+            "\nfn main() {\n    printf(\"Hello, World!\");\n}"
+        );
     }
 }
