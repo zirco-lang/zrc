@@ -6,7 +6,7 @@
 
 A modern programming language focusing on a strong type system and modern syntax
 
-[Repository Statistics](https://repo-tracker.com/r/gh/zirco-lang/zrc)
+![Alt](https://repobeats.axiom.co/api/embed/ba11a893172e06e66607b7949d986810ab7b42df.svg "Repobeats analytics image")
 
 </div>
 
