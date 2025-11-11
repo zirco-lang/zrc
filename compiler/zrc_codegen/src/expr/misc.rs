@@ -68,28 +68,37 @@ pub fn cg_cast<'ctx, 'input>(
             .as_basic_value_enum(),
         (false, false) if x.get_type().is_int_type() && ty.value().is_integer() => {
             // Cast between two integers
-            match (x_ty_is_signed_integer, ty.value().is_signed_integer()) {
-                // (x is signed, target is signed or unsigned)
-                (true, _) => cg
-                    .builder
-                    .build_int_s_extend(
-                        x.into_int_value(),
-                        llvm_basic_type(&cg, ty.value()).0.into_int_type(),
-                        "cast",
-                    )
-                    .expect("sext should have compiled successfully")
-                    .as_basic_value_enum(),
+            let source_int = x.into_int_value();
+            let target_int_type = llvm_basic_type(&cg, ty.value()).0.into_int_type();
+            let source_width = source_int.get_type().get_bit_width();
+            let target_width = target_int_type.get_bit_width();
 
-                // (x is signed, target is signed or unsigned)
-                (false, _) => cg
-                    .builder
-                    .build_int_z_extend(
-                        x.into_int_value(),
-                        llvm_basic_type(&cg, ty.value()).0.into_int_type(),
-                        "cast",
-                    )
-                    .expect("zext should have compiled successfully")
-                    .as_basic_value_enum(),
+            match source_width.cmp(&target_width) {
+                std::cmp::Ordering::Greater => {
+                    // Narrowing cast: use truncate
+                    cg.builder
+                        .build_int_truncate(source_int, target_int_type, "cast")
+                        .expect("trunc should have compiled successfully")
+                        .as_basic_value_enum()
+                }
+                std::cmp::Ordering::Less => {
+                    // Widening cast: use sign/zero extend based on source signedness
+                    if x_ty_is_signed_integer {
+                        cg.builder
+                            .build_int_s_extend(source_int, target_int_type, "cast")
+                            .expect("sext should have compiled successfully")
+                            .as_basic_value_enum()
+                    } else {
+                        cg.builder
+                            .build_int_z_extend(source_int, target_int_type, "cast")
+                            .expect("zext should have compiled successfully")
+                            .as_basic_value_enum()
+                    }
+                }
+                std::cmp::Ordering::Equal => {
+                    // Same width: just return the value
+                    source_int.as_basic_value_enum()
+                }
             }
         }
         (false, false) => {

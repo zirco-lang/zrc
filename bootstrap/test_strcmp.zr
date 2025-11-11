@@ -1,0 +1,20 @@
+// libc declarations
+fn printf(format: *u8, ...) -> i32;
+fn strcmp(s1: *u8, s2: *u8) -> i32;
+
+fn main() -> i32 {
+    printf("Testing strcmp...\n");
+    
+    let result1 = strcmp("fn", "fn");
+    printf("strcmp('fn', 'fn') = %d\n", result1);
+    
+    let result2 = strcmp("fn", "let");
+    printf("strcmp('fn', 'let') = %d\n", result2);
+    
+    if (strcmp("test", "test") == 0) {
+        printf("Strings match correctly\n");
+    }
+    
+    printf("Success!\n");
+    return 0i32;
+}

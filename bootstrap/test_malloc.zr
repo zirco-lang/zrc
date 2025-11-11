@@ -1,0 +1,28 @@
+// libc declarations
+fn printf(format: *u8, ...) -> i32;
+fn malloc(size: usize) -> *struct {};
+
+struct Token {
+    kind: i32,
+    value: *u8,
+    len: i32
+}
+
+fn main() -> i32 {
+    printf("Testing malloc...\n");
+    let tok = malloc(sizeof *Token) as *Token;
+    printf("Malloc returned: %p\n", tok);
+    
+    if (tok as i64 == 0) {
+        printf("Malloc failed\n");
+        return 1i32;
+    }
+    
+    tok->kind = 42i32;
+    tok->value = 0 as *u8;
+    tok->len = 0i32;
+    
+    printf("Token kind: %d\n", tok->kind);
+    printf("Success!\n");
+    return 0i32;
+}

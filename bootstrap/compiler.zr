@@ -286,6 +286,9 @@ fn codegen_advance(cg: *Codegen) -> void {
 fn codegen_expect(cg: *Codegen, kind: i32) -> void {
     if (cg->current_tok->kind != kind) {
         printf("Parse error: expected token %d got %d\n", kind, cg->current_tok->kind);
+        if (cg->current_tok->value as i64 != 0) {
+            printf("Current token value: %s\n", cg->current_tok->value);
+        }
         exit(1);
     }
     codegen_advance(cg);
@@ -312,14 +315,16 @@ fn codegen_expr(cg: *Codegen) -> i32 {
         fprintf(cg->output, "  %%t%d = add i32 0, %s\n", result, cg->current_tok->value);
         codegen_advance(cg);
     } else if (cg->current_tok->kind == TOK_IDENT) {
+        let ident_name = cg->current_tok->value;
         result = codegen_new_temp(cg);
-        fprintf(cg->output, "  %%t%d = load i32, i32* %%%s\n", result, cg->current_tok->value);
         codegen_advance(cg);
         
         if (cg->current_tok->kind == TOK_LPAREN) {
+            fprintf(cg->output, "  %%t%d = call i32 @%s()\n", result, ident_name);
             codegen_advance(cg);
-            fprintf(cg->output, "  %%t%d = call i32 @%s()\n", result, cg->current_tok->value);
             codegen_expect(cg, TOK_RPAREN);
+        } else {
+            fprintf(cg->output, "  %%t%d = load i32, i32* %%%s\n", result, ident_name);
         }
     } else if (cg->current_tok->kind == TOK_LPAREN) {
         codegen_advance(cg);
@@ -369,7 +374,7 @@ fn codegen_stmt(cg: *Codegen) -> void {
         
         if (cg->current_tok->kind == TOK_COLON) {
             codegen_advance(cg);
-            codegen_advance(cg);
+            codegen_expect(cg, TOK_IDENT);
         }
         
         if (cg->current_tok->kind == TOK_EQUAL) {
@@ -456,7 +461,7 @@ fn codegen_function(cg: *Codegen) -> void {
         let param = cg->current_tok->value;
         codegen_expect(cg, TOK_IDENT);
         codegen_expect(cg, TOK_COLON);
-        codegen_advance(cg);
+        codegen_expect(cg, TOK_IDENT);
         fprintf(cg->output, "i32 %%%s.param", param);
         
         while (cg->current_tok->kind == TOK_COMMA) {
@@ -464,7 +469,7 @@ fn codegen_function(cg: *Codegen) -> void {
             let param2 = cg->current_tok->value;
             codegen_expect(cg, TOK_IDENT);
             codegen_expect(cg, TOK_COLON);
-            codegen_advance(cg);
+            codegen_expect(cg, TOK_IDENT);
             fprintf(cg->output, ", i32 %%%s.param", param2);
         }
     }
@@ -473,7 +478,7 @@ fn codegen_function(cg: *Codegen) -> void {
     
     if (cg->current_tok->kind == TOK_ARROW) {
         codegen_advance(cg);
-        codegen_advance(cg);
+        codegen_expect(cg, TOK_IDENT);
     }
     
     fprintf(cg->output, ") {\n");
@@ -507,13 +512,13 @@ fn main() -> i32 {
     printf("Zirco Self-Hosted Bootstrap Compiler\n");
     printf("=====================================\n\n");
     
-    let cg = codegen_new("bootstrap/test.zr", "bootstrap/test.ll");
+    let cg = codegen_new("bootstrap/test_simple.zr", "bootstrap/test_simple.ll");
     codegen_compile(cg);
     fclose(cg->output);
     fclose(cg->lex->input);
     
     printf("Compilation complete!\n");
-    printf("Generated: bootstrap/test.ll\n");
+    printf("Generated: bootstrap/test_simple.ll\n");
     
     return 0;
 }

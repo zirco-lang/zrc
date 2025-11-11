@@ -1,0 +1,24 @@
+// libc declarations
+type FILE = struct {};
+fn fopen(filename: *u8, mode: *u8) -> *FILE;
+fn fclose(stream: *FILE) -> i32;
+fn printf(format: *u8, ...) -> i32;
+
+fn test_fopen() -> i32 {
+    printf("Testing fopen...\n");
+    let f = fopen("bootstrap/test.zr", "r");
+    if (f as i64 == 0) {
+        printf("Failed to open file\n");
+        return 1i32;
+    }
+    printf("File opened successfully\n");
+    fclose(f);
+    return 0i32;
+}
+
+fn main() -> i32 {
+    printf("Starting test\n");
+    let result = test_fopen();
+    printf("Test result: %d\n", result);
+    return result;
+}
