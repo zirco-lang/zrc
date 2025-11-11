@@ -9,7 +9,7 @@ fn main() {
 
     build.include(format!("{}/include", llvm_sys_root));
     build.flag_if_supported("-std=c++17");
-    build.flag_if_supported("-Wno-everything");
+    build.flag_if_supported("-w");
 
     build.compile("zrc_codegen_optimize_module");
 
