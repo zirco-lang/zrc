@@ -183,7 +183,7 @@ pub fn cg_struct_construction<'ctx, 'input>(
 
             // Initialize the union with the provided field (if any)
             // In unions, all fields share the same memory space
-            for (field_name, _field_ty) in field_types.iter() {
+            for (field_name, _field_ty) in field_types {
                 if let Some(field_expr) = fields.get(field_name) {
                     // Evaluate the field value
                     let field_value = unpack!(bb = cg_expr(cg, bb, field_expr.clone()));
@@ -194,7 +194,7 @@ pub fn cg_struct_construction<'ctx, 'input>(
                         .builder
                         .build_bit_cast(
                             union_ptr,
-                            field_value.get_type().ptr_type(inkwell::AddressSpace::default()),
+                            cg.ctx.ptr_type(inkwell::AddressSpace::default()),
                             "union_field_ptr",
                         )
                         .expect("bitcast should have compiled successfully")
