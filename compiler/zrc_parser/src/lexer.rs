@@ -336,6 +336,10 @@ pub enum Tok<'input> {
     #[token("&")]
     #[display("&")]
     BitwiseAnd,
+    /// The token `|>` (pipe operator)
+    #[token("|>")]
+    #[display("|>")]
+    Pipe,
     /// The token `|`
     #[token("|")]
     #[display("|")]
@@ -794,7 +798,7 @@ mod tests {
     #[test]
     fn all_tokens_lex_and_display_correctly() {
         let input = concat!(
-            "++ -- + - * / % == != > >= < <= && || ! & | ^ ~ << >> ",
+            "++ -- + - * / % == != > >= < <= && || ! & |> | ^ ~ << >> ",
             "= += -= *= /= %= &= |= ^= <<= >>= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
             r#" struct union enum match sizeof type switch default -> => "str" 7_000 0xF_A"#,
@@ -818,6 +822,7 @@ mod tests {
             Tok::LogicalOr,
             Tok::LogicalNot,
             Tok::BitwiseAnd,
+            Tok::Pipe,
             Tok::BitwiseOr,
             Tok::BitwiseXor,
             Tok::BitwiseNot,

@@ -65,6 +65,7 @@ pub fn type_expr<'input>(
         ExprKind::Arithmetic(op, lhs, rhs) => {
             binary::type_expr_arithmetic(scope, expr_span, op, *lhs, *rhs)?
         }
+        ExprKind::Pipe(lhs, rhs) => misc::type_expr_pipe(scope, expr_span, *lhs, *rhs)?,
         ExprKind::Cast(x, ty) => misc::type_expr_cast(scope, expr_span, *x, ty)?,
         ExprKind::SizeOfType(ty) => misc::type_expr_size_of_type(scope, expr_span, ty)?,
         ExprKind::SizeOfExpr(x) => misc::type_expr_size_of_expr(scope, expr_span, *x)?,

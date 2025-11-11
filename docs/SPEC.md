@@ -335,7 +335,7 @@ Zirco uses the following operators and punctuation:
 
 **Other Operators**:
 ```
-.   ->  ::  ?   :   as
+.   ->  ::  ?   :   as  |>
 ```
 
 **Delimiters**:
@@ -539,7 +539,7 @@ Operators are listed from highest to lowest precedence:
 | 8 | `==` `!=` | Equality | Left-to-right |
 | 9 | `&` | Bitwise AND | Left-to-right |
 | 10 | `^` | Bitwise XOR | Left-to-right |
-| 11 | `\|` | Bitwise OR | Left-to-right |
+| 11 | `\|` `\|>` | Bitwise OR, Pipe operator | Left-to-right |
 | 12 | `&&` | Logical AND | Left-to-right |
 | 13 | `\|\|` | Logical OR | Left-to-right |
 | 14 | `? :` | Ternary conditional | Right-to-left |
@@ -754,6 +754,36 @@ let result = add(5, 3);
 **Rules**:
 - Arguments are evaluated left-to-right (evaluation order is defined)
 - Number and types of arguments must match the function signature
+
+#### 4.12.1 Pipe Operator
+
+The pipe operator `|>` provides a convenient syntax for function composition by passing the result of one expression as the first argument to another:
+
+**Basic Pipe**:
+```zirco
+// E1 |> E2 is equivalent to E2(E1)
+let result = 5 |> double;  // equivalent to: double(5)
+```
+
+**Pipe with Arguments**:
+```zirco
+// E1 |> E2(args...) is equivalent to E2(E1, args...)
+let result = 5 |> add(10);  // equivalent to: add(5, 10)
+```
+
+**Chained Pipes**:
+```zirco
+// Pipes are left-associative
+let result = a |> f |> g(x) |> h;
+// equivalent to: h(g(f(a), x))
+```
+
+**Rules**:
+- The pipe operator has the same precedence as bitwise OR (`|`)
+- The pipe operator is left-associative
+- `E1` is evaluated and passed as the first argument to the function or callable expression on the right
+- If the right-hand side is a function call with arguments, `E1` is prepended to the argument list
+- Value categories and type semantics follow normal function call rules
 
 ### 4.13 Cast Expressions
 

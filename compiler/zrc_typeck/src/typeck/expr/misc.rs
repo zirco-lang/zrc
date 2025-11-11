@@ -302,6 +302,51 @@ pub fn type_expr_struct_construction<'input>(
     })
 }
 
+/// Typeck a pipe expr: `E1 |> E2` becomes `E2(E1)` or `E1 |> E2(args...)` becomes `E2(E1, args...)`
+pub fn type_expr_pipe<'input>(
+    scope: &Scope<'input, '_>,
+    expr_span: Span,
+    lhs: Expr<'input>,
+    rhs: Expr<'input>,
+) -> Result<TypedExpr<'input>, Diagnostic> {
+    use zrc_parser::ast::expr::ExprKind;
+    use zrc_utils::spanned;
+
+    // Check if rhs is a call expression
+    let rhs_span = rhs.0.span();
+    let rhs_kind = rhs.0.into_value();
+    match rhs_kind {
+        ExprKind::Call(f, args) => {
+            // E1 |> E2(args...) => E2(E1, args...)
+            // Prepend lhs to the argument list
+            let mut new_args = vec![lhs];
+            new_args.extend(args.into_value());
+            
+            // Create a new call expression with the updated arguments
+            let new_args_spanned = spanned!(
+                expr_span.start(),
+                new_args,
+                expr_span.end(),
+                expr_span.file_name()
+            );
+            super::call::type_expr_call(scope, expr_span, *f, new_args_spanned)
+        }
+        other => {
+            // E1 |> E2 => E2(E1)
+            // Create a call expression: E2(E1)
+            // Reconstruct rhs from the moved rhs_kind
+            let rhs_reconstructed = Expr(other.in_span(rhs_span));
+            let args_spanned = spanned!(
+                expr_span.start(),
+                vec![lhs],
+                expr_span.end(),
+                expr_span.file_name()
+            );
+            super::call::type_expr_call(scope, expr_span, rhs_reconstructed, args_spanned)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use zrc_parser::{ast::expr::Expr, lexer::NumberLiteral};

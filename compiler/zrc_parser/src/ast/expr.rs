@@ -204,6 +204,8 @@ pub enum ExprKind<'input> {
     Comparison(Comparison, Box<Expr<'input>>, Box<Expr<'input>>),
     /// Arithmetic operations
     Arithmetic(Arithmetic, Box<Expr<'input>>, Box<Expr<'input>>),
+    /// Pipe operator: `a |> f`
+    Pipe(Box<Expr<'input>>, Box<Expr<'input>>),
 
     /// `!x`
     UnaryNot(Box<Expr<'input>>),
@@ -271,7 +273,7 @@ impl ExprKind<'_> {
             Self::Ternary(_, _, _) => Precedence::Ternary,
             Self::Logical(Logical::Or, _, _) => Precedence::LogicalOr,
             Self::Logical(Logical::And, _, _) => Precedence::LogicalAnd,
-            Self::BinaryBitwise(BinaryBitwise::Or, _, _) => Precedence::BitwiseOr,
+            Self::BinaryBitwise(BinaryBitwise::Or, _, _) | Self::Pipe(_, _) => Precedence::BitwiseOr,
             Self::BinaryBitwise(BinaryBitwise::Xor, _, _) => Precedence::BitwiseXor,
             Self::BinaryBitwise(BinaryBitwise::And, _, _) => Precedence::BitwiseAnd,
             Self::BinaryBitwise(BinaryBitwise::Shl | BinaryBitwise::Shr, _, _) => {
@@ -385,6 +387,12 @@ impl std::fmt::Display for ExprKind<'_> {
                 let prec = self.precedence();
                 Self::fmt_child(f, lhs, prec, false)?;
                 write!(f, " {op} ")?;
+                Self::fmt_child(f, rhs, prec, true)
+            }
+            Self::Pipe(lhs, rhs) => {
+                let prec = self.precedence();
+                Self::fmt_child(f, lhs, prec, false)?;
+                write!(f, " |> ")?;
                 Self::fmt_child(f, rhs, prec, true)
             }
             Self::UnaryNot(expr) => {
@@ -674,6 +682,16 @@ impl<'input> Expr<'input> {
         Self::build_arithmetic(Arithmetic::Modulo, lhs, rhs)
     }
 
+    #[must_use]
+    pub fn build_pipe(lhs: Self, rhs: Self) -> Self {
+        Self(spanned!(
+            lhs.0.start(),
+            ExprKind::Pipe(Box::new(lhs), Box::new(rhs)),
+            rhs.0.end(),
+            lhs.0.span().file_name()
+        ))
+    }
+
     // Span needed as the unary op may be in a different position than the expr
     #[must_use]
     pub fn build_not(sp: Span, expr: Self) -> Self {
@@ -897,6 +915,7 @@ mod tests {
             "a * b",
             "a / b",
             "a % b",
+            "a |> b",
             "!a",
             "~a",
             "-a",
@@ -965,6 +984,11 @@ mod tests {
             ("a + b.c", "a + b.c"),
             ("a++ + b", "a++ + b"),
             ("a + b++", "a + b++"),
+            // Pipe operator has same precedence as bitwise OR
+            ("a |> b |> c", "a |> b |> c"),
+            ("a |> (b |> c)", "a |> (b |> c)"),
+            ("a | b |> c", "a | b |> c"),
+            ("(a | b) |> c", "a | b |> c"), // Extra parens removed
         ];
 
         for (input, expected) in test_cases {

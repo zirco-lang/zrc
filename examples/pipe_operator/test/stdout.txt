@@ -1,0 +1,4 @@
+5 |> double = 10
+5 |> double |> add_ten = 20
+5 |> add(10) = 15
+5 |> double |> add(15) |> double = 50
