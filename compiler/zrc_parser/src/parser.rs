@@ -1,7 +1,8 @@
 //! Parsing and parser errors
 //!
-//! This module contains thin wrappers around the generated parser for the Zirco
-//! programming language, along with some additional models for error handling.
+//! This module contains thin wrappers around the custom hand-written parser for
+//! the Zirco programming language, along with some additional models for error
+//! handling.
 //!
 //! In most cases, you will be using the [`parse_program`] function to parse
 //! some input code. In some more specific situations, you may need to use
@@ -20,74 +21,12 @@
 //! let ast = parse_program("fn main() {}", "<test>");
 //! ```
 
-use lalrpop_util::ParseError;
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpannedExt};
+use zrc_diagnostics::Diagnostic;
 use zrc_utils::span::{Span, Spannable, Spanned};
 
-use super::{
-    ast::{expr::Expr, stmt::Declaration},
-    lexer,
-};
 use crate::{
-    ast::{stmt::Stmt, ty::Type},
-    internal_parser,
-    lexer::LexicalError,
+    ast::{expr::Expr, stmt::{Declaration, Stmt}, ty::Type},
 };
-
-/// Converts from a LALRPOP [`ParseError`] to a corresponding [`Diagnostic`].
-fn parser_error_to_diagnostic(
-    error: ParseError<usize, lexer::Tok, Spanned<LexicalError>>,
-) -> Diagnostic {
-    match error {
-        ParseError::InvalidToken { location } => DiagnosticKind::InvalidToken.error_in(
-            Span::from_positions_and_file(location, location, "<unknown>"),
-        ),
-
-        ParseError::UnrecognizedEof { location, expected } => {
-            DiagnosticKind::UnexpectedEof(expected).error_in(Span::from_positions_and_file(
-                location - 1,
-                location,
-                "<unknown>",
-            ))
-        }
-
-        ParseError::UnrecognizedToken {
-            token: (start, token, end),
-            expected,
-        } => DiagnosticKind::UnrecognizedToken(token.to_string(), expected)
-            .error_in(Span::from_positions_and_file(start, end, "<unknown>")),
-
-        ParseError::ExtraToken {
-            token: (start, token, end),
-        } => DiagnosticKind::ExtraToken(token.to_string()).error_in(Span::from_positions_and_file(
-            start,
-            end,
-            "<unknown>",
-        )),
-
-        ParseError::User { error } => error.error(|error| match error {
-            LexicalError::UnknownToken(token) => DiagnosticKind::UnknownToken(token.to_string()),
-            LexicalError::UnterminatedBlockComment => DiagnosticKind::UnterminatedBlockComment,
-            LexicalError::UnterminatedStringLiteral => DiagnosticKind::UnterminatedStringLiteral,
-            LexicalError::UnknownEscapeSequence => DiagnosticKind::UnknownEscapeSequence,
-            LexicalError::JavascriptUserDetected(expected) => {
-                DiagnosticKind::JavascriptUserDetected(expected)
-            }
-        }),
-    }
-}
-
-/// Converts the [`lexer::ZircoLexer`] result type of
-/// [`Spanned<Result<Tok, LexicalError>>`] to something suitable to pass to
-/// LALRPOP.
-fn zirco_lexer_span_to_lalrpop_span<'input>(
-    spanned: Spanned<Result<lexer::Tok<'input>, LexicalError<'input>>>,
-) -> Result<(usize, lexer::Tok<'input>, usize), Spanned<LexicalError<'input>>> {
-    spanned.transpose().map(|spanned_tok| {
-        let span = spanned_tok.span();
-        (span.start(), spanned_tok.into_value(), span.end())
-    })
-}
 
 /// Parses a Zirco program with a specific file name, yielding a list of
 /// [`Declaration`]s.
@@ -112,12 +51,7 @@ pub fn parse_program<'input>(
     input: &'input str,
     file_name: &'static str,
 ) -> Result<Vec<Spanned<Declaration<'input>>>, Diagnostic> {
-    internal_parser::ProgramParser::new()
-        .parse(
-            file_name,
-            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
-        )
-        .map_err(parser_error_to_diagnostic)
+    crate::custom_parser::parse_program(input, file_name)
 }
 
 /// Parses a singular Zirco statement list, yielding a vector of AST [`Stmt`]
@@ -143,15 +77,7 @@ pub fn parse_stmt_list<'input>(
     input: &'input str,
     file_name: &'static str,
 ) -> Result<Spanned<Vec<Stmt<'input>>>, Diagnostic> {
-    internal_parser::StmtListParser::new()
-        .parse(
-            file_name,
-            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
-        )
-        .map(|stmt_list| {
-            stmt_list.in_span(Span::from_positions_and_file(0, input.len(), file_name))
-        })
-        .map_err(parser_error_to_diagnostic)
+    crate::custom_parser::parse_stmt_list(input, file_name)
 }
 
 /// Parses a singular Zirco type, yielding an AST [`Type`] node.
@@ -176,12 +102,7 @@ pub fn parse_type<'input>(
     input: &'input str,
     file_name: &'static str,
 ) -> Result<Type<'input>, Diagnostic> {
-    internal_parser::TypeParser::new()
-        .parse(
-            file_name,
-            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
-        )
-        .map_err(parser_error_to_diagnostic)
+    crate::custom_parser::parse_type(input, file_name)
 }
 
 /// Parses a singular Zirco expression, yielding an AST [`Expr`] node.
@@ -206,12 +127,7 @@ pub fn parse_expr<'input>(
     input: &'input str,
     file_name: &'static str,
 ) -> Result<Expr<'input>, Diagnostic> {
-    internal_parser::ExprParser::new()
-        .parse(
-            file_name,
-            lexer::ZircoLexer::new(input, file_name).map(zirco_lexer_span_to_lalrpop_span),
-        )
-        .map_err(parser_error_to_diagnostic)
+    crate::custom_parser::parse_expr(input, file_name)
 }
 
 /// Parses a single source chunk from the preprocessor.
@@ -228,13 +144,7 @@ pub fn parse_source_chunk(
 ) -> Result<Vec<Spanned<Declaration<'_>>>, Diagnostic> {
     // Convert String to &'static str using Box::leak
     let file_name: &'static str = Box::leak(chunk.file_name.clone().into_boxed_str());
-
-    internal_parser::ProgramParser::new()
-        .parse(
-            file_name,
-            lexer::ZircoLexer::new(&chunk.content, file_name).map(zirco_lexer_span_to_lalrpop_span),
-        )
-        .map_err(parser_error_to_diagnostic)
+    crate::custom_parser::parse_program(&chunk.content, file_name)
 }
 
 #[cfg(test)]

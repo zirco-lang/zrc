@@ -1,6 +1,4 @@
-extern crate lalrpop;
-
+// No build script needed - we use a custom hand-written parser
 fn main() {
-    // Generate the LR parser from our grammar
-    lalrpop::process_root().expect("LALRPOP build should not error");
+    // Build script intentionally left empty
 }
