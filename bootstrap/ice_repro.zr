@@ -1,0 +1,9 @@
+fn test() -> i32 {
+    let x: i32 = 65;
+    let y: u8 = x as u8;
+    return 0i32;
+}
+
+fn main() -> i32 {
+    return test();
+}
