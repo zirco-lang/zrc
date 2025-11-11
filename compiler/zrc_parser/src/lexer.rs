@@ -796,6 +796,7 @@ mod tests {
     /// Tests that all tokens can be properly lexed, and that they all impl
     /// [`Display`] correctly.
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn all_tokens_lex_and_display_correctly() {
         let input = concat!(
             "++ -- + - * / % == != > >= < <= && || ! & |> | ^ ~ << >> ",

@@ -273,7 +273,9 @@ impl ExprKind<'_> {
             Self::Ternary(_, _, _) => Precedence::Ternary,
             Self::Logical(Logical::Or, _, _) => Precedence::LogicalOr,
             Self::Logical(Logical::And, _, _) => Precedence::LogicalAnd,
-            Self::BinaryBitwise(BinaryBitwise::Or, _, _) | Self::Pipe(_, _) => Precedence::BitwiseOr,
+            Self::BinaryBitwise(BinaryBitwise::Or, _, _) | Self::Pipe(_, _) => {
+                Precedence::BitwiseOr
+            }
             Self::BinaryBitwise(BinaryBitwise::Xor, _, _) => Precedence::BitwiseXor,
             Self::BinaryBitwise(BinaryBitwise::And, _, _) => Precedence::BitwiseAnd,
             Self::BinaryBitwise(BinaryBitwise::Shl | BinaryBitwise::Shr, _, _) => {

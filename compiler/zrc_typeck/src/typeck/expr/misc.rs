@@ -302,7 +302,8 @@ pub fn type_expr_struct_construction<'input>(
     })
 }
 
-/// Typeck a pipe expr: `E1 |> E2` becomes `E2(E1)` or `E1 |> E2(args...)` becomes `E2(E1, args...)`
+/// Typeck a pipe expr: `E1 |> E2` becomes `E2(E1)` or `E1 |> E2(args...)`
+/// becomes `E2(E1, args...)`
 pub fn type_expr_pipe<'input>(
     scope: &Scope<'input, '_>,
     expr_span: Span,
@@ -315,13 +316,14 @@ pub fn type_expr_pipe<'input>(
     // Check if rhs is a call expression
     let rhs_span = rhs.0.span();
     let rhs_kind = rhs.0.into_value();
+    #[allow(clippy::wildcard_enum_match_arm)]
     match rhs_kind {
         ExprKind::Call(f, args) => {
             // E1 |> E2(args...) => E2(E1, args...)
             // Prepend lhs to the argument list
             let mut new_args = vec![lhs];
             new_args.extend(args.into_value());
-            
+
             // Create a new call expression with the updated arguments
             let new_args_spanned = spanned!(
                 expr_span.start(),
