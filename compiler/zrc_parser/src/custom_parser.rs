@@ -64,7 +64,7 @@ impl<'input> CustomParser<'input> {
 
     /// Peek at the token kind without error handling
     fn peek_kind(&self) -> Option<&Tok<'input>> {
-        self.peek()?.as_ref().ok()
+        self.peek().and_then(|t| t.value().ok())
     }
 
     /// Check if we're at the end of input
