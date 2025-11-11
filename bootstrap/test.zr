@@ -1,0 +1,18 @@
+fn add(x: i32, y: i32) -> i32 {
+    return x + y;
+}
+
+fn factorial(n: i32) -> i32 {
+    if (n < 2) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+fn main() -> i32 {
+    let x = 5;
+    let y = 10;
+    let sum = add(x, y);
+    let fact = factorial(5);
+    return 0;
+}

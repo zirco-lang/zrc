@@ -1,0 +1,26 @@
+#pragma once
+
+// File I/O types and functions
+type FILE = struct {};
+
+fn fopen(filename: *u8, mode: *u8) -> *FILE;
+fn fclose(stream: *FILE) -> i32;
+fn fread(ptr: *void, size: usize, nmemb: usize, stream: *FILE) -> usize;
+fn fwrite(ptr: *void, size: usize, nmemb: usize, stream: *FILE) -> usize;
+fn fgetc(stream: *FILE) -> i32;
+fn fputc(c: i32, stream: *FILE) -> i32;
+fn fgets(s: *u8, size: i32, stream: *FILE) -> *u8;
+fn fputs(s: *u8, stream: *FILE) -> i32;
+fn fseek(stream: *FILE, offset: i64, whence: i32) -> i32;
+fn ftell(stream: *FILE) -> i64;
+fn rewind(stream: *FILE) -> void;
+fn feof(stream: *FILE) -> i32;
+fn ferror(stream: *FILE) -> i32;
+
+// Constants for fseek
+let SEEK_SET: i32 = 0;
+let SEEK_CUR: i32 = 1;
+let SEEK_END: i32 = 2;
+
+// EOF constant
+let EOF: i32 = -1;

@@ -1,0 +1,519 @@
+// Self-hosted Zirco Bootstrap Compiler
+// Generates LLVM IR directly
+
+// Libc declarations
+type FILE = struct {};
+
+fn fopen(filename: *u8, mode: *u8) -> *FILE;
+fn fclose(stream: *FILE) -> i32;
+fn fgetc(stream: *FILE) -> i32;
+fn fprintf(stream: *FILE, format: *u8, ...) -> i32;
+fn printf(format: *u8, ...) -> i32;
+fn malloc(size: usize) -> *struct {};
+fn strcmp(s1: *u8, s2: *u8) -> i32;
+fn strlen(s: *u8) -> usize;
+fn exit(status: i32) -> void;
+fn sprintf(dest: *u8, format: *u8, ...) -> i32;
+
+// Token kinds
+let TOK_EOF: i32 = 0i32;
+let TOK_FN: i32 = 1i32;
+let TOK_LET: i32 = 2i32;
+let TOK_RETURN: i32 = 3i32;
+let TOK_IF: i32 = 4i32;
+let TOK_WHILE: i32 = 5i32;
+let TOK_IDENT: i32 = 6i32;
+let TOK_NUMBER: i32 = 7i32;
+let TOK_STRING: i32 = 8i32;
+let TOK_LPAREN: i32 = 9i32;
+let TOK_RPAREN: i32 = 10i32;
+let TOK_LBRACE: i32 = 11i32;
+let TOK_RBRACE: i32 = 12i32;
+let TOK_SEMICOLON: i32 = 13i32;
+let TOK_COLON: i32 = 14i32;
+let TOK_COMMA: i32 = 15i32;
+let TOK_ARROW: i32 = 16i32;
+let TOK_PLUS: i32 = 17i32;
+let TOK_MINUS: i32 = 18i32;
+let TOK_STAR: i32 = 19i32;
+let TOK_EQUAL: i32 = 20i32;
+let TOK_LESS: i32 = 21i32;
+
+// Helper to check for EOF (fgetc returns -1)
+fn is_eof(c: i32) -> i32 {
+    if (c < 0) {
+        return 1i32;
+    }
+    return 0i32;
+}
+
+// Token structure
+struct Token {
+    kind: i32,
+    value: *u8,
+    len: i32
+}
+
+// Lexer
+struct Lexer {
+    input: *FILE,
+    current: i32,
+    line: i32,
+    col: i32
+}
+
+fn lexer_new(filename: *u8) -> *Lexer {
+    let lex = malloc(sizeof *Lexer) as *Lexer;
+    lex->input = fopen(filename, "r");
+    if (lex->input as i64 == 0) {
+        printf("Error: cannot open %s\n", filename);
+        exit(1);
+    }
+    lex->current = fgetc(lex->input);
+    lex->line = 1;
+    lex->col = 1;
+    return lex;
+}
+
+fn lexer_advance(lex: *Lexer) -> void {
+    if (lex->current == 10) {
+        lex->line = lex->line + 1;
+        lex->col = 1;
+    } else {
+        lex->col = lex->col + 1;
+    }
+    lex->current = fgetc(lex->input);
+}
+
+fn is_alpha(c: i32) -> i32 {
+    if ((c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95) {
+        return 1i32;
+    }
+    return 0i32;
+}
+
+fn is_digit(c: i32) -> i32 {
+    if (c >= 48 && c <= 57) {
+        return 1i32;
+    }
+    return 0i32;
+}
+
+fn lexer_skip_ws(lex: *Lexer) -> void {
+    while (lex->current == 32 || lex->current == 9 || 
+           lex->current == 10 || lex->current == 13) {
+        lexer_advance(lex);
+    }
+    
+    if (lex->current == 47) {
+        let save = lex->current;
+        lexer_advance(lex);
+        if (lex->current == 47) {
+            while (lex->current != 10 && lex->current < 0) {
+                lexer_advance(lex);
+            }
+            lexer_skip_ws(lex);
+        }
+    }
+}
+
+fn lexer_read_ident(lex: *Lexer) -> *Token {
+    let buf = malloc(256) as *u8;
+    let i = 0 as usize;
+    
+    while (is_alpha(lex->current) != 0 || is_digit(lex->current) != 0) {
+        buf[i] = lex->current as u8;
+        i = i + 1 as usize;
+        lexer_advance(lex);
+    }
+    buf[i] = 0 as u8;
+    
+    let tok = malloc(sizeof *Token) as *Token;
+    tok->value = buf;
+    tok->len = i as i32;
+    
+    if (strcmp(buf, "fn") == 0) {
+        tok->kind = TOK_FN;
+    } else if (strcmp(buf, "let") == 0) {
+        tok->kind = TOK_LET;
+    } else if (strcmp(buf, "return") == 0) {
+        tok->kind = TOK_RETURN;
+    } else if (strcmp(buf, "if") == 0) {
+        tok->kind = TOK_IF;
+    } else if (strcmp(buf, "while") == 0) {
+        tok->kind = TOK_WHILE;
+    } else {
+        tok->kind = TOK_IDENT;
+    }
+    
+    return tok;
+}
+
+fn lexer_read_number(lex: *Lexer) -> *Token {
+    let buf = malloc(256) as *u8;
+    let i = 0 as usize;
+    
+    while (is_digit(lex->current) != 0) {
+        buf[i] = lex->current as u8;
+        i = i + 1 as usize;
+        lexer_advance(lex);
+    }
+    buf[i] = 0 as u8;
+    
+    let tok = malloc(sizeof *Token) as *Token;
+    tok->kind = TOK_NUMBER;
+    tok->value = buf;
+    tok->len = i as i32;
+    
+    return tok;
+}
+
+fn lexer_read_string(lex: *Lexer) -> *Token {
+    let buf = malloc(1024) as *u8;
+    let i = 0 as usize;
+    
+    lexer_advance(lex);
+    
+    while (lex->current != 34 && lex->current < 0) {
+        buf[i] = lex->current as u8;
+        i = i + 1 as usize;
+        lexer_advance(lex);
+    }
+    
+    if (lex->current == 34) {
+        lexer_advance(lex);
+    }
+    buf[i] = 0 as u8;
+    
+    let tok = malloc(sizeof *Token) as *Token;
+    tok->kind = TOK_STRING;
+    tok->value = buf;
+    tok->len = i as i32;
+    
+    return tok;
+}
+
+fn lexer_next(lex: *Lexer) -> *Token {
+    lexer_skip_ws(lex);
+    
+    let tok = malloc(sizeof *Token) as *Token;
+    tok->value = 0 as *u8;
+    tok->len = 0;
+    
+    if (lex->current < 0) {
+        tok->kind = TOK_EOF;
+        return tok;
+    }
+    
+    if (is_alpha(lex->current) != 0) {
+        return lexer_read_ident(lex);
+    }
+    
+    if (is_digit(lex->current) != 0) {
+        return lexer_read_number(lex);
+    }
+    
+    if (lex->current == 34) {
+        return lexer_read_string(lex);
+    }
+    
+    let c = lex->current;
+    lexer_advance(lex);
+    
+    if (c == 40) {
+        tok->kind = TOK_LPAREN;
+    } else if (c == 41) {
+        tok->kind = TOK_RPAREN;
+    } else if (c == 123) {
+        tok->kind = TOK_LBRACE;
+    } else if (c == 125) {
+        tok->kind = TOK_RBRACE;
+    } else if (c == 59) {
+        tok->kind = TOK_SEMICOLON;
+    } else if (c == 58) {
+        tok->kind = TOK_COLON;
+    } else if (c == 44) {
+        tok->kind = TOK_COMMA;
+    } else if (c == 43) {
+        tok->kind = TOK_PLUS;
+    } else if (c == 45) {
+        if (lex->current == 62) {
+            lexer_advance(lex);
+            tok->kind = TOK_ARROW;
+        } else {
+            tok->kind = TOK_MINUS;
+        }
+    } else if (c == 42) {
+        tok->kind = TOK_STAR;
+    } else if (c == 61) {
+        tok->kind = TOK_EQUAL;
+    } else if (c == 60) {
+        tok->kind = TOK_LESS;
+    } else {
+        tok->kind = TOK_EOF;
+    }
+    
+    return tok;
+}
+
+// Code generator
+struct Codegen {
+    lex: *Lexer,
+    current_tok: *Token,
+    output: *FILE,
+    temp_counter: i32,
+    label_counter: i32
+}
+
+fn codegen_new(infile: *u8, outfile: *u8) -> *Codegen {
+    let cg = malloc(sizeof *Codegen) as *Codegen;
+    cg->lex = lexer_new(infile);
+    cg->current_tok = lexer_next(cg->lex);
+    cg->output = fopen(outfile, "w");
+    if (cg->output as i64 == 0) {
+        printf("Error: cannot open output %s\n", outfile);
+        exit(1);
+    }
+    cg->temp_counter = 0;
+    cg->label_counter = 0;
+    return cg;
+}
+
+fn codegen_advance(cg: *Codegen) -> void {
+    cg->current_tok = lexer_next(cg->lex);
+}
+
+fn codegen_expect(cg: *Codegen, kind: i32) -> void {
+    if (cg->current_tok->kind != kind) {
+        printf("Parse error: expected token %d got %d\n", kind, cg->current_tok->kind);
+        exit(1);
+    }
+    codegen_advance(cg);
+}
+
+fn codegen_new_temp(cg: *Codegen) -> i32 {
+    let t = cg->temp_counter;
+    cg->temp_counter = cg->temp_counter + 1;
+    return t;
+}
+
+fn codegen_new_label(cg: *Codegen) -> i32 {
+    let l = cg->label_counter;
+    cg->label_counter = cg->label_counter + 1;
+    return l;
+}
+
+// Parse and generate expression
+fn codegen_expr(cg: *Codegen) -> i32 {
+    let result = 0;
+    
+    if (cg->current_tok->kind == TOK_NUMBER) {
+        result = codegen_new_temp(cg);
+        fprintf(cg->output, "  %%t%d = add i32 0, %s\n", result, cg->current_tok->value);
+        codegen_advance(cg);
+    } else if (cg->current_tok->kind == TOK_IDENT) {
+        result = codegen_new_temp(cg);
+        fprintf(cg->output, "  %%t%d = load i32, i32* %%%s\n", result, cg->current_tok->value);
+        codegen_advance(cg);
+        
+        if (cg->current_tok->kind == TOK_LPAREN) {
+            codegen_advance(cg);
+            fprintf(cg->output, "  %%t%d = call i32 @%s()\n", result, cg->current_tok->value);
+            codegen_expect(cg, TOK_RPAREN);
+        }
+    } else if (cg->current_tok->kind == TOK_LPAREN) {
+        codegen_advance(cg);
+        result = codegen_expr(cg);
+        codegen_expect(cg, TOK_RPAREN);
+    } else {
+        result = 0;
+    }
+    
+    if (cg->current_tok->kind == TOK_PLUS) {
+        codegen_advance(cg);
+        let right = codegen_expr(cg);
+        let t = codegen_new_temp(cg);
+        fprintf(cg->output, "  %%t%d = add i32 %%t%d, %%t%d\n", t, result, right);
+        result = t;
+    } else if (cg->current_tok->kind == TOK_MINUS) {
+        codegen_advance(cg);
+        let right = codegen_expr(cg);
+        let t = codegen_new_temp(cg);
+        fprintf(cg->output, "  %%t%d = sub i32 %%t%d, %%t%d\n", t, result, right);
+        result = t;
+    } else if (cg->current_tok->kind == TOK_STAR) {
+        codegen_advance(cg);
+        let right = codegen_expr(cg);
+        let t = codegen_new_temp(cg);
+        fprintf(cg->output, "  %%t%d = mul i32 %%t%d, %%t%d\n", t, result, right);
+        result = t;
+    } else if (cg->current_tok->kind == TOK_LESS) {
+        codegen_advance(cg);
+        let right = codegen_expr(cg);
+        let t = codegen_new_temp(cg);
+        fprintf(cg->output, "  %%t%d = icmp slt i32 %%t%d, %%t%d\n", t, result, right);
+        result = t;
+    }
+    
+    return result;
+}
+
+// Parse and generate statement
+fn codegen_stmt(cg: *Codegen) -> void {
+    if (cg->current_tok->kind == TOK_LET) {
+        codegen_advance(cg);
+        let name = cg->current_tok->value;
+        codegen_expect(cg, TOK_IDENT);
+        
+        fprintf(cg->output, "  %%%s = alloca i32\n", name);
+        
+        if (cg->current_tok->kind == TOK_COLON) {
+            codegen_advance(cg);
+            codegen_advance(cg);
+        }
+        
+        if (cg->current_tok->kind == TOK_EQUAL) {
+            codegen_advance(cg);
+            let val = codegen_expr(cg);
+            fprintf(cg->output, "  store i32 %%t%d, i32* %%%s\n", val, name);
+        }
+        
+        codegen_expect(cg, TOK_SEMICOLON);
+    } else if (cg->current_tok->kind == TOK_RETURN) {
+        codegen_advance(cg);
+        
+        if (cg->current_tok->kind != TOK_SEMICOLON) {
+            let val = codegen_expr(cg);
+            fprintf(cg->output, "  ret i32 %%t%d\n", val);
+        } else {
+            fprintf(cg->output, "  ret void\n");
+        }
+        
+        codegen_expect(cg, TOK_SEMICOLON);
+    } else if (cg->current_tok->kind == TOK_IF) {
+        codegen_advance(cg);
+        codegen_expect(cg, TOK_LPAREN);
+        let cond = codegen_expr(cg);
+        codegen_expect(cg, TOK_RPAREN);
+        
+        let then_label = codegen_new_label(cg);
+        let end_label = codegen_new_label(cg);
+        
+        fprintf(cg->output, "  br i1 %%t%d, label %%L%d, label %%L%d\n", cond, then_label, end_label);
+        fprintf(cg->output, "L%d:\n", then_label);
+        
+        codegen_expect(cg, TOK_LBRACE);
+        while (cg->current_tok->kind != TOK_RBRACE) {
+            codegen_stmt(cg);
+        }
+        codegen_expect(cg, TOK_RBRACE);
+        
+        fprintf(cg->output, "  br label %%L%d\n", end_label);
+        fprintf(cg->output, "L%d:\n", end_label);
+    } else if (cg->current_tok->kind == TOK_WHILE) {
+        codegen_advance(cg);
+        
+        let cond_label = codegen_new_label(cg);
+        let body_label = codegen_new_label(cg);
+        let end_label = codegen_new_label(cg);
+        
+        fprintf(cg->output, "  br label %%L%d\n", cond_label);
+        fprintf(cg->output, "L%d:\n", cond_label);
+        
+        codegen_expect(cg, TOK_LPAREN);
+        let cond = codegen_expr(cg);
+        codegen_expect(cg, TOK_RPAREN);
+        
+        fprintf(cg->output, "  br i1 %%t%d, label %%L%d, label %%L%d\n", cond, body_label, end_label);
+        fprintf(cg->output, "L%d:\n", body_label);
+        
+        codegen_expect(cg, TOK_LBRACE);
+        while (cg->current_tok->kind != TOK_RBRACE) {
+            codegen_stmt(cg);
+        }
+        codegen_expect(cg, TOK_RBRACE);
+        
+        fprintf(cg->output, "  br label %%L%d\n", cond_label);
+        fprintf(cg->output, "L%d:\n", end_label);
+    } else {
+        let val = codegen_expr(cg);
+        codegen_expect(cg, TOK_SEMICOLON);
+    }
+}
+
+// Parse and generate function
+fn codegen_function(cg: *Codegen) -> void {
+    codegen_expect(cg, TOK_FN);
+    
+    let name = cg->current_tok->value;
+    codegen_expect(cg, TOK_IDENT);
+    
+    codegen_expect(cg, TOK_LPAREN);
+    
+    fprintf(cg->output, "define i32 @%s(", name);
+    
+    if (cg->current_tok->kind != TOK_RPAREN) {
+        let param = cg->current_tok->value;
+        codegen_expect(cg, TOK_IDENT);
+        codegen_expect(cg, TOK_COLON);
+        codegen_advance(cg);
+        fprintf(cg->output, "i32 %%%s.param", param);
+        
+        while (cg->current_tok->kind == TOK_COMMA) {
+            codegen_advance(cg);
+            let param2 = cg->current_tok->value;
+            codegen_expect(cg, TOK_IDENT);
+            codegen_expect(cg, TOK_COLON);
+            codegen_advance(cg);
+            fprintf(cg->output, ", i32 %%%s.param", param2);
+        }
+    }
+    
+    codegen_expect(cg, TOK_RPAREN);
+    
+    if (cg->current_tok->kind == TOK_ARROW) {
+        codegen_advance(cg);
+        codegen_advance(cg);
+    }
+    
+    fprintf(cg->output, ") {\n");
+    
+    codegen_expect(cg, TOK_LBRACE);
+    
+    while (cg->current_tok->kind != TOK_RBRACE) {
+        codegen_stmt(cg);
+    }
+    
+    codegen_expect(cg, TOK_RBRACE);
+    
+    fprintf(cg->output, "}\n\n");
+}
+
+// Main compilation
+fn codegen_compile(cg: *Codegen) -> void {
+    fprintf(cg->output, "; Generated by Zirco Bootstrap Compiler\n\n");
+    
+    while (cg->current_tok->kind != TOK_EOF) {
+        if (cg->current_tok->kind == TOK_FN) {
+            codegen_function(cg);
+        } else {
+            printf("Error: unexpected token at top level\n");
+            exit(1);
+        }
+    }
+}
+
+fn main() -> i32 {
+    printf("Zirco Self-Hosted Bootstrap Compiler\n");
+    printf("=====================================\n\n");
+    
+    let cg = codegen_new("bootstrap/test.zr", "bootstrap/test.ll");
+    codegen_compile(cg);
+    fclose(cg->output);
+    fclose(cg->lex->input);
+    
+    printf("Compilation complete!\n");
+    printf("Generated: bootstrap/test.ll\n");
+    
+    return 0;
+}
