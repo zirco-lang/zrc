@@ -407,6 +407,15 @@ pub fn type_expr_struct_construction<'input>(
         initialized_fields.insert(field_name_str, typed_field_expr);
     }
 
+    // For unions, verify exactly one field is initialized
+    if matches!(resolved_ty, TastType::Union(_)) && initialized_fields.len() != 1 {
+        return Err(DiagnosticKind::ExpectedGot {
+            expected: "exactly one field initialization".to_string(),
+            got: format!("{} field initializations", initialized_fields.len()),
+        }
+        .error_in(fields.span()));
+    }
+
     // For structs (not unions), verify all fields are initialized
     if matches!(resolved_ty, TastType::Struct(_)) {
         for (field_name, _field_type) in &expected_fields {
