@@ -24,7 +24,7 @@ pub struct Place<'input> {
 /// Places may be:
 /// - A variable or an property access of a place
 /// - A dereference or index into any expression yielding a pointer
-#[allow(variant_size_differences)]
+#[expect(variant_size_differences)]
 #[derive(PartialEq, Debug, Clone)]
 pub enum PlaceKind<'input> {
     /// `*x`
@@ -263,7 +263,7 @@ impl Display for TypedExpr<'_> {
 }
 
 impl Display for TypedExprKind<'_> {
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Comma(lhs, rhs) => {

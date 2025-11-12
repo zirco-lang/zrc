@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// Code generates a switch statement
-#[allow(clippy::too_many_arguments, clippy::ref_option)]
+#[expect(clippy::too_many_arguments, clippy::ref_option)]
 pub fn cg_if_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,

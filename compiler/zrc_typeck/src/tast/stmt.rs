@@ -80,7 +80,6 @@ pub enum TypedStmtKind<'input> {
 }
 
 /// A struct or function declaration at the top level of a file
-#[allow(variant_size_differences)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypedDeclaration<'input> {
     /// A declaration of a function
@@ -187,7 +186,7 @@ impl Display for TypedStmt<'_> {
 }
 
 impl Display for TypedStmtKind<'_> {
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::IfStmt(cond, if_true, None) => {

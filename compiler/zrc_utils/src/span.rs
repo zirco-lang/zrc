@@ -146,7 +146,6 @@ impl<T> Spanned<T> {
     ///
     /// This differs from [`Spanned::value`] because it consumes the
     /// [`Spanned<T>`] instance and drops the [`Span`].
-    #[allow(clippy::missing_const_for_fn)]
     #[inline]
     pub fn into_value(self) -> T {
         self.1
@@ -193,7 +192,7 @@ impl<T, E> Spanned<Result<T, E>> {
     /// Converts a [`Spanned<Result<T, E>>`] to a [`Result<Spanned<T>,
     /// Spanned<E>>`]. Note: This is not reversible. See the note on
     /// [`Spanned<Option<T>>::transpose`].
-    #[allow(clippy::missing_errors_doc)] // just propagates input error
+    #[expect(clippy::missing_errors_doc)] // just propagates input error
     pub fn transpose(self) -> Result<Spanned<T>, Spanned<E>> {
         let span = self.span();
         self.into_value()
@@ -283,7 +282,7 @@ mod tests {
         }
 
         #[test]
-        #[allow(clippy::let_underscore_must_use)]
+        #[expect(clippy::let_underscore_must_use)]
         #[should_panic(expected = "span must have positive length")]
         fn span_from_invalid_positions_panics() {
             let _ = Span::from_positions_and_file(5, 0, "<test>");

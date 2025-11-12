@@ -69,7 +69,6 @@ pub fn create_fn<'ctx: 'a, 'a>(
 ///
 /// # Panics
 /// Panics if `ty` is not an integer type
-#[allow(clippy::needless_pass_by_value)]
 pub fn llvm_int_type<'ctx: 'a, 'a>(
     ctx: &impl AsCompilationUnitCtx<'ctx, 'a>,
     ty: &Type,
@@ -105,7 +104,7 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
 ///
 /// # Panics
 /// Panics if `ty` is not a basic type
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 pub fn llvm_basic_type<'ctx: 'a, 'a>(
     ctx: &impl AsCompilationUnitCtx<'ctx, 'a>,
     ty: &Type,

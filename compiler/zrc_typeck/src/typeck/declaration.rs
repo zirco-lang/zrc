@@ -34,7 +34,6 @@ pub const fn is_constant_expr(expr: &TypedExpr) -> bool {
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
-#[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
 pub fn process_declaration<'input>(
     global_scope: &mut GlobalScope<'input>,
     declaration: AstDeclaration<'input>,

@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Code generates a for statement
-#[allow(clippy::too_many_arguments, clippy::ref_option, clippy::box_collection)]
+#[expect(clippy::too_many_arguments, clippy::box_collection)]
 pub fn cg_for_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
@@ -119,7 +119,6 @@ pub fn cg_for_stmt<'ctx, 'input, 'a>(
 }
 
 /// Code generates a while statement
-#[allow(clippy::too_many_arguments, clippy::ref_option)]
 pub fn cg_while_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     scope: &'a CgScope<'input, 'ctx>,
@@ -181,7 +180,6 @@ pub fn cg_while_stmt<'ctx, 'input, 'a>(
 }
 
 /// Code generates a do..while statement
-#[allow(clippy::too_many_arguments, clippy::ref_option)]
 pub fn cg_do_while_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     scope: &'a CgScope<'input, 'ctx>,

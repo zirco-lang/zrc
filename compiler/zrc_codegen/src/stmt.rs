@@ -41,7 +41,7 @@ use crate::{
 /// instructions. It is passed to [`cg_block`] to allow it to properly handle
 /// break and continue.
 #[derive(PartialEq, Eq, Debug, Clone)]
-#[allow(clippy::redundant_pub_crate)]
+#[expect(clippy::redundant_pub_crate)]
 pub(crate) struct LoopBreakaway<'ctx> {
     /// Points to the exit basic block.
     on_break: BasicBlock<'ctx>,
@@ -54,10 +54,8 @@ pub(crate) struct LoopBreakaway<'ctx> {
 ///
 /// # Panics
 /// Panics if an internal code generation error is encountered.
-#[allow(
-    clippy::too_many_arguments,
+#[expect(
     clippy::too_many_lines,
-    clippy::needless_pass_by_value,
     clippy::redundant_pub_crate,
     clippy::ref_option
 )]

@@ -55,7 +55,7 @@ use crate::tast::{
 /// Panics in some internal state failures.
 // TODO: Maybe the TAST should attach the BlockReturnActuality in each BlockStmt itself and preserve
 // it on sub-blocks in the TAST (this may be helpful in control flow analysis)
-#[allow(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines)]
 pub fn type_block<'input, 'gs>(
     parent_scope: &Scope<'input, 'gs>,
     input_block: Spanned<Vec<Stmt<'input>>>,

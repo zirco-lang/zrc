@@ -16,7 +16,7 @@ use crate::tast::{
 };
 
 /// Type check an if statement.
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 pub fn type_if<'input>(
     scope: &Scope<'input, '_>,
     cond: Expr<'input>,
