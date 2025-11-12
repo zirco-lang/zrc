@@ -105,7 +105,7 @@ pub fn cg_arithmetic<'ctx, 'input>(
         // Most languages make incrementing a pointer increase the address by the size
         // of the pointee type, hence our use of `gep`.
         // REVIEW: Is this the approach we want to take?
-        #[allow(clippy::wildcard_enum_match_arm)]
+        #[expect(clippy::wildcard_enum_match_arm)]
         let reg = match op {
             // SAFETY: This can segfault if indices are used incorrectly
             // This is only used for pointer arithmetic, so the indices should be correct

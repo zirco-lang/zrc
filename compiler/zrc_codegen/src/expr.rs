@@ -39,12 +39,7 @@ struct CgExprArgs<'ctx, 'input, 'a> {
 
 /// Generate LLVM IR for a [`TypedExpr`], returning a [`BasicBlockAnd`] with the
 /// resulting basic block and the computed value
-#[allow(
-    clippy::redundant_pub_crate,
-    clippy::too_many_lines,
-    clippy::match_same_arms,
-    clippy::too_many_arguments
-)]
+#[expect(clippy::redundant_pub_crate)]
 pub(crate) fn cg_expr<'ctx, 'input, 'a>(
     cg: BlockCtx<'ctx, 'input, 'a>,
     bb: BasicBlock<'ctx>,

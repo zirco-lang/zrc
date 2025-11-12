@@ -18,7 +18,7 @@ pub struct Type<'input>(pub Spanned<TypeKind<'input>>);
 
 /// The key-value pairs of a struct
 #[derive(PartialEq, Eq, Debug, Clone)]
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub struct KeyTypeMapping<'input>(pub Spanned<Vec<Spanned<(Spanned<&'input str>, Type<'input>)>>>);
 impl Display for KeyTypeMapping<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -54,9 +54,7 @@ pub enum TypeKind<'input> {
 
 // AST builder. We are able to infer the spans of many based on the start of
 // their leftmost and the end of their rightmost operands.
-#[allow(missing_docs)]
-#[allow(clippy::missing_docs_in_private_items)]
-#[allow(clippy::should_implement_trait)]
+#[allow(missing_docs, clippy::missing_docs_in_private_items)]
 impl<'input> Type<'input> {
     #[must_use]
     pub fn build_ident(ident: Spanned<&'input str>) -> Self {

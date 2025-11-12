@@ -152,7 +152,7 @@ pub fn cg_struct_construction<'ctx, 'input>(
             let field_value = unpack!(bb = cg_expr(cg, bb, field_expr.clone()));
 
             // Get pointer to this field in the struct
-            #[allow(clippy::cast_possible_truncation, clippy::as_conversions)]
+            #[expect(clippy::cast_possible_truncation, clippy::as_conversions)]
             let field_ptr = cg
                 .builder
                 .build_struct_gep(struct_type, struct_ptr, idx as u32, "field_ptr")

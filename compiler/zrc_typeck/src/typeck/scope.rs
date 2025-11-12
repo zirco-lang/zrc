@@ -113,7 +113,6 @@ impl<'input> ValueCtx<'input> {
     /// Create a new empty [`ValueScope`].
     // Does not impl [Default] because a default would be misleading: the "empty" scope is more
     // accurate.
-    #[allow(clippy::new_without_default)]
     #[must_use]
     pub fn new() -> Self {
         Self {

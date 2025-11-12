@@ -24,7 +24,7 @@ use crate::tast::{
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
-#[allow(clippy::too_many_lines, clippy::needless_pass_by_value)]
+#[expect(clippy::too_many_lines, clippy::needless_pass_by_value)]
 pub fn process_function_declaration<'input>(
     global_scope: &mut GlobalScope<'input>,
     name: Spanned<&'input str>,

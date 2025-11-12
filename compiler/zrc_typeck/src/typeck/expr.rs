@@ -23,7 +23,6 @@ use crate::tast::expr::TypedExpr;
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
-#[allow(clippy::missing_panics_doc)]
 pub fn type_expr<'input>(
     scope: &Scope<'input, '_>,
     expr: Expr<'input>,
@@ -102,7 +101,7 @@ mod tests {
     };
 
     #[test]
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn various_expressions_infer_correctly() {
         let scope = GlobalScope {
             global_values: ValueCtx::from_mappings(HashMap::from([

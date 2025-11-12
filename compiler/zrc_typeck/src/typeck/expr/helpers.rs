@@ -43,7 +43,7 @@ pub fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, Diagnostic> {
     let kind_span = expr.kind.span();
     let stringified = expr.inferred_type.to_string();
 
-    #[allow(clippy::wildcard_enum_match_arm)]
+    #[expect(clippy::wildcard_enum_match_arm)]
     Ok(match expr.kind.into_value() {
         TypedExprKind::UnaryDereference(x) => Place {
             inferred_type: expr.inferred_type,

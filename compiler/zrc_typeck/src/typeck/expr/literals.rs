@@ -44,7 +44,7 @@ pub fn type_expr_number_literal<'input>(
         .expect("Number literal should have been valid");
 
     // Check bounds based on type
-    #[allow(clippy::wildcard_enum_match_arm)]
+    #[expect(clippy::wildcard_enum_match_arm)]
     let bounds = match ty_resolved {
         TastType::I8 => Some((i8::MIN.into(), i8::MAX.into())),
         TastType::U8 => Some((u8::MIN.into(), u8::MAX.into())),
@@ -62,8 +62,8 @@ pub fn type_expr_number_literal<'input>(
     if let Some((min, max)) = bounds {
         // Check if the value fits in the range
         // We need to handle unsigned values that might be larger than i128::MAX
-        #[allow(clippy::cast_possible_wrap)]
-        #[allow(clippy::as_conversions)]
+        #[expect(clippy::cast_possible_wrap)]
+        #[expect(clippy::as_conversions)]
         let value_in_range = u128::try_from(i128::MAX).ok().is_some_and(|max_as_u128| {
             if parsed_value <= max_as_u128 {
                 let value_as_signed = parsed_value as i128;

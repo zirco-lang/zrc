@@ -133,7 +133,7 @@ fn find_include_file(ctx: &PreprocessorCtx, include_file: &str) -> Option<PathBu
 /// - An included file cannot be found
 /// - An included file cannot be read
 /// - A preprocessing directive is malformed
-#[allow(clippy::result_large_err)]
+#[expect(clippy::result_large_err)]
 pub fn preprocess(
     base_path: &Path,
     search_paths: Vec<&'static Path>,
@@ -146,7 +146,7 @@ pub fn preprocess(
 }
 
 /// Internal recursive preprocessing function
-#[allow(clippy::too_many_lines, clippy::result_large_err)]
+#[expect(clippy::too_many_lines, clippy::result_large_err)]
 fn preprocess_internal(
     base_path: &Path,
     file_name: &str,

@@ -16,7 +16,7 @@ use crate::tast::{
 };
 
 /// Typeck a call expr
-#[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
+#[expect(clippy::needless_pass_by_value, clippy::too_many_lines)]
 pub fn type_expr_call<'input>(
     scope: &Scope<'input, '_>,
     expr_span: Span,
@@ -31,7 +31,7 @@ pub fn type_expr_call<'input>(
         .map(|x| type_expr(scope, x.clone()))
         .collect::<Result<Vec<TypedExpr>, Diagnostic>>()?;
 
-    #[allow(clippy::wildcard_enum_match_arm)]
+    #[expect(clippy::wildcard_enum_match_arm)]
     match ft.inferred_type.clone() {
         TastType::Fn(Fn {
             arguments: ArgumentDeclarationList::NonVariadic(arg_types),

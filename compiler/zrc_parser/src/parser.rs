@@ -107,7 +107,7 @@ fn zirco_lexer_span_to_lalrpop_span<'input>(
 /// # Errors
 /// This function returns [`Err`] with a [`Diagnostic`] if any error was
 /// encountered while parsing the input program.
-#[allow(clippy::result_large_err)]
+#[expect(clippy::result_large_err)]
 pub fn parse_program<'input>(
     input: &'input str,
     file_name: &'static str,
@@ -138,7 +138,7 @@ pub fn parse_program<'input>(
 /// # Errors
 /// This function returns [`Err`] with a [`Diagnostic`] if any error was
 /// encountered while parsing the input statement list.
-#[allow(clippy::result_large_err)]
+#[expect(clippy::result_large_err)]
 pub fn parse_stmt_list<'input>(
     input: &'input str,
     file_name: &'static str,
@@ -171,7 +171,7 @@ pub fn parse_stmt_list<'input>(
 /// # Errors
 /// This function returns [`Err`] with a [`Diagnostic`] if any error was
 /// encountered while parsing the input expression.
-#[allow(clippy::result_large_err)]
+#[expect(clippy::result_large_err)]
 pub fn parse_type<'input>(
     input: &'input str,
     file_name: &'static str,
@@ -201,7 +201,7 @@ pub fn parse_type<'input>(
 /// # Errors
 /// This function returns [`Err`] with a [`Diagnostic`] if any error was
 /// encountered while parsing the input expression.
-#[allow(clippy::result_large_err)]
+#[expect(clippy::result_large_err)]
 pub fn parse_expr<'input>(
     input: &'input str,
     file_name: &'static str,
@@ -222,7 +222,7 @@ pub fn parse_expr<'input>(
 /// # Errors
 /// This function returns [`Err`] with a diagnostic if any error was
 /// encountered while parsing the chunk.
-#[allow(clippy::result_large_err)]
+#[expect(clippy::result_large_err)]
 pub fn parse_source_chunk(
     chunk: &zrc_preprocessor::SourceChunk,
 ) -> Result<Vec<Spanned<Declaration<'_>>>, Diagnostic> {

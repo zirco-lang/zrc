@@ -73,7 +73,6 @@ impl BlockReturnActuality {
     /// Sometimes + Always => Sometimes
     /// Always + Always => Always
     #[must_use]
-    #[allow(clippy::min_ident_chars)]
     pub const fn join(a: Self, b: Self) -> Self {
         match (a, b) {
             (Self::NeverReturns, Self::NeverReturns) => Self::NeverReturns,
