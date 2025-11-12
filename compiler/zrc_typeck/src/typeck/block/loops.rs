@@ -83,6 +83,33 @@ pub fn type_for<'input>(
     )))
 }
 
+/// Type check a four statement.
+pub fn type_four<'input>(
+    scope: &Scope<'input, '_>,
+    body: Box<Stmt<'input>>,
+    return_ability: &BlockReturnAbility<'input>,
+    stmt_span: Span,
+) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
+    let loop_scope = scope.clone();
+
+    let body_as_block = coerce_stmt_into_block(*body);
+
+    let body_as_block_span = body_as_block.span();
+    let (typed_body, body_return_actuality) = type_block(
+        &loop_scope,
+        body_as_block,
+        true,
+        return_ability.clone().demote(),
+    )?;
+
+    Ok(Some((
+        TypedStmt(
+            TypedStmtKind::FourStmt(typed_body.in_span(body_as_block_span)).in_span(stmt_span),
+        ),
+        body_return_actuality,
+    )))
+}
+
 /// Type check a while statement.
 pub fn type_while<'input>(
     scope: &Scope<'input, '_>,
