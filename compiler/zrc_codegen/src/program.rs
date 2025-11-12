@@ -11,6 +11,7 @@ use inkwell::{
     debug_info::{AsDIScope, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage},
     memory_buffer::MemoryBuffer,
     module::{FlagBehavior, Module},
+    passes::PassBuilderOptions,
     targets::{
         CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
     },
@@ -189,19 +190,18 @@ pub fn cg_init_fn<'ctx>(
 
 /// Run optimizations on the given program.
 fn optimize_module(module: &Module<'_>, tm: &TargetMachine, optimization_level: OptimizationLevel) {
-    // SAFETY: This is safe because we ensure that the module is valid and
-    // properly constructed before passing it to the optimizer.
-    //
-    // We must use FFI here because Inkwell does not expose the LLVM
-    // optimization passes directly.
-    unsafe {
-        #[expect(clippy::as_conversions)]
-        crate::zrc_codegen_optimize_module(
-            module.as_mut_ptr(),
-            tm.as_mut_ptr(),
-            optimization_level as u32,
-        );
-    }
+    module
+        .run_passes(
+            match optimization_level {
+                OptimizationLevel::None => "default<O0>",
+                OptimizationLevel::Less => "default<O1>",
+                OptimizationLevel::Default => "default<O2>",
+                OptimizationLevel::Aggressive => "default<O3>",
+            },
+            tm,
+            PassBuilderOptions::create(),
+        )
+        .expect("optimizing module should succeed");
 }
 
 /// Code generate and verify a program given a [`Context`] and return the final

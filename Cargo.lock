@@ -1721,7 +1721,6 @@ dependencies = [
  "indoc",
  "inkwell",
  "insta",
- "llvm-sys",
  "zrc_parser",
  "zrc_typeck",
  "zrc_utils",
