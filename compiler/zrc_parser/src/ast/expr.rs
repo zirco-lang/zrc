@@ -244,7 +244,7 @@ pub enum ExprKind<'input> {
     SizeOfExpr(Box<Expr<'input>>),
 
     /// Struct construction: `new Type { field1: value1, field2: value2 }`
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     StructConstruction(
         Type<'input>,
         Spanned<Vec<Spanned<(Spanned<&'input str>, Expr<'input>)>>>,
@@ -342,7 +342,7 @@ impl ExprKind<'_> {
 }
 
 impl std::fmt::Display for ExprKind<'_> {
-    #[allow(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Comma(lhs, rhs) => {
@@ -504,9 +504,7 @@ impl std::fmt::Display for Expr<'_> {
 
 // AST builder. We are able to infer the spans of many based on the start of
 // their leftmost and the end of their rightmost operands.
-#[allow(missing_docs)]
-#[allow(clippy::missing_docs_in_private_items)]
-#[allow(clippy::should_implement_trait)]
+#[allow(missing_docs, clippy::missing_docs_in_private_items)]
 impl<'input> Expr<'input> {
     #[must_use]
     pub fn build_comma(lhs: Self, rhs: Self) -> Self {
@@ -845,7 +843,7 @@ impl<'input> Expr<'input> {
         ))
     }
     #[must_use]
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub fn build_struct_construction(
         ty: Type<'input>,
         fields: Spanned<Vec<Spanned<(Spanned<&'input str>, Self)>>>,

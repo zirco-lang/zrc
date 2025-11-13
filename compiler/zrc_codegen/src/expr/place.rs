@@ -28,7 +28,6 @@ use crate::{
 };
 
 /// Resolve a place to its LLVM [`PointerValue`]
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn cg_place<'ctx>(
     cg: BlockCtx<'ctx, '_, '_>,
     mut bb: BasicBlock<'ctx>,
@@ -80,7 +79,7 @@ pub fn cg_place<'ctx>(
             bb.and(reg.as_basic_value_enum().into_pointer_value())
         }
 
-        #[allow(clippy::wildcard_enum_match_arm)]
+        #[expect(clippy::wildcard_enum_match_arm)]
         PlaceKind::Dot(x, prop) => match &x.inferred_type {
             Type::Struct(contents) => {
                 let x_ty = llvm_basic_type(&cg, &x.inferred_type).0;

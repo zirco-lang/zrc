@@ -130,7 +130,7 @@ fn resolve_type_with_opaque<'input>(
 ///
 /// # Errors
 /// Returns an error if an opaque type is found not behind a pointer.
-#[allow(clippy::wildcard_enum_match_arm)]
+#[expect(clippy::wildcard_enum_match_arm)]
 fn check_opaque_behind_pointer<'input>(
     ty: &TastType<'input>,
     opaque_name: &'input str,
@@ -175,7 +175,7 @@ pub fn resolve_type_with_self_reference<'input>(
 /// Replace all opaque type references with the concrete type.
 /// For self-referential types behind pointers, replaces with an empty struct
 /// as a placeholder since pointers don't need to know the full pointee type.
-#[allow(clippy::wildcard_enum_match_arm)]
+#[expect(clippy::wildcard_enum_match_arm)]
 fn replace_opaque_with_concrete<'input>(
     ty: TastType<'input>,
     opaque_name: &'input str,
@@ -220,7 +220,6 @@ fn replace_opaque_with_concrete<'input>(
 ///
 /// # Errors
 /// Errors if a key is not unique or is unresolvable.
-#[allow(clippy::type_complexity)]
 pub(super) fn resolve_key_type_mapping<'input>(
     type_scope: &TypeCtx<'input>,
     members: KeyTypeMapping<'input>,
@@ -247,7 +246,6 @@ pub(super) fn resolve_key_type_mapping<'input>(
 /// # Errors
 /// Errors if a key is not unique, is unresolvable, or contains a
 /// self-referential type not behind a pointer.
-#[allow(clippy::type_complexity)]
 fn resolve_key_type_mapping_with_opaque<'input>(
     type_scope: &TypeCtx<'input>,
     members: KeyTypeMapping<'input>,

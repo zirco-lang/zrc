@@ -29,7 +29,7 @@ use crate::OutputFormat;
 /// * `debug_mode` - The debug level for code generation.
 /// * `triple` - The target triple for code generation.
 /// * `cpu` - The target CPU for code generation.
-#[allow(
+#[expect(
     clippy::too_many_arguments,
     clippy::wildcard_enum_match_arm,
     clippy::result_large_err

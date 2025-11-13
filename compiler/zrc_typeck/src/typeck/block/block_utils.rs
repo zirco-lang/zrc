@@ -10,7 +10,7 @@ use zrc_utils::span::{Spannable, Spanned};
 pub fn coerce_stmt_into_block(stmt: Stmt<'_>) -> Spanned<Vec<Stmt<'_>>> {
     let span = stmt.0.span();
 
-    #[allow(clippy::wildcard_enum_match_arm)]
+    #[expect(clippy::wildcard_enum_match_arm)]
     stmt.0.map(|value| match value {
         StmtKind::BlockStmt(stmts) => stmts,
         stmt_kind => vec![Stmt(stmt_kind.in_span(span))],

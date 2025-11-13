@@ -11,6 +11,7 @@ use inkwell::{
     debug_info::{AsDIScope, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage},
     memory_buffer::MemoryBuffer,
     module::{FlagBehavior, Module},
+    passes::PassBuilderOptions,
     targets::{
         CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
     },
@@ -36,7 +37,7 @@ use crate::{
 /// # Panics
 ///
 /// Panics if the expression is not a valid constant expression.
-#[allow(clippy::too_many_lines, clippy::wildcard_enum_match_arm)]
+#[expect(clippy::wildcard_enum_match_arm)]
 fn eval_const_expr<'ctx>(
     unit: &CompilationUnitCtx<'ctx, '_>,
     expr: &zrc_typeck::tast::expr::TypedExpr,
@@ -98,7 +99,6 @@ fn eval_const_expr<'ctx>(
 /// Use [`cg_init_fn`] instead for definitions.
 /// We do not attach debugging info to extern functions, to follow with clang's
 /// (probably correct) behavior.
-#[allow(clippy::too_many_arguments)]
 pub fn cg_init_extern_fn<'ctx>(
     unit: &CompilationUnitCtx<'ctx, '_>,
     name: &str,
@@ -132,7 +132,6 @@ pub fn cg_init_extern_fn<'ctx>(
 
 /// Same as [`cg_init_extern_fn`] but properly initializes function
 /// *definitions* with their debugging information.
-#[allow(clippy::too_many_arguments)]
 pub fn cg_init_fn<'ctx>(
     unit: &CompilationUnitCtx<'ctx, '_>,
     name: &str,
@@ -191,19 +190,18 @@ pub fn cg_init_fn<'ctx>(
 
 /// Run optimizations on the given program.
 fn optimize_module(module: &Module<'_>, tm: &TargetMachine, optimization_level: OptimizationLevel) {
-    // SAFETY: This is safe because we ensure that the module is valid and
-    // properly constructed before passing it to the optimizer.
-    //
-    // We must use FFI here because Inkwell does not expose the LLVM
-    // optimization passes directly.
-    unsafe {
-        #[allow(clippy::as_conversions)]
-        crate::zrc_codegen_optimize_module(
-            module.as_mut_ptr(),
-            tm.as_mut_ptr(),
-            optimization_level as u32,
-        );
-    }
+    module
+        .run_passes(
+            match optimization_level {
+                OptimizationLevel::None => "default<O0>",
+                OptimizationLevel::Less => "default<O1>",
+                OptimizationLevel::Default => "default<O2>",
+                OptimizationLevel::Aggressive => "default<O3>",
+            },
+            tm,
+            PassBuilderOptions::create(),
+        )
+        .expect("optimizing module should succeed");
 }
 
 /// Code generate and verify a program given a [`Context`] and return the final
@@ -213,7 +211,7 @@ fn optimize_module(module: &Module<'_>, tm: &TargetMachine, optimization_level: 
 /// Panics if code generation fails. This can be caused by an invalid TAST being
 /// passed, so make sure to type check it so invariants are upheld.
 #[must_use]
-#[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+#[expect(clippy::too_many_lines, clippy::too_many_arguments)]
 fn cg_program_without_optimization<'ctx>(
     frontend_version_string: &str,
     cli_args: &str,
@@ -461,7 +459,7 @@ fn cg_program_without_optimization<'ctx>(
 /// Panics if code generation fails. This can be caused by an invalid TAST being
 /// passed, so make sure to type check it so invariants are upheld.
 #[must_use]
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn cg_program<'ctx>(
     frontend_version_string: &str,
     cli_args: &str,
@@ -496,7 +494,7 @@ fn cg_program<'ctx>(
 /// # Panics
 /// Panics on internal code generation failure.
 #[must_use]
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn cg_program_to_string(
     frontend_version_string: &str,
     parent_directory: &str,
@@ -548,7 +546,7 @@ pub fn cg_program_to_string(
 /// # Panics
 /// Panics on internal code generation failure.
 #[must_use]
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 // this function is currently only used in tests because the LLVM optimizer
 // doesn't handle well when multithreaded.
 #[cfg(test)]
@@ -603,7 +601,7 @@ pub fn cg_program_to_string_without_optimization(
 /// # Panics
 /// Panics on internal code generation failure.
 #[must_use]
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn cg_program_to_buffer(
     frontend_version_string: &str,
     parent_directory: &str,

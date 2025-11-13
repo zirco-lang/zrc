@@ -20,7 +20,7 @@ use crate::tast::{
 };
 
 /// Type check a switch case statement.
-#[allow(clippy::ptr_arg)]
+#[expect(clippy::ptr_arg)]
 pub fn type_switch_case<'input>(
     scope: &Scope<'input, '_>,
     scrutinee: Expr<'input>,
@@ -122,7 +122,7 @@ pub fn type_switch_case<'input>(
 }
 
 /// Desugar and type check a match statement.
-#[allow(clippy::too_many_lines, clippy::needless_pass_by_value)]
+#[expect(clippy::too_many_lines, clippy::needless_pass_by_value)]
 pub fn type_match<'input>(
     scope: &Scope<'input, '_>,
     scrutinee: Expr<'input>,
@@ -207,7 +207,7 @@ pub fn type_match<'input>(
 
     // Ensure each enum variant is covered by exactly one case
     // We do this by sorting both lists and comparing them
-    #[allow(clippy::useless_asref)]
+    #[expect(clippy::useless_asref)]
     let mut sorted_enum_variants: Vec<(&str, &TastType<'_>)> = enum_as_union_def
         .iter()
         .map(|(name, ty)| (name.as_ref(), ty))
