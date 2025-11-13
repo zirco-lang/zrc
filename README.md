@@ -223,10 +223,6 @@ A: You can:
 -   Check the [CONTRIBUTING.md](./CONTRIBUTING.md) guide
 -   For sensitive matters, email [zirco@0xlogn.dev](mailto:zirco@0xlogn.dev)
 
-## Licence & Contact
-
-Zirco is released under the [GNU GPL v3.0](./LICENSE). To contact the maintainer, please use issues or a GitHub discussion. For sensitive matters, please email [zirco@0xlogn.dev](mailto:zirco@0xlogn.dev) and optionally encrypt your messages [using my PGP key](https://0xlogn.dev/gpg).
-
 ## Code Coverage
 
 If you're curious, here's our test coverage represented as a cool little chart:
