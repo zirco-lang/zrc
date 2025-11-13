@@ -72,6 +72,8 @@ pub struct SourceChunk {
     pub file_name: String,
     /// The starting line number (1-indexed) in the original file
     pub start_line: usize,
+    /// The byte offset in the original file where this chunk starts
+    pub byte_offset: usize,
     /// The content of this chunk
     pub content: String,
 }
@@ -79,10 +81,16 @@ pub struct SourceChunk {
 impl SourceChunk {
     /// Create a new source chunk
     #[must_use]
-    pub const fn new(file_name: String, start_line: usize, content: String) -> Self {
+    pub const fn new(
+        file_name: String,
+        start_line: usize,
+        byte_offset: usize,
+        content: String,
+    ) -> Self {
         Self {
             file_name,
             start_line,
+            byte_offset,
             content,
         }
     }
@@ -155,6 +163,8 @@ fn preprocess_internal(
 ) -> Result<(), Diagnostic> {
     let mut current_chunk_lines = Vec::new();
     let mut chunk_start_line = 1;
+    let mut chunk_start_byte = 0;
+    let mut current_byte = 0;
     let mut has_pragma_once = false;
 
     for (line_num, line) in content.lines().enumerate() {
@@ -173,12 +183,15 @@ fn preprocess_internal(
                 has_pragma_once = true;
                 // Don't add this line to chunks, it's just a directive
                 chunk_start_line = line_num + 1;
+                // Update byte offset to skip this line
+                chunk_start_byte = current_byte + line.len() + 1; // +1 for newline
             } else if let Some(include_path) = directive.strip_prefix("include") {
                 // Flush current chunk if it has content
                 if !current_chunk_lines.is_empty() {
                     ctx.chunks.push(SourceChunk::new(
                         file_name.to_string(),
                         chunk_start_line,
+                        chunk_start_byte,
                         current_chunk_lines.join("\n"),
                     ));
                     current_chunk_lines.clear();
@@ -248,6 +261,7 @@ fn preprocess_internal(
                 // Check if already included with pragma once
                 if ctx.pragma_once_files.contains(&canonical_path) {
                     chunk_start_line = line_num + 1;
+                    chunk_start_byte = current_byte + line.len() + 1; // +1 for newline
                     continue;
                 }
 
@@ -277,6 +291,7 @@ fn preprocess_internal(
                 preprocess_internal(include_base, &include_file, &included_content, ctx)?;
 
                 chunk_start_line = line_num + 1;
+                chunk_start_byte = current_byte + line.len() + 1; // +1 for newline
             } else {
                 return Err(
                     DiagnosticKind::PreprocessorUnknownDirective(directive.to_string()).error_in(
@@ -287,6 +302,9 @@ fn preprocess_internal(
         } else {
             current_chunk_lines.push(line);
         }
+
+        // Update current byte position (line length + 1 for newline)
+        current_byte += line.len() + 1;
     }
 
     // Add the file to pragma_once set if it has the directive
@@ -299,6 +317,7 @@ fn preprocess_internal(
         ctx.chunks.push(SourceChunk::new(
             file_name.to_string(),
             chunk_start_line,
+            chunk_start_byte,
             current_chunk_lines.join("\n"),
         ));
     }
@@ -319,6 +338,7 @@ mod tests {
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].file_name, "test.zr");
         assert_eq!(chunks[0].start_line, 1);
+        assert_eq!(chunks[0].byte_offset, 0);
         assert_eq!(chunks[0].content, content);
     }
 
@@ -329,6 +349,8 @@ mod tests {
             preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].start_line, 2);
+        assert_eq!(chunks[0].byte_offset, 13); // "#pragma once\n" is 13 bytes
         assert_eq!(chunks[0].content, "fn test() {}");
     }
 }
