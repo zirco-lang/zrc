@@ -24,8 +24,15 @@ enum Color {
 }
 
 fn print_color(c: Color) -> struct {} {
-    printf("Color discriminant: %zu\n", c.__discriminant__);
-    printf("Color value: %d\n", c.__value__.Red);
+    // Raw access is undefined behavior, but accessible under
+    // __discriminant__ and __value__
+    
+    match (c) {
+        Red: x => printf("Color is Red with value: %d\n", x);
+        Green: x => printf("Color is Green with value: %d\n", x);
+        Blue: x => printf("Color is Blue with value: %d\n", x);
+    }
+
     return;
 }
 
@@ -40,7 +47,7 @@ fn main() -> i32 {
     
     // Create enum with inline type
     let color1 = new enum { Red: i32, Green: i32, Blue: i32 } { Red: 255 };
-    printf("Inline enum discriminant: %zu\n", color1.__discriminant__);
+    print_color(color1);
     
     // Create enum with named type
     let color2 = new Color { Green: 128 };
