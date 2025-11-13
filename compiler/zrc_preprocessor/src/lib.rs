@@ -181,6 +181,16 @@ fn preprocess_internal(
                 .is_some_and(|suffix| suffix.trim() == "once")
             {
                 has_pragma_once = true;
+                // Flush current chunk if it has content before the pragma directive
+                if !current_chunk_lines.is_empty() {
+                    ctx.chunks.push(SourceChunk::new(
+                        file_name.to_string(),
+                        chunk_start_line,
+                        chunk_start_byte,
+                        current_chunk_lines.join("\n"),
+                    ));
+                    current_chunk_lines.clear();
+                }
                 // Don't add this line to chunks, it's just a directive
                 chunk_start_line = line_num + 1;
                 // Update byte offset to skip this line
@@ -352,5 +362,36 @@ mod tests {
         assert_eq!(chunks[0].start_line, 2);
         assert_eq!(chunks[0].byte_offset, 13); // "#pragma once\n" is 13 bytes
         assert_eq!(chunks[0].content, "fn test() {}");
+    }
+
+    #[test]
+    fn preprocess_pragma_once_with_multiple_lines() {
+        let content = "#pragma once\n\nfn first() {}\nfn second() {}";
+        let chunks =
+            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].start_line, 2);
+        assert_eq!(chunks[0].byte_offset, 13); // "#pragma once\n" is 13 bytes
+        assert_eq!(chunks[0].content, "\nfn first() {}\nfn second() {}");
+    }
+
+    #[test]
+    fn preprocess_tracks_byte_offsets_correctly() {
+        // Test that byte offsets are correctly calculated
+        let content = "line1\n#pragma once\nline3";
+        let chunks =
+            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
+
+        // First chunk: "line1" (before pragma)
+        assert_eq!(chunks.len(), 2);
+        assert_eq!(chunks[0].content, "line1");
+        assert_eq!(chunks[0].byte_offset, 0);
+        assert_eq!(chunks[0].start_line, 1);
+
+        // Second chunk: "line3" (after pragma)
+        assert_eq!(chunks[1].content, "line3");
+        assert_eq!(chunks[1].byte_offset, 19); // "line1\n#pragma once\n" is 19 bytes
+        assert_eq!(chunks[1].start_line, 3);
     }
 }
