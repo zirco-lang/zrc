@@ -291,6 +291,7 @@ LogicalAnd = ExprPrecedenceTier<_LogicalAnd, Bitwise>;
 Bitwise: Expr<'input> = BitwiseOr;
 _BitwiseOr: ExprKind<'input> = {
     <l:BitwiseOr> "|" <r:BitwiseXor> => ExprKind::BinaryBitwise(BinaryBitwise::Or, Box::new(l), Box::new(r)),
+    <l:BitwiseOr> "|>" <r:BitwiseXor> => ExprKind::Pipe(Box::new(l), Box::new(r)),
 };
 BitwiseOr: Expr<'input> = ExprPrecedenceTier<_BitwiseOr, BitwiseXor>;
 _BitwiseXor: ExprKind<'input> = {
@@ -418,6 +419,7 @@ extern {
         "!" => lexer::Tok::LogicalNot,
 
         "&" => lexer::Tok::BitwiseAnd,
+        "|>" => lexer::Tok::Pipe,
         "|" => lexer::Tok::BitwiseOr,
         "^" => lexer::Tok::BitwiseXor,
         "~" => lexer::Tok::BitwiseNot,
