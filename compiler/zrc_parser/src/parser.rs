@@ -229,10 +229,23 @@ pub fn parse_source_chunk(
     // Convert String to &'static str using Box::leak
     let file_name: &'static str = Box::leak(chunk.file_name.clone().into_boxed_str());
 
+    // Create a lexer that adjusts spans by the byte offset
+    let byte_offset = chunk.byte_offset;
+    let adjusted_lexer = lexer::ZircoLexer::new(&chunk.content, file_name).map(move |spanned| {
+        // Adjust the span by adding the byte offset
+        let span = spanned.span();
+        let adjusted_span = Span::from_positions_and_file(
+            span.start() + byte_offset,
+            span.end() + byte_offset,
+            span.file_name(),
+        );
+        adjusted_span.containing(spanned.into_value())
+    });
+
     internal_parser::ProgramParser::new()
         .parse(
             file_name,
-            lexer::ZircoLexer::new(&chunk.content, file_name).map(zirco_lexer_span_to_lalrpop_span),
+            adjusted_lexer.map(zirco_lexer_span_to_lalrpop_span),
         )
         .map_err(parser_error_to_diagnostic)
 }
