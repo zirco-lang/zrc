@@ -69,6 +69,7 @@ OpenStmt: StmtKind<'input> = {
         post: c,
         body: Box::new(d)
     },
+    "four" <d:SpannedStmt<OpenStmt>> => StmtKind::FourStmt(Box::new(d)),
 };
 
 ClosedStmt: StmtKind<'input> = {
@@ -90,6 +91,7 @@ ClosedStmt: StmtKind<'input> = {
         post: c,
         body: Box::new(d)
     },
+    "four" <d:SpannedStmt<ClosedStmt>> => StmtKind::FourStmt(Box::new(d)),
 };
 
 SimpleStmt: StmtKind<'input> = {
@@ -461,6 +463,7 @@ extern {
         "while" => lexer::Tok::While,
         "do" => lexer::Tok::Do,
         "for" => lexer::Tok::For,
+        "four" => lexer::Tok::Four,
         "break" => lexer::Tok::Break,
         "continue" => lexer::Tok::Continue,
         "return" => lexer::Tok::Return,

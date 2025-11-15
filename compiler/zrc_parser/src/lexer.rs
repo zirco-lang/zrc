@@ -488,6 +488,10 @@ pub enum Tok<'input> {
     #[token("for")]
     #[display("for")]
     For,
+    /// The keyword `four`
+    #[token("four")]
+    #[display("four")]
+    Four,
     /// The keyword `break`
     #[token("break")]
     #[display("break")]
@@ -792,12 +796,13 @@ mod tests {
     /// Tests that all tokens can be properly lexed, and that they all impl
     /// [`Display`] correctly.
     #[test]
+    #[expect(clippy::too_many_lines)]
     fn all_tokens_lex_and_display_correctly() {
         let input = concat!(
             "++ -- + - * / % == != > >= < <= && || ! & | ^ ~ << >> ",
             "= += -= *= /= %= &= |= ^= <<= >>= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
-            r#" struct union enum match sizeof type switch default -> => "str" 7_000 0xF_A"#,
+            r#" struct union enum match sizeof type switch default four -> => "str" 7_000 0xF_A"#,
             " 0b1_0 abc"
         );
         let tokens: Vec<Tok> = vec![
@@ -867,6 +872,7 @@ mod tests {
             Tok::Type,
             Tok::Switch,
             Tok::Default,
+            Tok::Four,
             Tok::SmallArrow,
             Tok::FatArrow,
             Tok::StringLiteral(ZrcString(vec![

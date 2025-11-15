@@ -118,6 +118,70 @@ pub fn cg_for_stmt<'ctx, 'input, 'a>(
     exit
 }
 
+/// Code generates a four statement
+#[allow(clippy::needless_pass_by_value)]
+pub fn cg_four_stmt<'ctx, 'input, 'a>(
+    cg: FunctionCtx<'ctx, 'a>,
+    bb: BasicBlock<'ctx>,
+    scope: &'a CgScope<'input, 'ctx>,
+    lexical_block: DILexicalBlock<'ctx>,
+    body: Spanned<Vec<TypedStmt<'input>>>,
+) -> BasicBlock<'ctx> {
+    let mut current_bb = bb;
+
+    let exit = cg.ctx.append_basic_block(cg.fn_value, "exit");
+
+    // Pre-create all four body blocks so "continue" can target the *next* one.
+    let mut bodies: Vec<BasicBlock<'ctx>> = Vec::with_capacity(4);
+    for i in 0..4 {
+        bodies.push(cg.ctx.append_basic_block(cg.fn_value, &format!("body{i}")));
+    }
+
+    for (i, &body_bb) in bodies.iter().enumerate() {
+        // Branch from the current insertion point to this iteration's body.
+        cg.builder.position_at_end(current_bb);
+        cg.builder
+            .build_unconditional_branch(body_bb)
+            .expect("branch should generate successfully");
+
+        cg.builder.position_at_end(body_bb);
+
+        // If there's a next iteration, `continue` should jump to that iteration's body.
+        // Otherwise, `continue` should jump to exit (no further iterations).
+        let on_continue = if i + 1 < bodies.len() {
+            bodies[i + 1]
+        } else {
+            exit
+        };
+
+        let next_bb = cg_block(
+            cg,
+            body_bb,
+            scope,
+            lexical_block,
+            body.clone(),
+            &Some(LoopBreakaway {
+                on_break: exit,
+                on_continue, // continue jumps to the next iteration's body
+            }),
+        );
+
+        if let Some(next_bb) = next_bb {
+            current_bb = next_bb;
+        } else {
+            // body was unreachable, so we stop generating further iterations
+            return exit;
+        }
+    }
+    cg.builder
+        .build_unconditional_branch(exit)
+        .expect("branch should generate successfully");
+
+    cg.builder.position_at_end(exit);
+
+    exit
+}
+
 /// Code generates a while statement
 pub fn cg_while_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,

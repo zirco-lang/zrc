@@ -53,6 +53,8 @@ pub enum TypedStmtKind<'input> {
         /// The body of the loop.
         body: Spanned<Vec<TypedStmt<'input>>>,
     },
+    /// `four body`
+    FourStmt(Spanned<Vec<TypedStmt<'input>>>),
     /// `switch`
     SwitchCase {
         /// The value to be switched over (`x` in `switch (x) {}`)
@@ -213,6 +215,17 @@ impl Display for TypedStmtKind<'_> {
                         .join("\n"),
                     if_false
                         .value()
+                        .iter()
+                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )
+            }
+            Self::FourStmt(body) => {
+                write!(
+                    f,
+                    "four {{\n{}\n}}",
+                    body.value()
                         .iter()
                         .map(|stmt| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()

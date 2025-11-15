@@ -162,6 +162,9 @@ pub fn type_block<'input, 'gs>(
                                 &return_ability,
                                 stmt_span,
                             ),
+                            StmtKind::FourStmt(body) => {
+                                loops::type_four(&scope, body, &return_ability, stmt_span)
+                            }
 
                             StmtKind::BlockStmt(body) => {
                                 let (typed_body, return_actuality) = type_block(

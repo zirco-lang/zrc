@@ -85,6 +85,8 @@ pub enum StmtKind<'input> {
         /// The body of the loop.
         body: Box<Stmt<'input>>,
     },
+    /// `four body`
+    FourStmt(Box<Stmt<'input>>),
     /// `{ ... }`
     BlockStmt(Vec<Stmt<'input>>),
     /// `x;`
@@ -149,6 +151,7 @@ impl Display for StmtKind<'_> {
                     post.as_ref().map_or(String::new(), ToString::to_string),
                 )
             }
+            Self::FourStmt(body) => write!(f, "four {body}"),
 
             Self::BlockStmt(stmts) => {
                 if stmts.is_empty() {
@@ -388,6 +391,8 @@ mod tests {
             "for (let x = 4; ; ) {\n    ;\n}",
             "for (let x = 4, y = 5; ; ) {\n    ;\n}",
             "for (let x = 4; true; ) {\n    ;\n}",
+            "four {\n    ;\n}",
+            "four return;",
             "let x;",
             "let x = 4;",
             "let x: i32;",
