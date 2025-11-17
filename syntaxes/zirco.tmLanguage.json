@@ -1,0 +1,425 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Zirco",
+  "scopeName": "source.zirco",
+  "fileTypes": [
+    "zr",
+    "zh"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#preprocessor"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#characters"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#function-declaration"
+    },
+    {
+      "include": "#type-declaration"
+    },
+    {
+      "include": "#struct-declaration"
+    },
+    {
+      "include": "#union-declaration"
+    },
+    {
+      "include": "#enum-declaration"
+    },
+    {
+      "include": "#function-call"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.zirco",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "preprocessor": {
+      "patterns": [
+        {
+          "name": "meta.preprocessor.include.zirco",
+          "begin": "^\\s*(#)\\s*(include)\\b",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.directive.zirco"
+            },
+            "2": {
+              "name": "keyword.control.directive.include.zirco"
+            }
+          },
+          "end": "$",
+          "patterns": [
+            {
+              "name": "string.quoted.double.include.zirco",
+              "match": "\"[^\"]*\""
+            },
+            {
+              "name": "string.quoted.other.lt-gt.include.zirco",
+              "match": "<[^>]*>"
+            }
+          ]
+        },
+        {
+          "name": "meta.preprocessor.pragma.zirco",
+          "match": "^\\s*(#)\\s*(pragma)\\s+(once)\\b",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.directive.zirco"
+            },
+            "2": {
+              "name": "keyword.control.directive.pragma.zirco"
+            },
+            "3": {
+              "name": "keyword.control.directive.pragma.once.zirco"
+            }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.zirco",
+          "match": "\\b(if|else|while|do|for|four|break|continue|return|switch|match|default|unreachable)\\b"
+        },
+        {
+          "name": "keyword.other.zirco",
+          "match": "\\b(fn|let|type|struct|union|enum|as|sizeof|new)\\b"
+        },
+        {
+          "name": "storage.type.zirco",
+          "match": "\\b(i8|i16|i32|i64|isize|u8|u16|u32|u64|usize|bool)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.zirco",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.zirco",
+              "match": "\\\\(n|r|t|\\\\|\"|')"
+            },
+            {
+              "name": "constant.character.escape.hex.zirco",
+              "match": "\\\\x[0-9a-fA-F]{2}"
+            },
+            {
+              "name": "constant.character.escape.unicode.zirco",
+              "match": "\\\\u\\{[0-9a-fA-F]+\\}"
+            },
+            {
+              "name": "invalid.illegal.unknown-escape.zirco",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "characters": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.zirco",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.zirco",
+              "match": "\\\\(n|r|t|\\\\|\"|')"
+            },
+            {
+              "name": "constant.character.escape.hex.zirco",
+              "match": "\\\\x[0-9a-fA-F]{2}"
+            },
+            {
+              "name": "constant.character.escape.unicode.zirco",
+              "match": "\\\\u\\{[0-9a-fA-F]+\\}"
+            },
+            {
+              "name": "invalid.illegal.unknown-escape.zirco",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.zirco",
+          "match": "\\b0x[0-9a-fA-F_]+(i8|i16|i32|i64|isize|u8|u16|u32|u64|usize)?\\b"
+        },
+        {
+          "name": "constant.numeric.binary.zirco",
+          "match": "\\b0b[01_]+(i8|i16|i32|i64|isize|u8|u16|u32|u64|usize)?\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.zirco",
+          "match": "\\b[0-9][0-9_]*(i8|i16|i32|i64|isize|u8|u16|u32|u64|usize)?\\b"
+        }
+      ]
+    },
+    "function-declaration": {
+      "patterns": [
+        {
+          "name": "meta.function.declaration.zirco",
+          "begin": "\\b(fn)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.other.fn.zirco"
+            },
+            "2": {
+              "name": "entity.name.function.zirco"
+            }
+          },
+          "end": "\\)",
+          "patterns": [
+            {
+              "include": "#function-parameters"
+            }
+          ]
+        }
+      ]
+    },
+    "function-parameters": {
+      "patterns": [
+        {
+          "name": "meta.function.parameters.zirco",
+          "match": "([a-zA-Z_][a-zA-Z0-9_]*)\\s*(:)",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.zirco"
+            },
+            "2": {
+              "name": "punctuation.separator.colon.zirco"
+            }
+          }
+        },
+        {
+          "name": "keyword.operator.variadic.zirco",
+          "match": "\\.\\.\\."
+        },
+        {
+          "include": "#types"
+        },
+        {
+          "include": "#operators"
+        }
+      ]
+    },
+    "type-declaration": {
+      "patterns": [
+        {
+          "name": "meta.type.declaration.zirco",
+          "match": "\\b(type)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(=)",
+          "captures": {
+            "1": {
+              "name": "keyword.other.type.zirco"
+            },
+            "2": {
+              "name": "entity.name.type.zirco"
+            },
+            "3": {
+              "name": "keyword.operator.assignment.zirco"
+            }
+          }
+        }
+      ]
+    },
+    "struct-declaration": {
+      "patterns": [
+        {
+          "name": "meta.struct.declaration.zirco",
+          "match": "\\b(struct)\\s+([a-zA-Z_][a-zA-Z0-9_]*)?",
+          "captures": {
+            "1": {
+              "name": "keyword.other.struct.zirco"
+            },
+            "2": {
+              "name": "entity.name.type.struct.zirco"
+            }
+          }
+        }
+      ]
+    },
+    "union-declaration": {
+      "patterns": [
+        {
+          "name": "meta.union.declaration.zirco",
+          "match": "\\b(union)\\s+([a-zA-Z_][a-zA-Z0-9_]*)?",
+          "captures": {
+            "1": {
+              "name": "keyword.other.union.zirco"
+            },
+            "2": {
+              "name": "entity.name.type.union.zirco"
+            }
+          }
+        }
+      ]
+    },
+    "enum-declaration": {
+      "patterns": [
+        {
+          "name": "meta.enum.declaration.zirco",
+          "match": "\\b(enum)\\s+([a-zA-Z_][a-zA-Z0-9_]*)?",
+          "captures": {
+            "1": {
+              "name": "keyword.other.enum.zirco"
+            },
+            "2": {
+              "name": "entity.name.type.enum.zirco"
+            }
+          }
+        }
+      ]
+    },
+    "function-call": {
+      "patterns": [
+        {
+          "name": "meta.function.call.zirco",
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.call.zirco"
+            }
+          }
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arrow.zirco",
+          "match": "->|=>"
+        },
+        {
+          "name": "keyword.operator.comparison.zirco",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.logical.zirco",
+          "match": "&&|\\|\\||!"
+        },
+        {
+          "name": "keyword.operator.bitwise.zirco",
+          "match": "<<|>>|&|\\||\\^|~"
+        },
+        {
+          "name": "keyword.operator.assignment.zirco",
+          "match": "\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>="
+        },
+        {
+          "name": "keyword.operator.arithmetic.zirco",
+          "match": "\\+\\+|--|\\+|-|\\*|/|%"
+        },
+        {
+          "name": "keyword.operator.assignment.zirco",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.access.zirco",
+          "match": "\\.|::"
+        },
+        {
+          "name": "keyword.operator.ternary.zirco",
+          "match": "\\?|:"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.pointer.zirco",
+          "match": "\\*"
+        },
+        {
+          "name": "storage.type.zirco",
+          "match": "\\b(i8|i16|i32|i64|isize|u8|u16|u32|u64|usize|bool)\\b"
+        },
+        {
+          "name": "entity.name.type.zirco",
+          "match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.zirco",
+          "match": "\\b(true|false)\\b"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.section.braces.begin.zirco",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.section.braces.end.zirco",
+          "match": "\\}"
+        },
+        {
+          "name": "punctuation.section.brackets.begin.zirco",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.section.brackets.end.zirco",
+          "match": "\\]"
+        },
+        {
+          "name": "punctuation.section.parens.begin.zirco",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.section.parens.end.zirco",
+          "match": "\\)"
+        },
+        {
+          "name": "punctuation.separator.comma.zirco",
+          "match": ","
+        },
+        {
+          "name": "punctuation.terminator.statement.zirco",
+          "match": ";"
+        }
+      ]
+    }
+  }
+}
