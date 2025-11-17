@@ -221,11 +221,11 @@ A: You can:
 -   Open a GitHub issue for bugs or feature requests
 -   Start a GitHub discussion for general questions
 -   Check the [CONTRIBUTING.md](./CONTRIBUTING.md) guide
--   For sensitive matters, email [zirco@0xlogn.dev](mailto:zirco@0xlogn.dev)
+-   For sensitive matters, email [logan@zirco.dev](mailto:logan@zirco.dev]
 
 ## Licence & Contact
 
-Zirco is released under the [GNU GPL v3.0](./LICENSE). To contact the maintainer, please use issues or a GitHub discussion. For sensitive matters, please email [zirco@0xlogn.dev](mailto:zirco@0xlogn.dev) and optionally encrypt your messages [using my PGP key](https://0xlogn.dev/gpg).
+Zirco is released under the [GNU GPL v3.0](./LICENSE). To contact the maintainer, please use issues or a GitHub discussion. For sensitive matters, please email [logan@zirco.dev](mailto:logan@zirco.dev).
 
 ## Code Coverage
 
