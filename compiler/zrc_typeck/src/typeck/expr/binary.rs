@@ -5,10 +5,10 @@ use zrc_parser::ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Exp
 use zrc_utils::span::{Span, Spannable};
 
 use super::{
-    super::scope::Scope,
+    super::{diagnostics::DiagnosticCollector, scope::Scope},
     helpers::{
-        expect, expect_is_integer, expect_is_unsigned_integer, resolve_binary_int_operands,
-        try_coerce_to,
+        expect, expect_is_integer, expect_is_unsigned_integer, handle_type_error,
+        resolve_binary_int_operands, try_coerce_to,
     },
     type_expr,
 };
@@ -74,13 +74,16 @@ pub fn type_expr_logical<'input>(
 /// Typeck an eq expr
 pub fn type_expr_equality<'input>(
     scope: &Scope<'input, '_>,
+    diagnostics: &DiagnosticCollector,
     expr_span: Span,
     op: Equality,
     lhs: Expr<'input>,
     rhs: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    let lhs_t = type_expr(scope, lhs)?;
-    let rhs_t = type_expr(scope, rhs)?;
+    let lhs_span = lhs.0.span();
+    let lhs_t = handle_type_error(type_expr(scope, diagnostics, lhs), diagnostics, lhs_span);
+    let rhs_span = rhs.0.span();
+    let rhs_t = handle_type_error(type_expr(scope, diagnostics, rhs), diagnostics, rhs_span);
 
     // If either operand is poison, propagate poison
     if lhs_t.inferred_type.is_poison() || rhs_t.inferred_type.is_poison() {
@@ -98,11 +101,17 @@ pub fn type_expr_equality<'input>(
             if resolved_lhs.inferred_type == resolved_rhs.inferred_type {
                 (resolved_lhs, resolved_rhs)
             } else {
-                return Err(DiagnosticKind::EqualityOperators(
+                let diag = DiagnosticKind::EqualityOperators(
                     resolved_lhs.inferred_type.to_string(),
                     resolved_rhs.inferred_type.to_string(),
                 )
-                .error_in(expr_span));
+                .error_in(expr_span);
+                diagnostics.push(diag);
+                return Ok(TypedExpr {
+                    inferred_type: TastType::Poison,
+                    kind: TypedExprKind::Equality(op, Box::new(resolved_lhs), Box::new(resolved_rhs))
+                        .in_span(expr_span),
+                });
             }
         } else if let (TastType::Ptr(_), TastType::Ptr(_)) =
             (&lhs_t.inferred_type, &rhs_t.inferred_type)
@@ -113,11 +122,17 @@ pub fn type_expr_equality<'input>(
             // bool == bool is valid
             (lhs_t, rhs_t)
         } else {
-            return Err(DiagnosticKind::EqualityOperators(
+            let diag = DiagnosticKind::EqualityOperators(
                 lhs_t.inferred_type.to_string(),
                 rhs_t.inferred_type.to_string(),
             )
-            .error_in(expr_span));
+            .error_in(expr_span);
+            diagnostics.push(diag);
+            return Ok(TypedExpr {
+                inferred_type: TastType::Poison,
+                kind: TypedExprKind::Equality(op, Box::new(lhs_t), Box::new(rhs_t))
+                    .in_span(expr_span),
+            });
         };
 
     Ok(TypedExpr {
