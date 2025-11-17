@@ -6,4 +6,4 @@ Currently as zrc is in active development, only the HEAD of main is supported. T
 
 ## Reporting a Vulnerability
 
-In the case you find any security vulnerability in zrc's latest commit, please send an email to <zirco@0xlogn.dev>.
+In the case you find any security vulnerability in zrc's latest commit, please send an email to <logan@zirco.dev>.

@@ -4,11 +4,11 @@ Welcome to Zirco! This guide will help you get up and running with the Zirco pro
 
 ## What You'll Learn
 
-- How to install all necessary prerequisites
-- How to build the Zirco compiler from source
-- How to write and compile your first Zirco program
-- How to use the compiler's various output formats
-- How to troubleshoot common issues
+-   How to install all necessary prerequisites
+-   How to build the Zirco compiler from source
+-   How to write and compile your first Zirco program
+-   How to use the compiler's various output formats
+-   How to troubleshoot common issues
 
 ## Prerequisites
 
@@ -19,12 +19,14 @@ Before you begin, you'll need to install several tools and libraries. Zirco work
 Git is used to clone the Zirco repository. Most systems have it pre-installed, but if not:
 
 **Linux (Ubuntu/Debian):**
+
 ```bash
 sudo apt-get update
 sudo apt-get install -y git
 ```
 
 **macOS:**
+
 ```bash
 # Using Homebrew
 brew install git
@@ -40,6 +42,7 @@ Zirco is written in Rust, so you need an up-to-date Rust toolchain (including `r
 **All Platforms:**
 
 Install Rust using rustup:
+
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
@@ -47,6 +50,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 Or visit [rustup.rs](https://rustup.rs) for alternative installation methods.
 
 After installation, verify your Rust installation:
+
 ```bash
 rustc --version
 cargo --version
@@ -59,17 +63,20 @@ You should see version information for both commands.
 Zirco's code generator relies on LLVM 16 for compilation. You need the LLVM static or dynamic library with Polly support.
 
 **Linux (Ubuntu/Debian):**
+
 ```bash
 sudo apt-get update
 sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
 ```
 
 **macOS:**
+
 ```bash
 brew install llvm@16
 ```
 
 After installation on macOS, you may need to set the LLVM prefix:
+
 ```bash
 export LLVM_SYS_160_PREFIX=$(brew --prefix llvm@16)
 ```
@@ -82,6 +89,7 @@ LLVM installation on Windows is more complex. We recommend using WSL (Windows Su
 You'll need a C compiler to link the compiled object files.
 
 **Linux (Ubuntu/Debian):**
+
 ```bash
 sudo apt-get install -y clang
 # or
@@ -90,11 +98,13 @@ sudo apt-get install -y gcc
 
 **macOS:**
 Xcode Command Line Tools include clang:
+
 ```bash
 xcode-select --install
 ```
 
 **Windows (WSL):**
+
 ```bash
 sudo apt-get install -y clang
 ```
@@ -185,8 +195,9 @@ fn main() {
 ```
 
 This program:
-- Declares the C `printf` function (external function declaration)
-- Defines a `main` function that calls `printf` to print "Hello, World!"
+
+-   Declares the C `printf` function (external function declaration)
+-   Defines a `main` function that calls `printf` to print "Hello, World!"
 
 ### Step 2: Compile to Object File
 
@@ -215,6 +226,7 @@ clang -o hello hello.o -lc
 ```
 
 You should see:
+
 ```
 Hello, World!
 ```
@@ -272,7 +284,7 @@ zrc --emit ast-debug-pretty hello.zr # Rust debug format with indentation
 View the type-checked structure with type information:
 
 ```bash
-zrc --emit tast hello.zr              # Formatted as Zirco code  
+zrc --emit tast hello.zr              # Formatted as Zirco code
 zrc --emit tast-debug hello.zr        # Rust debug format
 zrc --emit tast-debug-pretty hello.zr # Rust debug format with indentation
 ```
@@ -314,11 +326,12 @@ zrc --emit object -o hello.o -O 3 -g --target x86_64-unknown-linux-gnu hello.zr
 ```
 
 This command:
-- Emits an object file (`--emit object`)
-- Outputs to `hello.o` (`-o hello.o`)
-- Uses aggressive optimization (`-O 3`)
-- Includes debug information (`-g`)
-- Targets x86_64 Linux (`--target x86_64-unknown-linux-gnu`)
+
+-   Emits an object file (`--emit object`)
+-   Outputs to `hello.o` (`-o hello.o`)
+-   Uses aggressive optimization (`-O 3`)
+-   Includes debug information (`-g`)
+-   Targets x86_64 Linux (`--target x86_64-unknown-linux-gnu`)
 
 ## More Examples
 
@@ -430,29 +443,32 @@ Now that you have Zirco up and running, here's what you can explore next:
 1. **Language Specification**: Read the comprehensive [Language Specification](./SPEC.md) to learn about Zirco's syntax, type system, and semantics.
 
 2. **Examples**: Explore the `examples/` directory to see more complex Zirco programs:
-   - `hello_world/` - Basic program structure
-   - `fibonacci/` - Recursion and conditionals
-   - `struct_construction/` - Working with structs
-   - `loop_example/` - For loops and iteration
-   - `pointer_swap/` - Pointer manipulation
-   - `global_variables/` - Global variable usage
+
+    - `hello_world/` - Basic program structure
+    - `fibonacci/` - Recursion and conditionals
+    - `struct_construction/` - Working with structs
+    - `loop_example/` - For loops and iteration
+    - `pointer_swap/` - Pointer manipulation
+    - `global_variables/` - Global variable usage
 
 3. **Contributing**: If you'd like to contribute to Zirco, check out [CONTRIBUTING.md](../.github/CONTRIBUTING.md) for guidelines on:
-   - Setting up a development environment
-   - Running tests and linters
-   - Code style requirements
-   - Submitting pull requests
+
+    - Setting up a development environment
+    - Running tests and linters
+    - Code style requirements
+    - Submitting pull requests
 
 4. **Compiler Internals**: Learn about the compiler pipeline:
-   - **Lexer** (`zrc_parser`) - Tokenization
-   - **Parser** (`zrc_parser`) - AST generation using LALRPOP
-   - **Type Checker** (`zrc_typeck`) - Semantic analysis
-   - **Code Generator** (`zrc_codegen`) - LLVM IR generation
 
-5. **Get Help**: 
-   - [Open an issue](https://github.com/zirco-lang/zrc/issues) for bugs or questions
-   - Check the [FAQ](../README.md#frequently-asked-questions-faq) for common questions
-   - Email [zirco@0xlogn.dev](mailto:zirco@0xlogn.dev) for sensitive matters
+    - **Lexer** (`zrc_parser`) - Tokenization
+    - **Parser** (`zrc_parser`) - AST generation using LALRPOP
+    - **Type Checker** (`zrc_typeck`) - Semantic analysis
+    - **Code Generator** (`zrc_codegen`) - LLVM IR generation
+
+5. **Get Help**:
+    - [Open an issue](https://github.com/zirco-lang/zrc/issues) for bugs or questions
+    - Check the [FAQ](../README.md#frequently-asked-questions-faq) for common questions
+    - Email [logan@zirco.dev](mailto:logan@zirco.dev) for sensitive matters
 
 ## Important Notes
 
@@ -460,10 +476,10 @@ Now that you have Zirco up and running, here's what you can explore next:
 
 ⚠️ **Zirco is experimental and unstable.** There are **NO STABILITY GUARANTEES** on the current version. This means:
 
-- Internal compiler APIs may change without notice
-- Zirco code may fail to build on different `zrc` versions  
-- Language semantics may change
-- This is not recommended for production use
+-   Internal compiler APIs may change without notice
+-   Zirco code may fail to build on different `zrc` versions
+-   Language semantics may change
+-   This is not recommended for production use
 
 Zirco is a learning project and reference implementation for compiler design. Use it for education, experimentation, and fun!
 
@@ -471,10 +487,10 @@ Zirco is a learning project and reference implementation for compiler design. Us
 
 While Zirco is primarily developed and tested on Linux and WSL, it should work on:
 
-- ✅ Linux (Ubuntu, Debian, Fedora, Arch, etc.)
-- ✅ WSL (Windows Subsystem for Linux)
-- ✅ macOS (with some environment variable configuration)
-- ⚠️ Windows (recommended to use WSL for best experience)
+-   ✅ Linux (Ubuntu, Debian, Fedora, Arch, etc.)
+-   ✅ WSL (Windows Subsystem for Linux)
+-   ✅ macOS (with some environment variable configuration)
+-   ⚠️ Windows (recommended to use WSL for best experience)
 
 The compiler can target any platform supported by LLVM through the `--target` flag.
 
@@ -486,6 +502,6 @@ You've now learned how to:
 ✅ Build the Zirco compiler from source  
 ✅ Write and compile a Zirco program  
 ✅ Use different output formats and compiler options  
-✅ Troubleshoot common issues  
+✅ Troubleshoot common issues
 
 Happy coding with Zirco! 🚀
