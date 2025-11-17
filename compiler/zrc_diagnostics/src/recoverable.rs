@@ -17,7 +17,7 @@
 /// use zrc_utils::{span::Spanned, spanned_test};
 ///
 /// // A recoverable error with a fallback value
-/// let recoverable: Result<i32, MaybeRecoverable<i32, Diagnostic>> = 
+/// let recoverable: Result<i32, MaybeRecoverable<i32, Diagnostic>> =
 ///     Err(MaybeRecoverable::Recoverable(
 ///         42, // fallback value
 ///         Diagnostic(
@@ -27,7 +27,7 @@
 ///     ));
 ///
 /// // A fatal error with no fallback
-/// let fatal: Result<i32, MaybeRecoverable<i32, Diagnostic>> = 
+/// let fatal: Result<i32, MaybeRecoverable<i32, Diagnostic>> =
 ///     Err(MaybeRecoverable::Fatal(
 ///         Diagnostic(
 ///             Severity::Error,
@@ -62,10 +62,10 @@ impl<T, E> From<E> for MaybeRecoverable<T, E> {
 /// fn type_check_expr() -> RecoverableResult<String, Diagnostic> {
 ///     // On success
 ///     Ok("i32".to_string())
-///     
+///
 ///     // Or on recoverable error
 ///     // Err(MaybeRecoverable::Recoverable("poison".to_string(), diagnostic))
-///     
+///
 ///     // Or on fatal error
 ///     // Err(MaybeRecoverable::Fatal(diagnostic))
 /// }
@@ -89,15 +89,15 @@ mod tests {
         let recoverable: MaybeRecoverable<i32, &str> = MaybeRecoverable::Recoverable(42, "error");
 
         match fatal {
-            MaybeRecoverable::Fatal(e) => assert_eq!(e, "error"),
+            MaybeRecoverable::Fatal(err) => assert_eq!(err, "error"),
             MaybeRecoverable::Recoverable(_, _) => panic!("Expected Fatal variant"),
         }
 
         match recoverable {
             MaybeRecoverable::Fatal(_) => panic!("Expected Recoverable variant"),
-            MaybeRecoverable::Recoverable(v, e) => {
-                assert_eq!(v, 42);
-                assert_eq!(e, "error");
+            MaybeRecoverable::Recoverable(val, err) => {
+                assert_eq!(val, 42);
+                assert_eq!(err, "error");
             }
         }
     }
@@ -105,8 +105,7 @@ mod tests {
     #[test]
     fn recoverable_result_is_result() {
         let ok_result: RecoverableResult<i32, &str> = Ok(42);
-        let err_result: RecoverableResult<i32, &str> =
-            Err(MaybeRecoverable::Fatal("error"));
+        let err_result: RecoverableResult<i32, &str> = Err(MaybeRecoverable::Fatal("error"));
 
         assert!(ok_result.is_ok());
         assert!(err_result.is_err());

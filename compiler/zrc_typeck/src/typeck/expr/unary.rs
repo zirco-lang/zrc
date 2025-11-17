@@ -22,6 +22,14 @@ pub fn type_expr_unary_not<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_ty = type_expr(scope, x)?;
 
+    // If operand is poison, propagate poison
+    if x_ty.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::UnaryNot(Box::new(x_ty)).in_span(expr_span),
+        });
+    }
+
     expect(
         x_ty.inferred_type == TastType::Bool,
         "boolean".to_string(),
@@ -44,6 +52,14 @@ pub fn type_expr_unary_bitwise_not<'input>(
     let x_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
 
+    // If operand is poison, propagate poison
+    if x_ty.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::UnaryBitwiseNot(Box::new(x_ty)).in_span(expr_span),
+        });
+    }
+
     expect_is_integer(&x_ty.inferred_type, x_span)?;
 
     Ok(TypedExpr {
@@ -61,6 +77,14 @@ pub fn type_expr_unary_minus<'input>(
     let x_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
 
+    // If operand is poison, propagate poison
+    if x_ty.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::UnaryMinus(Box::new(x_ty)).in_span(expr_span),
+        });
+    }
+
     expect_is_signed_integer(&x_ty.inferred_type, x_span)?;
 
     Ok(TypedExpr {
@@ -77,6 +101,15 @@ pub fn type_expr_unary_address_of<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_ty = type_expr(scope, x)?;
 
+    // If operand is poison, propagate poison
+    if x_ty.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::UnaryAddressOf(Box::new(expr_to_place(expr_span, x_ty)?))
+                .in_span(expr_span),
+        });
+    }
+
     Ok(TypedExpr {
         inferred_type: TastType::Ptr(Box::new(x_ty.inferred_type.clone())),
         kind: TypedExprKind::UnaryAddressOf(Box::new(expr_to_place(expr_span, x_ty)?))
@@ -91,6 +124,14 @@ pub fn type_expr_unary_dereference<'input>(
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_ty = type_expr(scope, x)?;
+
+    // If operand is poison, propagate poison
+    if x_ty.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::UnaryDereference(Box::new(x_ty)).in_span(expr_span),
+        });
+    }
 
     if let TastType::Ptr(tt) = x_ty.inferred_type.clone() {
         Ok(TypedExpr {
@@ -113,6 +154,16 @@ pub fn type_expr_prefix_increment<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
+
+    // If operand is poison, propagate poison
+    if x_ty.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::PrefixIncrement(Box::new(expr_to_place(expr_span, x_ty)?))
+                .in_span(expr_span),
+        });
+    }
+
     let place = expr_to_place(expr_span, x_ty)?;
 
     expect_is_integer(&place.inferred_type, x_span)?;
@@ -131,6 +182,16 @@ pub fn type_expr_prefix_decrement<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
+
+    // If operand is poison, propagate poison
+    if x_ty.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::PrefixDecrement(Box::new(expr_to_place(expr_span, x_ty)?))
+                .in_span(expr_span),
+        });
+    }
+
     let place = expr_to_place(expr_span, x_ty)?;
 
     expect_is_integer(&place.inferred_type, x_span)?;
@@ -149,6 +210,16 @@ pub fn type_expr_postfix_increment<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
+
+    // If operand is poison, propagate poison
+    if x_ty.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::PostfixIncrement(Box::new(expr_to_place(expr_span, x_ty)?))
+                .in_span(expr_span),
+        });
+    }
+
     let place = expr_to_place(expr_span, x_ty)?;
 
     expect_is_integer(&place.inferred_type, x_span)?;
@@ -167,6 +238,16 @@ pub fn type_expr_postfix_decrement<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
+
+    // If operand is poison, propagate poison
+    if x_ty.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::PostfixDecrement(Box::new(expr_to_place(expr_span, x_ty)?))
+                .in_span(expr_span),
+        });
+    }
+
     let place = expr_to_place(expr_span, x_ty)?;
 
     expect_is_integer(&place.inferred_type, x_span)?;

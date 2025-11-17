@@ -80,7 +80,8 @@ pub fn expect_identical_types<'a, 'input>(
 }
 
 /// Assert a condition and produce a [`DiagnosticKind::ExpectedGot`] diagnostic
-/// otherwise.
+/// otherwise. Returns Ok if the condition is true or if the got type is poison
+/// (to prevent cascading errors).
 pub fn expect(
     condition: bool,
     expected_str: String,
@@ -98,29 +99,44 @@ pub fn expect(
     }
 }
 
-/// Assert that a type is an integer type
+/// Assert that a type is an integer type. Returns Ok if poison (to prevent
+/// cascading errors).
 pub fn expect_is_integer(ty: &TastType, span: Span) -> Result<(), Diagnostic> {
-    expect(ty.is_integer(), "integer".to_string(), ty.to_string(), span)
+    if ty.is_poison() {
+        Ok(())
+    } else {
+        expect(ty.is_integer(), "integer".to_string(), ty.to_string(), span)
+    }
 }
 
-/// Assert that a type is a signed integer type
+/// Assert that a type is a signed integer type. Returns Ok if poison (to
+/// prevent cascading errors).
 pub fn expect_is_signed_integer(ty: &TastType, span: Span) -> Result<(), Diagnostic> {
-    expect(
-        ty.is_signed_integer(),
-        "signed integer".to_string(),
-        ty.to_string(),
-        span,
-    )
+    if ty.is_poison() {
+        Ok(())
+    } else {
+        expect(
+            ty.is_signed_integer(),
+            "signed integer".to_string(),
+            ty.to_string(),
+            span,
+        )
+    }
 }
 
-/// Assert that a type is an unsigned integer type
+/// Assert that a type is an unsigned integer type. Returns Ok if poison (to
+/// prevent cascading errors).
 pub fn expect_is_unsigned_integer(ty: &TastType, span: Span) -> Result<(), Diagnostic> {
-    expect(
-        ty.is_unsigned_integer(),
-        "unsigned integer".to_string(),
-        ty.to_string(),
-        span,
-    )
+    if ty.is_poison() {
+        Ok(())
+    } else {
+        expect(
+            ty.is_unsigned_integer(),
+            "unsigned integer".to_string(),
+            ty.to_string(),
+            span,
+        )
+    }
 }
 
 /// Try to coerce an expression to a target type if possible.
@@ -146,10 +162,16 @@ pub fn try_coerce_to<'input>(
 /// Resolve binary operands for operations that require matching types.
 /// Returns a tuple of (`result_type`, lhs, rhs) where both operands have been
 /// coerced to a compatible type. If both are `{int}`, they resolve to `i32`.
+/// If either operand is poison, propagates poison type.
 pub fn resolve_binary_int_operands<'input>(
     lhs: TypedExpr<'input>,
     rhs: TypedExpr<'input>,
 ) -> (TastType<'input>, TypedExpr<'input>, TypedExpr<'input>) {
+    // If either side is poison, propagate poison
+    if lhs.inferred_type.is_poison() || rhs.inferred_type.is_poison() {
+        return (TastType::Poison, lhs, rhs);
+    }
+
     if lhs.inferred_type == rhs.inferred_type {
         // Both have the same type
         if matches!(lhs.inferred_type, TastType::Int) {

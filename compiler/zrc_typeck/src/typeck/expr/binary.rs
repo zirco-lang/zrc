@@ -30,6 +30,14 @@ pub fn type_expr_logical<'input>(
     let rhs_span = rhs.0.span();
     let rhs_t = type_expr(scope, rhs)?;
 
+    // If either operand is poison, propagate poison
+    if lhs_t.inferred_type.is_poison() || rhs_t.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::Logical(op, Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
+        });
+    }
+
     expect(
         lhs_t.inferred_type == TastType::Bool,
         "bool".to_string(),
@@ -59,6 +67,14 @@ pub fn type_expr_equality<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let lhs_t = type_expr(scope, lhs)?;
     let rhs_t = type_expr(scope, rhs)?;
+
+    // If either operand is poison, propagate poison
+    if lhs_t.inferred_type.is_poison() || rhs_t.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::Equality(op, Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
+        });
+    }
 
     let (final_lhs, final_rhs) =
         if lhs_t.inferred_type.is_integer() && rhs_t.inferred_type.is_integer() {
@@ -110,6 +126,15 @@ pub fn type_expr_binary_bitwise<'input>(
     let rhs_span = rhs.0.span();
     let rhs_t = type_expr(scope, rhs)?;
 
+    // If either operand is poison, propagate poison
+    if lhs_t.inferred_type.is_poison() || rhs_t.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::BinaryBitwise(op, Box::new(lhs_t), Box::new(rhs_t))
+                .in_span(expr_span),
+        });
+    }
+
     expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
     expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
@@ -155,6 +180,15 @@ pub fn type_expr_comparison<'input>(
     let rhs_span = rhs.0.span();
     let rhs_t = type_expr(scope, rhs)?;
 
+    // If either operand is poison, propagate poison
+    if lhs_t.inferred_type.is_poison() || rhs_t.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::Comparison(op, Box::new(lhs_t), Box::new(rhs_t))
+                .in_span(expr_span),
+        });
+    }
+
     expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
     expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
@@ -189,6 +223,15 @@ pub fn type_expr_arithmetic<'input>(
     let lhs_t = type_expr(scope, lhs)?;
     let rhs_span = rhs.0.span();
     let rhs_t = type_expr(scope, rhs)?;
+
+    // If either operand is poison, propagate poison
+    if lhs_t.inferred_type.is_poison() || rhs_t.inferred_type.is_poison() {
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::Arithmetic(op, Box::new(lhs_t), Box::new(rhs_t))
+                .in_span(expr_span),
+        });
+    }
 
     if let TastType::Ptr(_) = lhs_t.inferred_type {
         if matches!(
