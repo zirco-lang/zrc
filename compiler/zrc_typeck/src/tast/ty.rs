@@ -77,6 +77,11 @@ pub enum Type<'input> {
     /// Opaque types should never appear in final TAST output or code
     /// generation.
     Opaque(&'input str),
+    /// Poison type - represents a type error that has been recovered from.
+    /// This type is used to continue type checking after encountering errors.
+    /// It is compatible with all other types to prevent cascading errors.
+    /// Poison types should never appear in final code generation.
+    Poison,
 }
 
 impl Display for Type<'_> {
@@ -117,6 +122,7 @@ impl Display for Type<'_> {
                     .join(", ")
             ),
             Self::Opaque(name) => write!(f, "{name}"),
+            Self::Poison => write!(f, "<error>"),
         }
     }
 }
@@ -182,6 +188,12 @@ impl<'input> Type<'input> {
         Type::Struct(IndexMap::new())
     }
 
+    /// Returns `true` if this is a poison type
+    #[must_use]
+    pub const fn is_poison(&self) -> bool {
+        matches!(self, Type::Poison)
+    }
+
     /// Check if this type can be implicitly cast to the target type.
     /// Currently supports:
     /// - `*T` -> `*struct{}` (void pointer downcast)
@@ -208,6 +220,11 @@ impl<'input> Type<'input> {
     /// ```
     #[must_use]
     pub fn can_implicitly_cast_to(&self, target: &Self) -> bool {
+        // Poison type is compatible with everything to prevent cascading errors
+        if self.is_poison() || target.is_poison() {
+            return true;
+        }
+
         // Allow any pointer type to implicitly cast to void pointer (*struct{})
         if let (Type::Ptr(_from_pointee), Type::Ptr(to_pointee)) = (self, target)
             && let Type::Struct(fields) = to_pointee.as_ref()
@@ -346,7 +363,8 @@ mod tests {
             | Type::Ptr(_)
             | Type::Fn(_)
             | Type::Union(_)
-            | Type::Opaque(_) => panic!("unit should be an empty struct"),
+            | Type::Opaque(_)
+            | Type::Poison => panic!("unit should be an empty struct"),
         }
     }
 
@@ -382,5 +400,40 @@ mod tests {
         assert!(Type::Int.is_integer());
         assert!(!Type::Int.is_signed_integer());
         assert!(!Type::Int.is_unsigned_integer());
+    }
+
+    #[test]
+    fn test_poison_type_display() {
+        assert_eq!(Type::Poison.to_string(), "<error>");
+    }
+
+    #[test]
+    fn test_poison_type_is_poison() {
+        assert!(Type::Poison.is_poison());
+        assert!(!Type::I32.is_poison());
+        assert!(!Type::Bool.is_poison());
+    }
+
+    #[test]
+    fn test_poison_type_is_not_integer() {
+        assert!(!Type::Poison.is_integer());
+        assert!(!Type::Poison.is_signed_integer());
+        assert!(!Type::Poison.is_unsigned_integer());
+    }
+
+    #[test]
+    fn test_poison_type_implicit_cast() {
+        let poison = Type::Poison;
+
+        // Poison should implicitly cast to any type
+        assert!(poison.can_implicitly_cast_to(&Type::I32));
+        assert!(poison.can_implicitly_cast_to(&Type::Bool));
+        assert!(poison.can_implicitly_cast_to(&Type::Ptr(Box::new(Type::I32))));
+        assert!(poison.can_implicitly_cast_to(&Type::Poison));
+
+        // Any type should implicitly cast to poison
+        assert!(Type::I32.can_implicitly_cast_to(&poison));
+        assert!(Type::Bool.can_implicitly_cast_to(&poison));
+        assert!(Type::Ptr(Box::new(Type::I32)).can_implicitly_cast_to(&poison));
     }
 }

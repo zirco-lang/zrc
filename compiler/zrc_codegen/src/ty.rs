@@ -93,6 +93,9 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
             Type::Opaque(name) => {
                 panic!("opaque type '{name}' reached code generation, should be resolved in typeck")
             }
+            Type::Poison => {
+                panic!("poison type reached code generation, should be filtered out in typeck")
+            }
         },
         ctx.dbg_builder()
             .create_basic_type(&ty.to_string(), 0, 0, 0)
@@ -140,6 +143,9 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
         Type::Fn(_) => panic!("function is not a basic type"),
         Type::Opaque(name) => {
             panic!("opaque type '{name}' reached code generation, should be resolved in typeck")
+        }
+        Type::Poison => {
+            panic!("poison type reached code generation, should be filtered out in typeck")
         }
         Type::Struct(fields) => (
             ctx.ctx()
@@ -276,6 +282,10 @@ pub fn llvm_type<'ctx: 'a, 'a>(
 
         Type::Opaque(name) => {
             panic!("opaque type '{name}' reached code generation, should be resolved in typeck")
+        }
+
+        Type::Poison => {
+            panic!("poison type reached code generation, should be filtered out in typeck")
         }
     }
 }

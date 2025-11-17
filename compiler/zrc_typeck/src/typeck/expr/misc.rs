@@ -214,6 +214,13 @@ pub fn type_expr_struct_construction<'input>(
     // Ensure it's a struct or union type
     let expected_fields = match &resolved_ty {
         TastType::Struct(fields) | TastType::Union(fields) => fields.clone(),
+        TastType::Poison => {
+            // If the type is poison, return a poison expression
+            return Ok(TypedExpr {
+                inferred_type: TastType::Poison,
+                kind: TypedExprKind::StructConstruction(IndexMap::new()).in_span(expr_span),
+            });
+        }
         TastType::I8
         | TastType::U8
         | TastType::I16

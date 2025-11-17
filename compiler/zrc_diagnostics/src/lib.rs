@@ -58,7 +58,9 @@
 mod diagnostic;
 mod diagnostic_kind;
 mod ext;
+mod recoverable;
 
 pub use diagnostic::{Diagnostic, Severity};
 pub use diagnostic_kind::DiagnosticKind;
 pub use ext::{SpanExt, SpannedExt};
+pub use recoverable::{MaybeRecoverable, RecoverableResult};
