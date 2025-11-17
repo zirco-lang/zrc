@@ -6,6 +6,7 @@ use derive_more::Display;
 use zrc_utils::{code_fmt::indent_lines, span::Spanned};
 
 use super::{expr::TypedExpr, ty::Type};
+use crate::typeck::BlockMetadata;
 
 /// A declaration created with `let`.
 #[derive(Debug, Clone, PartialEq)]
@@ -22,24 +23,24 @@ pub struct LetDeclaration<'input> {
 
 /// A zirco statement after typeck
 #[derive(Debug, Clone, PartialEq)]
-pub struct TypedStmt<'input>(pub Spanned<TypedStmtKind<'input>>);
+pub struct TypedStmt<'input, 'gs>(pub Spanned<TypedStmtKind<'input, 'gs>>);
 
 /// The enum representing all of the different kinds of statements in Zirco
 /// after type checking
 #[derive(Debug, Clone, PartialEq)]
-pub enum TypedStmtKind<'input> {
+pub enum TypedStmtKind<'input, 'gs> {
     // all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here
     // (basically if (x) y has become if (x) {y})
     /// `if (x) y` or `if (x) y else z`
     IfStmt(
         TypedExpr<'input>,
-        Spanned<Vec<TypedStmt<'input>>>,
-        Option<Spanned<Vec<TypedStmt<'input>>>>,
+        Spanned<BlockMetadata<'input, 'gs>>,
+        Option<Spanned<BlockMetadata<'input, 'gs>>>,
     ),
     /// `while (x) y`
-    WhileStmt(TypedExpr<'input>, Spanned<Vec<TypedStmt<'input>>>),
+    WhileStmt(TypedExpr<'input>, Spanned<BlockMetadata<'input, 'gs>>),
     /// `do x while (y)`
-    DoWhileStmt(Spanned<Vec<TypedStmt<'input>>>, TypedExpr<'input>),
+    DoWhileStmt(Spanned<BlockMetadata<'input, 'gs>>, TypedExpr<'input>),
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
@@ -51,21 +52,21 @@ pub enum TypedStmtKind<'input> {
         /// Runs after each iteration of the loop.
         post: Option<TypedExpr<'input>>,
         /// The body of the loop.
-        body: Spanned<Vec<TypedStmt<'input>>>,
+        body: Spanned<BlockMetadata<'input, 'gs>>,
     },
     /// `four body`
-    FourStmt(Spanned<Vec<TypedStmt<'input>>>),
+    FourStmt(Spanned<BlockMetadata<'input, 'gs>>),
     /// `switch`
     SwitchCase {
         /// The value to be switched over (`x` in `switch (x) {}`)
         scrutinee: TypedExpr<'input>,
         /// The default case
-        default: Vec<TypedStmt<'input>>,
+        default: BlockMetadata<'input, 'gs>,
         /// The list of other cases
-        cases: Vec<(TypedExpr<'input>, Vec<TypedStmt<'input>>)>,
+        cases: Vec<(TypedExpr<'input>, BlockMetadata<'input, 'gs>)>,
     },
     /// `{ ... }`
-    BlockStmt(Vec<TypedStmt<'input>>),
+    BlockStmt(BlockMetadata<'input, 'gs>),
     /// `x;`
     ExprStmt(TypedExpr<'input>),
     /// `continue;`
@@ -83,7 +84,7 @@ pub enum TypedStmtKind<'input> {
 
 /// A struct or function declaration at the top level of a file
 #[derive(Debug, Clone, PartialEq)]
-pub enum TypedDeclaration<'input> {
+pub enum TypedDeclaration<'input, 'gs> {
     /// A declaration of a function
     FunctionDeclaration {
         /// The name of the function.
@@ -94,7 +95,7 @@ pub enum TypedDeclaration<'input> {
         return_type: Spanned<Type<'input>>,
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
-        body: Option<Spanned<Vec<TypedStmt<'input>>>>,
+        body: Option<Spanned<BlockMetadata<'input, 'gs>>>,
     },
     /// A global let declaration
     GlobalLetDeclaration(Vec<Spanned<LetDeclaration<'input>>>),
@@ -181,13 +182,13 @@ impl Display for LetDeclaration<'_> {
     }
 }
 
-impl Display for TypedStmt<'_> {
+impl Display for TypedStmt<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0.value())
     }
 }
 
-impl Display for TypedStmtKind<'_> {
+impl Display for TypedStmtKind<'_, '_> {
     #[expect(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -197,8 +198,9 @@ impl Display for TypedStmtKind<'_> {
                     "if ({cond}) {{\n{}\n}}",
                     if_true
                         .value()
+                        .stmts
                         .iter()
-                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -209,14 +211,16 @@ impl Display for TypedStmtKind<'_> {
                     "if ({cond}) {{\n{}\n}} else {{\n{}\n}}",
                     if_true
                         .value()
+                        .stmts
                         .iter()
-                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n"),
                     if_false
                         .value()
+                        .stmts
                         .iter()
-                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -226,8 +230,9 @@ impl Display for TypedStmtKind<'_> {
                     f,
                     "four {{\n{}\n}}",
                     body.value()
+                        .stmts
                         .iter()
-                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -237,8 +242,9 @@ impl Display for TypedStmtKind<'_> {
                     f,
                     "while ({cond}) {{\n{}\n}}",
                     body.value()
+                        .stmts
                         .iter()
-                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -248,8 +254,9 @@ impl Display for TypedStmtKind<'_> {
                     f,
                     "do {{\n{}\n}} while ({cond});",
                     body.value()
+                        .stmts
                         .iter()
-                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -276,8 +283,9 @@ impl Display for TypedStmtKind<'_> {
                     cond.as_ref().map_or(String::new(), ToString::to_string),
                     post.as_ref().map_or(String::new(), ToString::to_string),
                     body.value()
+                        .stmts
                         .iter()
-                        .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -294,19 +302,21 @@ impl Display for TypedStmtKind<'_> {
                         " {} => {{\n{}\n}}",
                         case_expr,
                         case_stmts
+                            .stmts
                             .iter()
-                            .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                            .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
                             .collect::<Vec<_>>()
                             .join("\n")
                     )?;
                 }
-                if !default.is_empty() {
+                if !default.stmts.is_empty() {
                     write!(
                         f,
                         " default => {{\n{}\n}}",
                         default
+                            .stmts
                             .iter()
-                            .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                            .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
                             .collect::<Vec<_>>()
                             .join("\n")
                     )?;
@@ -314,15 +324,16 @@ impl Display for TypedStmtKind<'_> {
                 write!(f, " }}")
             }
             Self::BlockStmt(stmts) => {
-                if stmts.is_empty() {
+                if stmts.stmts.is_empty() {
                     write!(f, "{{}}")
                 } else {
                     write!(
                         f,
                         "{{\n{}\n}}",
                         stmts
+                            .stmts
                             .iter()
-                            .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                            .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
                             .collect::<Vec<_>>()
                             .join("\n")
                     )
@@ -348,7 +359,7 @@ impl Display for TypedStmtKind<'_> {
     }
 }
 
-impl Display for TypedDeclaration<'_> {
+impl Display for TypedDeclaration<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::FunctionDeclaration {
@@ -360,8 +371,9 @@ impl Display for TypedDeclaration<'_> {
                 f,
                 "fn {name}({parameters}) -> {return_type} {{\n{}\n}}",
                 body.value()
+                    .stmts
                     .iter()
-                    .map(|stmt| indent_lines(&stmt.to_string(), "    "))
+                    .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
                     .collect::<Vec<String>>()
                     .join("\n")
             ),

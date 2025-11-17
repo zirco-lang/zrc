@@ -38,11 +38,17 @@ jobs:
               uses: actions-rs/cargo@v1
               with:
                   command: build
-            - name: Upload build artifact
+            - name: Upload zrc build artifact
               uses: actions/upload-artifact@v5
               with:
                   name: zrc-debug
                   path: target/debug/zrc
+                  retention-days: 1
+            - name: Upload zircop build artifact
+              uses: actions/upload-artifact@v5
+              with:
+                  name: zircop-debug
+                  path: target/debug/zircop
                   retention-days: 1
     verify-examples:
         needs: build
@@ -66,3 +72,26 @@ jobs:
               run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
             - name: Build and test all examples
               run: make -j2 -C examples test ZRC=zrc
+    lint-examples:
+        needs: build
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v5
+              with:
+                  # Make sure the actual branch is checked out when running on pull requests
+                  ref: ${{ github.head_ref }}
+                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+            - name: Download build artifact
+              uses: actions/download-artifact@v6
+              with:
+                  name: zircop-debug
+                  path: ./artifacts
+            - name: Make zircop executable
+              run: |
+                  chmod +x ./artifacts/zircop
+            - name: Add zrc and zircop to PATH
+              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
+            - name: Lint all examples
+              run: make -j2 -C examples lint ZIRCOP=zircop

@@ -18,7 +18,7 @@ use crate::tast::{
 /// Typeck a call expr
 #[expect(clippy::needless_pass_by_value, clippy::too_many_lines)]
 pub fn type_expr_call<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr_span: Span,
     f: Expr<'input>,
     args: Spanned<Vec<Expr<'input>>>,

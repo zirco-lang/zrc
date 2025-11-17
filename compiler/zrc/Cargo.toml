@@ -8,6 +8,7 @@ edition = "2024"
 [dependencies]
 zrc_parser = { version = "0.1.0", path = "../zrc_parser" }
 zrc_preprocessor = { version = "0.1.0", path = "../zrc_preprocessor" }
+zrc_utils = { version = "0.1.0", path = "../zrc_utils" }
 zrc_typeck = { version = "0.1.0", path = "../zrc_typeck" }
 zrc_codegen = { version = "0.1.0", path = "../zrc_codegen" }
 anyhow = "1.0.82"

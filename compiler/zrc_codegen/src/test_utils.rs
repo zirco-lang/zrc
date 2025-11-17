@@ -24,6 +24,14 @@
 #[macro_export]
 macro_rules! cg_snapshot_test {
     ($source:expr) => {
+        let mut __zrc_codegen_test_gs = ::zrc_typeck::typeck::GlobalScope::new();
+        let __zrc_codegen_typed = ::zrc_typeck::typeck::type_program(
+            &mut __zrc_codegen_test_gs,
+            ::zrc_parser::parser::parse_program($source, "<test>")
+                .expect("parsing should succeed"),
+        )
+        .expect("typeck should succeed");
+
         let resulting_ir = $crate::program::cg_program_to_string_without_optimization(
             "zrc test runner",
             "/fake/path",
@@ -32,11 +40,7 @@ macro_rules! cg_snapshot_test {
             // this would mess up snapshots
             "zrc --fake-args",
             $source,
-            ::zrc_typeck::typeck::type_program(
-                ::zrc_parser::parser::parse_program($source, "<test>")
-                    .expect("parsing should succeed"),
-            )
-            .expect("typeck should succeed"),
+            __zrc_codegen_typed,
             ::inkwell::debug_info::DWARFEmissionKind::Full,
             &$crate::get_native_triple(),
             "",

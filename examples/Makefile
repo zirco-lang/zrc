@@ -12,8 +12,14 @@ test: $(EXAMPLES:%=%_test)
 
 clean: $(EXAMPLES:%=%_clean)
 
+lint: $(EXAMPLES:%=%_lint)
+	@echo "All examples linted and OK!"
+
 %_test:
 	$(MAKE) -C $* test
 
 %_clean:
 	$(MAKE) -C $* clean
+
+%_lint:
+	$(MAKE) -C $* lint

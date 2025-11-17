@@ -4,7 +4,10 @@ use inkwell::{
     basic_block::BasicBlock,
     debug_info::{AsDIScope, DILexicalBlock},
 };
-use zrc_typeck::tast::{expr::TypedExpr, stmt::TypedStmt};
+use zrc_typeck::{
+    tast::expr::TypedExpr,
+    typeck::{BlockMetadata, BlockReturnActuality},
+};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
 use crate::{
@@ -16,20 +19,28 @@ use crate::{
 
 /// Code generates a switch statement
 #[expect(clippy::too_many_arguments, clippy::ref_option)]
-pub fn cg_if_stmt<'ctx, 'input, 'a>(
+pub fn cg_if_stmt<'ctx, 'input, 'gs, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'input, 'ctx>,
     lexical_block: DILexicalBlock<'ctx>,
     breakaway: &Option<LoopBreakaway<'ctx>>,
     cond: TypedExpr<'input>,
-    then: Spanned<Vec<TypedStmt<'input>>>,
-    then_else: Option<Spanned<Vec<TypedStmt<'input>>>>,
+    then: Spanned<BlockMetadata<'input, 'gs>>,
+    then_else: Option<Spanned<BlockMetadata<'input, 'gs>>>,
 ) -> Option<BasicBlock<'ctx>> {
     let expr_cg = BlockCtx::new(cg, scope, lexical_block);
 
     let then_else = then_else.unwrap_or_else(|| {
-        vec![].in_span(Span::from_positions_and_file(
+        // Create an empty `BlockMetadata` that uses the `then` block's scope
+        // so it has a valid `Scope` reference for the lifetime `'gs`.
+        let empty = BlockMetadata {
+            stmts: vec![],
+            scope: then.value().scope.clone(),
+            return_actuality: BlockReturnActuality::NeverReturns,
+        };
+
+        empty.in_span(Span::from_positions_and_file(
             then.end(),
             then.end(),
             then.span().file_name(),

@@ -24,9 +24,9 @@ use inkwell::{
     basic_block::BasicBlock,
     debug_info::{AsDIScope, DILexicalBlock},
 };
-use zrc_typeck::tast::{
-    stmt::{TypedStmt, TypedStmtKind},
-    ty::Type,
+use zrc_typeck::{
+    tast::{stmt::TypedStmtKind, ty::Type},
+    typeck::BlockMetadata,
 };
 use zrc_utils::span::{Spannable, Spanned};
 
@@ -57,14 +57,15 @@ pub(crate) struct LoopBreakaway<'ctx> {
 #[expect(
     clippy::too_many_lines,
     clippy::redundant_pub_crate,
-    clippy::ref_option
+    clippy::ref_option,
+    clippy::needless_pass_by_value
 )]
 pub(crate) fn cg_block<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     parent_scope: &'a CgScope<'input, 'ctx>,
     parent_lexical_block: DILexicalBlock<'ctx>,
-    block: Spanned<Vec<TypedStmt<'input>>>,
+    block: Spanned<BlockMetadata<'input, '_>>,
     breakaway: &Option<LoopBreakaway<'ctx>>,
 ) -> Option<BasicBlock<'ctx>> {
     let mut scope = parent_scope.clone();
@@ -77,160 +78,167 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
         block_line_col.col,
     );
 
-    block
-        .into_value()
-        .into_iter()
-        .try_fold(bb, |bb, stmt| -> Option<BasicBlock> {
-            let stmt_span = stmt.0.span();
-            let stmt_line_col = cg.line_lookup.lookup_from_index(stmt_span.start());
-            let debug_location = cg.dbg_builder.create_debug_location(
-                cg.ctx,
-                stmt_line_col.line,
-                stmt_line_col.col,
-                lexical_block.as_debug_info_scope(),
-                None,
-            );
-            cg.builder.set_current_debug_location(debug_location);
+    let stmts = block.value().stmts.as_slice();
 
-            match stmt.0.into_value() {
-                TypedStmtKind::UnreachableStmt => {
-                    cg.builder
-                        .build_unreachable()
-                        .expect("unreachable should generate successfully");
+    stmts.iter().try_fold(bb, |bb, stmt| -> Option<BasicBlock> {
+        let stmt_span = stmt.0.span();
+        let stmt_line_col = cg.line_lookup.lookup_from_index(stmt_span.start());
+        let debug_location = cg.dbg_builder.create_debug_location(
+            cg.ctx,
+            stmt_line_col.line,
+            stmt_line_col.col,
+            lexical_block.as_debug_info_scope(),
+            None,
+        );
+        cg.builder.set_current_debug_location(debug_location);
 
-                    None
-                }
+        match stmt.0.value() {
+            TypedStmtKind::UnreachableStmt => {
+                cg.builder
+                    .build_unreachable()
+                    .expect("unreachable should generate successfully");
 
-                TypedStmtKind::SwitchCase {
-                    scrutinee,
-                    default,
-                    cases,
-                } => Some(switch::cg_switch_stmt(
-                    cg,
-                    bb,
-                    &scope,
-                    lexical_block,
-                    breakaway,
-                    stmt_span,
-                    scrutinee,
-                    default,
-                    cases,
-                )),
-
-                TypedStmtKind::ExprStmt(expr) => {
-                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
-
-                    Some(cg_expr(expr_cg, bb, expr).bb)
-                }
-
-                TypedStmtKind::IfStmt(cond, then, then_else) => branch::cg_if_stmt(
-                    cg,
-                    bb,
-                    &scope,
-                    lexical_block,
-                    breakaway,
-                    cond,
-                    then,
-                    then_else,
-                ),
-
-                TypedStmtKind::BlockStmt(block) => cg_block(
-                    cg,
-                    bb,
-                    &scope,
-                    lexical_block,
-                    block.in_span(stmt_span),
-                    breakaway,
-                ),
-
-                TypedStmtKind::ReturnStmt(Some(expr)) => {
-                    let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
-
-                    let expr = cg_expr(expr_cg, bb, expr).into_value();
-
-                    cg.builder
-                        .build_return(Some(&expr))
-                        .expect("return should generate successfully");
-
-                    None
-                }
-
-                TypedStmtKind::ReturnStmt(None) => {
-                    let unit_type = llvm_basic_type(&cg, &Type::unit());
-
-                    cg.builder
-                        .build_return(Some(&unit_type.0.const_zero()))
-                        .expect("return should generate successfully");
-
-                    None
-                }
-
-                TypedStmtKind::ContinueStmt => {
-                    cg.builder
-                        .build_unconditional_branch(
-                            breakaway
-                                .as_ref()
-                                .expect("`breakaway` should exist all places `continue` is valid")
-                                .on_continue,
-                        )
-                        .expect("branch should generate successfully");
-
-                    None
-                }
-
-                TypedStmtKind::BreakStmt => {
-                    cg.builder
-                        .build_unconditional_branch(
-                            breakaway
-                                .as_ref()
-                                .expect("`breakaway` should exist all places `break` is valid")
-                                .on_break,
-                        )
-                        .expect("branch should generate successfully");
-
-                    None
-                }
-
-                TypedStmtKind::DeclarationList(declarations) => Some(let_decl::cg_let_declaration(
-                    cg,
-                    bb,
-                    &mut scope,
-                    lexical_block,
-                    declarations,
-                )),
-
-                TypedStmtKind::ForStmt {
-                    init,
-                    cond,
-                    post,
-                    body,
-                } => Some(loops::cg_for_stmt(
-                    cg,
-                    bb,
-                    &scope,
-                    lexical_block,
-                    init,
-                    cond,
-                    post,
-                    body,
-                )),
-                TypedStmtKind::FourStmt(body) => {
-                    Some(loops::cg_four_stmt(cg, bb, &scope, lexical_block, body))
-                }
-
-                TypedStmtKind::WhileStmt(cond, body) => {
-                    Some(loops::cg_while_stmt(cg, &scope, lexical_block, cond, body))
-                }
-
-                TypedStmtKind::DoWhileStmt(body, cond) => Some(loops::cg_do_while_stmt(
-                    cg,
-                    &scope,
-                    lexical_block,
-                    body,
-                    cond,
-                )),
+                None
             }
-        })
+
+            TypedStmtKind::SwitchCase {
+                scrutinee,
+                default,
+                cases,
+            } => Some(switch::cg_switch_stmt(
+                cg,
+                bb,
+                &scope,
+                lexical_block,
+                breakaway,
+                stmt_span,
+                scrutinee.clone(),
+                default.clone(),
+                cases.clone(),
+            )),
+
+            TypedStmtKind::ExprStmt(expr) => {
+                let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+
+                Some(cg_expr(expr_cg, bb, expr.clone()).bb)
+            }
+
+            TypedStmtKind::IfStmt(cond, then, then_else) => branch::cg_if_stmt(
+                cg,
+                bb,
+                &scope,
+                lexical_block,
+                breakaway,
+                cond.clone(),
+                then.clone(),
+                then_else.clone(),
+            ),
+
+            TypedStmtKind::BlockStmt(block) => cg_block(
+                cg,
+                bb,
+                &scope,
+                lexical_block,
+                block.clone().in_span(stmt_span),
+                breakaway,
+            ),
+
+            TypedStmtKind::ReturnStmt(Some(expr)) => {
+                let expr_cg = BlockCtx::new(cg, &scope, lexical_block);
+
+                let expr = cg_expr(expr_cg, bb, expr.clone()).into_value();
+
+                cg.builder
+                    .build_return(Some(&expr))
+                    .expect("return should generate successfully");
+
+                None
+            }
+
+            TypedStmtKind::ReturnStmt(None) => {
+                let unit_type = llvm_basic_type(&cg, &Type::unit());
+
+                cg.builder
+                    .build_return(Some(&unit_type.0.const_zero()))
+                    .expect("return should generate successfully");
+
+                None
+            }
+
+            TypedStmtKind::ContinueStmt => {
+                cg.builder
+                    .build_unconditional_branch(
+                        breakaway
+                            .as_ref()
+                            .expect("`breakaway` should exist all places `continue` is valid")
+                            .on_continue,
+                    )
+                    .expect("branch should generate successfully");
+
+                None
+            }
+
+            TypedStmtKind::BreakStmt => {
+                cg.builder
+                    .build_unconditional_branch(
+                        breakaway
+                            .as_ref()
+                            .expect("`breakaway` should exist all places `break` is valid")
+                            .on_break,
+                    )
+                    .expect("branch should generate successfully");
+
+                None
+            }
+
+            TypedStmtKind::DeclarationList(declarations) => Some(let_decl::cg_let_declaration(
+                cg,
+                bb,
+                &mut scope,
+                lexical_block,
+                declarations.clone(),
+            )),
+
+            TypedStmtKind::ForStmt {
+                init,
+                cond,
+                post,
+                body,
+            } => Some(loops::cg_for_stmt(
+                cg,
+                bb,
+                &scope,
+                lexical_block,
+                init.clone(),
+                cond.clone(),
+                post.clone(),
+                body.clone(),
+            )),
+            TypedStmtKind::FourStmt(body) => Some(loops::cg_four_stmt(
+                cg,
+                bb,
+                &scope,
+                lexical_block,
+                body.clone(),
+            )),
+
+            TypedStmtKind::WhileStmt(cond, body) => Some(loops::cg_while_stmt(
+                cg,
+                &scope,
+                lexical_block,
+                cond.clone(),
+                body.clone(),
+            )),
+
+            TypedStmtKind::DoWhileStmt(body, cond) => Some(loops::cg_do_while_stmt(
+                cg,
+                &scope,
+                lexical_block,
+                body.clone(),
+                cond.clone(),
+            )),
+        }
+    })
 }
 
 #[cfg(test)]

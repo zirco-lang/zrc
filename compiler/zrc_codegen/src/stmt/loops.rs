@@ -1,9 +1,9 @@
 //! Code generation for switch statements
 
 use inkwell::{basic_block::BasicBlock, debug_info::DILexicalBlock};
-use zrc_typeck::tast::{
-    expr::TypedExpr,
-    stmt::{LetDeclaration, TypedStmt},
+use zrc_typeck::{
+    tast::{expr::TypedExpr, stmt::LetDeclaration},
+    typeck::BlockMetadata,
 };
 use zrc_utils::span::Spanned;
 
@@ -26,7 +26,7 @@ pub fn cg_for_stmt<'ctx, 'input, 'a>(
     init: Option<Box<Vec<Spanned<LetDeclaration<'input>>>>>,
     cond: Option<TypedExpr<'input>>,
     post: Option<TypedExpr<'input>>,
-    body: Spanned<Vec<TypedStmt<'input>>>,
+    body: Spanned<BlockMetadata<'input, '_>>,
 ) -> BasicBlock<'ctx> {
     // For loops generate a somewhat more complicated CFG, with a few parts.
     // The preheader, where `init` runs. Breaks to the header.
@@ -120,12 +120,12 @@ pub fn cg_for_stmt<'ctx, 'input, 'a>(
 
 /// Code generates a four statement
 #[allow(clippy::needless_pass_by_value)]
-pub fn cg_four_stmt<'ctx, 'input, 'a>(
+pub fn cg_four_stmt<'ctx, 'input, 'gs, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'input, 'ctx>,
     lexical_block: DILexicalBlock<'ctx>,
-    body: Spanned<Vec<TypedStmt<'input>>>,
+    body: Spanned<BlockMetadata<'input, 'gs>>,
 ) -> BasicBlock<'ctx> {
     let mut current_bb = bb;
 
@@ -188,7 +188,7 @@ pub fn cg_while_stmt<'ctx, 'input, 'a>(
     scope: &'a CgScope<'input, 'ctx>,
     lexical_block: DILexicalBlock<'ctx>,
     cond: TypedExpr<'input>,
-    body: Spanned<Vec<TypedStmt<'input>>>,
+    body: Spanned<BlockMetadata<'input, '_>>,
 ) -> BasicBlock<'ctx> {
     let expr_cg = BlockCtx::new(cg, scope, lexical_block);
 
@@ -248,7 +248,7 @@ pub fn cg_do_while_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     scope: &'a CgScope<'input, 'ctx>,
     lexical_block: DILexicalBlock<'ctx>,
-    body: Spanned<Vec<TypedStmt<'input>>>,
+    body: Spanned<BlockMetadata<'input, '_>>,
     cond: TypedExpr<'input>,
 ) -> BasicBlock<'ctx> {
     let expr_cg = BlockCtx::new(cg, scope, lexical_block);

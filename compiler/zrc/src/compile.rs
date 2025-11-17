@@ -85,7 +85,8 @@ pub fn compile(
 
     // otherwise, move on:
     // === TYPE CHECKER ===
-    let typed_ast = zrc_typeck::typeck::type_program(ast)?;
+    let mut global_scope = zrc_typeck::typeck::GlobalScope::new();
+    let typed_ast = zrc_typeck::typeck::type_program(&mut global_scope, ast)?;
 
     // display the TAST if the user wants it
     if matches!(

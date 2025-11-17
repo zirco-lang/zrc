@@ -11,35 +11,27 @@ use super::{
     super::{block::BlockReturnAbility, resolve_type, scope::GlobalScope},
     type_block,
 };
-use crate::tast::{
-    self,
-    stmt::{ArgumentDeclaration as TastArgumentDeclaration, TypedDeclaration},
-    ty::{Fn, FunctionDeclarationGlobalMetadata, Type as TastType},
+use crate::{
+    tast::{
+        self,
+        stmt::{ArgumentDeclaration as TastArgumentDeclaration, TypedDeclaration},
+        ty::{Fn, FunctionDeclarationGlobalMetadata, Type as TastType},
+    },
+    typeck::scope::ValueEntry,
 };
 
-/// Process a top-level function declaration, insert it into the
-/// scope, and return a [TAST declaration](TypedDeclaration).
-///
-/// This should only be used in the global scope.
-///
-/// # Errors
-/// Errors if a type checker error is encountered.
-#[expect(clippy::too_many_lines, clippy::needless_pass_by_value)]
-pub fn process_function_declaration<'input>(
+/// Register the function signature and global entries into `global_scope`.
+/// This does not typecheck the function body; it only inserts the function
+/// into the global value and declaration tables so other declarations can
+/// resolve it during registration.
+#[expect(clippy::needless_pass_by_value)]
+pub fn register_function_declaration<'input>(
     global_scope: &mut GlobalScope<'input>,
     name: Spanned<&'input str>,
     parameters: Spanned<ArgumentDeclarationList<'input>>,
     return_type: Option<Type<'input>>,
     body: Option<Spanned<Vec<Stmt<'input>>>>,
-) -> Result<Option<TypedDeclaration<'input>>, Diagnostic> {
-    if matches!(parameters.value(), ArgumentDeclarationList::Variadic(_)) && body.is_some() {
-        return Err(parameters.error(|_| DiagnosticKind::VariadicFunctionMustBeExternal));
-    }
-
-    let return_type_span = return_type
-        .as_ref()
-        .map_or_else(|| name.span(), |ty| ty.0.span());
-
+) -> Result<(), Diagnostic> {
     let resolved_return_type = return_type
         .clone()
         .map(|ty| resolve_type(&global_scope.types, ty))
@@ -73,16 +65,14 @@ pub fn process_function_declaration<'input>(
     };
 
     let has_existing_implementation =
-        if let Some(ty) = global_scope.global_values.resolve(name.value()) {
-            if let TastType::Fn(_) = ty {
-                // if a function has already been declared with this name...
-
+        if let Some(ty_rc) = global_scope.global_values.resolve(name.value()) {
+            let ty = ty_rc.borrow();
+            if let TastType::Fn(_) = ty.ty {
                 let canonical = global_scope
                     .declarations
                     .get(name.value())
                     .expect("global_scope.declarations was not populated with function properly");
 
-                // TODO: store and reference previous declaration's span in the error
                 if canonical.fn_type != fn_type {
                     return Err(name.error(|_| {
                         DiagnosticKind::ConflictingFunctionDeclarations(
@@ -92,7 +82,6 @@ pub fn process_function_declaration<'input>(
                     }));
                 }
 
-                // TODO: store and reference previous declaration's span in the error
                 if body.is_some() && canonical.has_implementation {
                     return Err(name.error(|name| {
                         DiagnosticKind::ConflictingImplementations(name.to_string())
@@ -107,9 +96,10 @@ pub fn process_function_declaration<'input>(
             false
         };
 
-    global_scope
-        .global_values
-        .insert(name.into_value(), TastType::Fn(fn_type.clone()));
+    global_scope.global_values.insert(
+        name.into_value(),
+        ValueEntry::unused(TastType::Fn(fn_type.clone()), name.span()),
+    );
 
     global_scope.declarations.insert(
         name.into_value(),
@@ -120,10 +110,6 @@ pub fn process_function_declaration<'input>(
     );
 
     if *name.value() == "main" {
-        // main() can be either
-        // fn() -> i32
-        // fn(usize, **u8) -> i32
-
         if resolved_return_type != TastType::I32 {
             return Err(name.error(|_| {
                 DiagnosticKind::MainFunctionMustReturnI32(resolved_return_type.to_string())
@@ -131,10 +117,7 @@ pub fn process_function_declaration<'input>(
         }
 
         match &parameters.value() {
-            ArgumentDeclarationList::NonVariadic(params) if params.is_empty() => {
-                // can be either empty or (usize, **u8)
-            }
-
+            ArgumentDeclarationList::NonVariadic(params) if params.is_empty() => {}
             ArgumentDeclarationList::NonVariadic(params) if params.len() == 2 => {
                 let first_param_type =
                     resolve_type(&global_scope.types, params[0].value().ty.clone())?;
@@ -150,16 +133,48 @@ pub fn process_function_declaration<'input>(
                     return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
                 }
             }
-
             ArgumentDeclarationList::NonVariadic(_) => {
                 return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
             }
-
             ArgumentDeclarationList::Variadic(_) => {
                 return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
             }
         }
     }
+
+    Ok(())
+}
+
+/// Finalize the function declaration using only immutable access to the
+/// `GlobalScope`. This constructs the `TypedDeclaration` and typechecks the
+/// body (if any) using a subscope derived from `global_scope`.
+#[expect(clippy::needless_pass_by_value)]
+pub fn finalize_function_declaration<'input, 'gs>(
+    global_scope: &'gs GlobalScope<'input>,
+    name: Spanned<&'input str>,
+    parameters: Spanned<ArgumentDeclarationList<'input>>,
+    return_type: Option<Type<'input>>,
+    body: Option<Spanned<Vec<Stmt<'input>>>>,
+) -> Result<Option<TypedDeclaration<'input, 'gs>>, Diagnostic> {
+    let resolved_return_type = return_type
+        .clone()
+        .map(|ty| resolve_type(&global_scope.types, ty))
+        .transpose()?
+        .unwrap_or_else(TastType::unit);
+
+    let (ArgumentDeclarationList::NonVariadic(inner_params)
+    | ArgumentDeclarationList::Variadic(inner_params)) = parameters.value();
+
+    let resolved_parameters = inner_params
+        .iter()
+        .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
+            Ok(TastArgumentDeclaration {
+                name: parameter.value().name,
+                ty: resolve_type(&global_scope.types, parameter.value().ty.clone())?
+                    .in_span(parameter.span()),
+            })
+        })
+        .collect::<Result<Vec<_>, Diagnostic>>()?;
 
     Ok(Some(TypedDeclaration::FunctionDeclaration {
         name,
@@ -172,27 +187,26 @@ pub fn process_function_declaration<'input>(
             }
         }
         .in_span(parameters.span()),
-        return_type: resolved_return_type.clone().in_span(return_type_span),
+        return_type: resolved_return_type.clone().in_span(
+            return_type
+                .as_ref()
+                .map_or_else(|| name.span(), |ty| ty.0.span()),
+        ),
         body: if let Some(body) = body {
             let mut function_scope = global_scope.create_subscope();
             for param in resolved_parameters {
-                function_scope
-                    .values
-                    .insert(param.name.value(), param.ty.into_value());
+                function_scope.values.insert(
+                    param.name.value(),
+                    ValueEntry::unused(param.ty.into_value(), param.name.span()),
+                );
             }
 
-            // discard return actuality as it's guaranteed
-            Some(
-                body.span().containing(
-                    type_block(
-                        &function_scope,
-                        body,
-                        false,
-                        BlockReturnAbility::MustReturn(resolved_return_type),
-                    )?
-                    .0,
-                ),
-            )
+            Some(body.span().containing(type_block(
+                &function_scope,
+                body,
+                false,
+                BlockReturnAbility::MustReturn(resolved_return_type),
+            )?))
         } else {
             None
         },
@@ -222,7 +236,7 @@ mod tests {
         assert!(
             super::super::process_declaration(
                 &mut GlobalScope {
-                    global_values: ValueCtx::from([(
+                    global_values: ValueCtx::from_unused([(
                         "get_true",
                         TastType::Fn(Fn {
                             arguments: TastArgumentDeclarationList::NonVariadic(vec![]),

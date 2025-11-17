@@ -6,6 +6,8 @@ mod cfa;
 mod loops;
 mod switch_match;
 
+use std::fmt::Display;
+
 pub use block_utils::{coerce_stmt_into_block, has_duplicates};
 pub use cfa::{BlockReturnAbility, BlockReturnActuality};
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
@@ -17,6 +19,27 @@ use crate::tast::{
     stmt::{TypedStmt, TypedStmtKind},
     ty::Type as TastType,
 };
+
+/// The result returned by [`type_block`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct BlockMetadata<'input, 'gs> {
+    /// The typed statements within the block.
+    pub stmts: Vec<TypedStmt<'input, 'gs>>,
+
+    /// The local scope after type checking the block.
+    pub scope: Scope<'input, 'gs>,
+
+    /// The return actuality of the block.
+    pub return_actuality: BlockReturnActuality,
+}
+impl Display for BlockMetadata<'_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for stmt in &self.stmts {
+            writeln!(f, "{stmt}")?;
+        }
+        Ok(())
+    }
+}
 
 /// Type check a block of [AST statement](Stmt)s and return a block of [TAST
 /// statement](TypedStmt)s.
@@ -61,7 +84,7 @@ pub fn type_block<'input, 'gs>(
     input_block: Spanned<Vec<Stmt<'input>>>,
     can_use_break_continue: bool,
     return_ability: BlockReturnAbility<'input>,
-) -> Result<(Vec<TypedStmt<'input>>, BlockReturnActuality), Diagnostic> {
+) -> Result<BlockMetadata<'input, 'gs>, Diagnostic> {
     let mut scope: Scope<'input, 'gs> = parent_scope.clone();
 
     let input_block_span = input_block.span();
@@ -71,10 +94,10 @@ pub fn type_block<'input, 'gs>(
         .into_value()
         .into_iter()
         .filter_map(
-            |stmt| -> Option<Result<(TypedStmt<'input>, BlockReturnActuality), Diagnostic>> {
+            |stmt| -> Option<Result<(TypedStmt<'input, 'gs>, BlockReturnActuality), Diagnostic>> {
                 let stmt_span = stmt.0.span();
                 let inner_closure =
-                    || -> Result<Option<(TypedStmt<'_>, BlockReturnActuality)>, Diagnostic> {
+                    || -> Result<Option<(TypedStmt<'_, '_>, BlockReturnActuality)>, Diagnostic> {
                         match stmt.0.into_value() {
                             StmtKind::EmptyStmt => Ok(None),
                             StmtKind::BreakStmt if can_use_break_continue => Ok(Some((
@@ -96,7 +119,7 @@ pub fn type_block<'input, 'gs>(
 
                             StmtKind::SwitchCase { scrutinee, cases } => {
                                 switch_match::type_switch_case(
-                                    &scope,
+                                    &mut scope,
                                     scrutinee,
                                     &cases,
                                     &return_ability,
@@ -105,7 +128,7 @@ pub fn type_block<'input, 'gs>(
                             }
 
                             StmtKind::Match { scrutinee, cases } => switch_match::type_match(
-                                &scope,
+                                &mut scope,
                                 scrutinee,
                                 cases,
                                 can_use_break_continue,
@@ -133,7 +156,7 @@ pub fn type_block<'input, 'gs>(
                             ))),
 
                             StmtKind::IfStmt(cond, then, then_else) => branch::type_if(
-                                &scope,
+                                &mut scope,
                                 cond,
                                 then,
                                 then_else,
@@ -142,12 +165,20 @@ pub fn type_block<'input, 'gs>(
                                 stmt_span,
                             ),
 
-                            StmtKind::WhileStmt(cond, body) => {
-                                loops::type_while(&scope, cond, body, &return_ability, stmt_span)
-                            }
-                            StmtKind::DoWhileStmt(body, cond) => {
-                                loops::type_do_while(&scope, body, cond, &return_ability, stmt_span)
-                            }
+                            StmtKind::WhileStmt(cond, body) => loops::type_while(
+                                &mut scope,
+                                cond,
+                                body,
+                                &return_ability,
+                                stmt_span,
+                            ),
+                            StmtKind::DoWhileStmt(body, cond) => loops::type_do_while(
+                                &mut scope,
+                                body,
+                                cond,
+                                &return_ability,
+                                stmt_span,
+                            ),
                             StmtKind::ForStmt {
                                 init,
                                 cond,
@@ -167,15 +198,16 @@ pub fn type_block<'input, 'gs>(
                             }
 
                             StmtKind::BlockStmt(body) => {
-                                let (typed_body, return_actuality) = type_block(
+                                let typed_block = type_block(
                                     &scope,
                                     body.in_span(stmt_span),
                                     can_use_break_continue,
                                     return_ability.clone().demote(),
                                 )?;
+                                let return_actuality = typed_block.return_actuality;
                                 Ok(Some((
                                     TypedStmt(
-                                        TypedStmtKind::BlockStmt(typed_body).in_span(stmt_span),
+                                        TypedStmtKind::BlockStmt(typed_block).in_span(stmt_span),
                                     ),
                                     return_actuality,
                                 )))
@@ -183,14 +215,14 @@ pub fn type_block<'input, 'gs>(
 
                             StmtKind::ExprStmt(expr) => Ok(Some((
                                 TypedStmt(
-                                    TypedStmtKind::ExprStmt(type_expr(&scope, expr)?)
+                                    TypedStmtKind::ExprStmt(type_expr(&mut scope, expr)?)
                                         .in_span(stmt_span),
                                 ),
                                 BlockReturnActuality::NeverReturns,
                             ))),
                             StmtKind::ReturnStmt(value) => {
                                 let resolved_value =
-                                    value.map(|expr| type_expr(&scope, expr)).transpose()?;
+                                    value.map(|expr| type_expr(&mut scope, expr)).transpose()?;
 
                                 let inferred_return_type = resolved_value
                                     .clone()
@@ -307,5 +339,9 @@ pub fn type_block<'input, 'gs>(
             ));
         }
     }
-    .map(|actuality| (tast_block, actuality))
+    .map(|return_actuality| BlockMetadata {
+        stmts: tast_block,
+        scope,
+        return_actuality,
+    })
 }

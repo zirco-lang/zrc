@@ -5,8 +5,9 @@ use zrc_parser::ast::stmt::LetDeclaration as AstLetDeclaration;
 use zrc_utils::span::{Spannable, Spanned};
 
 use super::super::{expr::try_coerce_to, resolve_type, scope::Scope, type_expr};
-use crate::tast::{
-    expr::TypedExpr, stmt::LetDeclaration as TastLetDeclaration, ty::Type as TastType,
+use crate::{
+    tast::{expr::TypedExpr, stmt::LetDeclaration as TastLetDeclaration, ty::Type as TastType},
+    typeck::scope::ValueEntry,
 };
 
 /// Process a vector of [AST let declarations](AstLetDeclaration) and insert it
@@ -119,9 +120,10 @@ pub fn process_let_declaration<'input>(
                     }
                 };
 
-                scope
-                    .values
-                    .insert(result_decl.name.value(), result_decl.ty.clone());
+                scope.values.insert(
+                    result_decl.name.value(),
+                    ValueEntry::unused(result_decl.ty.clone(), let_decl_span),
+                );
                 Ok(result_decl.in_span(let_decl_span))
             },
         )

@@ -19,15 +19,15 @@ use crate::tast::{
 };
 
 /// Type check a for statement.
-pub fn type_for<'input>(
-    scope: &Scope<'input, '_>,
+pub fn type_for<'input, 'gs>(
+    scope: &Scope<'input, 'gs>,
     init: Option<Box<Spanned<Vec<Spanned<LetDeclaration<'input>>>>>>,
     cond: Option<Expr<'input>>,
     post: Option<Expr<'input>>,
     body: Box<Stmt<'input>>,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
     // TODO: same logic as the TODO comment on the while loop applies
     // here.
 
@@ -42,7 +42,9 @@ pub fn type_for<'input>(
         .transpose()?;
 
     let cond_span = cond.as_ref().map(|inner| inner.0.span());
-    let typed_cond = cond.map(|cond| type_expr(&loop_scope, cond)).transpose()?;
+    let typed_cond = cond
+        .map(|cond| type_expr(&mut loop_scope, cond))
+        .transpose()?;
 
     if let Some(inner_t_cond) = typed_cond.clone()
         && inner_t_cond.inferred_type != TastType::Bool
@@ -58,16 +60,20 @@ pub fn type_for<'input>(
         ));
     }
 
-    let typed_post = post.map(|post| type_expr(&loop_scope, post)).transpose()?;
+    let typed_post = post
+        .map(|post| type_expr(&mut loop_scope, post))
+        .transpose()?;
 
     let body_as_block = coerce_stmt_into_block(*body);
     let body_as_block_span = body_as_block.span();
-    let (typed_body, body_return_actuality) = type_block(
+
+    let body = type_block(
         &loop_scope,
         body_as_block,
         true,
         return_ability.clone().demote(),
     )?;
+    let ra = body.return_actuality;
 
     Ok(Some((
         TypedStmt(
@@ -75,49 +81,49 @@ pub fn type_for<'input>(
                 init: typed_init.map(Box::new),
                 cond: typed_cond,
                 post: typed_post,
-                body: typed_body.in_span(body_as_block_span),
+                body: body.in_span(body_as_block_span),
             }
             .in_span(stmt_span),
         ),
-        body_return_actuality.demote(),
+        ra.demote(),
     )))
 }
 
 /// Type check a four statement.
-pub fn type_four<'input>(
-    scope: &Scope<'input, '_>,
+pub fn type_four<'input, 'gs>(
+    scope: &Scope<'input, 'gs>,
     body: Box<Stmt<'input>>,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
     let loop_scope = scope.clone();
 
     let body_as_block = coerce_stmt_into_block(*body);
 
     let body_as_block_span = body_as_block.span();
-    let (typed_body, body_return_actuality) = type_block(
+
+    let body = type_block(
         &loop_scope,
         body_as_block,
         true,
         return_ability.clone().demote(),
     )?;
+    let ra = body.return_actuality;
 
     Ok(Some((
-        TypedStmt(
-            TypedStmtKind::FourStmt(typed_body.in_span(body_as_block_span)).in_span(stmt_span),
-        ),
-        body_return_actuality,
+        TypedStmt(TypedStmtKind::FourStmt(body.in_span(body_as_block_span)).in_span(stmt_span)),
+        ra,
     )))
 }
 
 /// Type check a while statement.
-pub fn type_while<'input>(
-    scope: &Scope<'input, '_>,
+pub fn type_while<'input, 'gs>(
+    scope: &mut Scope<'input, 'gs>,
     cond: Expr<'input>,
     body: Box<Stmt<'input>>,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
     // TODO: we might be able to prove that the body runs at least once
     // or an infinite loop making this
     // won't/will return statically
@@ -134,29 +140,28 @@ pub fn type_while<'input>(
         .error_in(cond_span));
     }
 
-    let (typed_body, body_return_actuality) = type_block(
+    let body = type_block(
         scope,
         coerce_stmt_into_block(*body),
         true,
         return_ability.clone().demote(),
     )?;
+    let ra = body.return_actuality;
 
     Ok(Some((
-        TypedStmt(
-            TypedStmtKind::WhileStmt(typed_cond, typed_body.in_span(body_span)).in_span(stmt_span),
-        ),
-        body_return_actuality.demote(),
+        TypedStmt(TypedStmtKind::WhileStmt(typed_cond, body.in_span(body_span)).in_span(stmt_span)),
+        ra.demote(),
     )))
 }
 
 /// Type check a do..while statement.
-pub fn type_do_while<'input>(
-    scope: &Scope<'input, '_>,
+pub fn type_do_while<'input, 'gs>(
+    scope: &mut Scope<'input, 'gs>,
     body: Box<Stmt<'input>>,
     cond: Expr<'input>,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
     let cond_span = cond.0.span();
     let body_span = body.0.span();
     let typed_cond = type_expr(scope, cond)?;
@@ -169,20 +174,20 @@ pub fn type_do_while<'input>(
         .error_in(cond_span));
     }
 
-    let (typed_body, body_return_actuality) = type_block(
+    let body = type_block(
         scope,
         coerce_stmt_into_block(*body),
         true,
         return_ability.clone().demote(),
     )?;
+    let ra = body.return_actuality;
 
     Ok(Some((
         TypedStmt(
-            TypedStmtKind::DoWhileStmt(typed_body.in_span(body_span), typed_cond)
-                .in_span(stmt_span),
+            TypedStmtKind::DoWhileStmt(body.in_span(body_span), typed_cond).in_span(stmt_span),
         ),
         // Unlike `while`, a `do..while` loop is guaranteed to run at
         // least once. For this reason, we do not need to `demote` it.
-        body_return_actuality,
+        ra,
     )))
 }

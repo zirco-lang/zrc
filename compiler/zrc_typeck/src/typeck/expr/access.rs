@@ -16,7 +16,7 @@ use crate::tast::{
 
 /// Typeck an index expr
 pub fn type_expr_index<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr_span: Span,
     ptr: Expr<'input>,
     offset: Expr<'input>,
@@ -55,7 +55,7 @@ pub fn type_expr_index<'input>(
 
 /// Typeck a dot expr
 pub fn type_expr_dot<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr_span: Span,
     obj: Expr<'input>,
     key: Spanned<&'input str>,
@@ -87,7 +87,7 @@ pub fn type_expr_dot<'input>(
 
 /// Typeck an arrow expr
 pub fn type_expr_arrow<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr_span: Span,
     obj: Box<Expr<'input>>,
     key: Spanned<&'input str>,

@@ -8,6 +8,7 @@ members = [
     "compiler/zrc_typeck",
     "compiler/zrc_codegen",
     "compiler/zrc_preprocessor",
+    "tools/zircop",
 ]
 
 [profile.release]

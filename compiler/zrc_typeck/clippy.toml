@@ -1,2 +1,2 @@
 absolute-paths-max-segments = 3
-allowed-idents-below-min-chars = [ "..", "f", "a", "b" ]
+allowed-idents-below-min-chars = [ "..", "f", "a", "b", "k", "v", "e" ]

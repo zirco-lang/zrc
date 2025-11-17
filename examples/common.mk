@@ -1,7 +1,9 @@
 MACOSX_DEPLOYMENT_TARGET ?= 13.0
 
 ZRC ?= ../../target/debug/zrc
+ZIRCOP ?= ../../target/debug/zircop
 ZRFLAGS ?= -I../../include/
+ZIRCOPFLAGS ?= -I../../include/
 LDFLAGS ?= -lc
 OUTDIR ?= ./out
 
@@ -22,3 +24,11 @@ clean:
 .PHONY: test
 test: all
 	../test_harness.sh $(OUTDIR)/run
+
+.PHONY: lint
+lint:
+	@failed=0; \
+	for file in $(ZR_SOURCES); do \
+	  $(ZIRCOP) $(ZIRCOPFLAGS) $$file || failed=1; \
+	done; \
+	exit $$failed
