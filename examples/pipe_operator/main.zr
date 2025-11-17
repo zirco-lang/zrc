@@ -13,21 +13,21 @@ fn add(x: i32, y: i32) -> i32 {
 }
 
 fn main() -> i32 {
-    // Test basic pipe: a |> f
-    let result1: i32 = 5 |> double;
-    printf("5 |> double = %d\n", result1);
+    // Test basic pipe with call: a |> f()
+    let result1: i32 = 5 |> double();
+    printf("5 |> double() = %d\n", result1);
 
-    // Test chained pipe: a |> f |> g (left-associative)
-    let result2: i32 = 5 |> double |> add_ten;
-    printf("5 |> double |> add_ten = %d\n", result2);
+    // Test chained pipe: a |> f() |> g() (left-associative)
+    let result2: i32 = 5 |> double() |> add_ten();
+    printf("5 |> double() |> add_ten() = %d\n", result2);
 
-    // Test pipe with function call: a |> f(b)
+    // Test pipe with function call with args: a |> f(b)
     let result3: i32 = 5 |> add(10);
     printf("5 |> add(10) = %d\n", result3);
 
     // Test complex chained pipe with args
-    let result4: i32 = 5 |> double |> add(15) |> double;
-    printf("5 |> double |> add(15) |> double = %d\n", result4);
+    let result4: i32 = 5 |> double() |> add(15) |> double();
+    printf("5 |> double() |> add(15) |> double() = %d\n", result4);
 
     return 0;
 }

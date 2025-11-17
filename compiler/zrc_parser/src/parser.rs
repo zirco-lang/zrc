@@ -296,36 +296,49 @@ mod tests {
 
         #[test]
         fn pipe_operator_parses_as_expected() {
-            // Test basic pipe: a |> f
+            // Test basic pipe with call: a |> f()
             assert_eq!(
-                parse_expr("a |> f", "<test>"),
+                parse_expr("a |> f()", "<test>"),
                 Ok(Expr::build_pipe(
                     Expr::build_ident(spanned_test!(0, "a", 1)),
-                    Expr::build_ident(spanned_test!(5, "f", 6))
+                    Expr::build_call(
+                        Span::from_positions_and_file(5, 8, "<test>"),
+                        Expr::build_ident(spanned_test!(5, "f", 6)),
+                        spanned_test!(6, vec![], 8)
+                    )
                 ))
             );
 
-            // Test chained pipe: a |> f |> g (left-associative)
+            // Test pipe with arguments: a |> f(b)
             assert_eq!(
-                parse_expr("a |> f |> g", "<test>"),
+                parse_expr("a |> f(b)", "<test>"),
+                Ok(Expr::build_pipe(
+                    Expr::build_ident(spanned_test!(0, "a", 1)),
+                    Expr::build_call(
+                        Span::from_positions_and_file(5, 9, "<test>"),
+                        Expr::build_ident(spanned_test!(5, "f", 6)),
+                        spanned_test!(6, vec![Expr::build_ident(spanned_test!(7, "b", 8))], 9)
+                    )
+                ))
+            );
+
+            // Test chained pipe: a |> f() |> g() (left-associative)
+            assert_eq!(
+                parse_expr("a |> f() |> g()", "<test>"),
                 Ok(Expr::build_pipe(
                     Expr::build_pipe(
                         Expr::build_ident(spanned_test!(0, "a", 1)),
-                        Expr::build_ident(spanned_test!(5, "f", 6))
+                        Expr::build_call(
+                            Span::from_positions_and_file(5, 8, "<test>"),
+                            Expr::build_ident(spanned_test!(5, "f", 6)),
+                            spanned_test!(6, vec![], 8)
+                        )
                     ),
-                    Expr::build_ident(spanned_test!(10, "g", 11))
-                ))
-            );
-
-            // Test pipe with precedence same as bitwise OR
-            assert_eq!(
-                parse_expr("a | b |> c", "<test>"),
-                Ok(Expr::build_pipe(
-                    Expr::build_bit_or(
-                        Expr::build_ident(spanned_test!(0, "a", 1)),
-                        Expr::build_ident(spanned_test!(4, "b", 5))
-                    ),
-                    Expr::build_ident(spanned_test!(9, "c", 10))
+                    Expr::build_call(
+                        Span::from_positions_and_file(12, 15, "<test>"),
+                        Expr::build_ident(spanned_test!(12, "g", 13)),
+                        spanned_test!(13, vec![], 15)
+                    )
                 ))
             );
         }

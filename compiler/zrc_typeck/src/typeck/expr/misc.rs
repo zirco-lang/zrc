@@ -302,14 +302,17 @@ pub fn type_expr_struct_construction<'input>(
     })
 }
 
-/// Typeck a pipe expr: `E1 |> E2` becomes `E2(E1)` or `E1 |> E2(args...)`
-/// becomes `E2(E1, args...)`
+/// Typeck a pipe expr: `E1 |> E2(args...)` becomes `E2(E1, args...)`
+///
+/// The right-hand side must be a call expression. `E1 |> E2` (without call) is
+/// an error.
 pub fn type_expr_pipe<'input>(
     scope: &Scope<'input, '_>,
     expr_span: Span,
     lhs: Expr<'input>,
     rhs: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
+    use zrc_diagnostics::DiagnosticKind;
     use zrc_parser::ast::expr::ExprKind;
     use zrc_utils::spanned;
 
@@ -333,18 +336,13 @@ pub fn type_expr_pipe<'input>(
             );
             super::call::type_expr_call(scope, expr_span, *f, new_args_spanned)
         }
-        other => {
-            // E1 |> E2 => E2(E1)
-            // Create a call expression: E2(E1)
-            // Reconstruct rhs from the moved rhs_kind
-            let rhs_reconstructed = Expr(other.in_span(rhs_span));
-            let args_spanned = spanned!(
-                expr_span.start(),
-                vec![lhs],
-                expr_span.end(),
-                expr_span.file_name()
-            );
-            super::call::type_expr_call(scope, expr_span, rhs_reconstructed, args_spanned)
+        _ => {
+            // E1 |> E2 => error
+            Err(DiagnosticKind::ExpectedGot {
+                expected: "call expression (e.g., `f()`)".to_string(),
+                got: "non-call expression".to_string(),
+            }
+            .error_in(rhs_span))
         }
     }
 }
