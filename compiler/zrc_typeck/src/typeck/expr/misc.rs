@@ -1,7 +1,10 @@
 //! type checking for misc expressions
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
-use zrc_parser::ast::{expr::Expr, ty::Type};
+use zrc_parser::{
+    ast::{expr::Expr, ty::Type},
+    lexer::NumberLiteral,
+};
 use zrc_utils::span::{Span, Spannable};
 
 use super::{
@@ -197,7 +200,7 @@ pub fn type_expr_size_of_expr<'input>(
 }
 
 /// Typeck a struct construction expr
-#[expect(clippy::type_complexity)]
+#[expect(clippy::type_complexity, clippy::too_many_lines)]
 pub fn type_expr_struct_construction<'input>(
     scope: &Scope<'input, '_>,
     expr_span: Span,
@@ -207,9 +210,130 @@ pub fn type_expr_struct_construction<'input>(
     >,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     use indexmap::IndexMap;
+    use zrc_parser::ast::ty::TypeKind as ParserTypeKind;
+
+    // Check if we're constructing an enum before desugaring
+    let is_enum_literal = matches!(ty.0.value(), ParserTypeKind::Enum(_));
 
     // Resolve the type being constructed
     let resolved_ty = resolve_type(scope.types, ty)?;
+
+    // Check if the resolved type is an enum (desugared into a struct with
+    // __discriminant__ and __value__)
+    let is_enum = is_enum_literal
+        || matches!(
+            &resolved_ty,
+            TastType::Struct(fields) if fields.len() == 2
+                && fields.contains_key("__discriminant__")
+                && fields.contains_key("__value__")
+                && matches!(fields.get("__value__"), Some(TastType::Union(_)))
+        );
+
+    // Handle enum construction specially
+    if is_enum {
+        // Enums are desugared into: struct { __discriminant__: usize, __value__: union
+        // { ... } } We need to transform: { VariantName: value }
+        // Into: { __discriminant__: index, __value__: { VariantName: value } }
+
+        let TastType::Struct(enum_fields) = &resolved_ty else {
+            unreachable!("enum should desugar to a struct")
+        };
+
+        // Extract the union type from __value__ field
+        let union_ty = enum_fields.get("__value__").ok_or_else(|| {
+            DiagnosticKind::ExpectedGot {
+                expected: "enum with __value__ field".to_string(),
+                got: resolved_ty.to_string(),
+            }
+            .error_in(expr_span)
+        })?;
+
+        let TastType::Union(variant_types) = union_ty else {
+            unreachable!("enum __value__ field should be a union")
+        };
+
+        // Determine which variant is being constructed
+        if fields.value().len() != 1 {
+            return Err(DiagnosticKind::ExpectedGot {
+                expected: "exactly one variant initialization".to_string(),
+                got: format!("{} field initializations", fields.value().len()),
+            }
+            .error_in(fields.span()));
+        }
+
+        let field_init = &fields.value()[0];
+        let (variant_name, variant_expr) = field_init.value();
+        let variant_name_str = variant_name.value();
+
+        // Find the discriminant value (index of the variant)
+        let discriminant = variant_types
+            .iter()
+            .position(|(name, _)| name == variant_name_str)
+            .ok_or_else(|| {
+                DiagnosticKind::StructOrUnionDoesNotHaveMember(
+                    resolved_ty.to_string(),
+                    (*variant_name_str).to_string(),
+                )
+                .error_in(variant_name.span())
+            })?;
+
+        // Get the expected type for this variant
+        // We know this exists because we just found the discriminant above
+        let expected_variant_type = variant_types
+            .get(variant_name_str)
+            .expect("variant should exist since discriminant was found");
+
+        // Type check the variant value
+        let typed_variant_expr = type_expr(scope, variant_expr.clone())?;
+
+        // Try to coerce the variant value to the expected type
+        let typed_variant_expr = if typed_variant_expr.inferred_type == *expected_variant_type {
+            typed_variant_expr
+        } else if typed_variant_expr
+            .inferred_type
+            .can_implicitly_cast_to(expected_variant_type)
+        {
+            try_coerce_to(typed_variant_expr, expected_variant_type)
+        } else {
+            return Err(DiagnosticKind::ExpectedGot {
+                expected: expected_variant_type.to_string(),
+                got: typed_variant_expr.inferred_type.to_string(),
+            }
+            .error_in(typed_variant_expr.kind.span()));
+        };
+
+        // Create the discriminant literal
+        // We need to create a proper NumberLiteral from the lexer
+        // Use Box::leak to create a string with 'static lifetime that can be cast to
+        // 'input
+        let discriminant_str: &'input str = Box::leak(discriminant.to_string().into_boxed_str());
+        let discriminant_expr = TypedExpr {
+            inferred_type: TastType::Usize,
+            kind: TypedExprKind::NumberLiteral(
+                NumberLiteral::Decimal(discriminant_str),
+                TastType::Usize,
+            )
+            .in_span(variant_name.span()),
+        };
+
+        // Create the union construction for __value__
+        let mut union_fields = IndexMap::new();
+        union_fields.insert(*variant_name_str, typed_variant_expr);
+        let union_construction = TypedExpr {
+            inferred_type: union_ty.clone(),
+            kind: TypedExprKind::StructConstruction(union_fields).in_span(fields.span()),
+        };
+
+        // Create the final struct construction
+        let mut struct_fields = IndexMap::new();
+        struct_fields.insert("__discriminant__", discriminant_expr);
+        struct_fields.insert("__value__", union_construction);
+
+        return Ok(TypedExpr {
+            inferred_type: resolved_ty,
+            kind: TypedExprKind::StructConstruction(struct_fields).in_span(expr_span),
+        });
+    }
 
     // Ensure it's a struct or union type
     let expected_fields = match &resolved_ty {
@@ -281,6 +405,15 @@ pub fn type_expr_struct_construction<'input>(
         }
 
         initialized_fields.insert(field_name_str, typed_field_expr);
+    }
+
+    // For unions, verify exactly one field is initialized
+    if matches!(resolved_ty, TastType::Union(_)) && initialized_fields.len() != 1 {
+        return Err(DiagnosticKind::ExpectedGot {
+            expected: "exactly one field initialization".to_string(),
+            got: format!("{} field initializations", initialized_fields.len()),
+        }
+        .error_in(fields.span()));
     }
 
     // For structs (not unions), verify all fields are initialized

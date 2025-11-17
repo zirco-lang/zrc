@@ -1,0 +1,57 @@
+#include <stdio.zh>
+
+// Union example
+union Value {
+    i: i32,
+    f: i64
+}
+
+fn print_as_int(v: Value) -> struct {} {
+    printf("Union value as i32: %d\n", v.i);
+    return;
+}
+
+fn print_as_long(v: Value) -> struct {} {
+    printf("Union value as i64: %ld\n", v.f);
+    return;
+}
+
+// Enum example
+enum Color {
+    Red: i32,
+    Green: i32,
+    Blue: i32
+}
+
+fn print_color(c: Color) -> struct {} {
+    // Raw access is undefined behavior, but accessible under
+    // __discriminant__ and __value__
+    
+    match (c) {
+        Red: x => printf("Color is Red with value: %d\n", x);
+        Green: x => printf("Color is Green with value: %d\n", x);
+        Blue: x => printf("Color is Blue with value: %d\n", x);
+    }
+
+    return;
+}
+
+fn main() -> i32 {
+    // Create union with inline type
+    let val1 = new union { i: i32, f: i64 } { i: 42 };
+    print_as_int(val1);
+    
+    // Create union with named type
+    let val2 = new Value { f: 1000000000 };
+    print_as_long(val2);
+    
+    // Create enum with inline type
+    let color1 = new enum { Red: i32, Green: i32, Blue: i32 } { Red: 255 };
+    print_color(color1);
+    
+    // Create enum with named type
+    let color2 = new Color { Green: 128 };
+    print_color(color2);
+    
+    return 0;
+}

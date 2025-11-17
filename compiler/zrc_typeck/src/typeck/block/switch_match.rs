@@ -331,7 +331,7 @@ pub fn type_match<'input>(
         scope,
         Spanned::from_span_and_value(stmt_span, vec![switch_stmt.clone()]),
         can_use_break_continue,
-        return_ability.clone(),
+        return_ability.clone().demote(),
     )?;
 
     Ok(Some((

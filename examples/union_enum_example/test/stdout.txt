@@ -1,0 +1,4 @@
+Union value as i32: 42
+Union value as i64: 1000000000
+Color is Red with value: 255
+Color is Green with value: 128
