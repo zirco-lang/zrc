@@ -2,6 +2,7 @@
 
 mod block;
 mod declaration;
+mod diagnostics;
 mod expr;
 mod scope;
 mod ty;

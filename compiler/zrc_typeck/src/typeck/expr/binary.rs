@@ -20,15 +20,16 @@ use crate::tast::{
 /// Typeck a logical expr
 pub fn type_expr_logical<'input>(
     scope: &Scope<'input, '_>,
+    diagnostics: &DiagnosticCollector,
     expr_span: Span,
     op: Logical,
     lhs: Expr<'input>,
     rhs: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let lhs_span = lhs.0.span();
-    let lhs_t = type_expr(scope, lhs)?;
+    let lhs_t = handle_type_error(type_expr(scope, diagnostics, lhs), diagnostics, lhs_span);
     let rhs_span = rhs.0.span();
-    let rhs_t = type_expr(scope, rhs)?;
+    let rhs_t = handle_type_error(type_expr(scope, diagnostics, rhs), diagnostics, rhs_span);
 
     // If either operand is poison, propagate poison
     if lhs_t.inferred_type.is_poison() || rhs_t.inferred_type.is_poison() {
@@ -38,18 +39,31 @@ pub fn type_expr_logical<'input>(
         });
     }
 
-    expect(
+    if let Err(diag) = expect(
         lhs_t.inferred_type == TastType::Bool,
         "bool".to_string(),
         lhs_t.inferred_type.to_string(),
         lhs_span,
-    )?;
-    expect(
+    ) {
+        diagnostics.push(diag);
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::Logical(op, Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
+        });
+    }
+    
+    if let Err(diag) = expect(
         rhs_t.inferred_type == TastType::Bool,
         "bool".to_string(),
         rhs_t.inferred_type.to_string(),
         rhs_span,
-    )?;
+    ) {
+        diagnostics.push(diag);
+        return Ok(TypedExpr {
+            inferred_type: TastType::Poison,
+            kind: TypedExprKind::Logical(op, Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
+        });
+    }
 
     Ok(TypedExpr {
         inferred_type: TastType::Bool,

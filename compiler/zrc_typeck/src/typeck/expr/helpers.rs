@@ -9,6 +9,31 @@ use crate::tast::{
     ty::Type as TastType,
 };
 
+use super::super::diagnostics::DiagnosticCollector;
+
+/// Handle a type checking result by collecting any diagnostic and returning
+/// a poison value if an error occurred, allowing type checking to continue.
+///
+/// This enables error recovery: instead of stopping at the first error, we
+/// collect it and return a poison value that propagates through the type system.
+pub fn handle_type_error<'input>(
+    result: Result<TypedExpr<'input>, Diagnostic>,
+    diagnostics: &DiagnosticCollector,
+    span: Span,
+) -> TypedExpr<'input> {
+    match result {
+        Ok(expr) => expr,
+        Err(diagnostic) => {
+            diagnostics.push(diagnostic);
+            // Return a poison expression to continue type checking
+            TypedExpr {
+                inferred_type: TastType::Poison,
+                kind: TypedExprKind::Identifier("__poison__").in_span(span),
+            }
+        }
+    }
+}
+
 /// Desugar an assignment like `x += y` to `x = x + y`.
 pub fn desugar_assignment<'input>(
     mode: Assignment,

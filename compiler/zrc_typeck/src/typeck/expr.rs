@@ -9,11 +9,11 @@ mod literals;
 mod misc;
 mod unary;
 
-pub use helpers::try_coerce_to;
+pub use helpers::{handle_type_error, try_coerce_to};
 use zrc_diagnostics::Diagnostic;
 use zrc_parser::ast::expr::{Expr, ExprKind};
 
-use super::scope::Scope;
+use super::{diagnostics::DiagnosticCollector, scope::Scope};
 use crate::tast::expr::TypedExpr;
 
 // FIXME: this NEEDS to be rewritten to use references almost everywhere and be
@@ -21,64 +21,162 @@ use crate::tast::expr::TypedExpr;
 /// Type check and infer an [AST expression](Expr) to a [TAST
 /// expression](TypedExpr).
 ///
+/// Collects diagnostics in the provided collector and returns poison values
+/// for expressions with type errors, allowing error recovery.
+///
 /// # Errors
-/// Errors if a type checker error is encountered.
+/// Returns Err only for fatal errors that prevent continuing. Recoverable
+/// errors are collected in the diagnostics collector and poison values are
+/// returned.
 pub fn type_expr<'input>(
     scope: &Scope<'input, '_>,
+    diagnostics: &DiagnosticCollector,
     expr: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let expr_span = expr.0.span();
     Ok(match expr.0.into_value() {
-        ExprKind::Comma(lhs, rhs) => misc::type_expr_comma(scope, expr_span, *lhs, *rhs)?,
-        ExprKind::Assignment(mode, place, value) => {
-            assignment::type_expr_assignment(scope, expr_span, mode, *place, *value)?
+        ExprKind::Comma(lhs, rhs) => {
+            handle_type_error(
+                misc::type_expr_comma(scope, diagnostics, expr_span, *lhs, *rhs),
+                diagnostics,
+                expr_span,
+            )
         }
-        ExprKind::UnaryNot(x) => unary::type_expr_unary_not(scope, expr_span, *x)?,
-        ExprKind::UnaryBitwiseNot(x) => unary::type_expr_unary_bitwise_not(scope, expr_span, *x)?,
-        ExprKind::UnaryMinus(x) => unary::type_expr_unary_minus(scope, expr_span, *x)?,
-        ExprKind::UnaryAddressOf(x) => unary::type_expr_unary_address_of(scope, expr_span, *x)?,
-        ExprKind::UnaryDereference(x) => unary::type_expr_unary_dereference(scope, expr_span, *x)?,
-        ExprKind::PrefixIncrement(x) => unary::type_expr_prefix_increment(scope, expr_span, *x)?,
-        ExprKind::PrefixDecrement(x) => unary::type_expr_prefix_decrement(scope, expr_span, *x)?,
-        ExprKind::Index(ptr, offset) => access::type_expr_index(scope, expr_span, *ptr, *offset)?,
-        ExprKind::Dot(obj, key) => access::type_expr_dot(scope, expr_span, *obj, key)?,
-        ExprKind::Arrow(obj, key) => access::type_expr_arrow(scope, expr_span, obj, key)?,
-        ExprKind::Call(f, args) => call::type_expr_call(scope, expr_span, *f, args)?,
-        ExprKind::PostfixIncrement(x) => unary::type_expr_postfix_increment(scope, expr_span, *x)?,
-        ExprKind::PostfixDecrement(x) => unary::type_expr_postfix_decrement(scope, expr_span, *x)?,
-        ExprKind::Ternary(cond, if_true, if_false) => {
-            misc::type_expr_ternary(scope, expr_span, *cond, *if_true, *if_false)?
-        }
-        ExprKind::Logical(op, lhs, rhs) => {
-            binary::type_expr_logical(scope, expr_span, op, *lhs, *rhs)?
-        }
-        ExprKind::Equality(op, lhs, rhs) => {
-            binary::type_expr_equality(scope, expr_span, op, *lhs, *rhs)?
-        }
-        ExprKind::BinaryBitwise(op, lhs, rhs) => {
-            binary::type_expr_binary_bitwise(scope, expr_span, op, *lhs, *rhs)?
-        }
-        ExprKind::Comparison(op, lhs, rhs) => {
-            binary::type_expr_comparison(scope, expr_span, op, *lhs, *rhs)?
-        }
-        ExprKind::Arithmetic(op, lhs, rhs) => {
-            binary::type_expr_arithmetic(scope, expr_span, op, *lhs, *rhs)?
-        }
-        ExprKind::Cast(x, ty) => misc::type_expr_cast(scope, expr_span, *x, ty)?,
-        ExprKind::SizeOfType(ty) => misc::type_expr_size_of_type(scope, expr_span, ty)?,
-        ExprKind::SizeOfExpr(x) => misc::type_expr_size_of_expr(scope, expr_span, *x)?,
-        ExprKind::NumberLiteral(n, ty) => {
-            literals::type_expr_number_literal(scope, expr_span, n, ty)?
-        }
+        ExprKind::Assignment(mode, place, value) => handle_type_error(
+            assignment::type_expr_assignment(scope, diagnostics, expr_span, mode, *place, *value),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::UnaryNot(x) => handle_type_error(
+            unary::type_expr_unary_not(scope, diagnostics, expr_span, *x),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::UnaryBitwiseNot(x) => handle_type_error(
+            unary::type_expr_unary_bitwise_not(scope, diagnostics, expr_span, *x),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::UnaryMinus(x) => handle_type_error(
+            unary::type_expr_unary_minus(scope, diagnostics, expr_span, *x),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::UnaryAddressOf(x) => handle_type_error(
+            unary::type_expr_unary_address_of(scope, diagnostics, expr_span, *x),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::UnaryDereference(x) => handle_type_error(
+            unary::type_expr_unary_dereference(scope, diagnostics, expr_span, *x),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::PrefixIncrement(x) => handle_type_error(
+            unary::type_expr_prefix_increment(scope, diagnostics, expr_span, *x),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::PrefixDecrement(x) => handle_type_error(
+            unary::type_expr_prefix_decrement(scope, diagnostics, expr_span, *x),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::Index(ptr, offset) => handle_type_error(
+            access::type_expr_index(scope, diagnostics, expr_span, *ptr, *offset),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::Dot(obj, key) => handle_type_error(
+            access::type_expr_dot(scope, diagnostics, expr_span, *obj, key),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::Arrow(obj, key) => handle_type_error(
+            access::type_expr_arrow(scope, diagnostics, expr_span, obj, key),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::Call(f, args) => handle_type_error(
+            call::type_expr_call(scope, diagnostics, expr_span, *f, args),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::PostfixIncrement(x) => handle_type_error(
+            unary::type_expr_postfix_increment(scope, diagnostics, expr_span, *x),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::PostfixDecrement(x) => handle_type_error(
+            unary::type_expr_postfix_decrement(scope, diagnostics, expr_span, *x),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::Ternary(cond, if_true, if_false) => handle_type_error(
+            misc::type_expr_ternary(scope, diagnostics, expr_span, *cond, *if_true, *if_false),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::Logical(op, lhs, rhs) => handle_type_error(
+            binary::type_expr_logical(scope, diagnostics, expr_span, op, *lhs, *rhs),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::Equality(op, lhs, rhs) => handle_type_error(
+            binary::type_expr_equality(scope, diagnostics, expr_span, op, *lhs, *rhs),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::BinaryBitwise(op, lhs, rhs) => handle_type_error(
+            binary::type_expr_binary_bitwise(scope, diagnostics, expr_span, op, *lhs, *rhs),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::Comparison(op, lhs, rhs) => handle_type_error(
+            binary::type_expr_comparison(scope, diagnostics, expr_span, op, *lhs, *rhs),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::Arithmetic(op, lhs, rhs) => handle_type_error(
+            binary::type_expr_arithmetic(scope, diagnostics, expr_span, op, *lhs, *rhs),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::Cast(x, ty) => handle_type_error(
+            misc::type_expr_cast(scope, diagnostics, expr_span, *x, ty),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::SizeOfType(ty) => handle_type_error(
+            misc::type_expr_size_of_type(scope, diagnostics, expr_span, ty),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::SizeOfExpr(x) => handle_type_error(
+            misc::type_expr_size_of_expr(scope, diagnostics, expr_span, *x),
+            diagnostics,
+            expr_span,
+        ),
+        ExprKind::NumberLiteral(n, ty) => handle_type_error(
+            literals::type_expr_number_literal(scope, diagnostics, expr_span, n, ty),
+            diagnostics,
+            expr_span,
+        ),
         ExprKind::StringLiteral(str) => literals::type_expr_string_literal(scope, expr_span, str),
         ExprKind::CharLiteral(ch) => literals::type_expr_char_literal(scope, expr_span, ch),
-        ExprKind::Identifier(i) => literals::type_expr_identifier(scope, expr_span, i)?,
+        ExprKind::Identifier(i) => handle_type_error(
+            literals::type_expr_identifier(scope, diagnostics, expr_span, i),
+            diagnostics,
+            expr_span,
+        ),
         ExprKind::BooleanLiteral(value) => {
             literals::type_expr_boolean_literal(scope, expr_span, value)
         }
-        ExprKind::StructConstruction(ty, fields) => {
-            misc::type_expr_struct_construction(scope, expr_span, ty, &fields)?
-        }
+        ExprKind::StructConstruction(ty, fields) => handle_type_error(
+            misc::type_expr_struct_construction(scope, diagnostics, expr_span, ty, &fields),
+            diagnostics,
+            expr_span,
+        ),
     })
 }
 
