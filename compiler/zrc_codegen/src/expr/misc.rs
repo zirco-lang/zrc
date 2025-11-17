@@ -137,8 +137,30 @@ pub fn cg_struct_construction<'ctx, 'input>(
             // Get the LLVM struct type
             let struct_type = llvm_basic_type(&cg, &inferred_type).0.into_struct_type();
 
+<<<<<<< HEAD
             // Allocate space for the struct on the stack
             let struct_ptr = cg
+=======
+    // Allocate space for the struct on the stack
+    let struct_ptr = cg
+        .builder
+        .build_alloca(struct_type, "struct_tmp")
+        .expect("struct allocation should have compiled successfully");
+
+    // Initialize each field
+    let (Type::Struct(field_types) | Type::Union(field_types)) = &inferred_type else {
+        unreachable!("struct construction should only be used with struct/union types")
+    };
+
+    for (idx, (field_name, _field_ty)) in field_types.iter().enumerate() {
+        if let Some(field_expr) = fields.get(field_name) {
+            // Evaluate the field value
+            let field_value = unpack!(bb = cg_expr(cg, bb, field_expr.clone()));
+
+            // Get pointer to this field in the struct
+            #[expect(clippy::cast_possible_truncation, clippy::as_conversions)]
+            let field_ptr = cg
+>>>>>>> main
                 .builder
                 .build_alloca(struct_type, "struct_tmp")
                 .expect("struct allocation should have compiled successfully");
