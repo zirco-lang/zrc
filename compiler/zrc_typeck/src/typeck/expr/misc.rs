@@ -200,11 +200,7 @@ pub fn type_expr_size_of_expr<'input>(
 }
 
 /// Typeck a struct construction expr
-<<<<<<< HEAD
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
-=======
-#[expect(clippy::type_complexity)]
->>>>>>> main
 pub fn type_expr_struct_construction<'input>(
     scope: &Scope<'input, '_>,
     expr_span: Span,
