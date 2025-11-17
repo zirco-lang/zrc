@@ -1,0 +1,202 @@
+// Zirco Syntax Highlighting Test
+// This file demonstrates all syntax elements supported by the TextMate grammar
+
+// Preprocessor directives
+#pragma once
+#include <stdio.zh>
+#include "custom_header.zr"
+
+// Global variables
+let GLOBAL_CONST: i32 = 42;
+let global_var: bool = true;
+
+// Type aliases
+type MyInt = i32;
+type CharPtr = *u8;
+
+// Struct declaration
+struct Point {
+    x: i32,
+    y: i32
+}
+
+// Union declaration
+union Value {
+    i: i32,
+    f: i64
+}
+
+// Enum declaration
+enum Color {
+    Red: i32,
+    Green: i32,
+    Blue: i32
+}
+
+// Function declaration with various types
+fn add(a: i32, b: i32) -> i32 {
+    return a + b;
+}
+
+// Variadic function
+fn printf(format: *u8, ...) -> i32;
+
+// Function with pointers
+fn swap(a: *i32, b: *i32) {
+    let temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+// Main function with all control flow constructs
+fn main() -> i32 {
+    // Boolean literals
+    let flag = true;
+    let other_flag = false;
+    
+    // Number literals
+    let decimal = 42;
+    let hex = 0xFF;
+    let binary = 0b1010;
+    let with_suffix = 100i32;
+    let unsigned = 255u8;
+    let with_underscores = 1_000_000;
+    
+    // String and character literals
+    let str = "Hello, World!\n";
+    let char = 'a';
+    let escaped_char = '\n';
+    let hex_escape = "\x41";
+    let unicode_escape = "\u{2400}";
+    
+    // If statement
+    if (flag) {
+        printf("Flag is true\n");
+    } else if (other_flag) {
+        printf("Other flag is true\n");
+    } else {
+        printf("Both flags are false\n");
+    }
+    
+    // While loop
+    let i = 0;
+    while (i < 10) {
+        printf("%d ", i);
+        i = i + 1;
+    }
+    
+    // Do-while loop
+    do {
+        printf("%d ", i);
+        i = i - 1;
+    } while (i > 0);
+    
+    // For loop with increment/decrement operators
+    for (let j = 0; j < 10; j++) {
+        if (j == 5) {
+            continue;
+        }
+        if (j == 8) {
+            break;
+        }
+        printf("%d ", j);
+    }
+    
+    // Four loop (unique to Zirco)
+    four printf("This prints four times\n");
+    
+    // Switch statement
+    let day = 1;
+    switch (day) {
+        1 => printf("Monday\n");
+        2 => printf("Tuesday\n");
+        default => printf("Other day\n");
+    }
+    
+    // Match statement (enum matching)
+    let color = new Color { Red: 255 };
+    match (color) {
+        Red: x => printf("Red: %d\n", x);
+        Green: y => printf("Green: %d\n", y);
+        Blue: z => printf("Blue: %d\n", z);
+    }
+    
+    // Struct construction
+    let point = new Point { x: 10, y: 20 };
+    
+    // Member access
+    let x_val = point.x;
+    point.y = 30;
+    
+    // Pointer operations
+    let ptr = &x_val;
+    let value = *ptr;
+    
+    // Arrow operator
+    let point_ptr: *Point = &point;
+    let y_val = point_ptr->y;
+    
+    // Array indexing
+    let arr: *i32;
+    arr[0] = 42;
+    
+    // Arithmetic operators
+    let sum = 1 + 2;
+    let diff = 10 - 5;
+    let product = 3 * 4;
+    let quotient = 20 / 4;
+    let remainder = 17 % 5;
+    
+    // Comparison operators
+    let equal = (1 == 1);
+    let not_equal = (1 != 2);
+    let less = (1 < 2);
+    let less_equal = (1 <= 1);
+    let greater = (2 > 1);
+    let greater_equal = (2 >= 2);
+    
+    // Logical operators
+    let and_result = true && false;
+    let or_result = true || false;
+    let not_result = !true;
+    
+    // Bitwise operators
+    let bitwise_and = 0b1010 & 0b1100;
+    let bitwise_or = 0b1010 | 0b1100;
+    let bitwise_xor = 0b1010 ^ 0b1100;
+    let bitwise_not = ~0b1010;
+    let left_shift = 1 << 3;
+    let right_shift = 8 >> 2;
+    
+    // Assignment operators
+    let mut_var = 10;
+    mut_var += 5;
+    mut_var -= 2;
+    mut_var *= 3;
+    mut_var /= 2;
+    mut_var %= 4;
+    mut_var &= 0xFF;
+    mut_var |= 0x0F;
+    mut_var ^= 0xAA;
+    mut_var <<= 1;
+    mut_var >>= 1;
+    
+    // Ternary operator
+    let max = (a > b) ? a : b;
+    
+    // Type casting
+    let casted = 42 as u8;
+    
+    // Sizeof operator
+    let size = sizeof i32;
+    let expr_size = sizeof(point);
+    
+    // Comma operator
+    let result = (a = 1, b = 2, a + b);
+    
+    // Function calls
+    let add_result = add(5, 3);
+    printf("Result: %d\n", add_result);
+    
+    return 0;
+}

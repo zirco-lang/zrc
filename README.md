@@ -73,6 +73,17 @@ For detailed instructions and troubleshooting, see the [Getting Started Guide](.
 
 For a comprehensive guide to the Zirco language syntax, semantics, and behavior, see the [Language Specification](./docs/SPEC.md).
 
+## Syntax Highlighting
+
+Zirco includes a TextMate grammar for syntax highlighting in editors that support TextMate grammars:
+
+-   **Visual Studio Code**: Automatic syntax highlighting when viewing `.zr` and `.zh` files on GitHub
+-   **Sublime Text**: Can use the grammar from the `syntaxes/` directory
+-   **GitHub**: Syntax highlighting is automatically applied to Zirco files in the web interface
+-   **Other editors**: Any editor supporting TextMate grammars can use `syntaxes/zirco.tmLanguage.json`
+
+The grammar supports all Zirco language features including keywords, operators, literals, preprocessor directives, functions, types, structs, unions, enums, and more. See [syntaxes/README.md](./syntaxes/README.md) for details.
+
 ## Usage
 
 If you are directly invoking the compiler with `cargo`, replace `zrc` with `cargo run --` in the below commands.
