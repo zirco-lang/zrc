@@ -1,0 +1,7 @@
+#include <stdio.zh>
+
+fn main() -> i32 {
+    four printf("Hello, World!\n");
+
+    return 0;
+}
