@@ -49,11 +49,91 @@ The grammar provides syntax highlighting for:
 
 ### Visual Studio Code
 
-To use this grammar in VS Code, you can create a VS Code extension or add it to your workspace settings:
+There are several ways to use this grammar in VS Code:
 
-1. Copy `zirco.tmLanguage.json` to your VS Code extensions directory
-2. Create a `package.json` for the extension
-3. The grammar will automatically be applied to `.zr` and `.zh` files
+#### Option 1: GitHub Web Interface (Automatic)
+When viewing Zirco files (`.zr`, `.zh`) on GitHub, syntax highlighting is automatically applied using this grammar.
+
+#### Option 2: Local VS Code Extension (Recommended for Development)
+
+1. **Create a VS Code extension directory:**
+   ```bash
+   mkdir -p ~/.vscode/extensions/zirco-language
+   cd ~/.vscode/extensions/zirco-language
+   ```
+
+2. **Copy the grammar file:**
+   ```bash
+   cp /path/to/zrc/syntaxes/zirco.tmLanguage.json .
+   ```
+
+3. **Create a `package.json` file:**
+   ```json
+   {
+     "name": "zirco-language",
+     "displayName": "Zirco Language Support",
+     "description": "Syntax highlighting for Zirco programming language",
+     "version": "0.1.0",
+     "engines": {
+       "vscode": "^1.50.0"
+     },
+     "categories": ["Programming Languages"],
+     "contributes": {
+       "languages": [{
+         "id": "zirco",
+         "aliases": ["Zirco", "zirco"],
+         "extensions": [".zr", ".zh"],
+         "configuration": "./language-configuration.json"
+       }],
+       "grammars": [{
+         "language": "zirco",
+         "scopeName": "source.zirco",
+         "path": "./zirco.tmLanguage.json"
+       }]
+     }
+   }
+   ```
+
+4. **Create a `language-configuration.json` file (optional but recommended):**
+   ```json
+   {
+     "comments": {
+       "lineComment": "//"
+     },
+     "brackets": [
+       ["{", "}"],
+       ["[", "]"],
+       ["(", ")"]
+     ],
+     "autoClosingPairs": [
+       { "open": "{", "close": "}" },
+       { "open": "[", "close": "]" },
+       { "open": "(", "close": ")" },
+       { "open": "\"", "close": "\"", "notIn": ["string"] },
+       { "open": "'", "close": "'", "notIn": ["string", "comment"] }
+     ],
+     "surroundingPairs": [
+       ["{", "}"],
+       ["[", "]"],
+       ["(", ")"],
+       ["\"", "\""],
+       ["'", "'"]
+     ]
+   }
+   ```
+
+5. **Reload VS Code:**
+   - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
+   - Type "Reload Window" and press Enter
+   - The syntax highlighting will now be active for `.zr` and `.zh` files
+
+#### Option 3: Workspace Settings (Quick Setup)
+
+For a simpler setup within a specific project:
+
+1. Open the Zirco repository in VS Code
+2. The grammar file in `syntaxes/` will be automatically recognized by GitHub's linguist
+3. For local highlighting, you can use the VS Code extension method above
 
 ### GitHub
 
