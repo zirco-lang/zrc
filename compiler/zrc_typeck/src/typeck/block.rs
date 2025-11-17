@@ -76,6 +76,10 @@ pub fn type_block<'input, 'gs>(
                 let inner_closure =
                     || -> Result<Option<(TypedStmt<'_>, BlockReturnActuality)>, Diagnostic> {
                         match stmt.0.into_value() {
+                            StmtKind::LineComment(_) | StmtKind::BlockComment(_) => {
+                                // Comments are not represented in the typed AST, skip them
+                                Ok(None)
+                            }
                             StmtKind::EmptyStmt => Ok(None),
                             StmtKind::BreakStmt if can_use_break_continue => Ok(Some((
                                 TypedStmt(TypedStmtKind::BreakStmt.in_span(stmt_span)),

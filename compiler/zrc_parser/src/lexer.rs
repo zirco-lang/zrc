@@ -154,7 +154,8 @@ fn lex_string_contents<'input>(
 /// See also: [zrc#14](https://github.com/zirco-lang/zrc/pull/14)
 fn handle_block_comment_start<'input>(
     lex: &mut Lexer<'input, Tok<'input>>,
-) -> logos::FilterResult<(), InternalLexicalError> {
+) -> Result<&'input str, InternalLexicalError> {
+    let start_pos = lex.span().start;
     let mut depth = 1;
     // This contains all of the remaining tokens in our input except for the opening
     // to this comment -- that's already been consumed.
@@ -192,16 +193,14 @@ fn handle_block_comment_start<'input>(
     }
 
     if depth == 0 {
-        // We've reached the end of this block comment - because we attach the
-        // handle_block_comment_start callback to basically any token variant
-        // (to keep the Tok enum clean of useless variants), we should simply
-        // skip this token. This will skip from the beginning of our Span to the end
-        // that was given through all of the calls to lex.bump().
-        logos::FilterResult::Skip
+        // We've reached the end of this block comment - return the full comment text
+        // including the opening /* and closing */
+        let end_pos = lex.span().end;
+        Ok(&lex.source()[start_pos..end_pos])
     } else {
         // This means we've reached the end of our input still in a comment.
         // We can throw an error here.
-        logos::FilterResult::Error(InternalLexicalError::UnterminatedBlockComment)
+        Err(InternalLexicalError::UnterminatedBlockComment)
     }
 }
 
@@ -245,15 +244,19 @@ impl<'input> NumberLiteral<'input> {
 #[logos(
     error = InternalLexicalError,
     skip r"[ \t\r\n\f]+",         // whitespace
-    skip r"//[^\r\n]*(\r\n|\n)?", // single-line comments
-    // multi-line comments are handled by a callback: see handle_block_comment_start.
 )]
 pub enum Tok<'input> {
-    // Handle nested block comments -- this does not need its own token type and can be attached
-    // to whatever token is directly below this. The handle_block_comment_start will either Skip
-    // the matched characters or throw an error. It will never return a token.
-    // Read the doc comment above handle_block_comment_start for more information.
+    // === COMMENTS ===
+    /// A line comment starting with `//`
+    #[regex(r"//[^\r\n]*", lexer_slice)]
+    #[display("{_0}")]
+    LineComment(&'input str),
+
+    /// A block comment enclosed in `/* */` (can be nested)
     #[token("/*", handle_block_comment_start)]
+    #[display("{_0}")]
+    BlockComment(&'input str),
+
     // === ARITHMETIC OPERATORS ===
     /// The token `++`
     #[token("++")]
@@ -906,9 +909,9 @@ mod tests {
     mod comments {
         use super::*;
 
-        /// Simple single-line comments should work as expected
+        /// Simple single-line comments should be lexed as tokens
         #[test]
-        fn single_line_comments_are_skipped() {
+        fn single_line_comments_are_lexed() {
             let lexer = ZircoLexer::new(
                 concat!("a\n", "//abc\n", "b\n", "// def\n", "c // ghi\n", "// jkl",),
                 "<test>",
@@ -920,15 +923,19 @@ mod tests {
                 tokens,
                 vec![
                     spanned!(0, Tok::Identifier("a"), 1, "<test>"),
+                    spanned!(2, Tok::LineComment("//abc"), 7, "<test>"),
                     spanned!(8, Tok::Identifier("b"), 9, "<test>"),
+                    spanned!(10, Tok::LineComment("// def"), 16, "<test>"),
                     spanned!(17, Tok::Identifier("c"), 18, "<test>"),
+                    spanned!(19, Tok::LineComment("// ghi"), 25, "<test>"),
+                    spanned!(26, Tok::LineComment("// jkl"), 32, "<test>"),
                 ]
             );
         }
 
         /// Non-nested multi-line comments work as expected
         #[test]
-        fn multiline_comments_are_skipped() {
+        fn multiline_comments_are_lexed() {
             let lexer = ZircoLexer::new("a\nb/* abc */c/*\naaa\n*/d", "<test>");
             let tokens: Vec<_> = lexer
                 .map(|x| x.transpose().expect("lexing should succeed"))
@@ -938,7 +945,9 @@ mod tests {
                 vec![
                     spanned!(0, Tok::Identifier("a"), 1, "<test>"),
                     spanned!(2, Tok::Identifier("b"), 3, "<test>"),
+                    spanned!(3, Tok::BlockComment("/* abc */"), 12, "<test>"),
                     spanned!(12, Tok::Identifier("c"), 13, "<test>"),
+                    spanned!(13, Tok::BlockComment("/*\naaa\n*/"), 22, "<test>"),
                     spanned!(22, Tok::Identifier("d"), 23, "<test>"),
                 ]
             );
@@ -946,7 +955,7 @@ mod tests {
 
         /// Nested multi-line comments work as expected
         #[test]
-        fn nested_multiline_comments_are_skipped() {
+        fn nested_multiline_comments_are_lexed() {
             let lexer = ZircoLexer::new("a/* /* */ */b", "<test>"); // should lex OK
             let tokens: Vec<_> = lexer
                 .map(|x| x.transpose().expect("lexing should succeed"))
@@ -955,6 +964,7 @@ mod tests {
                 tokens,
                 vec![
                     spanned!(0, Tok::Identifier("a"), 1, "<test>"),
+                    spanned!(1, Tok::BlockComment("/* /* */ */"), 12, "<test>"),
                     spanned!(12, Tok::Identifier("b"), 13, "<test>"),
                 ]
             );
@@ -987,6 +997,12 @@ mod tests {
                 tokens,
                 vec![
                     spanned!(0, Tok::Identifier("a"), 1, "<test>"),
+                    spanned!(
+                        2,
+                        Tok::BlockComment("/* \u{30b3}\u{30e1}\u{30f3}\u{30c8} */"),
+                        20,
+                        "<test>"
+                    ),
                     spanned!(21, Tok::Identifier("b"), 22, "<test>"),
                 ]
             );

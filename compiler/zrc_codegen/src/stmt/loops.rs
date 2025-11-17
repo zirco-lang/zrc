@@ -338,8 +338,9 @@ mod tests {
                             else {
                                 // TEST: continue jumps to the header block
                                 if (get_bool()) continue;
-                                // TEST: otherwise, we proceed
-                                else {}
+                                else {
+                                    // TEST: otherwise, we proceed
+                                }
                             }
 
                             // TEST: the loop jumps back to the header block

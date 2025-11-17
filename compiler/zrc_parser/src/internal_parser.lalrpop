@@ -48,8 +48,14 @@ pub Program: Vec<Spanned<Declaration<'input>>> = Spanned<Declaration>*;
 // attach to the inner 'if' statement.
 Stmt: Stmt<'input> = {
     SpannedStmt<OpenStmt>,
-    SpannedStmt<ClosedStmt>
+    SpannedStmt<ClosedStmt>,
+    SpannedStmt<CommentStmt>,
 }
+
+CommentStmt: StmtKind<'input> = {
+    <LineComment> => StmtKind::LineComment(<>),
+    <BlockComment> => StmtKind::BlockComment(<>),
+};
 
 OpenStmt: StmtKind<'input> = {
     "if" "(" <e:Expr> ")" <s:Stmt> => StmtKind::IfStmt(e, Box::new(s), None),
@@ -125,6 +131,8 @@ MatchCase: MatchCase<'input> = {
 
 // For declarations at the global scope
 Declaration: Declaration<'input> = {
+    <LineComment> => Declaration::LineComment(<>),
+    <BlockComment> => Declaration::BlockComment(<>),
     <FunctionDeclaration>,
     <StructOrUnionDeclaration>,
     <TypeAliasDeclaration>,
@@ -400,6 +408,9 @@ extern {
     type Error = Spanned<lexer::LexicalError<'input>>;
 
     enum lexer::Tok<'input> {
+        LineComment => lexer::Tok::LineComment(<&'input str>),
+        BlockComment => lexer::Tok::BlockComment(<&'input str>),
+        
         "++" => lexer::Tok::PlusPlus,
         "--" => lexer::Tok::MinusMinus,
         "+" => lexer::Tok::Plus,

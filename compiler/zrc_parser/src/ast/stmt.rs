@@ -65,6 +65,10 @@ impl Display for MatchCase<'_> {
 /// used by the parser to represent the AST in the statement position.
 #[derive(PartialEq, Debug, Clone)]
 pub enum StmtKind<'input> {
+    /// A line comment `// ...`
+    LineComment(&'input str),
+    /// A block comment `/* ... */`
+    BlockComment(&'input str),
     /// `if (x) y` or `if (x) y else z`
     IfStmt(Expr<'input>, Box<Stmt<'input>>, Option<Box<Stmt<'input>>>),
     /// `while (x) y`
@@ -121,6 +125,7 @@ pub enum StmtKind<'input> {
 impl Display for StmtKind<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::LineComment(text) | Self::BlockComment(text) => write!(f, "{text}"),
             Self::IfStmt(cond, if_true, None) => write!(f, "if ({cond}) {if_true}"),
             Self::IfStmt(cond, if_true, Some(if_false)) => {
                 write!(f, "if ({cond}) {if_true} else {if_false}")
@@ -213,6 +218,10 @@ impl Display for StmtKind<'_> {
 /// A struct or function declaration at the top level of a file
 #[derive(PartialEq, Debug, Clone)]
 pub enum Declaration<'input> {
+    /// A line comment `// ...`
+    LineComment(&'input str),
+    /// A block comment `/* ... */`
+    BlockComment(&'input str),
     /// A declaration of a function
     FunctionDeclaration {
         /// The name of the function.
@@ -240,6 +249,7 @@ pub enum Declaration<'input> {
 impl Display for Declaration<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::LineComment(text) | Self::BlockComment(text) => write!(f, "{text}"),
             Self::FunctionDeclaration {
                 name,
                 parameters,

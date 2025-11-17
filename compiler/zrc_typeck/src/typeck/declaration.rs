@@ -39,6 +39,10 @@ pub fn process_declaration<'input>(
     declaration: AstDeclaration<'input>,
 ) -> Result<Option<TypedDeclaration<'input>>, Diagnostic> {
     Ok(match declaration {
+        AstDeclaration::LineComment(_) | AstDeclaration::BlockComment(_) => {
+            // Comments are not represented in the typed AST, skip them
+            None
+        }
         AstDeclaration::FunctionDeclaration {
             name,
             parameters,
