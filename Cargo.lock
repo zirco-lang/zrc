@@ -1697,6 +1697,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "zircop"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "derive_more",
+ "thiserror",
+ "zrc_diagnostics",
+ "zrc_parser",
+ "zrc_preprocessor",
+ "zrc_typeck",
+ "zrc_utils",
+]
+
+[[package]]
 name = "zrc"
 version = "0.1.0"
 dependencies = [
@@ -1710,6 +1725,7 @@ dependencies = [
  "zrc_parser",
  "zrc_preprocessor",
  "zrc_typeck",
+ "zrc_utils",
 ]
 
 [[package]]

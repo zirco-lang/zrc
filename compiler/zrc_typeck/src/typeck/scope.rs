@@ -1,14 +1,19 @@
 //! Scopes and other global typeck state
 
-use std::collections::HashMap;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, hash_map::IntoIter},
+    rc::Rc,
+};
 
 use indexmap::IndexMap;
+use zrc_utils::span::Span;
 
 use crate::tast::ty::{FunctionDeclarationGlobalMetadata, Type as TastType};
 
 /// Represents a typing scope: a scope that contains the mapping from a type's
 /// name to its internal [`TastType`] representation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TypeCtx<'input> {
     /// Mappings from type name to its [`TastType`]
     mappings: HashMap<&'input str, TastType<'input>>,
@@ -101,13 +106,50 @@ where
     }
 }
 
+/// Represents a singular value in a value context.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValueEntry<'input> {
+    /// The data type of the value
+    pub ty: TastType<'input>,
+    /// Whether or not the value has been utilized (accessed) yet
+    /// This is used for unused variable warnings in zircop.
+    pub used: bool,
+    /// The source span where this value was declared, for diagnostic purposes
+    pub declaration_span: Span,
+}
+impl<'input> ValueEntry<'input> {
+    /// Create a used value entry
+    #[must_use]
+    pub const fn used(ty: TastType<'input>, declaration_span: Span) -> Self {
+        Self {
+            ty,
+            used: true,
+            declaration_span,
+        }
+    }
+
+    /// Create an unused value entry
+    #[must_use]
+    pub const fn unused(ty: TastType<'input>, declaration_span: Span) -> Self {
+        Self {
+            ty,
+            used: false,
+            declaration_span,
+        }
+    }
+}
+
 /// Represents a value scope: a scope that contains the mapping from an
 /// identifier to its contained data type.
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ValueCtx<'input> {
-    /// Mappings from identifier to its contained data [`TastType`]
-    mappings: HashMap<&'input str, TastType<'input>>,
+    /// Mappings from identifier to its contained data [`TastType`].
+    ///
+    /// Each entry is stored behind an `Rc<RefCell<...>>` so that when a
+    /// subscope clones the `ValueCtx` the entries remain shared and mutations
+    /// (for example marking a variable as `used`) are visible to parent and
+    /// sibling scopes.
+    mappings: HashMap<&'input str, Rc<RefCell<ValueEntry<'input>>>>,
 }
 impl<'input> ValueCtx<'input> {
     /// Create a new empty [`ValueScope`].
@@ -123,8 +165,37 @@ impl<'input> ValueCtx<'input> {
     /// Create a new [`ValueScope`] from a [`HashMap`] mapping identifier [str]s
     /// to data types
     #[must_use]
-    pub const fn from_mappings(mappings: HashMap<&'input str, TastType<'input>>) -> Self {
-        Self { mappings }
+    pub fn from_mappings(mappings: HashMap<&'input str, ValueEntry<'input>>) -> Self {
+        Self {
+            mappings: mappings
+                .into_iter()
+                .map(|(k, v)| (k, Rc::new(RefCell::new(v))))
+                .collect(),
+        }
+    }
+
+    /// Create a new [`ValueScope`] from a [`HashMap`] mapping identifier [str]s
+    /// to data types, assuming they are all unused.
+    ///
+    /// This generates the invalid span 0..0 for all entries, so it is for
+    /// testing only.
+    #[must_use]
+    #[cfg(test)]
+    pub fn from_unused_mappings(mappings: HashMap<&'input str, TastType<'input>>) -> Self {
+        Self {
+            mappings: mappings
+                .into_iter()
+                .map(|(k, v)| {
+                    (
+                        k,
+                        Rc::new(RefCell::new(ValueEntry::unused(
+                            v,
+                            Span::from_positions_and_file(0, 0, "<test>"),
+                        ))),
+                    )
+                })
+                .collect(),
+        }
     }
 
     /// Determine if a variable exists by a given name
@@ -133,25 +204,74 @@ impl<'input> ValueCtx<'input> {
         self.mappings.contains_key(identifier)
     }
 
-    /// Determine the data [`TastType`] of a variable
     #[must_use]
-    pub fn resolve(&self, identifier: &'input str) -> Option<&TastType<'input>> {
-        self.mappings.get(identifier)
+    /// Resolve an identifier to a shared `Rc<RefCell<ValueEntry>>`.
+    ///
+    /// Returns a cloned `Rc` so callers can borrow as needed.
+    pub fn resolve(&self, identifier: &'input str) -> Option<Rc<RefCell<ValueEntry<'input>>>> {
+        self.mappings.get(identifier).cloned()
+    }
+
+    /// Access the mutable [`ValueEntry`] for a given identifier
+    /// Access the entry as a shared `Rc<RefCell<...>>` so mutation can occur
+    /// through interior mutability even if the surrounding `GlobalScope` is
+    /// immutably borrowed.
+    #[expect(clippy::needless_pass_by_ref_mut)]
+    pub fn resolve_mut(
+        &mut self,
+        identifier: &'input str,
+    ) -> Option<Rc<RefCell<ValueEntry<'input>>>> {
+        self.mappings.get(identifier).cloned()
     }
 
     /// Create a new variable with a given name and data [`TastType`]
-    pub fn insert(&mut self, identifier: &'input str, resolution: TastType<'input>) {
-        self.mappings.insert(identifier, resolution);
+    pub fn insert(&mut self, identifier: &'input str, resolution: ValueEntry<'input>) {
+        self.mappings
+            .insert(identifier, Rc::new(RefCell::new(resolution)));
+    }
+
+    /// Convert a [`HashMap`] of unused variable mappings into a value context
+    ///
+    /// This generates the invalid span 0..0 for all entries, so it is for
+    /// testing only.
+    #[must_use]
+    #[cfg(test)]
+    pub fn from_unused<T>(mappings: T) -> Self
+    where
+        T: Into<HashMap<&'input str, TastType<'input>>>,
+    {
+        Self::from_unused_mappings(mappings.into())
+    }
+
+    /// Iterate over the entries in this value context
+    pub fn iter(&self) -> impl Iterator<Item = (&'input str, Rc<RefCell<ValueEntry<'input>>>)> {
+        // Clone the Rc so the iterator yields owned `Rc<RefCell<...>>` values
+        // that callers can borrow from without borrowing `self` for the whole
+        // loop.
+        self.mappings.iter().map(|(k, v)| (*k, v.clone()))
     }
 }
 impl<'input, T> From<T> for ValueCtx<'input>
 where
-    T: Into<HashMap<&'input str, TastType<'input>>>,
+    T: Into<HashMap<&'input str, ValueEntry<'input>>>,
 {
     fn from(value: T) -> Self {
-        Self {
-            mappings: value.into(),
-        }
+        Self::from_mappings(value.into())
+    }
+}
+impl<'input> IntoIterator for ValueCtx<'input> {
+    type Item = (&'input str, ValueEntry<'input>);
+    type IntoIter = IntoIter<&'input str, ValueEntry<'input>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        // Convert the Rc<RefCell<ValueEntry>> back into owned ValueEntry
+        // values for consumers of `into_iter`.
+        let owned: HashMap<&'input str, ValueEntry<'input>> = self
+            .mappings
+            .into_iter()
+            .map(|(k, v)| (k, v.borrow().clone()))
+            .collect();
+        owned.into_iter()
     }
 }
 
@@ -159,7 +279,7 @@ where
 ///
 /// The global scope contains all of the things that must be defined at the
 /// top-level: information about function declarations, type aliases, etc.
-/// Sub-[Scope]s can then be created off of a global scope to represent a
+/// subscopes can then be created off of a global scope to represent a
 /// function or block scope, which can resolve (but not mutate) the global data.
 // Cloning this would be an error, so it does not derive [Clone].
 #[derive(Debug)]
@@ -170,7 +290,7 @@ pub struct GlobalScope<'input> {
     /// Maps every global value (static and function) to its data type
     pub global_values: ValueCtx<'input>,
 
-    /// Contains data about every global [`tast::ty::Fn`]
+    /// Contains data about every global [`crate::tast::ty::Fn`]
     pub declarations: HashMap<&'input str, FunctionDeclarationGlobalMetadata<'input>>,
 }
 impl<'input> GlobalScope<'input> {
@@ -196,7 +316,7 @@ impl<'input> GlobalScope<'input> {
         }
     }
 
-    /// Create a [Subscope] from this [`GlobalScope`].
+    /// Create a subscope from this [`GlobalScope`].
     #[must_use]
     pub fn create_subscope<'gs>(&'gs self) -> Scope<'input, 'gs> {
         Scope::from_global_scope(self)
@@ -212,12 +332,12 @@ impl Default for GlobalScope<'static> {
 /// have their own sub-scopes.
 ///
 /// Subscopes are special because they cannot declare types: they simply use the
-/// [`TypeScope`] of the [`GlobalScope`] they were created within.
+/// type context of the [`GlobalScope`] they were created within.
 ///
 /// Subscopes should only be created with the [`GlobalScope::create_subscope`]
 /// method.
 // Cloning is proper behavior for creating a subscope off of another.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Scope<'input, 'gs> {
     /// Maps every variable to its data type
     pub values: ValueCtx<'input>,

@@ -41,24 +41,20 @@
     unused_crate_dependencies,
     variant_size_differences,
     unused_qualifications,
-    clippy::unwrap_used,
-
-    // These should be enabled in any non-user-facing code, like the parser, but not in the
-    // frontend.
-    clippy::print_stderr,
-    clippy::print_stdout
+    clippy::unwrap_used
 )]
 #![allow(
     clippy::multiple_crate_versions,
     clippy::cargo_common_metadata,
     clippy::module_name_repetitions,
-    clippy::doc_comment_double_space_linebreaks
+    clippy::doc_comment_double_space_linebreaks,
+    clippy::missing_errors_doc,
+    unused_crate_dependencies
 )]
 
 pub mod diagnostic;
-mod diagnostic_kind;
-mod ext;
-
-pub use diagnostic::{Diagnostic, Severity};
-pub use diagnostic_kind::DiagnosticKind;
-pub use ext::{SpanExt, SpannedExt};
+pub mod lint;
+pub mod lints;
+pub mod pass;
+pub mod runner;
+pub mod visit;

@@ -62,12 +62,12 @@ mod build_info;
 mod cli;
 mod compile;
 mod ice;
-mod io;
 
 use anyhow::bail;
 use clap::Parser;
 use cli::{Cli, OutputFormat};
 use zrc_codegen::DebugLevel;
+use zrc_utils::io;
 
 fn main() -> anyhow::Result<()> {
     ice::setup_panic_hook();
@@ -118,7 +118,7 @@ fn main() -> anyhow::Result<()> {
 
     match result {
         Err(diagnostic) => {
-            eprintln!("{}", diagnostic.print_with_filename(&source_content, path));
+            eprintln!("{}", diagnostic.print(Some(&source_content)));
             std::process::exit(1);
         }
         Ok(x) => {

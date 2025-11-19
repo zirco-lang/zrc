@@ -184,7 +184,7 @@ fn preprocess_internal(
                 // Flush current chunk if it has content before the pragma directive
                 if !current_chunk_lines.is_empty() {
                     ctx.chunks.push(SourceChunk::new(
-                        file_name.to_string(),
+                        base_path.join(file_name).to_string_lossy().to_string(),
                         chunk_start_line,
                         chunk_start_byte,
                         current_chunk_lines.join("\n"),
@@ -199,7 +199,7 @@ fn preprocess_internal(
                 // Flush current chunk if it has content
                 if !current_chunk_lines.is_empty() {
                     ctx.chunks.push(SourceChunk::new(
-                        file_name.to_string(),
+                        base_path.join(file_name).to_string_lossy().to_string(),
                         chunk_start_line,
                         chunk_start_byte,
                         current_chunk_lines.join("\n"),
@@ -325,7 +325,7 @@ fn preprocess_internal(
     // Flush remaining chunk
     if !current_chunk_lines.is_empty() {
         ctx.chunks.push(SourceChunk::new(
-            file_name.to_string(),
+            base_path.join(file_name).to_string_lossy().to_string(),
             chunk_start_line,
             chunk_start_byte,
             current_chunk_lines.join("\n"),
@@ -346,7 +346,7 @@ mod tests {
             preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
-        assert_eq!(chunks[0].file_name, "test.zr");
+        assert_eq!(chunks[0].file_name, "./test.zr");
         assert_eq!(chunks[0].start_line, 1);
         assert_eq!(chunks[0].byte_offset, 0);
         assert_eq!(chunks[0].content, content);

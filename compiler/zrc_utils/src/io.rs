@@ -21,7 +21,11 @@ use std::{
 /// # Errors
 ///
 /// If the file cannot be opened, an error is returned.
-pub fn open_input(path: &PathBuf) -> anyhow::Result<(String, String, Box<dyn Read>)> {
+///
+/// # Panics
+///
+/// If the file name or directory name cannot be converted to a valid string.
+pub fn open_input(path: &PathBuf) -> Result<(String, String, Box<dyn Read>), io::Error> {
     if path.as_os_str() == "-" {
         Ok((
             "/dev".to_string(),
@@ -57,7 +61,7 @@ pub fn open_input(path: &PathBuf) -> anyhow::Result<(String, String, Box<dyn Rea
 /// # Errors
 ///
 /// If the file cannot be opened or created, an error is returned.
-pub fn open_output(path: &PathBuf) -> anyhow::Result<Box<dyn io::Write>> {
+pub fn open_output(path: &PathBuf) -> Result<Box<dyn io::Write>, io::Error> {
     Ok(if path.as_os_str() == "-" {
         Box::new(io::stdout())
     } else {

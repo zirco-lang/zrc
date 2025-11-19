@@ -13,21 +13,24 @@ use super::{
     cfa::{BlockReturnAbility, BlockReturnActuality},
     type_block,
 };
-use crate::tast::{
-    expr::TypedExpr,
-    stmt::{TypedStmt, TypedStmtKind},
-    ty::Type as TastType,
+use crate::{
+    tast::{
+        expr::TypedExpr,
+        stmt::{TypedStmt, TypedStmtKind},
+        ty::Type as TastType,
+    },
+    typeck::block::BlockMetadata,
 };
 
 /// Type check a switch case statement.
 #[expect(clippy::ptr_arg)]
-pub fn type_switch_case<'input>(
-    scope: &Scope<'input, '_>,
+pub fn type_switch_case<'input, 'gs>(
+    scope: &mut Scope<'input, 'gs>,
     scrutinee: Expr<'input>,
     cases: &Vec<Spanned<SwitchCase<'input>>>,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
     let mut cases = cases.clone();
     let scrutinee = type_expr(scope, scrutinee)?;
     let scrutinee_ty = scrutinee.inferred_type.clone();
@@ -42,12 +45,14 @@ pub fn type_switch_case<'input>(
         return Err(DiagnosticKind::SwitchCaseMissingTerminalDefault.error_in(stmt_span));
     };
 
-    let (default_stmt, default_ra) = type_block(
+    let default_block = type_block(
         scope,
         coerce_stmt_into_block(default_stmt.clone()),
         false,
         return_ability.clone().demote(),
     )?;
+
+    let default_ra = default_block.return_actuality;
 
     if has_duplicates(
         &(cases
@@ -89,20 +94,21 @@ pub fn type_switch_case<'input>(
                 .error_in(trigger.kind.span()));
             };
 
-            let (exec, return_status) = type_block(
+            let exec_block = type_block(
                 scope,
                 coerce_stmt_into_block(exec),
                 false,
                 return_ability.clone().demote(),
             )?;
+            let return_status = exec_block.return_actuality;
 
             Ok::<
                 (
-                    (TypedExpr<'input>, Vec<TypedStmt<'_>>),
+                    (TypedExpr<'input>, BlockMetadata<'_, '_>),
                     BlockReturnActuality,
                 ),
                 Diagnostic,
-            >(((trigger, exec), return_status))
+            >(((trigger, exec_block), return_status))
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -112,7 +118,7 @@ pub fn type_switch_case<'input>(
         TypedStmt(
             (TypedStmtKind::SwitchCase {
                 scrutinee,
-                default: default_stmt,
+                default: default_block,
                 cases,
             })
             .in_span(stmt_span),
@@ -123,14 +129,14 @@ pub fn type_switch_case<'input>(
 
 /// Desugar and type check a match statement.
 #[expect(clippy::too_many_lines, clippy::needless_pass_by_value)]
-pub fn type_match<'input>(
-    scope: &Scope<'input, '_>,
+pub fn type_match<'input, 'gs>(
+    scope: &mut Scope<'input, 'gs>,
     scrutinee: Expr<'input>,
     cases: Vec<Spanned<MatchCase<'input>>>,
     can_use_break_continue: bool,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
     // The following code:
     // fn takes_i32(x: i32);
     // fn takes_i64(x: i64);
@@ -327,15 +333,17 @@ pub fn type_match<'input>(
     ));
 
     // Recursively type check the desugared switch statement
-    let (typed_switch, switch_return_actuality) = type_block(
+    let typed_switch_block = type_block(
         scope,
         Spanned::from_span_and_value(stmt_span, vec![switch_stmt.clone()]),
         can_use_break_continue,
         return_ability.clone().demote(),
     )?;
 
+    let switch_return_actuality = typed_switch_block.return_actuality;
+
     Ok(Some((
-        TypedStmt(TypedStmtKind::BlockStmt(typed_switch).in_span(stmt_span)),
+        TypedStmt(TypedStmtKind::BlockStmt(typed_switch_block).in_span(stmt_span)),
         switch_return_actuality,
     )))
 }

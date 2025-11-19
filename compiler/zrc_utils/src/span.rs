@@ -142,6 +142,13 @@ impl<T> Spanned<T> {
         self.span().containing(f(self.into_value()))
     }
 
+    /// Applies a function to a reference to the contained value, returning a
+    /// new [`Spanned<T>`] instance with the same associated [`Span`]
+    #[inline]
+    pub fn map_ref<U>(&self, f: impl FnOnce(&T) -> U) -> Spanned<U> {
+        self.span().containing(f(self.value()))
+    }
+
     /// "Strips" the [`Spanned<T>`] of its [`Span`], returning the inner value
     ///
     /// This differs from [`Spanned::value`] because it consumes the

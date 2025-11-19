@@ -117,15 +117,24 @@ pub fn type_expr_char_literal<'input>(
 
 /// Resolve an identifier
 pub fn type_expr_identifier<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr_span: Span,
     i: &'input str,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    let ty = scope.values.resolve(i).ok_or_else(|| {
+    let ty_rc = scope.values.resolve_mut(i).ok_or_else(|| {
         DiagnosticKind::UnableToResolveIdentifier(i.to_string()).error_in(expr_span)
     })?;
+
+    // Mark as used and clone the type to return. Use a short-lived borrow
+    // so we don't keep the RefCell borrow across the function return.
+    let inferred_type = {
+        let mut ty = ty_rc.borrow_mut();
+        ty.used = true;
+        ty.ty.clone()
+    };
+
     Ok(TypedExpr {
-        inferred_type: ty.clone(),
+        inferred_type,
         kind: TypedExprKind::Identifier(i).in_span(expr_span),
     })
 }

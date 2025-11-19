@@ -1,7 +1,7 @@
 //! Code generation for switch statements
 
 use inkwell::{basic_block::BasicBlock, debug_info::DILexicalBlock};
-use zrc_typeck::tast::{expr::TypedExpr, stmt::TypedStmt};
+use zrc_typeck::{tast::expr::TypedExpr, typeck::BlockMetadata};
 use zrc_utils::span::{Span, Spannable};
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
 
 /// Code generates a switch statement
 #[expect(clippy::too_many_arguments, clippy::ref_option)]
-pub fn cg_switch_stmt<'ctx, 'input, 'a>(
+pub fn cg_switch_stmt<'ctx, 'input, 'gs, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     mut bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'input, 'ctx>,
@@ -23,8 +23,8 @@ pub fn cg_switch_stmt<'ctx, 'input, 'a>(
     breakaway: &Option<LoopBreakaway<'ctx>>,
     stmt_span: Span,
     scrutinee: TypedExpr<'input>,
-    default: Vec<TypedStmt<'input>>,
-    cases: Vec<(TypedExpr<'input>, Vec<TypedStmt<'input>>)>,
+    default: BlockMetadata<'input, 'gs>,
+    cases: Vec<(TypedExpr<'input>, BlockMetadata<'input, 'gs>)>,
 ) -> BasicBlock<'ctx> {
     let expr_cg = BlockCtx::new(cg, scope, lexical_block);
 

@@ -17,15 +17,15 @@ use crate::tast::{
 
 /// Type check an if statement.
 #[expect(clippy::needless_pass_by_value)]
-pub fn type_if<'input>(
-    scope: &Scope<'input, '_>,
+pub fn type_if<'input, 'gs>(
+    scope: &mut Scope<'input, 'gs>,
     cond: Expr<'input>,
     then: Box<Stmt<'input>>,
     then_else: Option<Box<Stmt<'input>>>,
     can_use_break_continue: bool,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
     // TODO: if `cond` is always true at compile-time, we can prove the
     // if branch is always taken (hence
     // if it's WillReturn we can be WillReturn
@@ -45,14 +45,15 @@ pub fn type_if<'input>(
         .error_in(cond_span));
     }
 
-    let (typed_then, then_return_actuality) = type_block(
+    let typed_then = type_block(
         scope,
         coerce_stmt_into_block(*then),
         can_use_break_continue,
         return_ability.clone().demote(),
     )?;
+    let then_act = typed_then.return_actuality;
 
-    let (typed_then_else, then_else_return_actuality) = then_else
+    let typed_then_else = then_else
         .clone()
         .map(|then_else| {
             type_block(
@@ -62,8 +63,10 @@ pub fn type_if<'input>(
                 return_ability.clone().demote(),
             )
         })
-        .transpose()?
-        .unzip();
+        .transpose()?;
+    let te_act = typed_then_else
+        .as_ref()
+        .map_or(BlockReturnActuality::NeverReturns, |te| te.return_actuality);
 
     Ok(Some((
         TypedStmt(
@@ -75,9 +78,6 @@ pub fn type_if<'input>(
             )
             .in_span(stmt_span),
         ),
-        BlockReturnActuality::join(
-            then_return_actuality,
-            then_else_return_actuality.unwrap_or(BlockReturnActuality::NeverReturns),
-        ),
+        BlockReturnActuality::join(then_act, te_act),
     )))
 }

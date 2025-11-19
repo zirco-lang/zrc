@@ -13,7 +13,7 @@ use crate::tast::expr::{TypedExpr, TypedExprKind};
 
 /// Typeck and desugar an assignment expr
 pub fn type_expr_assignment<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr_span: Span,
     mode: Assignment,
     place: Expr<'input>,

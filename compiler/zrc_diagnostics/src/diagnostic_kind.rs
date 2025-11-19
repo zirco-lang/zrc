@@ -12,7 +12,7 @@ use crate::{Diagnostic, Severity};
 // These remain as Strings, not 'input str slices, to avoid circular dependencies (it's either use
 // String, or use Tok, because str would be to-string()d from some tokens)
 #[expect(missing_docs)]
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
 pub enum DiagnosticKind {
     // LEXER ERRORS
     #[error("unknown token `{0}`")]

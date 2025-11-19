@@ -24,7 +24,7 @@ use crate::tast::expr::TypedExpr;
 /// # Errors
 /// Errors if a type checker error is encountered.
 pub fn type_expr<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let expr_span = expr.0.span();
@@ -104,7 +104,7 @@ mod tests {
     #[expect(clippy::too_many_lines)]
     fn various_expressions_infer_correctly() {
         let scope = GlobalScope {
-            global_values: ValueCtx::from_mappings(HashMap::from([
+            global_values: ValueCtx::from_unused_mappings(HashMap::from([
                 ("i8", TastType::I8),
                 ("u8", TastType::U8),
                 ("i32", TastType::I32),
@@ -396,7 +396,7 @@ mod tests {
         for (input, expected_result) in tests {
             assert_eq!(
                 type_expr(
-                    &scope.create_subscope(),
+                    &mut scope.create_subscope(),
                     zrc_parser::parser::parse_expr(input, "<test>")
                         .expect("parsing should succeed")
                 )

@@ -22,7 +22,7 @@ use crate::{
 
 /// Typeck a comma expr
 pub fn type_expr_comma<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr_span: Span,
     lhs: Expr<'input>,
     rhs: Expr<'input>,
@@ -37,7 +37,7 @@ pub fn type_expr_comma<'input>(
 
 /// Typeck a ternary expr
 pub fn type_expr_ternary<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr_span: Span,
     cond: Expr<'input>,
     if_true: Expr<'input>,
@@ -107,7 +107,7 @@ pub fn type_expr_ternary<'input>(
 
 /// Typeck a cast expr
 pub fn type_expr_cast<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr_span: Span,
     x: Expr<'input>,
     ty: Type<'input>,
@@ -186,7 +186,7 @@ pub fn type_expr_size_of_type<'input>(
 
 /// Typeck a sizeof(T) expr
 pub fn type_expr_size_of_expr<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -202,7 +202,7 @@ pub fn type_expr_size_of_expr<'input>(
 /// Typeck a struct construction expr
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
 pub fn type_expr_struct_construction<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &mut Scope<'input, '_>,
     expr_span: Span,
     ty: Type<'input>,
     fields: &zrc_utils::span::Spanned<
@@ -456,7 +456,7 @@ mod tests {
     fn sizeof_expr_works_as_expected() {
         assert_eq!(
             type_expr(
-                &GlobalScope::new().create_subscope(),
+                &mut GlobalScope::new().create_subscope(),
                 Expr::build_sizeof_expr(
                     Span::from_positions_and_file(0, 9, "<test>"),
                     Expr::build_number(spanned_test!(8, NumberLiteral::Decimal("1"), 9), None)

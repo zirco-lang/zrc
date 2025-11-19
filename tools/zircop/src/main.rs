@@ -41,24 +41,64 @@
     unused_crate_dependencies,
     variant_size_differences,
     unused_qualifications,
-    clippy::unwrap_used,
-
-    // These should be enabled in any non-user-facing code, like the parser, but not in the
-    // frontend.
-    clippy::print_stderr,
-    clippy::print_stdout
+    clippy::unwrap_used
 )]
 #![allow(
     clippy::multiple_crate_versions,
     clippy::cargo_common_metadata,
+    unused_crate_dependencies,
     clippy::module_name_repetitions,
-    clippy::doc_comment_double_space_linebreaks
+    clippy::doc_comment_double_space_linebreaks,
+    clippy::missing_errors_doc
 )]
 
-pub mod diagnostic;
-mod diagnostic_kind;
-mod ext;
+mod cli;
 
-pub use diagnostic::{Diagnostic, Severity};
-pub use diagnostic_kind::DiagnosticKind;
-pub use ext::{SpanExt, SpannedExt};
+use std::{path::Path, process};
+
+use anyhow::bail;
+use clap::Parser;
+use cli::Cli;
+use zircop::runner;
+use zrc_utils::io;
+
+fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+
+    let Some(ref path) = cli.path else {
+        bail!("Error: No input file specified.");
+    };
+
+    let (directory_name, file_name, mut input) = io::open_input(path)?;
+
+    let mut source_content = String::new();
+    input.read_to_string(&mut source_content)?;
+
+    let diagnostics = runner::run_with_default_passes(
+        cli::get_include_paths(&cli),
+        Path::new(&directory_name),
+        &file_name,
+        &source_content,
+    );
+
+    match diagnostics {
+        Err(diagnostic) => {
+            eprintln!("{}", diagnostic.print(Some(&source_content)));
+            eprintln!("The above error originated from zrc - this is not a Zircop lint.");
+            process::exit(1);
+        }
+        Ok(diagnostics) => {
+            for diag in &diagnostics {
+                eprintln!("{}", diag.print(Some(&source_content)));
+            }
+
+            println!("Linting complete: {} issue(s) found.", diagnostics.len());
+
+            if !diagnostics.is_empty() {
+                process::exit(1);
+            }
+        }
+    }
+
+    Ok(())
+}
