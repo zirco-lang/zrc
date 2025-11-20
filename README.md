@@ -20,6 +20,13 @@ As of now, Zirco uses a C-like set of semantics with Rusty syntax.
 
 This repository contains the entire Zirco compiler and all of its development work, including language-related proposals.
 
+## Toolchain Installation via Zircon
+
+Zirco can be installed via the Zircon toolchain installer. For more information, visit the
+[Zircon GitHub repository](https://github.com/zirco-lang/zircon).
+
+If you aim to contribute to the Zirco compiler itself, please follow the instructions below.
+
 ## Getting Started
 
 **New to Zirco?** Check out our comprehensive [Getting Started Guide](./docs/GETTING_STARTED.md) for step-by-step instructions on:
@@ -40,9 +47,9 @@ For experienced developers who want to get running quickly:
     # Rust toolchain (if not already installed)
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-    # LLVM 20 with Polly (Ubuntu/Debian)
+    # LLVM 20 with Polly + other dependencies (Ubuntu/Debian)
     sudo apt-get update
-    sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20
+    sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20 build-essential libssl-dev pkg-config libzstd-dev
     ```
 
 2. **Clone and build:**
@@ -91,137 +98,7 @@ all internal libraries and `zrc` is given version `0.1.0` until we begin maintai
 
 ## Contributing
 
-Contributions to Zirco are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for more information on how to contribute to the project.
-
-## Frequently Asked Questions (FAQ)
-
-### General Questions
-
-**Q: What is Zirco?**  
-A: Zirco is an experimental compiled programming language with a strong type system and modern syntax. It uses LLVM for code generation and is implemented in Rust.
-
-**Q: Is Zirco production-ready?**  
-A: No. Zirco is currently unstable and under active development. There are **NO STABILITY GUARANTEES** on the current version. Internal APIs may change, and Zirco code may fail to build on different `zrc` versions.
-
-**Q: What platforms does Zirco support?**  
-A: Zirco is primarily developed and tested on Linux and WSL, but it should work on Windows as well. The compiler can target any platform supported by LLVM through the `--target` flag.
-
-### Installation & Building
-
-**Q: What are the prerequisites for building Zirco?**  
-A: You need:
-
--   Git (to clone the repository)
--   An up-to-date stable Rust toolchain (`rustc` and `cargo` via [rustup](https://rustup.rs))
--   LLVM 20 static or dynamic library (including Polly)
--   For linting/formatting: Rust nightly toolchain with clippy and rustfmt components
-
-**Q: I'm getting a "could not find native static library `Polly`" error. How do I fix it?**  
-A: Install the LLVM 20 development libraries with Polly support:
-
-```bash
-sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20
-```
-
-**Q: How do I build the compiler?**  
-A: Clone the repository and run:
-
-```bash
-git clone https://github.com/zirco-lang/zrc
-cd zrc
-cargo build
-```
-
-For a release build, use `cargo build --release`.
-
-**Q: How do I install `zrc` to my system?**  
-A: Run `cargo install --path compiler/zrc` to install `zrc` to your Cargo `$PATH`.
-
-**Q: LLVM is not being found. What should I do?**  
-A: If LLVM 20 is installed but not found, try setting the environment variable:
-
-```bash
-export LLVM_SYS_201_PREFIX=/usr/lib/llvm-20
-cargo build
-```
-
-### Usage
-
-**Q: How do I compile a Zirco program?**  
-A: Use `zrc` (or `cargo run --` if not installed):
-
-```bash
-zrc main.zr                    # Emits LLVM IR to stdout
-zrc --emit object -o main.o main.zr  # Compiles to object file
-```
-
-**Q: What output formats does the compiler support?**  
-A: The compiler supports multiple output formats via the `--emit` flag:
-
--   `llvm` (default) - LLVM IR
--   `object` - Object file (.o)
--   `asm` - Assembly
--   `ast`, `ast-debug`, `ast-debug-pretty` - AST representations
--   `tast-debug`, `tast-debug-pretty` - Typed AST representations
-
-**Q: How can I see available compiler options?**  
-A: Run `zrc --help` for a complete list of options, including optimization levels, target selection, and debugging flags.
-
-**Q: Where can I find example programs?**  
-A: Check the `examples/` directory, which contains working examples like `hello_world`, `fibonacci`, `struct_construction`, and more. You can run all examples with `make -C examples test`.
-
-### Development & Contributing
-
-**Q: How do I run the test suite?**  
-A: Run `cargo test` to execute all tests.
-
-**Q: How do I lint and format my code?**  
-A: The project requires nightly Rust for linting and formatting:
-
-```bash
-cargo +nightly clippy --all-targets -- -D warnings
-cargo +nightly fmt
-```
-
-Both commands must pass before committing.
-
-**Q: CI is failing on clippy or fmt. What should I do?**  
-A: Make sure you're using the nightly toolchain for these commands. Install it with `rustup toolchain install nightly --component clippy --component rustfmt`, then run the commands above.
-
-**Q: What coding standards does the project follow?**  
-A: The project uses extremely strict clippy lints, including requirements for documentation on all items (even private ones). All code must be properly documented, and `unwrap()`, `todo!()`, and `unimplemented!()` are forbidden. Check `compiler/zrc/src/main.rs` for the complete lint configuration.
-
-**Q: How does the compiler pipeline work?**  
-A: The compiler follows a traditional pipeline:
-
-1. **Lexer** (`zrc_parser`) - Tokenization
-2. **Parser** (`zrc_parser`) - AST generation using LALRPOP
-3. **Type Checker** (`zrc_typeck`) - Semantic analysis producing a Typed AST (TAST)
-4. **Code Generator** (`zrc_codegen`) - LLVM IR generation using inkwell
-
-For a detailed explanation of each stage, see [docs/COMPILER_PIPELINE.md](./docs/COMPILER_PIPELINE.md).
-
-**Q: Where can I find the language specification?**  
-A: See [docs/SPEC.md](./docs/SPEC.md) for a comprehensive guide to Zirco's syntax, semantics, and behavior.
-
-### Troubleshooting
-
-**Q: Build times are slow. Is this normal?**  
-A: Yes. The first clean build takes ~40-45 seconds due to LLVM dependencies. Incremental builds are much faster (~1-2 seconds).
-
-**Q: Tests are failing that seem unrelated to my changes. What should I do?**  
-A: The project may have pre-existing issues. Focus on ensuring your changes don't introduce new failures. If you're unsure, ask in the issue or PR discussion.
-
-**Q: I found a bug or have a feature request. Where should I report it?**  
-A: Please [create an issue](https://github.com/zirco-lang/zrc/issues/new/choose) on GitHub. For suggestions, it's recommended to discuss them in an issue before starting work.
-
-**Q: How do I get help with the project?**  
-A: You can:
-
--   Open a GitHub issue for bugs or feature requests
--   Start a GitHub discussion for general questions
--   Check the [CONTRIBUTING.md](./CONTRIBUTING.md) guide
--   For sensitive matters, email [logan@zirco.dev](mailto:logan@zirco.dev]
+Contributions to Zirco are welcome! Please read [CONTRIBUTING.md](./.github/CONTRIBUTING.md) for more information on how to contribute to the project.
 
 ## Licence & Contact
 
