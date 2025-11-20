@@ -12,7 +12,7 @@ Welcome to Zirco! This guide will help you get up and running with the Zirco pro
 
 ## Prerequisites
 
-Before you begin, you'll need to install several tools and libraries. Zirco works best on Linux or WSL (Windows Subsystem for Linux), but it should also work on macOS and Windows.
+Before you begin, you'll need to install several tools and libraries. Zirco works best on Linux or WSL (Windows Subsystem for Linux), but it can also be built on macOS with some additional configuration. Zirco is not currently supported on native Windows.
 
 ### 1. Git
 
@@ -31,9 +31,6 @@ sudo apt-get install -y git
 # Using Homebrew
 brew install git
 ```
-
-**Windows:**
-Download and install from [git-scm.com](https://git-scm.com/)
 
 ### 2. Rust Toolchain
 
@@ -58,58 +55,33 @@ cargo --version
 
 You should see version information for both commands.
 
-### 3. LLVM 16 with Polly
+### 3. LLVM dependencies
 
-Zirco's code generator relies on LLVM 16 for compilation. You need the LLVM static or dynamic library with Polly support.
+Zirco's code generator relies on LLVM 20 for compilation. You need the LLVM static or dynamic library with Polly support.
 
 **Linux (Ubuntu/Debian):**
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
+sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20 build-essential libssl-dev pkg-config libzstd-dev
 ```
 
 **macOS:**
 
 ```bash
-brew install llvm@16
+brew install llvm@20
 ```
 
 After installation on macOS, you may need to set the LLVM prefix:
 
 ```bash
-export LLVM_SYS_160_PREFIX=$(brew --prefix llvm@16)
+export LLVM_SYS_201_PREFIX=$(brew --prefix llvm@20)
 ```
 
 **Windows:**
 LLVM installation on Windows is more complex. We recommend using WSL (Windows Subsystem for Linux) for the best experience.
 
-### 4. C Compiler (Clang or GCC)
-
-You'll need a C compiler to link the compiled object files.
-
-**Linux (Ubuntu/Debian):**
-
-```bash
-sudo apt-get install -y clang
-# or
-sudo apt-get install -y gcc
-```
-
-**macOS:**
-Xcode Command Line Tools include clang:
-
-```bash
-xcode-select --install
-```
-
-**Windows (WSL):**
-
-```bash
-sudo apt-get install -y clang
-```
-
-### 5. Optional: Rust Nightly (for Development)
+### 4. Optional: Rust Nightly (for Development)
 
 If you plan to contribute to Zirco or run linting/formatting tools, install the nightly toolchain:
 
@@ -118,6 +90,10 @@ rustup toolchain install nightly --component clippy --component rustfmt
 ```
 
 ## Installation
+
+### Alternative Method: Using Zircon Toolchain Installer
+
+If you prefer a simpler installation and do not plan on contributing to Zirco, you can install it using the Zircon toolchain installer. For more information, visit the [Zircon GitHub repository](https://github.com/zirco-lang/zircon).
 
 ### Step 1: Clone the Repository
 
