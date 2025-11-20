@@ -75,6 +75,12 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
                     .to_string(),
                 "<stdin>",
             ),
+            "<unknown>" => (
+                piped_source
+                    .expect("piped source must be provided for <unknown>")
+                    .to_string(),
+                "<unknown>",
+            ),
             path => {
                 let source = std::fs::read_to_string(path)
                     .unwrap_or_else(|_| panic!("failed to read source file {path} for diagnostic"));
