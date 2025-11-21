@@ -58,3 +58,24 @@ impl<'input> SyntacticVisit<'input> for Visit {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+    use zrc_utils::spanned_test;
+
+    use super::*;
+    use crate::zircop_lint_test;
+
+    zircop_lint_test! {
+        name: empty_struct_declaration,
+        source: indoc!{"
+            struct EmptyStruct {}
+        "},
+        diagnostics: vec![
+            LintDiagnostic::new(
+                spanned_test!(0, LintDiagnosticKind::EmptyStructUsed, 21)
+            ),
+        ]
+    }
+}
