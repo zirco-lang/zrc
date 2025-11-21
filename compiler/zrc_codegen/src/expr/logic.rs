@@ -86,7 +86,9 @@ pub fn cg_comparison<'ctx, 'input>(
 
 /// Code generate a logical AND expression
 pub fn cg_logical_and<'ctx, 'input>(
-    CgExprArgs { cg, mut bb, .. }: CgExprArgs<'ctx, 'input, '_>,
+    CgExprArgs {
+        cg, bb: mut top_bb, ..
+    }: CgExprArgs<'ctx, 'input, '_>,
     lhs: Box<TypedExpr<'input>>,
     rhs: Box<TypedExpr<'input>>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
@@ -103,14 +105,10 @@ pub fn cg_logical_and<'ctx, 'input>(
     //   ; If we branched from land_rhs, result is whatever rhs evaluated to
     //   %result = phi i1 [ false, %entry ], [ %rhs, %land_rhs ]
 
-    let top_bb = cg
-        .builder
-        .get_insert_block()
-        .expect("should be in a basic block");
-    let land_rhs_bb = cg.ctx.append_basic_block(cg.fn_value, "land_rhs");
+    let mut land_rhs_bb = cg.ctx.append_basic_block(cg.fn_value, "land_rhs");
     let land_end_bb = cg.ctx.append_basic_block(cg.fn_value, "land_end");
 
-    let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
+    let lhs = unpack!(top_bb = cg_expr(cg, top_bb, *lhs));
 
     cg.builder
         .build_conditional_branch(lhs.into_int_value(), land_rhs_bb, land_end_bb)
@@ -119,7 +117,7 @@ pub fn cg_logical_and<'ctx, 'input>(
         );
     cg.builder.position_at_end(land_rhs_bb);
 
-    let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
+    let rhs = unpack!(land_rhs_bb = cg_expr(cg, land_rhs_bb, *rhs));
 
     cg.builder
         .build_unconditional_branch(land_end_bb)
@@ -136,12 +134,14 @@ pub fn cg_logical_and<'ctx, 'input>(
         (&rhs, land_rhs_bb),
     ]);
 
-    bb.and(reg.as_basic_value())
+    land_end_bb.and(reg.as_basic_value())
 }
 
 /// Code generate a logical OR expression
 pub fn cg_logical_or<'ctx, 'input>(
-    CgExprArgs { cg, mut bb, .. }: CgExprArgs<'ctx, 'input, '_>,
+    CgExprArgs {
+        cg, bb: mut top_bb, ..
+    }: CgExprArgs<'ctx, 'input, '_>,
     lhs: Box<TypedExpr<'input>>,
     rhs: Box<TypedExpr<'input>>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
@@ -158,14 +158,10 @@ pub fn cg_logical_or<'ctx, 'input>(
     //   ; If we branched from lor_rhs, result is whatever rhs evaluated to
     //   %result = phi i1 [ true, %entry ], [ %rhs, %lor_rhs ]
 
-    let top_bb = cg
-        .builder
-        .get_insert_block()
-        .expect("should be in a basic block");
-    let lor_rhs_bb = cg.ctx.append_basic_block(cg.fn_value, "lor_rhs");
+    let mut lor_rhs_bb = cg.ctx.append_basic_block(cg.fn_value, "lor_rhs");
     let lor_end_bb = cg.ctx.append_basic_block(cg.fn_value, "lor_end");
 
-    let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
+    let lhs = unpack!(top_bb = cg_expr(cg, top_bb, *lhs));
     cg.builder
         .build_conditional_branch(lhs.into_int_value(), lor_end_bb, lor_rhs_bb)
         .expect(
@@ -173,7 +169,7 @@ pub fn cg_logical_or<'ctx, 'input>(
         );
     cg.builder.position_at_end(lor_rhs_bb);
 
-    let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
+    let rhs = unpack!(lor_rhs_bb = cg_expr(cg, lor_rhs_bb, *rhs));
     cg.builder
         .build_unconditional_branch(lor_end_bb)
         .expect("unconditional branch to logical OR end block should have compiled successfully");
@@ -189,7 +185,7 @@ pub fn cg_logical_or<'ctx, 'input>(
         (&rhs, lor_rhs_bb),
     ]);
 
-    bb.and(reg.as_basic_value())
+    lor_end_bb.and(reg.as_basic_value())
 }
 
 /// Code generate a logical expression
