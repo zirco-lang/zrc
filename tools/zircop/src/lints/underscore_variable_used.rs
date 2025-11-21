@@ -85,3 +85,31 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit<'input> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+    use zrc_utils::spanned_test;
+
+    use super::*;
+    use crate::zircop_lint_test;
+
+    zircop_lint_test! {
+        name: underscore_variable_used_lints_properly,
+        source: indoc!{"
+            fn f() -> i32 {
+                let _used = 10;
+                return _used;
+            }
+        "},
+        diagnostics: vec![
+            LintDiagnostic::new(
+                spanned_test!(
+                    24,
+                    LintDiagnosticKind::UnderscoreVariableUsed("_used".to_string()),
+                    34
+                )
+            ),
+        ]
+    }
+}

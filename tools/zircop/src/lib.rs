@@ -57,4 +57,6 @@ pub mod lint;
 pub mod lints;
 pub mod pass;
 pub mod runner;
+#[cfg(test)]
+pub mod test_utils;
 pub mod visit;
