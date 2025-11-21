@@ -111,29 +111,29 @@ where
 pub struct ValueEntry<'input> {
     /// The data type of the value
     pub ty: TastType<'input>,
-    /// Whether or not the value has been utilized (accessed) yet
-    /// This is used for unused variable warnings in zircop.
-    pub used: bool,
+    /// List of span locations where this value has been referenced.
+    /// This is used for unused variable warnings in zircop and for future use in a language server.
+    pub referenced_spans: Vec<Span>,
     /// The source span where this value was declared, for diagnostic purposes
     pub declaration_span: Span,
 }
 impl<'input> ValueEntry<'input> {
-    /// Create a used value entry
+    /// Create a used value entry with an initial reference span
     #[must_use]
-    pub const fn used(ty: TastType<'input>, declaration_span: Span) -> Self {
+    pub fn used(ty: TastType<'input>, declaration_span: Span, reference_span: Span) -> Self {
         Self {
             ty,
-            used: true,
+            referenced_spans: vec![reference_span],
             declaration_span,
         }
     }
 
     /// Create an unused value entry
     #[must_use]
-    pub const fn unused(ty: TastType<'input>, declaration_span: Span) -> Self {
+    pub fn unused(ty: TastType<'input>, declaration_span: Span) -> Self {
         Self {
             ty,
-            used: false,
+            referenced_spans: Vec::new(),
             declaration_span,
         }
     }
