@@ -283,7 +283,27 @@ fn cg_program_without_optimization<'ctx>(
             );
             (Some(dbg), Some(cu))
         }
-        DWARFEmissionKind::LineTablesOnly | DWARFEmissionKind::None => (None, None),
+        DWARFEmissionKind::LineTablesOnly => {
+            let (dbg, cu) = module.create_debug_info_builder(
+                true,
+                DWARFSourceLanguage::C,
+                file_name,
+                parent_directory,
+                frontend_version_string,
+                false,
+                cli_args,
+                0,
+                "",
+                DWARFEmissionKind::LineTablesOnly,
+                0,
+                false,
+                false,
+                "",
+                "",
+            );
+            (Some(dbg), Some(cu))
+        }
+        DWARFEmissionKind::None => (None, None),
     };
 
     let unit = CompilationUnitCtx {
