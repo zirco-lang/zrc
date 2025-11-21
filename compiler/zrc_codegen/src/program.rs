@@ -250,11 +250,14 @@ fn cg_program_without_optimization<'ctx>(
     let module = ctx.create_module(file_name);
 
     let debug_metadata_version = ctx.i32_type().const_int(3, false);
-    module.add_basic_value_flag(
-        "Debug Info Version",
-        FlagBehavior::Warning,
-        debug_metadata_version,
-    );
+
+    if debug_level != DWARFEmissionKind::None {
+        module.add_basic_value_flag(
+            "Debug Info Version",
+            FlagBehavior::Warning,
+            debug_metadata_version,
+        );
+    }
 
     let (dbg_builder, compilation_unit) = match debug_level {
         DWARFEmissionKind::Full => {
