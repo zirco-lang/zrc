@@ -49,13 +49,13 @@ pub trait AsCompilationUnitCtx<'ctx: 'a, 'a> {
     /// The LLVM builder for debug info
     ///
     /// This is useful for creating debug info metadata.
-    fn dbg_builder(&self) -> &'a DebugInfoBuilder<'ctx> {
+    fn dbg_builder(&self) -> Option<&'a DebugInfoBuilder<'ctx>> {
         self.as_unit_ctx().dbg_builder
     }
     /// The LLVM compile unit for debug info
     ///
     /// This is useful for creating debug info metadata.
-    fn compilation_unit(&self) -> &'a DICompileUnit<'ctx> {
+    fn compilation_unit(&self) -> Option<&'a DICompileUnit<'ctx>> {
         self.as_unit_ctx().compilation_unit
     }
     /// The LLVM module we are building in
@@ -84,9 +84,9 @@ pub struct CompilationUnitCtx<'ctx, 'a> {
     /// The lookup for lines in the source file
     pub line_lookup: &'a LineLookup,
     /// The LLVM builder for debug info
-    pub dbg_builder: &'a DebugInfoBuilder<'ctx>,
+    pub dbg_builder: Option<&'a DebugInfoBuilder<'ctx>>,
     /// The LLVM compile unit for debug info
-    pub compilation_unit: &'a DICompileUnit<'ctx>,
+    pub compilation_unit: Option<&'a DICompileUnit<'ctx>>,
     /// The LLVM module we are building in
     pub module: &'a Module<'ctx>,
 }
@@ -115,9 +115,9 @@ pub struct FunctionCtx<'ctx, 'a> {
     /// The lookup for lines in the source file
     pub line_lookup: &'a LineLookup,
     /// The LLVM builder for debug info
-    pub dbg_builder: &'a DebugInfoBuilder<'ctx>,
+    pub dbg_builder: Option<&'a DebugInfoBuilder<'ctx>>,
     /// The LLVM compile unit for debug info
-    pub compilation_unit: &'a DICompileUnit<'ctx>,
+    pub compilation_unit: Option<&'a DICompileUnit<'ctx>>,
     /// The LLVM module we are building in
     pub module: &'a Module<'ctx>,
 
@@ -177,9 +177,9 @@ pub struct BlockCtx<'ctx, 'input, 'a> {
     /// The lookup for lines in the source file
     pub line_lookup: &'a LineLookup,
     /// The LLVM builder for debug info
-    pub dbg_builder: &'a DebugInfoBuilder<'ctx>,
+    pub dbg_builder: Option<&'a DebugInfoBuilder<'ctx>>,
     /// The LLVM compile unit for debug info
-    pub compilation_unit: &'a DICompileUnit<'ctx>,
+    pub compilation_unit: Option<&'a DICompileUnit<'ctx>>,
     /// The LLVM module we are building in
     pub module: &'a Module<'ctx>,
 
@@ -190,7 +190,7 @@ pub struct BlockCtx<'ctx, 'input, 'a> {
     /// The code generation type/value scope this block lives in
     pub scope: &'a CgScope<'input, 'ctx>,
     /// The LLVM [`DILexicalBlock`] we're currently in
-    pub dbg_scope: DILexicalBlock<'ctx>,
+    pub dbg_scope: Option<DILexicalBlock<'ctx>>,
 }
 impl<'ctx, 'a> AsCompilationUnitCtx<'ctx, 'a> for BlockCtx<'ctx, '_, 'a> {
     fn as_unit_ctx(&self) -> CompilationUnitCtx<'ctx, 'a> {
@@ -211,7 +211,7 @@ impl<'ctx, 'input, 'a> BlockCtx<'ctx, 'input, 'a> {
     pub const fn new(
         function_ctx: FunctionCtx<'ctx, 'a>,
         scope: &'a CgScope<'input, 'ctx>,
-        dbg_scope: DILexicalBlock<'ctx>,
+        dbg_scope: Option<DILexicalBlock<'ctx>>,
     ) -> Self {
         Self {
             ctx: function_ctx.ctx,

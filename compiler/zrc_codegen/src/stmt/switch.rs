@@ -19,7 +19,7 @@ pub fn cg_switch_stmt<'ctx, 'input, 'gs, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     mut bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'input, 'ctx>,
-    lexical_block: DILexicalBlock<'ctx>,
+    lexical_block: Option<DILexicalBlock<'ctx>>,
     breakaway: &Option<LoopBreakaway<'ctx>>,
     stmt_span: Span,
     scrutinee: TypedExpr<'input>,

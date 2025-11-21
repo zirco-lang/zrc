@@ -32,14 +32,14 @@ use crate::ctx::AsCompilationUnitCtx;
 pub fn create_fn<'ctx: 'a, 'a>(
     ctx: &impl AsCompilationUnitCtx<'ctx, 'a>,
     ty: AnyTypeEnum<'ctx>,
-    dbg_ty: DIType<'ctx>,
+    dbg_ty: Option<DIType<'ctx>>,
     args: &[BasicMetadataTypeEnum<'ctx>],
-    dbg_args: &[DIType<'ctx>],
+    dbg_args: Option<&[DIType<'ctx>]>,
     is_variadic: bool,
 ) -> (
     FunctionType<'ctx>,
-    DISubroutineType<'ctx>,
-    DIBasicType<'ctx>,
+    Option<DISubroutineType<'ctx>>,
+    Option<DIBasicType<'ctx>>,
 ) {
     (
         match ty {
@@ -53,15 +53,19 @@ pub fn create_fn<'ctx: 'a, 'a>(
             AnyTypeEnum::FunctionType(_) => panic!("fn is not a valid return type for a function"),
             AnyTypeEnum::ScalableVectorType(x) => x.fn_type(args, is_variadic),
         },
-        ctx.dbg_builder().create_subroutine_type(
-            ctx.compilation_unit().get_file(),
-            Some(dbg_ty),
-            dbg_args,
-            0,
-        ),
-        ctx.dbg_builder()
-            .create_basic_type(&ty.to_string(), 0, 0, 0)
-            .expect("basic type should be valid"),
+        ctx.dbg_builder().map(|dbg_builder| {
+            dbg_builder.create_subroutine_type(
+                ctx.compilation_unit().expect("we have DI").get_file(),
+                dbg_ty,
+                dbg_args.expect("we have DI"),
+                0,
+            )
+        }),
+        ctx.dbg_builder().map(|dbg_builder| {
+            dbg_builder
+                .create_basic_type(&ty.to_string(), 0, 0, 0)
+                .expect("basic type should be valid")
+        }),
     )
 }
 
@@ -72,7 +76,7 @@ pub fn create_fn<'ctx: 'a, 'a>(
 pub fn llvm_int_type<'ctx: 'a, 'a>(
     ctx: &impl AsCompilationUnitCtx<'ctx, 'a>,
     ty: &Type,
-) -> (IntType<'ctx>, DIBasicType<'ctx>) {
+) -> (IntType<'ctx>, Option<DIBasicType<'ctx>>) {
     (
         match ty {
             Type::Bool => ctx.ctx().bool_type(),
@@ -94,9 +98,11 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
                 panic!("opaque type '{name}' reached code generation, should be resolved in typeck")
             }
         },
-        ctx.dbg_builder()
-            .create_basic_type(&ty.to_string(), 0, 0, 0)
-            .expect("basic type should be valid"),
+        ctx.dbg_builder().map(|dbg_builder| {
+            dbg_builder
+                .create_basic_type(&ty.to_string(), 0, 0, 0)
+                .expect("basic type should be valid")
+        }),
     )
 }
 
@@ -108,7 +114,7 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
 pub fn llvm_basic_type<'ctx: 'a, 'a>(
     ctx: &impl AsCompilationUnitCtx<'ctx, 'a>,
     ty: &Type,
-) -> (BasicTypeEnum<'ctx>, DIType<'ctx>) {
+) -> (BasicTypeEnum<'ctx>, Option<DIType<'ctx>>) {
     match ty {
         Type::Bool
         | Type::I8
@@ -122,7 +128,7 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
         | Type::Usize
         | Type::Isize => {
             let (ty, dbg_ty) = llvm_int_type(ctx, ty);
-            (ty.as_basic_type_enum(), dbg_ty.as_type())
+            (ty.as_basic_type_enum(), dbg_ty.map(|x| x.as_type()))
         }
         Type::Int => {
             panic!("{{int}} type reached code generation, should be resolved in typeck")
@@ -132,10 +138,12 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
             ctx.ctx()
                 .ptr_type(AddressSpace::default())
                 .as_basic_type_enum(),
-            ctx.dbg_builder()
-                .create_basic_type(&x.to_string(), 0, 0, 0)
-                .expect("basic type should be valid")
-                .as_type(),
+            ctx.dbg_builder().map(|dbg_builder| {
+                dbg_builder
+                    .create_basic_type(&x.to_string(), 0, 0, 0)
+                    .expect("basic type should be valid")
+                    .as_type()
+            }),
         ),
         Type::Fn(_) => panic!("function is not a basic type"),
         Type::Opaque(name) => {
@@ -151,39 +159,48 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
                     false,
                 )
                 .as_basic_type_enum(),
-            ctx.dbg_builder()
-                .create_struct_type(
-                    ctx.compilation_unit().get_file().as_debug_info_scope(),
-                    &ty.to_string(),
-                    ctx.compilation_unit().get_file(),
-                    0,
-                    0,
-                    0,
-                    0,
-                    None,
-                    &fields
-                        .into_iter()
-                        .map(|(key, key_ty)| {
-                            ctx.dbg_builder()
-                                .create_member_type(
-                                    ctx.compilation_unit().get_file().as_debug_info_scope(),
-                                    key,
-                                    ctx.compilation_unit().get_file(),
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    llvm_basic_type(ctx, key_ty).1,
-                                )
-                                .as_type()
-                        })
-                        .collect::<Vec<_>>(),
-                    0,
-                    None,
-                    "",
-                )
-                .as_type(),
+            ctx.dbg_builder().map(|dbg_builder| {
+                dbg_builder
+                    .create_struct_type(
+                        ctx.compilation_unit()
+                            .expect("we have DI")
+                            .get_file()
+                            .as_debug_info_scope(),
+                        &ty.to_string(),
+                        ctx.compilation_unit().expect("we have DI").get_file(),
+                        0,
+                        0,
+                        0,
+                        0,
+                        None,
+                        &fields
+                            .into_iter()
+                            .map(|(key, key_ty)| {
+                                ctx.dbg_builder()
+                                    .expect("we have DI")
+                                    .create_member_type(
+                                        ctx.compilation_unit()
+                                            .expect("we have DI")
+                                            .get_file()
+                                            .as_debug_info_scope(),
+                                        key,
+                                        ctx.compilation_unit().expect("we have DI").get_file(),
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        0,
+                                        llvm_basic_type(ctx, key_ty).1.expect("we have DI"),
+                                    )
+                                    .as_type()
+                            })
+                            .collect::<Vec<_>>(),
+                        0,
+                        None,
+                        "",
+                    )
+                    .as_type()
+            }),
         ),
         Type::Union(fields) => {
             // Determine which field has the largest size. This is what we will allocate.
@@ -203,23 +220,28 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
 
             (
                 largest_field.0,
-                ctx.dbg_builder()
-                    .create_union_type(
-                        ctx.compilation_unit().get_file().as_debug_info_scope(),
-                        &ty.to_string(),
-                        ctx.compilation_unit().get_file(),
-                        0,
-                        0,
-                        0,
-                        0,
-                        &fields
-                            .into_iter()
-                            .map(|(_, ty)| llvm_basic_type(ctx, ty).1)
-                            .collect::<Vec<_>>(),
-                        0,
-                        "",
-                    )
-                    .as_type(),
+                ctx.dbg_builder().map(|dbg_builder| {
+                    dbg_builder
+                        .create_union_type(
+                            ctx.compilation_unit()
+                                .expect("we have DI")
+                                .get_file()
+                                .as_debug_info_scope(),
+                            &ty.to_string(),
+                            ctx.compilation_unit().expect("we have DI").get_file(),
+                            0,
+                            0,
+                            0,
+                            0,
+                            &fields
+                                .into_iter()
+                                .map(|(_, ty)| llvm_basic_type(ctx, ty).1.expect("we have DI"))
+                                .collect::<Vec<_>>(),
+                            0,
+                            "",
+                        )
+                        .as_type()
+                }),
             )
         }
     }
@@ -229,7 +251,7 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
 pub fn llvm_type<'ctx: 'a, 'a>(
     ctx: &impl AsCompilationUnitCtx<'ctx, 'a>,
     ty: &Type,
-) -> (AnyTypeEnum<'ctx>, DIType<'ctx>) {
+) -> (AnyTypeEnum<'ctx>, Option<DIType<'ctx>>) {
     match ty {
         Type::Bool
         | Type::I8
@@ -255,6 +277,17 @@ pub fn llvm_type<'ctx: 'a, 'a>(
         Type::Fn(Fn { arguments, returns }) => {
             let (ret, ret_dbg) = llvm_type(ctx, returns);
             let is_variadic = arguments.is_variadic();
+            let argument_dbg_types = arguments
+                .as_arguments()
+                .iter()
+                .all(|arg| llvm_type(ctx, arg.ty.value()).1.is_some())
+                .then(|| {
+                    arguments
+                        .as_arguments()
+                        .iter()
+                        .map(|arg| llvm_type(ctx, arg.ty.value()).1.expect("we have DI"))
+                        .collect::<Vec<_>>()
+                });
             let (fn_ty, _, fn_dbg_ty) = create_fn(
                 ctx,
                 ret,
@@ -264,14 +297,10 @@ pub fn llvm_type<'ctx: 'a, 'a>(
                     .iter()
                     .map(|arg| llvm_basic_type(ctx, arg.ty.value()).0.into())
                     .collect::<Vec<_>>(),
-                &arguments
-                    .as_arguments()
-                    .iter()
-                    .map(|arg| llvm_basic_type(ctx, arg.ty.value()).1)
-                    .collect::<Vec<_>>(),
+                argument_dbg_types.as_deref(),
                 is_variadic,
             );
-            (fn_ty.as_any_type_enum(), fn_dbg_ty.as_type())
+            (fn_ty.as_any_type_enum(), fn_dbg_ty.map(|x| x.as_type()))
         }
 
         Type::Opaque(name) => {

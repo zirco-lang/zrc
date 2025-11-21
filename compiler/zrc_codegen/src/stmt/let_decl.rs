@@ -26,7 +26,7 @@ pub fn cg_let_declaration<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     mut bb: BasicBlock<'ctx>,
     scope: &'a mut CgScope<'input, 'ctx>,
-    dbg_scope: DILexicalBlock<'ctx>,
+    dbg_scope: Option<DILexicalBlock<'ctx>>,
     declarations: Vec<Spanned<LetDeclaration<'input>>>,
 ) -> BasicBlock<'ctx> {
     for spanned_let_declaration in declarations {
@@ -34,14 +34,17 @@ pub fn cg_let_declaration<'ctx, 'input, 'a>(
         let let_declaration = spanned_let_declaration.into_value();
 
         let stmt_line_col = cg.line_lookup.lookup_from_index(span.start());
-        let debug_location = cg.dbg_builder.create_debug_location(
-            cg.ctx,
-            stmt_line_col.line,
-            stmt_line_col.col,
-            dbg_scope.as_debug_info_scope(),
-            None,
-        );
-        cg.builder.set_current_debug_location(debug_location);
+
+        if let Some(dbg_builder) = &cg.dbg_builder {
+            let debug_location = dbg_builder.create_debug_location(
+                cg.ctx,
+                stmt_line_col.line,
+                stmt_line_col.col,
+                dbg_scope.expect("we have DI").as_debug_info_scope(),
+                None,
+            );
+            cg.builder.set_current_debug_location(debug_location);
+        }
 
         // we create our own builder here because we need to insert the alloca
         // at the beginning of the entry block, and that is easier than trying to

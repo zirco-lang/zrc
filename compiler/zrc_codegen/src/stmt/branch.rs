@@ -23,7 +23,7 @@ pub fn cg_if_stmt<'ctx, 'input, 'gs, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'input, 'ctx>,
-    lexical_block: DILexicalBlock<'ctx>,
+    lexical_block: Option<DILexicalBlock<'ctx>>,
     breakaway: &Option<LoopBreakaway<'ctx>>,
     cond: TypedExpr<'input>,
     then: Spanned<BlockMetadata<'input, 'gs>>,
@@ -71,16 +71,19 @@ pub fn cg_if_stmt<'ctx, 'input, 'gs, 'a>(
             let end = cg.ctx.append_basic_block(cg.fn_value, "end");
 
             let then_end_line_col = cg.line_lookup.lookup_from_index(then_end);
-            let terminating_debug_location = cg.dbg_builder.create_debug_location(
-                cg.ctx,
-                then_end_line_col.line,
-                then_end_line_col.col,
-                lexical_block.as_debug_info_scope(),
-                None,
-            );
 
-            cg.builder
-                .set_current_debug_location(terminating_debug_location);
+            if let Some(dbg_builder) = &cg.dbg_builder {
+                let terminating_debug_location = dbg_builder.create_debug_location(
+                    cg.ctx,
+                    then_end_line_col.line,
+                    then_end_line_col.col,
+                    lexical_block.expect("we have DI").as_debug_info_scope(),
+                    None,
+                );
+
+                cg.builder
+                    .set_current_debug_location(terminating_debug_location);
+            }
 
             cg.builder.position_at_end(single_bb);
             cg.builder
@@ -94,30 +97,35 @@ pub fn cg_if_stmt<'ctx, 'input, 'gs, 'a>(
             let end = cg.ctx.append_basic_block(cg.fn_value, "end");
 
             let then_end_line_col = cg.line_lookup.lookup_from_index(then_end);
-            let then_terminating_debug_location = cg.dbg_builder.create_debug_location(
-                cg.ctx,
-                then_end_line_col.line,
-                then_end_line_col.col,
-                lexical_block.as_debug_info_scope(),
-                None,
-            );
-            cg.builder
-                .set_current_debug_location(then_terminating_debug_location);
+            if let Some(dbg_builder) = &cg.dbg_builder {
+                let then_terminating_debug_location = dbg_builder.create_debug_location(
+                    cg.ctx,
+                    then_end_line_col.line,
+                    then_end_line_col.col,
+                    lexical_block.expect("we have DI").as_debug_info_scope(),
+                    None,
+                );
+                cg.builder
+                    .set_current_debug_location(then_terminating_debug_location);
+            }
             cg.builder.position_at_end(then_bb);
             cg.builder
                 .build_unconditional_branch(end)
                 .expect("branch should generate successfully");
 
             let then_else_end_line_col = cg.line_lookup.lookup_from_index(then_else_end);
-            let then_else_terminating_debug_location = cg.dbg_builder.create_debug_location(
-                cg.ctx,
-                then_else_end_line_col.line,
-                then_else_end_line_col.col,
-                lexical_block.as_debug_info_scope(),
-                None,
-            );
-            cg.builder
-                .set_current_debug_location(then_else_terminating_debug_location);
+
+            if let Some(dbg_builder) = &cg.dbg_builder {
+                let then_else_terminating_debug_location = dbg_builder.create_debug_location(
+                    cg.ctx,
+                    then_else_end_line_col.line,
+                    then_else_end_line_col.col,
+                    lexical_block.expect("we have DI").as_debug_info_scope(),
+                    None,
+                );
+                cg.builder
+                    .set_current_debug_location(then_else_terminating_debug_location);
+            }
 
             cg.builder.position_at_end(then_else_bb);
             cg.builder
