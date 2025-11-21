@@ -9,7 +9,7 @@ use clap::Parser;
 
 /// The official Zirco linter
 #[derive(Parser)]
-#[command(version)]
+#[command(version, short_flag = 'v')]
 pub struct Cli {
     /// The path of the file to lint
     pub path: Option<PathBuf>,
