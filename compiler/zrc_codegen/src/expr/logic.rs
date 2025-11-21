@@ -84,27 +84,125 @@ pub fn cg_comparison<'ctx, 'input>(
     bb.and(reg.as_basic_value_enum())
 }
 
+/// Code generate a logical AND expression
+pub fn cg_logical_and<'ctx, 'input>(
+    CgExprArgs { cg, mut bb, .. }: CgExprArgs<'ctx, 'input, '_>,
+    lhs: Box<TypedExpr<'input>>,
+    rhs: Box<TypedExpr<'input>>,
+) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
+    // Because Zirco short circuits logical expressions, we generate LLVM like this:
+    // Hence ensuring that rhs is only evaluated if lhs is true.
+    //
+    // %lhs = (cg_expr lhs)
+    // br i1 %lhs label %land_rhs, label %land_end
+    // land_rhs:
+    //   %rhs = (cg_expr rhs)
+    //   br label %land_end
+    // land_end:
+    //   ; If we branched directly from entry, lhs was false, so result is false
+    //   ; If we branched from land_rhs, result is whatever rhs evaluated to
+    //   %result = phi i1 [ false, %entry ], [ %rhs, %land_rhs ]
+
+    let top_bb = cg
+        .builder
+        .get_insert_block()
+        .expect("should be in a basic block");
+    let land_rhs_bb = cg.ctx.append_basic_block(cg.fn_value, "land_rhs");
+    let land_end_bb = cg.ctx.append_basic_block(cg.fn_value, "land_end");
+
+    let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
+
+    cg.builder
+        .build_conditional_branch(lhs.into_int_value(), land_rhs_bb, land_end_bb)
+        .expect(
+            "conditional branch to logical AND rhs or end block should have compiled successfully",
+        );
+    cg.builder.position_at_end(land_rhs_bb);
+
+    let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
+
+    cg.builder
+        .build_unconditional_branch(land_end_bb)
+        .expect("unconditional branch to logical AND end block should have compiled successfully");
+    cg.builder.position_at_end(land_end_bb);
+
+    let reg = cg
+        .builder
+        .build_phi(cg.ctx.bool_type(), "land_result")
+        .expect("phi node should have compiled successfully");
+
+    reg.add_incoming(&[
+        (&cg.ctx.bool_type().const_int(0, false), top_bb),
+        (&rhs, land_rhs_bb),
+    ]);
+
+    bb.and(reg.as_basic_value())
+}
+
+/// Code generate a logical OR expression
+pub fn cg_logical_or<'ctx, 'input>(
+    CgExprArgs { cg, mut bb, .. }: CgExprArgs<'ctx, 'input, '_>,
+    lhs: Box<TypedExpr<'input>>,
+    rhs: Box<TypedExpr<'input>>,
+) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
+    // Because Zirco short circuits logical expressions, we generate LLVM like this:
+    // Hence ensuring that rhs is only evaluated if lhs is false.
+    //
+    // %lhs = (cg_expr lhs)
+    // br i1 %lhs label %lor_end, label %lor_rhs
+    // lor_rhs:
+    //   %rhs = (cg_expr rhs)
+    //   br label %lor_end
+    // lor_end:
+    //   ; If we branched directly from entry, lhs was true, so result is true
+    //   ; If we branched from lor_rhs, result is whatever rhs evaluated to
+    //   %result = phi i1 [ true, %entry ], [ %rhs, %lor_rhs ]
+
+    let top_bb = cg
+        .builder
+        .get_insert_block()
+        .expect("should be in a basic block");
+    let lor_rhs_bb = cg.ctx.append_basic_block(cg.fn_value, "lor_rhs");
+    let lor_end_bb = cg.ctx.append_basic_block(cg.fn_value, "lor_end");
+
+    let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
+    cg.builder
+        .build_conditional_branch(lhs.into_int_value(), lor_end_bb, lor_rhs_bb)
+        .expect(
+            "conditional branch to logical OR rhs or end block should have compiled successfully",
+        );
+    cg.builder.position_at_end(lor_rhs_bb);
+
+    let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
+    cg.builder
+        .build_unconditional_branch(lor_end_bb)
+        .expect("unconditional branch to logical OR end block should have compiled successfully");
+    cg.builder.position_at_end(lor_end_bb);
+
+    let reg = cg
+        .builder
+        .build_phi(cg.ctx.bool_type(), "lor_result")
+        .expect("phi node should have compiled successfully");
+
+    reg.add_incoming(&[
+        (&cg.ctx.bool_type().const_int(1, false), top_bb),
+        (&rhs, lor_rhs_bb),
+    ]);
+
+    bb.and(reg.as_basic_value())
+}
+
 /// Code generate a logical expression
 pub fn cg_logical<'ctx, 'input>(
-    CgExprArgs { cg, mut bb, .. }: CgExprArgs<'ctx, 'input, '_>,
+    args: CgExprArgs<'ctx, 'input, '_>,
     op: Logical,
     lhs: Box<TypedExpr<'input>>,
     rhs: Box<TypedExpr<'input>>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
-    let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
-    let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
-
-    let reg = match op {
-        Logical::And => cg
-            .builder
-            .build_and(lhs.into_int_value(), rhs.into_int_value(), "and"),
-        Logical::Or => cg
-            .builder
-            .build_or(lhs.into_int_value(), rhs.into_int_value(), "or"),
+    match op {
+        Logical::And => cg_logical_and(args, lhs, rhs),
+        Logical::Or => cg_logical_or(args, lhs, rhs),
     }
-    .expect("logical operation should have compiled successfully");
-
-    bb.and(reg.as_basic_value_enum())
 }
 
 /// Code generate a unary logical NOT operation

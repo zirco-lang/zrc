@@ -20,13 +20,25 @@ entry:
   %call1 = call i1 @get_bool(), !dbg !12
   store i1 %call1, ptr %let_b, align 1, !dbg !13
   %load = load i1, ptr %let_a, align 1, !dbg !14
+  br i1 %load, label %land_rhs, label %land_end, !dbg !14
+
+land_rhs:                                         ; preds = %entry
   %load2 = load i1, ptr %let_b, align 1, !dbg !15
-  %and = and i1 %load, %load2, !dbg !15
-  store i1 %and, ptr %let_and, align 1, !dbg !16
+  br label %land_end, !dbg !15
+
+land_end:                                         ; preds = %land_rhs, %entry
+  %land_result = phi i1 [ false, %entry ], [ %load2, %land_rhs ], !dbg !15
+  store i1 %land_result, ptr %let_and, align 1, !dbg !16
   %load3 = load i1, ptr %let_a, align 1, !dbg !17
+  br i1 %load3, label %lor_end, label %lor_rhs, !dbg !17
+
+lor_rhs:                                          ; preds = %land_end
   %load4 = load i1, ptr %let_b, align 1, !dbg !18
-  %or = or i1 %load3, %load4, !dbg !18
-  store i1 %or, ptr %let_or, align 1, !dbg !19
+  br label %lor_end, !dbg !18
+
+lor_end:                                          ; preds = %lor_rhs, %land_end
+  %lor_result = phi i1 [ true, %land_end ], [ %load4, %lor_rhs ], !dbg !18
+  store i1 %lor_result, ptr %let_or, align 1, !dbg !19
   %load5 = load i1, ptr %let_a, align 1, !dbg !20
   %not = xor i1 %load5, true, !dbg !20
   store i1 %not, ptr %let_not, align 1, !dbg !21
