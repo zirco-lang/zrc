@@ -130,7 +130,7 @@ impl<'input> ValueEntry<'input> {
 
     /// Create an unused value entry
     #[must_use]
-    pub fn unused(ty: TastType<'input>, declaration_span: Span) -> Self {
+    pub const fn unused(ty: TastType<'input>, declaration_span: Span) -> Self {
         Self {
             ty,
             referenced_spans: Vec::new(),
