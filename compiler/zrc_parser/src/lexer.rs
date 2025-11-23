@@ -597,7 +597,7 @@ pub enum Tok<'input> {
     #[display("{_0}")]
     NumberLiteral(NumberLiteral<'input>),
     /// Any identifier
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", lexer_slice)]
+    #[regex(r"[a-zA-Z_]", lexer_slice)]
     #[display("{_0}")]
     Identifier(&'input str),
 }
