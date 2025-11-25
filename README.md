@@ -122,6 +122,7 @@ If you're curious, here's our test coverage represented as a cool little chart:
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ValShaped"><img src="https://avatars.githubusercontent.com/u/8754234?v=4?s=100" width="100px;" alt="Val"/><br /><sub><b>Val</b></sub></a><br /><a href="#ideas-ValShaped" title="Ideas, Planning, & Feedback">🤔</a> <a href="#code-ValShaped" title="Code">💻</a> <a href="#bug-ValShaped" title="Bug reports">🐛</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ilikestohack"><img src="https://avatars.githubusercontent.com/u/47259933?v=4?s=100" width="100px;" alt="charmines"/><br /><sub><b>charmines</b></sub></a><br /><a href="#code-ilikestohack" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/bobosii"><img src="https://avatars.githubusercontent.com/u/116455540?v=4?s=100" width="100px;" alt="Emirhan DAY"/><br /><sub><b>Emirhan DAY</b></sub></a><br /><a href="#code-bobosii" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://ali-m07.github.io/resume/"><img src="https://avatars.githubusercontent.com/u/60949510?v=4?s=100" width="100px;" alt="Ali Mansouri"/><br /><sub><b>Ali Mansouri</b></sub></a><br /><a href="#code-ali-m07" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>
