@@ -23,8 +23,8 @@ use crate::{
 ///
 /// This lint recursively searches every block's associated
 /// [`BlockMetadata::scope`] for any variables with the
-/// [`zrc_typeck::typeck::ValueEntry::referenced_spans`] parameter empty and a name
-/// that does not start with an underscore.
+/// [`zrc_typeck::typeck::ValueEntry::referenced_spans`] parameter empty and a
+/// name that does not start with an underscore.
 pub struct UnusedVariablesLint;
 impl UnusedVariablesLint {
     /// Initialize this lint
