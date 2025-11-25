@@ -23,8 +23,8 @@ use crate::{
 ///
 /// This lint recursively searches every block's associated
 /// [`BlockMetadata::scope`] for any variables with the
-/// [`zrc_typeck::typeck::ValueEntry::used`] parameter set to `false` and a name
-/// that does not start with an underscore.
+/// [`zrc_typeck::typeck::ValueEntry::referenced_spans`] parameter empty and a
+/// name that does not start with an underscore.
 pub struct UnusedVariablesLint;
 impl UnusedVariablesLint {
     /// Initialize this lint
@@ -65,7 +65,7 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit<'input> {
         // `Rc<RefCell<...>>` so borrow the entry when inspecting it.
         for (var_name, var_entry_rc) in block.scope.values.iter() {
             let var_entry = var_entry_rc.borrow();
-            if !var_entry.used
+            if var_entry.referenced_spans.is_empty()
                 && !var_name.starts_with('_')
                 && !self.reported_vars.contains(&var_name)
                 // Functions are also stored as variables in the scope, but
