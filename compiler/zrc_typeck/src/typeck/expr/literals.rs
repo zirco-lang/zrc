@@ -125,8 +125,9 @@ pub fn type_expr_identifier<'input>(
         DiagnosticKind::UnableToResolveIdentifier(i.to_string()).error_in(expr_span)
     })?;
 
-    // Mark as used by adding the reference span and clone the type to return. Use a short-lived borrow
-    // so we don't keep the RefCell borrow across the function return.
+    // Mark as used by adding the reference span and clone the type to return. Use a
+    // short-lived borrow so we don't keep the RefCell borrow across the
+    // function return.
     let inferred_type = {
         let mut ty = ty_rc.borrow_mut();
         ty.referenced_spans.push(expr_span);
