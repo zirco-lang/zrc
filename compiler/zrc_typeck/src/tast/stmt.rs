@@ -19,6 +19,8 @@ pub struct LetDeclaration<'input> {
     pub ty: Type<'input>, // types are definite after inference
     /// The value to associate with the new symbol.
     pub value: Option<TypedExpr<'input>>,
+    /// If the declaration is a constant
+    pub is_constant: bool,
 }
 
 /// A zirco statement after typeck
@@ -409,6 +411,7 @@ mod tests {
             name: spanned_test!(0, "x", 1),
             ty: Type::I32,
             value: None,
+            is_constant: false,
         };
         assert_eq!(decl.to_string(), "x: i32");
     }
@@ -422,6 +425,7 @@ mod tests {
                 inferred_type: Type::I32,
                 kind: spanned_test!(0, super::super::expr::TypedExprKind::Identifier("y"), 1),
             }),
+            is_constant: false,
         };
         let display = decl.to_string();
         assert!(display.contains("x: i32"));

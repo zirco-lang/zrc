@@ -280,6 +280,7 @@ pub fn type_match<'input, 'gs>(
             name: Spanned::from_span_and_value(case_span, var_binding),
             ty: None,
             value: Some(value_access),
+            is_constant: false,
         };
         let let_stmt = Stmt(Spanned::from_span_and_value(
             case_span,

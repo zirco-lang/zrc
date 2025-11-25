@@ -79,8 +79,11 @@ pub fn type_expr_call<'input>(
 
             Ok(TypedExpr {
                 inferred_type: *ret_type,
-                kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_with_casts)
-                    .in_span(expr_span),
+                kind: TypedExprKind::Call(
+                    Box::new(expr_to_place(scope, f_span, ft)?),
+                    args_with_casts,
+                )
+                .in_span(expr_span),
             })
         }
         TastType::Fn(Fn {
@@ -130,8 +133,11 @@ pub fn type_expr_call<'input>(
             // the rest may be any, so we don't need to check them
             Ok(TypedExpr {
                 inferred_type: *ret_type,
-                kind: TypedExprKind::Call(Box::new(expr_to_place(f_span, ft)?), args_with_casts)
-                    .in_span(expr_span),
+                kind: TypedExprKind::Call(
+                    Box::new(expr_to_place(scope, f_span, ft)?),
+                    args_with_casts,
+                )
+                .in_span(expr_span),
             })
         }
         _ => Err(

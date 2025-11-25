@@ -16,6 +16,7 @@ use crate::{
 ///
 /// # Errors
 /// Errors with type checker errors.
+#[expect(clippy::too_many_lines)]
 pub fn process_let_declaration<'input>(
     scope: &mut Scope<'input, '_>,
     declarations: Vec<Spanned<AstLetDeclaration<'input>>>,
@@ -47,6 +48,7 @@ pub fn process_let_declaration<'input>(
                         name: let_declaration.name,
                         ty,
                         value: None,
+                        is_constant: let_declaration.is_constant,
                     },
 
                     // Infer type from value
@@ -76,6 +78,7 @@ pub fn process_let_declaration<'input>(
                             name: let_declaration.name,
                             ty: resolved_type,
                             value: Some(value_coerced),
+                            is_constant: let_declaration.is_constant,
                         }
                     }
 
@@ -95,6 +98,7 @@ pub fn process_let_declaration<'input>(
                                     inferred_type,
                                     kind,
                                 }),
+                                is_constant: let_declaration.is_constant,
                             }
                         } else if inferred_type.can_implicitly_cast_to(&resolved_ty) {
                             // Insert implicit cast (e.g., {int} -> i8)
@@ -109,6 +113,7 @@ pub fn process_let_declaration<'input>(
                                 name: let_declaration.name,
                                 ty: resolved_ty,
                                 value: Some(value_coerced),
+                                is_constant: let_declaration.is_constant,
                             }
                         } else {
                             return Err(DiagnosticKind::InvalidAssignmentRightHandSideType {
@@ -122,7 +127,12 @@ pub fn process_let_declaration<'input>(
 
                 scope.values.insert(
                     result_decl.name.value(),
-                    ValueEntry::unused(result_decl.ty.clone(), let_decl_span),
+                    ValueEntry {
+                        ty: result_decl.ty.clone(),
+                        used: false,
+                        declaration_span: let_decl_span,
+                        is_constant: let_declaration.is_constant,
+                    },
                 );
                 Ok(result_decl.in_span(let_decl_span))
             },
