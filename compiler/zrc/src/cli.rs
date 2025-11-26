@@ -70,7 +70,7 @@ pub enum FrontendOptLevel {
     #[value(name = "2", alias("default"))]
     O2,
     /// Optimize for fast execution as much as possible.
-    /// 
+    ///
     /// This enables the most aggressive optimizations including:
     /// - Advanced loop optimizations and vectorization
     /// - Aggressive inlining and constant propagation  

@@ -590,7 +590,7 @@ pub enum Tok<'input> {
     #[display("\"{_0}\"")]
     StringLiteral(ZrcString<'input>),
     /// Any number literal (decimal, hexadecimal, or binary)
-    /// 
+    ///
     /// Supports underscores as separators for readability (e.g., `1_000_000`).
     /// Decimal numbers can have at most one decimal point.
     #[regex(r"[0-9][0-9_]*(\.[0-9_]+)?", |lex| NumberLiteral::Decimal(lex.slice()))]

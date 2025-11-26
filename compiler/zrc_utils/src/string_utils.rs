@@ -17,7 +17,7 @@
 /// # Examples
 /// ```
 /// use zrc_utils::string_utils::remove_underscores;
-/// 
+///
 /// assert_eq!(remove_underscores("1_000_000"), "1000000");
 /// assert_eq!(remove_underscores("0xFF_AA_BB"), "0xFFAABB");
 /// assert_eq!(remove_underscores("no_underscores"), "nounderscores");
@@ -46,7 +46,7 @@ pub fn remove_underscores(input: &str) -> String {
 /// # Examples
 /// ```
 /// use zrc_utils::string_utils::is_valid_identifier;
-/// 
+///
 /// assert!(is_valid_identifier("valid_name"));
 /// assert!(is_valid_identifier("_private"));
 /// assert!(is_valid_identifier("name123"));
@@ -59,15 +59,15 @@ pub fn is_valid_identifier(input: &str) -> bool {
     if input.is_empty() {
         return false;
     }
-    
+
     let mut chars = input.chars();
     let first = chars.next().expect("input is not empty");
-    
+
     // First character must be letter or underscore
     if !first.is_ascii_alphabetic() && first != '_' {
         return false;
     }
-    
+
     // Remaining characters must be alphanumeric or underscore
     chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
@@ -95,7 +95,7 @@ mod tests {
         assert!(is_valid_identifier("_"));
         assert!(is_valid_identifier("CamelCase"));
         assert!(is_valid_identifier("snake_case_123"));
-        
+
         // Invalid identifiers
         assert!(!is_valid_identifier("123invalid"));
         assert!(!is_valid_identifier(""));

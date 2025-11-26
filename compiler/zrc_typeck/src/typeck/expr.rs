@@ -16,7 +16,7 @@ use zrc_parser::ast::expr::{Expr, ExprKind};
 use super::scope::Scope;
 use crate::tast::expr::TypedExpr;
 
-// TODO: Performance optimization needed - this function should be rewritten to use 
+// TODO: Performance optimization needed - this function should be rewritten to use
 // references instead of cloning to prevent stack overflow on deeply nested expressions.
 // This is a known issue that affects compilation of complex expressions.
 /// Type check and infer an [AST expression](Expr) to a [TAST expression](TypedExpr).
