@@ -517,8 +517,11 @@ pub fn cg_program_to_string(
             triple,
             cpu,
             "",
-            // FIXME: Does this potentially run the optimizer twice (as we run it ourselves later)?
-            // That may be inefficient.
+            // TODO: Investigate potential double optimization issue
+            // The target machine is created with an optimization level, but we also run
+            // our own optimization passes later. This might be redundant and could impact
+            // compilation performance. Consider creating target machine with no optimization
+            // and relying solely on our explicit optimization passes.
             optimization_level,
             RelocMode::PIC,
             CodeModel::Default,
@@ -625,8 +628,11 @@ pub fn cg_program_to_buffer(
             triple,
             cpu,
             "",
-            // FIXME: Does this potentially run the optimizer twice (as we run it ourselves later)?
-            // That may be inefficient.
+            // TODO: Investigate potential double optimization issue
+            // The target machine is created with an optimization level, but we also run
+            // our own optimization passes later. This might be redundant and could impact
+            // compilation performance. Consider creating target machine with no optimization
+            // and relying solely on our explicit optimization passes.
             optimization_level,
             RelocMode::PIC,
             CodeModel::Default,
