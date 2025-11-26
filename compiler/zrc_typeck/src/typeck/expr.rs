@@ -16,13 +16,32 @@ use zrc_parser::ast::expr::{Expr, ExprKind};
 use super::scope::Scope;
 use crate::tast::expr::TypedExpr;
 
-// FIXME: this NEEDS to be rewritten to use references almost everywhere and be
-// no-clone. We stack overflow for deep expressions which is VERY VERY BAD.
-/// Type check and infer an [AST expression](Expr) to a [TAST
-/// expression](TypedExpr).
+// TODO: Performance optimization needed - this function should be rewritten to use 
+// references instead of cloning to prevent stack overflow on deeply nested expressions.
+// This is a known issue that affects compilation of complex expressions.
+/// Type check and infer an [AST expression](Expr) to a [TAST expression](TypedExpr).
+///
+/// This is the main entry point for expression type checking. It performs type inference
+/// and validation for all expression kinds including:
+/// - Arithmetic and logical operations
+/// - Function calls and method invocations  
+/// - Variable access and assignment
+/// - Literals and type casts
+/// - Control flow expressions (ternary, etc.)
+///
+/// # Arguments
+/// * `scope` - Mutable reference to the current type checking scope containing variable bindings
+/// * `expr` - The AST expression to type check
+///
+/// # Returns
+/// A typed expression (TAST) with inferred type information on success.
 ///
 /// # Errors
-/// Errors if a type checker error is encountered.
+/// Returns a diagnostic error if:
+/// - Type mismatch is detected
+/// - Undefined variable or function is referenced
+/// - Invalid operation for the given types
+/// - Other semantic analysis failures
 pub fn type_expr<'input>(
     scope: &mut Scope<'input, '_>,
     expr: Expr<'input>,

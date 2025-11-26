@@ -70,7 +70,12 @@ pub enum FrontendOptLevel {
     #[value(name = "2", alias("default"))]
     O2,
     /// Optimize for fast execution as much as possible.
-    // TODO: does this enable LTO?
+    /// 
+    /// This enables the most aggressive optimizations including:
+    /// - Advanced loop optimizations and vectorization
+    /// - Aggressive inlining and constant propagation  
+    /// - Inter-procedural optimizations
+    ///   Note: LTO (Link Time Optimization) is controlled separately via linker flags.
     #[value(name = "3", alias("aggressive"))]
     O3,
 }

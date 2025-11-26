@@ -88,11 +88,16 @@ fn main() -> anyhow::Result<()> {
     let mut source_content = String::new();
     input.read_to_string(&mut source_content)?;
 
+    // Prevent accidental output of binary object code to terminal
+    // This could corrupt the terminal display or cause other issues
     if cli.emit == OutputFormat::Object
         && !cli.force
         && cli.out_file.as_os_str().to_str().unwrap_or("-") == "-"
     {
-        bail!("emitting raw object code to stdout is not allowed. use --force to override this");
+        bail!(
+            "Emitting raw object code to stdout is not allowed as it may corrupt your terminal.\n\
+             Use --force to override this safety check, or specify an output file with -o <file>."
+        );
     }
 
     let result = compile::compile(

@@ -52,3 +52,4 @@ pub mod code_fmt;
 pub mod io;
 pub mod line_finder;
 pub mod span;
+pub mod string_utils;
