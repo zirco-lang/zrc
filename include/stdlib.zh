@@ -1,5 +1,5 @@
-struct Div32 { quot: i32, rem: i32 }
-struct Div64 { quot: i64, rem: i64 }
+struct Div32 { quot: i32, rem: i32 };
+struct Div64 { quot: i64, rem: i64 };
 //struct Div128 { quot: i128, rem: i128 }
 
 fn malloc(size: usize) -> *void;
