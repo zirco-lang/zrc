@@ -112,8 +112,7 @@ pub struct ValueEntry<'input> {
     /// The data type of the value
     pub ty: TastType<'input>,
     /// List of span locations where this value has been referenced.
-    /// This is used for unused variable warnings in zircop and for future use
-    /// in a language server.
+    /// This is used for unused variable warnings in zircop and for future use in a language server.
     pub referenced_spans: Vec<Span>,
     /// The source span where this value was declared, for diagnostic purposes
     pub declaration_span: Span,
