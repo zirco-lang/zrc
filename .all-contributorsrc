@@ -57,6 +57,16 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "CoryBorek",
+      "name": "Cory Borek",
+      "avatar_url": "https://avatars.githubusercontent.com/u/27520129?v=4",
+      "profile": "https://agentdid127.com",
+      "contributions": [
+        "ideas",
+        "bug"
+      ]
     }
   ]
 }
