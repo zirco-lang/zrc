@@ -145,7 +145,7 @@ fn find_include_file(ctx: &PreprocessorCtx, include_file: &str) -> Option<PathBu
 pub fn preprocess(
     base_path: &Path,
     search_paths: Vec<&'static Path>,
-    file_name: &str,
+    file_name: &'static str,
     content: &str,
 ) -> Result<Vec<SourceChunk>, Diagnostic> {
     let mut ctx = PreprocessorCtx::new(search_paths);
@@ -157,7 +157,7 @@ pub fn preprocess(
 #[expect(clippy::too_many_lines, clippy::result_large_err)]
 fn preprocess_internal(
     base_path: &Path,
-    file_name: &str,
+    file_name: &'static str,
     content: &str,
     ctx: &mut PreprocessorCtx,
 ) -> Result<(), Diagnostic> {
@@ -209,38 +209,36 @@ fn preprocess_internal(
 
                 // Parse include path
                 let include_path = include_path.trim();
-                let (mut include_file, do_search_path) = if let Some(path) =
-                    include_path.strip_prefix('"')
-                {
-                    (
-                        path.strip_suffix('"')
-                            .ok_or_else(|| {
-                                DiagnosticKind::PreprocessorUnterminatedIncludeString.error_in(
-                                    Span::from_positions_and_file(0, line.len(), "<preprocessor>"),
-                                )
-                            })?
-                            .to_string(),
-                        false,
-                    )
-                } else if let Some(path) = include_path.strip_prefix('<') {
-                    (
-                        path.strip_suffix('>')
-                            .ok_or_else(|| {
-                                DiagnosticKind::PreprocessorUnterminatedIncludeAngleBrackets
-                                    .error_in(Span::from_positions_and_file(
-                                        0,
-                                        line.len(),
-                                        "<preprocessor>",
-                                    ))
-                            })?
-                            .to_string(),
-                        true,
-                    )
-                } else {
-                    return Err(DiagnosticKind::PreprocessorInvalidIncludeSyntax.error_in(
-                        Span::from_positions_and_file(0, line.len(), "<preprocessor>"),
-                    ));
-                };
+                let (mut include_file, do_search_path) =
+                    if let Some(path) = include_path.strip_prefix('"') {
+                        (
+                            path.strip_suffix('"')
+                                .ok_or_else(|| {
+                                    DiagnosticKind::PreprocessorUnterminatedIncludeString.error_in(
+                                        Span::from_positions_and_file(0, line.len(), file_name),
+                                    )
+                                })?
+                                .to_string(),
+                            false,
+                        )
+                    } else if let Some(path) = include_path.strip_prefix('<') {
+                        (
+                            path.strip_suffix('>')
+                                .ok_or_else(|| {
+                                    DiagnosticKind::PreprocessorUnterminatedIncludeAngleBrackets
+                                        .error_in(Span::from_positions_and_file(
+                                            0,
+                                            line.len(),
+                                            file_name,
+                                        ))
+                                })?
+                                .to_string(),
+                            true,
+                        )
+                    } else {
+                        return Err(DiagnosticKind::PreprocessorInvalidIncludeSyntax
+                            .error_in(Span::from_positions_and_file(0, line.len(), file_name)));
+                    };
 
                 // Resolve the include file path
 
@@ -248,11 +246,7 @@ fn preprocess_internal(
                     include_file = find_include_file(ctx, &include_file)
                         .ok_or_else(|| {
                             DiagnosticKind::PreprocessorCannotFindIncludeFile(include_file.clone())
-                                .error_in(Span::from_positions_and_file(
-                                    0,
-                                    line.len(),
-                                    "<preprocessor>",
-                                ))
+                                .error_in(Span::from_positions_and_file(0, line.len(), file_name))
                         })?
                         .to_string_lossy()
                         .to_string();
@@ -261,11 +255,7 @@ fn preprocess_internal(
                 let include_full_path = base_path.join(&include_file);
                 let canonical_path = include_full_path.canonicalize().map_err(|_| {
                     DiagnosticKind::PreprocessorCannotFindIncludeFile(include_file.clone())
-                        .error_in(Span::from_positions_and_file(
-                            0,
-                            line.len(),
-                            "<preprocessor>",
-                        ))
+                        .error_in(Span::from_positions_and_file(0, line.len(), file_name))
                 })?;
 
                 // Check if already included with pragma once
@@ -284,29 +274,26 @@ fn preprocess_internal(
                     .error_in(Span::from_positions_and_file(
                         0,
                         line.len(),
-                        "<preprocessor>",
+                        file_name,
                     ))
                 })?;
 
                 // Recursively preprocess
                 let include_base = canonical_path.parent().ok_or_else(|| {
                     DiagnosticKind::PreprocessorCannotDetermineParentDirectory(include_file.clone())
-                        .error_in(Span::from_positions_and_file(
-                            0,
-                            line.len(),
-                            "<preprocessor>",
-                        ))
+                        .error_in(Span::from_positions_and_file(0, line.len(), file_name))
                 })?;
 
-                preprocess_internal(include_base, &include_file, &included_content, ctx)?;
+                let fp = Box::leak(Box::new(include_file));
+
+                preprocess_internal(include_base, fp, &included_content, ctx)?;
 
                 chunk_start_line = line_num + 1;
                 chunk_start_byte = current_byte + line.len() + 1; // +1 for newline
             } else {
                 return Err(
-                    DiagnosticKind::PreprocessorUnknownDirective(directive.to_string()).error_in(
-                        Span::from_positions_and_file(0, line.len(), "<preprocessor>"),
-                    ),
+                    DiagnosticKind::PreprocessorUnknownDirective(directive.to_string())
+                        .error_in(Span::from_positions_and_file(0, line.len(), file_name)),
                 );
             }
         } else {

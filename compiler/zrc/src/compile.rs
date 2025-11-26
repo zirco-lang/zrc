@@ -48,12 +48,9 @@ pub fn compile(
     cpu: &str,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
     // === PREPROCESSOR ===
-    let chunks = zrc_preprocessor::preprocess(
-        Path::new(parent_directory),
-        include_paths,
-        file_name,
-        content,
-    )?;
+    let ff = Box::leak(Box::new(file_name.to_string()));
+    let chunks =
+        zrc_preprocessor::preprocess(Path::new(parent_directory), include_paths, ff, content)?;
 
     // === PARSER ===
     let mut ast = Vec::new();
