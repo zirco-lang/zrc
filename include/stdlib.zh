@@ -9,14 +9,16 @@ fn free(ptr: *void);
 fn atoi(nptr: *u8) -> i32;
 fn atol(nptr: *u8) -> i64;
 fn atoll(nptr: *u8) -> i64;
-fn atof(nptr: *u8) -> f64;
+//TODO floats
+//fn atof(nptr: *u8) -> f64;
 fn strtol(nptr: *u8, endptr: **u8, base: i32) -> i64;
 fn strtoll(nptr: *u8, endptr: **u8, base: i32) -> i64;
 fn strtoul(nptr: *u8, endptr: **u8, base: i32) -> u64;
 fn strtoull(nptr: *u8, endptr: **u8, base: i32) -> u64;
-fn strtof(nptr: *u8, endptr: **u8) -> f32;
-fn strtod(nptr: *u8, endptr: **u8) -> f64;
-fn strtold(nptr: *u8, endptr: **u8) -> f64;
+// TODO floats
+//fn strtof(nptr: *u8, endptr: **u8) -> f32;
+//fn strtod(nptr: *u8, endptr: **u8) -> f64;
+//fn strtold(nptr: *u8, endptr: **u8) -> f64;
 fn abs(x: i32) -> i32;
 fn labs(x: i64) -> i64;
 fn llabs(x: i64) -> i64;
@@ -24,8 +26,9 @@ fn div(numer: i32, denom: i32) -> Div32;
 fn ldiv(numer: i64, denom: i64) -> Div64;
 //fn lldiv(numer: i128, denom: i128) -> Div128
 fn abort() -> void;
-fn atexit(func: *(fn() -> void)) -> i32;
-fn at_quick_exit(func: *(fn() -> void)) -> i32;
+// TODO: function pointers
+//fn atexit(func: *(fn() -> void)) -> i32;
+//fn at_quick_exit(func: *(fn() -> void)) -> i32;
 fn exit(status: i32) -> void;
 fn quick_exit(status: i32) -> void;
 fn system(command: *u8) -> i32;
