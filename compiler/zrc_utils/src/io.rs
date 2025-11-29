@@ -88,7 +88,7 @@ mod tests {
         assert!(result.is_ok());
         let (dir, file, _reader) = result.expect("should succeed");
         assert_eq!(dir, "/dev");
-        assert_eq!(file, "stdin");
+        assert_eq!(file, "<stdin>");
     }
 
     #[test]
