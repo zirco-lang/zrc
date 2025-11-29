@@ -2,3 +2,4 @@
 lcov.info
 .direnv
 /examples/**/out
+/result

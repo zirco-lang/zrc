@@ -167,6 +167,17 @@ fn preprocess_internal(
     let mut current_byte = 0;
     let mut has_pragma_once = false;
 
+    // Create a static file name string for use in spans
+    // Using Box::leak is intentional here as file names need to outlive the
+    // compilation process
+    let static_file_name: &'static str = Box::leak(
+        base_path
+            .join(file_name)
+            .to_string_lossy()
+            .into_owned()
+            .into_boxed_str(),
+    );
+
     for (line_num, line) in content.lines().enumerate() {
         let line_num = line_num + 1; // Convert to 1-indexed
         let trimmed = line.trim();
@@ -184,7 +195,7 @@ fn preprocess_internal(
                 // Flush current chunk if it has content before the pragma directive
                 if !current_chunk_lines.is_empty() {
                     ctx.chunks.push(SourceChunk::new(
-                        base_path.join(file_name).to_string_lossy().to_string(),
+                        static_file_name.to_string(),
                         chunk_start_line,
                         chunk_start_byte,
                         current_chunk_lines.join("\n"),
@@ -199,7 +210,7 @@ fn preprocess_internal(
                 // Flush current chunk if it has content
                 if !current_chunk_lines.is_empty() {
                     ctx.chunks.push(SourceChunk::new(
-                        base_path.join(file_name).to_string_lossy().to_string(),
+                        static_file_name.to_string(),
                         chunk_start_line,
                         chunk_start_byte,
                         current_chunk_lines.join("\n"),
@@ -209,38 +220,45 @@ fn preprocess_internal(
 
                 // Parse include path
                 let include_path = include_path.trim();
-                let (mut include_file, do_search_path) = if let Some(path) =
-                    include_path.strip_prefix('"')
-                {
-                    (
-                        path.strip_suffix('"')
-                            .ok_or_else(|| {
-                                DiagnosticKind::PreprocessorUnterminatedIncludeString.error_in(
-                                    Span::from_positions_and_file(0, line.len(), "<preprocessor>"),
-                                )
-                            })?
-                            .to_string(),
-                        false,
-                    )
-                } else if let Some(path) = include_path.strip_prefix('<') {
-                    (
-                        path.strip_suffix('>')
-                            .ok_or_else(|| {
-                                DiagnosticKind::PreprocessorUnterminatedIncludeAngleBrackets
-                                    .error_in(Span::from_positions_and_file(
-                                        0,
-                                        line.len(),
-                                        "<preprocessor>",
-                                    ))
-                            })?
-                            .to_string(),
-                        true,
-                    )
-                } else {
-                    return Err(DiagnosticKind::PreprocessorInvalidIncludeSyntax.error_in(
-                        Span::from_positions_and_file(0, line.len(), "<preprocessor>"),
-                    ));
-                };
+                let (mut include_file, do_search_path) =
+                    if let Some(path) = include_path.strip_prefix('"') {
+                        (
+                            path.strip_suffix('"')
+                                .ok_or_else(|| {
+                                    DiagnosticKind::PreprocessorUnterminatedIncludeString.error_in(
+                                        Span::from_positions_and_file(
+                                            current_byte,
+                                            current_byte + line.len(),
+                                            static_file_name,
+                                        ),
+                                    )
+                                })?
+                                .to_string(),
+                            false,
+                        )
+                    } else if let Some(path) = include_path.strip_prefix('<') {
+                        (
+                            path.strip_suffix('>')
+                                .ok_or_else(|| {
+                                    DiagnosticKind::PreprocessorUnterminatedIncludeAngleBrackets
+                                        .error_in(Span::from_positions_and_file(
+                                            current_byte,
+                                            current_byte + line.len(),
+                                            static_file_name,
+                                        ))
+                                })?
+                                .to_string(),
+                            true,
+                        )
+                    } else {
+                        return Err(DiagnosticKind::PreprocessorInvalidIncludeSyntax.error_in(
+                            Span::from_positions_and_file(
+                                current_byte,
+                                current_byte + line.len(),
+                                static_file_name,
+                            ),
+                        ));
+                    };
 
                 // Resolve the include file path
 
@@ -249,9 +267,9 @@ fn preprocess_internal(
                         .ok_or_else(|| {
                             DiagnosticKind::PreprocessorCannotFindIncludeFile(include_file.clone())
                                 .error_in(Span::from_positions_and_file(
-                                    0,
-                                    line.len(),
-                                    "<preprocessor>",
+                                    current_byte,
+                                    current_byte + line.len(),
+                                    static_file_name,
                                 ))
                         })?
                         .to_string_lossy()
@@ -262,9 +280,9 @@ fn preprocess_internal(
                 let canonical_path = include_full_path.canonicalize().map_err(|_| {
                     DiagnosticKind::PreprocessorCannotFindIncludeFile(include_file.clone())
                         .error_in(Span::from_positions_and_file(
-                            0,
-                            line.len(),
-                            "<preprocessor>",
+                            current_byte,
+                            current_byte + line.len(),
+                            static_file_name,
                         ))
                 })?;
 
@@ -282,9 +300,9 @@ fn preprocess_internal(
                         err.to_string(),
                     )
                     .error_in(Span::from_positions_and_file(
-                        0,
-                        line.len(),
-                        "<preprocessor>",
+                        current_byte,
+                        current_byte + line.len(),
+                        static_file_name,
                     ))
                 })?;
 
@@ -292,9 +310,9 @@ fn preprocess_internal(
                 let include_base = canonical_path.parent().ok_or_else(|| {
                     DiagnosticKind::PreprocessorCannotDetermineParentDirectory(include_file.clone())
                         .error_in(Span::from_positions_and_file(
-                            0,
-                            line.len(),
-                            "<preprocessor>",
+                            current_byte,
+                            current_byte + line.len(),
+                            static_file_name,
                         ))
                 })?;
 
@@ -305,7 +323,11 @@ fn preprocess_internal(
             } else {
                 return Err(
                     DiagnosticKind::PreprocessorUnknownDirective(directive.to_string()).error_in(
-                        Span::from_positions_and_file(0, line.len(), "<preprocessor>"),
+                        Span::from_positions_and_file(
+                            current_byte,
+                            current_byte + line.len(),
+                            static_file_name,
+                        ),
                     ),
                 );
             }
@@ -325,7 +347,7 @@ fn preprocess_internal(
     // Flush remaining chunk
     if !current_chunk_lines.is_empty() {
         ctx.chunks.push(SourceChunk::new(
-            base_path.join(file_name).to_string_lossy().to_string(),
+            static_file_name.to_string(),
             chunk_start_line,
             chunk_start_byte,
             current_chunk_lines.join("\n"),
@@ -393,5 +415,67 @@ mod tests {
         assert_eq!(chunks[1].content, "line3");
         assert_eq!(chunks[1].byte_offset, 19); // "line1\n#pragma once\n" is 19 bytes
         assert_eq!(chunks[1].start_line, 3);
+    }
+
+    #[test]
+    fn preprocessor_errors_include_correct_file_name() {
+        // Test that preprocessor errors reference the correct file name, not
+        // "<preprocessor>"
+        let content = "#include \"nonexistent.zr\"";
+        let result = preprocess(Path::new("/test/dir"), vec![], "main.zr", content);
+
+        assert!(result.is_err());
+        let err = result.expect_err("expected a preprocessing error");
+        // The error span should reference the actual file, not "<preprocessor>"
+        assert_eq!(err.1.span().file_name(), "/test/dir/main.zr");
+    }
+
+    #[test]
+    fn preprocessor_errors_include_correct_byte_offset() {
+        // Test that preprocessor errors on later lines have correct byte offsets
+        let content = "// line 1\n// line 2\n#unknown_directive";
+        let result = preprocess(Path::new("."), vec![], "test.zr", content);
+
+        assert!(result.is_err());
+        let err = result.expect_err("expected a preprocessing error");
+        // The error should start at byte 20 (after "// line 1\n// line 2\n")
+        assert_eq!(err.1.span().start(), 20);
+        assert_eq!(err.1.span().end(), 20 + "#unknown_directive".len());
+    }
+
+    #[test]
+    fn preprocessor_unterminated_include_string_error() {
+        let content = "#include \"unterminated";
+        let result = preprocess(Path::new("."), vec![], "test.zr", content);
+
+        assert!(result.is_err());
+        let err = result.expect_err("expected a preprocessing error");
+        assert_eq!(err.1.span().file_name(), "./test.zr");
+        assert_eq!(err.1.span().start(), 0);
+        assert_eq!(err.1.span().end(), content.len());
+    }
+
+    #[test]
+    fn preprocessor_unterminated_include_angle_brackets_error() {
+        let content = "#include <unterminated";
+        let result = preprocess(Path::new("."), vec![], "test.zr", content);
+
+        assert!(result.is_err());
+        let err = result.expect_err("expected a preprocessing error");
+        assert_eq!(err.1.span().file_name(), "./test.zr");
+        assert_eq!(err.1.span().start(), 0);
+        assert_eq!(err.1.span().end(), content.len());
+    }
+
+    #[test]
+    fn preprocessor_invalid_include_syntax_error() {
+        let content = "#include invalid";
+        let result = preprocess(Path::new("."), vec![], "test.zr", content);
+
+        assert!(result.is_err());
+        let err = result.expect_err("expected a preprocessing error");
+        assert_eq!(err.1.span().file_name(), "./test.zr");
+        assert_eq!(err.1.span().start(), 0);
+        assert_eq!(err.1.span().end(), content.len());
     }
 }
