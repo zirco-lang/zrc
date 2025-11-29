@@ -49,8 +49,10 @@
               libffi
               libxml2
             ];
-
-            LLVM_SYS_201_PREFIX = llvm.llvm.dev;
+            postInstall = ''
+		cp -r $src/include $out
+            '';
+	    LLVM_SYS_201_PREFIX = llvm.llvm.dev;
          };
 
         packages.default = self.packages.${system}.zrc;
