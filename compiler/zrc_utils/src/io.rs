@@ -29,7 +29,7 @@ pub fn open_input(path: &PathBuf) -> Result<(String, String, Box<dyn Read>), io:
     if path.as_os_str() == "-" {
         Ok((
             "/dev".to_string(),
-            "stdin".to_string(),
+            "<stdin>".to_string(),
             Box::new(io::stdin()),
         ))
     } else {
