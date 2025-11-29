@@ -8,7 +8,11 @@
 //! Read the documentation for the types [`Span`] and [`Spanned<T>`], and the
 //! trait [`Spannable`] to learn more.
 
-use std::{fmt::Display, ops::RangeInclusive};
+use std::{
+    fmt::{Debug, Display},
+    ops::RangeInclusive,
+    path::PathBuf,
+};
 
 /// Represents the start and end of some segment of a string
 ///
@@ -21,7 +25,7 @@ use std::{fmt::Display, ops::RangeInclusive};
 /// - Direct construction ([`Span::from_positions_and_file`])
 /// - Methods on another Span ([`Span::intersect`])
 /// - Stripping the value from a [`Spanned<T>`] ([`Spanned::span`])
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Span(usize, usize, &'static str);
 impl Span {
     /// Create a new [`Span`] given a start and end location with a file name.
@@ -97,7 +101,22 @@ impl Span {
 }
 impl Display for Span {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}-{}", self.start(), self.end())
+        write!(f, "{}:{}-{}", self.file_name(), self.start(), self.end())
+    }
+}
+impl Debug for Span {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "[.../{}:{}-{}]",
+            // shorten the path to just the file name for readability
+            PathBuf::from(self.file_name())
+                .file_name()
+                .expect("file name should exist")
+                .to_string_lossy(),
+            self.start(),
+            self.end()
+        )
     }
 }
 
@@ -112,7 +131,7 @@ impl Display for Span {
 /// - By attaching a value to a [`Span`] ([`Span::containing`])
 /// - By attaching a [`Span`] to a value (with the [`Spannable`] trait's
 ///   [`Spannable::in_span`] method)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Spanned<T>(Span, T);
 impl<T> Spanned<T> {
     /// Create a new [`Spanned<T>`] instance from a [`Span`] and some value
@@ -184,6 +203,14 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.value().fmt(f)
+    }
+}
+impl<T> Debug for Spanned<T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}: {:?}", self.span(), self.value())
     }
 }
 impl<T> Spanned<Option<T>> {
@@ -285,7 +312,7 @@ mod tests {
             assert_eq!(span.end(), 7);
             assert_eq!(span.file_name(), "<test>");
             assert_eq!(span.range(), 2..=7);
-            assert_eq!(span.to_string(), "2-7".to_string());
+            assert_eq!(span.to_string(), "<test>:2-7".to_string());
         }
 
         #[test]
