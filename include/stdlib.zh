@@ -26,7 +26,7 @@ fn div(numer: i32, denom: i32) -> Div32;
 fn ldiv(numer: i64, denom: i64) -> Div64;
 //fn lldiv(numer: i128, denom: i128) -> Div128
 fn abort() -> void;
-// TODO: void pointers
+// TODO: function pointers
 //fn atexit(func: *(fn() -> void)) -> i32;
 //fn at_quick_exit(func: *(fn() -> void)) -> i32;
 fn exit(status: i32) -> void;
