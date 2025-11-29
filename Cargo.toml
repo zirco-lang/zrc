@@ -9,6 +9,12 @@ members = [
     "compiler/zrc_codegen",
     "compiler/zrc_preprocessor",
     "tools/zircop",
+    "bindings/zrc_wasm",
+]
+
+default-members = [
+    "compiler/zrc",
+    "tools/zircop",
 ]
 
 [profile.release]

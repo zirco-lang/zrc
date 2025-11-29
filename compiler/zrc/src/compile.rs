@@ -7,7 +7,7 @@ use std::path::Path;
 
 use zrc_codegen::{DebugLevel, OptimizationLevel};
 
-use crate::OutputFormat;
+use crate::cli::OutputFormat;
 
 /// Drive the compilation process.
 ///
@@ -32,7 +32,8 @@ use crate::OutputFormat;
 #[expect(
     clippy::too_many_arguments,
     clippy::wildcard_enum_match_arm,
-    clippy::result_large_err
+    clippy::result_large_err,
+    clippy::missing_errors_doc
 )]
 pub fn compile(
     frontend_version_string: &str,
