@@ -43,14 +43,26 @@ pub fn cg_equality<'ctx, 'input>(
     let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
     let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
 
+    // For pointer comparisons, convert pointers to integers first
+    let (lhs_int, rhs_int) = if lhs.is_pointer_value() && rhs.is_pointer_value() {
+        let target_data = cg.target_machine.get_target_data();
+        let ptr_sized_int = cg.ctx.ptr_sized_int_type(&target_data, None);
+        let lhs_int = cg
+            .builder
+            .build_ptr_to_int(lhs.into_pointer_value(), ptr_sized_int, "ptr_to_int")
+            .expect("ptr_to_int should have compiled successfully");
+        let rhs_int = cg
+            .builder
+            .build_ptr_to_int(rhs.into_pointer_value(), ptr_sized_int, "ptr_to_int")
+            .expect("ptr_to_int should have compiled successfully");
+        (lhs_int, rhs_int)
+    } else {
+        (lhs.into_int_value(), rhs.into_int_value())
+    };
+
     let reg = cg
         .builder
-        .build_int_compare(
-            int_predicate_for_equality(op),
-            lhs.into_int_value(),
-            rhs.into_int_value(),
-            "cmp",
-        )
+        .build_int_compare(int_predicate_for_equality(op), lhs_int, rhs_int, "cmp")
         .expect("equality comparison should have compiled successfully");
 
     bb.and(reg.as_basic_value_enum())
@@ -260,6 +272,24 @@ mod tests {
 
                     // TEST: should create a bit NOT
                     let not = !a;
+                }
+            "});
+    }
+
+    #[test]
+    fn pointer_equality_operators_generate() {
+        cg_snapshot_test!(indoc! {"
+                fn get_ptr() -> *i32;
+
+                fn test() {
+                    let a = get_ptr();
+                    let b = get_ptr();
+
+                    // TEST: should create pointer comparison using ptrtoint + icmp
+                    let eq = a == b;
+
+                    // TEST: should create pointer comparison using ptrtoint + icmp
+                    let ne = a != b;
                 }
             "});
     }
