@@ -225,6 +225,15 @@ pub Type: Type<'input> = {
         Type(<>.map(TypeKind::Union)),
     Spanned<("enum" <KeyTypeMapping>)> =>
         Type(<>.map(TypeKind::Enum)),
+
+    // We MANDATE the return type specification otherwise it creates a shift/reduce conflict with
+    // `typeof (fn x -> y)`
+    // `(typeof fn x)->y`
+    Spanned<("fn" "(" <ArgumentDeclarationList?> ")" <("->" <Type>)>)> =>
+        Type(<>.map(|(params, ret)| TypeKind::Function {
+            parameters: Box::new(params.unwrap_or_else(|| ArgumentDeclarationList::empty())),
+            return_type: Box::new(ret),
+        })),
 }
 
 TypeOrParenthesizedType: Type<'input> = {

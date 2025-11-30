@@ -2,11 +2,17 @@
 
 use indexmap::IndexMap;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
-use zrc_parser::ast::ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind};
-use zrc_utils::span::Span;
+use zrc_parser::ast::{
+    stmt::ArgumentDeclarationList as AstADL,
+    ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind},
+};
+use zrc_utils::span::{Span, Spanned};
 
 use super::scope::TypeCtx;
-use crate::tast::ty::Type as TastType;
+use crate::tast::{
+    stmt::{ArgumentDeclaration, ArgumentDeclarationList},
+    ty::{Fn, Type as TastType},
+};
 
 /// Resolve an identifier to its corresponding [`TastType`].
 ///
@@ -44,6 +50,39 @@ pub fn resolve_type<'input>(
                     (TastType::Union(resolve_key_type_mapping(type_scope, members)?)),
                 ),
             ]))
+        }
+        ParserTypeKind::Function {
+            parameters,
+            return_type,
+        } => {
+            let is_variadic = matches!(*parameters, AstADL::Variadic(_));
+            let (AstADL::Variadic(param_decls) | AstADL::NonVariadic(param_decls)) = *parameters;
+            let parameters = Box::new(
+                param_decls
+                    .into_iter()
+                    .map(|param| {
+                        Ok(ArgumentDeclaration {
+                            name: param.value().name,
+                            ty: param
+                                .map(|param| resolve_type(type_scope, param.ty))
+                                .transpose()
+                                .map_err(Spanned::into_value)?,
+                        })
+                    })
+                    .collect::<Result<Vec<ArgumentDeclaration>, Diagnostic>>()?,
+            );
+            let parameters = if is_variadic {
+                ArgumentDeclarationList::Variadic(*parameters)
+            } else {
+                ArgumentDeclarationList::NonVariadic(*parameters)
+            };
+
+            let returns = Box::new(resolve_type(type_scope, *return_type)?);
+
+            TastType::Fn(Fn {
+                arguments: parameters,
+                returns,
+            })
         }
     })
 }
@@ -120,6 +159,45 @@ fn resolve_type_with_opaque<'input>(
                     )?)),
                 ),
             ]))
+        }
+        ParserTypeKind::Function {
+            parameters,
+            return_type,
+        } => {
+            let is_variadic = matches!(*parameters, AstADL::Variadic(_));
+            let (AstADL::Variadic(param_decls) | AstADL::NonVariadic(param_decls)) = *parameters;
+            let parameters = Box::new(
+                param_decls
+                    .into_iter()
+                    .map(|param| {
+                        Ok(ArgumentDeclaration {
+                            name: param.value().name,
+                            ty: param
+                                .map(|param| {
+                                    resolve_type_with_opaque(type_scope, param.ty, opaque_name)
+                                })
+                                .transpose()
+                                .map_err(Spanned::into_value)?,
+                        })
+                    })
+                    .collect::<Result<Vec<ArgumentDeclaration>, Diagnostic>>()?,
+            );
+            let parameters = if is_variadic {
+                ArgumentDeclarationList::Variadic(*parameters)
+            } else {
+                ArgumentDeclarationList::NonVariadic(*parameters)
+            };
+
+            let returns = Box::new(resolve_type_with_opaque(
+                type_scope,
+                *return_type,
+                opaque_name,
+            )?);
+
+            TastType::Fn(Fn {
+                arguments: parameters,
+                returns,
+            })
         }
     })
 }
