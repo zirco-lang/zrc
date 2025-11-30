@@ -16,4 +16,4 @@ fn snprintf(a: *u8, b: usize, c: *u8, ...) -> i32;
 fn fopen(filename: *u8, mode: *u8) -> *FILE;
 fn fclose(fptr: *FILE) -> i32;
 fn fprintf(fptr: *FILE, a: *u8, ...) -> i32;
-fn fread(buffer: *void, size: usize, count: usize, stream: *FILE);
+fn fread(buffer: *void, size: usize, count: usize, stream: *FILE) -> usize;
