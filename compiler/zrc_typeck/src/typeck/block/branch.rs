@@ -68,16 +68,19 @@ pub fn type_if<'input, 'gs>(
         .as_ref()
         .map_or(BlockReturnActuality::NeverReturns, |te| te.return_actuality);
 
+    let return_actuality = BlockReturnActuality::join(then_act, te_act);
+
     Ok(Some((
-        TypedStmt(
-            TypedStmtKind::IfStmt(
+        TypedStmt {
+            kind: TypedStmtKind::IfStmt(
                 typed_cond,
                 typed_then.in_span(then_span),
                 typed_then_else
                     .map(|x| x.in_span(te_span.expect("should have been unwrapped already"))),
             )
             .in_span(stmt_span),
-        ),
-        BlockReturnActuality::join(then_act, te_act),
+            return_actuality,
+        },
+        return_actuality,
     )))
 }

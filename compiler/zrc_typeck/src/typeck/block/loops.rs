@@ -74,18 +74,20 @@ pub fn type_for<'input, 'gs>(
         return_ability.clone().demote(),
     )?;
     let ra = body.return_actuality;
+    let return_actuality = ra.demote();
 
     Ok(Some((
-        TypedStmt(
-            TypedStmtKind::ForStmt {
+        TypedStmt {
+            kind: TypedStmtKind::ForStmt {
                 init: typed_init.map(Box::new),
                 cond: typed_cond,
                 post: typed_post,
                 body: body.in_span(body_as_block_span),
             }
             .in_span(stmt_span),
-        ),
-        ra.demote(),
+            return_actuality,
+        },
+        return_actuality,
     )))
 }
 
@@ -108,11 +110,14 @@ pub fn type_four<'input, 'gs>(
         true,
         return_ability.clone().demote(),
     )?;
-    let ra = body.return_actuality;
+    let return_actuality = body.return_actuality;
 
     Ok(Some((
-        TypedStmt(TypedStmtKind::FourStmt(body.in_span(body_as_block_span)).in_span(stmt_span)),
-        ra,
+        TypedStmt {
+            kind: TypedStmtKind::FourStmt(body.in_span(body_as_block_span)).in_span(stmt_span),
+            return_actuality,
+        },
+        return_actuality,
     )))
 }
 
@@ -147,10 +152,14 @@ pub fn type_while<'input, 'gs>(
         return_ability.clone().demote(),
     )?;
     let ra = body.return_actuality;
+    let return_actuality = ra.demote();
 
     Ok(Some((
-        TypedStmt(TypedStmtKind::WhileStmt(typed_cond, body.in_span(body_span)).in_span(stmt_span)),
-        ra.demote(),
+        TypedStmt {
+            kind: TypedStmtKind::WhileStmt(typed_cond, body.in_span(body_span)).in_span(stmt_span),
+            return_actuality,
+        },
+        return_actuality,
     )))
 }
 
@@ -180,14 +189,16 @@ pub fn type_do_while<'input, 'gs>(
         true,
         return_ability.clone().demote(),
     )?;
-    let ra = body.return_actuality;
+    // Unlike `while`, a `do..while` loop is guaranteed to run at
+    // least once. For this reason, we do not need to `demote` it.
+    let return_actuality = body.return_actuality;
 
     Ok(Some((
-        TypedStmt(
-            TypedStmtKind::DoWhileStmt(body.in_span(body_span), typed_cond).in_span(stmt_span),
-        ),
-        // Unlike `while`, a `do..while` loop is guaranteed to run at
-        // least once. For this reason, we do not need to `demote` it.
-        ra,
+        TypedStmt {
+            kind: TypedStmtKind::DoWhileStmt(body.in_span(body_span), typed_cond)
+                .in_span(stmt_span),
+            return_actuality,
+        },
+        return_actuality,
     )))
 }

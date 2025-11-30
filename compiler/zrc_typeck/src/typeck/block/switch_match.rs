@@ -114,16 +114,20 @@ pub fn type_switch_case<'input, 'gs>(
 
     let (cases, return_statuses): (Vec<_>, Vec<_>) = cases.into_iter().unzip();
 
+    let return_actuality =
+        BlockReturnActuality::join(BlockReturnActuality::join_iter(return_statuses), default_ra);
+
     Ok(Some((
-        TypedStmt(
-            (TypedStmtKind::SwitchCase {
+        TypedStmt {
+            kind: (TypedStmtKind::SwitchCase {
                 scrutinee,
                 default: default_block,
                 cases,
             })
             .in_span(stmt_span),
-        ),
-        BlockReturnActuality::join(BlockReturnActuality::join_iter(return_statuses), default_ra),
+            return_actuality,
+        },
+        return_actuality,
     )))
 }
 
@@ -344,7 +348,10 @@ pub fn type_match<'input, 'gs>(
     let switch_return_actuality = typed_switch_block.return_actuality;
 
     Ok(Some((
-        TypedStmt(TypedStmtKind::BlockStmt(typed_switch_block).in_span(stmt_span)),
+        TypedStmt {
+            kind: TypedStmtKind::BlockStmt(typed_switch_block).in_span(stmt_span),
+            return_actuality: switch_return_actuality,
+        },
         switch_return_actuality,
     )))
 }
