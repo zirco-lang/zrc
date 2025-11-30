@@ -68,28 +68,37 @@ pub fn cg_cast<'ctx, 'input>(
             .as_basic_value_enum(),
         (false, false) if x.get_type().is_int_type() && ty.value().is_integer() => {
             // Cast between two integers
-            match (x_ty_is_signed_integer, ty.value().is_signed_integer()) {
-                // (x is signed, target is signed or unsigned)
-                (true, _) => cg
-                    .builder
-                    .build_int_s_extend(
-                        x.into_int_value(),
-                        llvm_basic_type(&cg, ty.value()).0.into_int_type(),
-                        "cast",
-                    )
-                    .expect("sext should have compiled successfully")
-                    .as_basic_value_enum(),
+            let src_int = x.into_int_value();
+            let target_int_type = llvm_basic_type(&cg, ty.value()).0.into_int_type();
+            let src_width = src_int.get_type().get_bit_width();
+            let target_width = target_int_type.get_bit_width();
 
-                // (x is signed, target is signed or unsigned)
-                (false, _) => cg
-                    .builder
-                    .build_int_z_extend(
-                        x.into_int_value(),
-                        llvm_basic_type(&cg, ty.value()).0.into_int_type(),
-                        "cast",
-                    )
-                    .expect("zext should have compiled successfully")
-                    .as_basic_value_enum(),
+            match src_width.cmp(&target_width) {
+                std::cmp::Ordering::Less => {
+                    // Source is smaller, need to extend
+                    if x_ty_is_signed_integer {
+                        cg.builder
+                            .build_int_s_extend(src_int, target_int_type, "cast")
+                            .expect("sext should have compiled successfully")
+                            .as_basic_value_enum()
+                    } else {
+                        cg.builder
+                            .build_int_z_extend(src_int, target_int_type, "cast")
+                            .expect("zext should have compiled successfully")
+                            .as_basic_value_enum()
+                    }
+                }
+                std::cmp::Ordering::Greater => {
+                    // Source is larger, need to truncate
+                    cg.builder
+                        .build_int_truncate(src_int, target_int_type, "cast")
+                        .expect("trunc should have compiled successfully")
+                        .as_basic_value_enum()
+                }
+                std::cmp::Ordering::Equal => {
+                    // Same width, no conversion needed
+                    src_int.as_basic_value_enum()
+                }
             }
         }
         (false, false) => {
@@ -235,5 +244,75 @@ pub fn cg_struct_construction<'ctx, 'input>(
         | Type::Opaque(_) => {
             unreachable!("struct construction should only be used with struct/union types")
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // Please read the "Common patterns in tests" section of crate::test_utils for
+    // more information on how code generator tests are structured.
+
+    use indoc::indoc;
+
+    use crate::cg_snapshot_test;
+
+    #[test]
+    fn cast_truncation_generates_properly() {
+        // Regression test for issue: ICE when casting from larger int to smaller
+        // int (e.g., i32 to u8) Previously the compiler incorrectly used sext/zext
+        // instead of trunc
+        cg_snapshot_test!(indoc! {"
+            fn test_trunc_signed_to_unsigned() -> u8 {
+                let x: i32 = 65;
+                return x as u8;
+            }
+
+            fn test_trunc_unsigned_to_signed() -> i8 {
+                let x: u32 = 65;
+                return x as i8;
+            }
+
+            fn test_large_to_small_trunc() -> i16 {
+                let x: i64 = 1000;
+                return x as i16;
+            }
+        "});
+    }
+
+    #[test]
+    fn cast_extension_generates_properly() {
+        // Test that extension still works correctly after the truncation fix
+        cg_snapshot_test!(indoc! {"
+            fn test_sext_i8_to_i32() -> i32 {
+                let x: i8 = 1i8;
+                return x as i32;
+            }
+
+            fn test_zext_u8_to_i32() -> i32 {
+                let x: u8 = 255u8;
+                return x as i32;
+            }
+
+            fn test_small_to_large() -> u64 {
+                let x: u8 = 255u8;
+                return x as u64;
+            }
+        "});
+    }
+
+    #[test]
+    fn cast_same_size_generates_properly() {
+        // Test that same-size casts work correctly (no-op)
+        cg_snapshot_test!(indoc! {"
+            fn test_same_size_signed_to_unsigned() -> u32 {
+                let x: i32 = 42;
+                return x as u32;
+            }
+
+            fn test_same_size_unsigned_to_signed() -> i32 {
+                let x: u32 = 42;
+                return x as i32;
+            }
+        "});
     }
 }
