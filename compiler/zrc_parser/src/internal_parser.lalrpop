@@ -204,6 +204,15 @@ LetDeclaration: Vec<Spanned<LetDeclaration<'input>>> = {
         name: i,
         ty: t,
         value: v,
+        is_constant: false,
+    })).collect::<Vec<_>>(),
+    "const" <l:CommaSeparatedWithoutTrailing<
+        Spanned<(<Spanned<IDENTIFIER>> <(":" <Type>)?> <("=" <Assignment>)?>)>
+    >> ";" => l.into_iter().map(|sp| sp.map(|(i, t, v)| LetDeclaration {
+        name: i,
+        ty: t,
+        value: v,
+        is_constant: true,
     })).collect::<Vec<_>>(),
 };
 
@@ -468,6 +477,7 @@ extern {
         "continue" => lexer::Tok::Continue,
         "return" => lexer::Tok::Return,
         "let" => lexer::Tok::Let,
+        "const" => lexer::Tok::Const,
         "fn" => lexer::Tok::Fn,
         "as" => lexer::Tok::As,
         "struct" => lexer::Tok::Struct,

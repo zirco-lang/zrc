@@ -508,6 +508,10 @@ pub enum Tok<'input> {
     #[token("let")]
     #[display("let")]
     Let,
+    /// The keyword `const`
+    #[token("const")]
+    #[display("const")]
+    Const,
     /// The keyword `fn`
     #[token("fn")]
     #[display("fn")]
@@ -803,7 +807,7 @@ mod tests {
             "= += -= *= /= %= &= |= ^= <<= >>= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
             r#" struct union enum match sizeof type switch default four -> => "str" 7_000 0xF_A"#,
-            " 0b1_0 abc"
+            " 0b1_0 abc const"
         );
         let tokens: Vec<Tok> = vec![
             Tok::PlusPlus,
@@ -884,6 +888,7 @@ mod tests {
             Tok::NumberLiteral(NumberLiteral::Hexadecimal("F_A")),
             Tok::NumberLiteral(NumberLiteral::Binary("1_0")),
             Tok::Identifier("abc"),
+            Tok::Const,
         ];
 
         assert_eq!(

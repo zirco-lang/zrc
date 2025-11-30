@@ -342,6 +342,8 @@ pub struct LetDeclaration<'input> {
     pub ty: Option<Type<'input>>,
     /// The value to associate with the new symbol.
     pub value: Option<Expr<'input>>,
+    /// If this is a constant declaration (i.e. `const` instead of `let`)
+    pub is_constant: bool,
 }
 impl Display for LetDeclaration<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

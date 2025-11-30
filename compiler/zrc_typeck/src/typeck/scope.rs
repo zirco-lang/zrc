@@ -117,6 +117,8 @@ pub struct ValueEntry<'input> {
     pub referenced_spans: Vec<Span>,
     /// The source span where this value was declared, for diagnostic purposes
     pub declaration_span: Span,
+    /// If this value is a constant
+    pub is_constant: bool,
 }
 impl<'input> ValueEntry<'input> {
     /// Create a used value entry with an initial reference span
@@ -126,6 +128,7 @@ impl<'input> ValueEntry<'input> {
             ty,
             referenced_spans: vec![reference_span],
             declaration_span,
+            is_constant: false,
         }
     }
 
@@ -136,6 +139,7 @@ impl<'input> ValueEntry<'input> {
             ty,
             referenced_spans: Vec::new(),
             declaration_span,
+            is_constant: false,
         }
     }
 }

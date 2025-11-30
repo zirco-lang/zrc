@@ -22,7 +22,8 @@ pub fn type_expr_assignment<'input>(
     // Desugar `x += y` to `x = x + y`.
     let (place, value) = desugar_assignment(mode, place, value);
 
-    let place_t = expr_to_place(expr_span, type_expr(scope, place)?)?;
+    let lvalue = type_expr(scope, place)?;
+    let place_t = expr_to_place(scope, expr_span, lvalue)?;
     let value_t = type_expr(scope, value)?;
 
     if place_t.inferred_type == value_t.inferred_type {

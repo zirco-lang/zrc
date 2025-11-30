@@ -79,7 +79,7 @@ pub fn type_expr_unary_address_of<'input>(
 
     Ok(TypedExpr {
         inferred_type: TastType::Ptr(Box::new(x_ty.inferred_type.clone())),
-        kind: TypedExprKind::UnaryAddressOf(Box::new(expr_to_place(expr_span, x_ty)?))
+        kind: TypedExprKind::UnaryAddressOf(Box::new(expr_to_place(scope, expr_span, x_ty)?))
             .in_span(expr_span),
     })
 }
@@ -113,7 +113,7 @@ pub fn type_expr_prefix_increment<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
-    let place = expr_to_place(expr_span, x_ty)?;
+    let place = expr_to_place(scope, expr_span, x_ty)?;
 
     expect_is_integer(&place.inferred_type, x_span)?;
 
@@ -131,7 +131,7 @@ pub fn type_expr_prefix_decrement<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
-    let place = expr_to_place(expr_span, x_ty)?;
+    let place = expr_to_place(scope, expr_span, x_ty)?;
 
     expect_is_integer(&place.inferred_type, x_span)?;
 
@@ -149,7 +149,7 @@ pub fn type_expr_postfix_increment<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
-    let place = expr_to_place(expr_span, x_ty)?;
+    let place = expr_to_place(scope, expr_span, x_ty)?;
 
     expect_is_integer(&place.inferred_type, x_span)?;
 
@@ -167,7 +167,7 @@ pub fn type_expr_postfix_decrement<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
-    let place = expr_to_place(expr_span, x_ty)?;
+    let place = expr_to_place(scope, expr_span, x_ty)?;
 
     expect_is_integer(&place.inferred_type, x_span)?;
 
