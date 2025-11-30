@@ -50,11 +50,11 @@ pub fn cg_equality<'ctx, 'input>(
         let lhs_int = cg
             .builder
             .build_ptr_to_int(lhs.into_pointer_value(), ptr_sized_int, "ptr_to_int")
-            .expect("ptr_to_int should have compiled successfully");
+            .expect("lhs ptr_to_int for pointer comparison should have compiled successfully");
         let rhs_int = cg
             .builder
             .build_ptr_to_int(rhs.into_pointer_value(), ptr_sized_int, "ptr_to_int")
-            .expect("ptr_to_int should have compiled successfully");
+            .expect("rhs ptr_to_int for pointer comparison should have compiled successfully");
         (lhs_int, rhs_int)
     } else {
         (lhs.into_int_value(), rhs.into_int_value())
