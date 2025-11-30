@@ -11,6 +11,8 @@ use zrc_utils::{
     spanned,
 };
 
+use crate::ast::stmt::ArgumentDeclarationList;
+
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone, Display)]
 #[display("{_0}")]
@@ -50,6 +52,15 @@ pub enum TypeKind<'input> {
     /// A tagged union type
     #[display("enum {{ {_0} }}")]
     Enum(KeyTypeMapping<'input>),
+    /// A function type
+    /// `fn(params) -> return_type`
+    #[display("fn({parameters}) -> {return_type}")]
+    Function {
+        /// The function parameters
+        parameters: Box<ArgumentDeclarationList<'input>>,
+        /// The return type, if any
+        return_type: Box<Type<'input>>,
+    },
 }
 
 // AST builder. We are able to infer the spans of many based on the start of
@@ -101,6 +112,7 @@ mod tests {
             "struct { a: i32, b: i32 }",
             "union { a: i32, b: i32 }",
             "enum { Eight: i8, Sixteen: i16 }",
+            "fn(x: i32, y: i32) -> i32",
         ];
 
         for input in test_cases {
