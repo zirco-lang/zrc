@@ -35,14 +35,17 @@ pub fn cg_place<'ctx>(
 ) -> BasicBlockAnd<'ctx, PointerValue<'ctx>> {
     let place_span = place.kind.span();
     let line_and_col = cg.line_lookup.lookup_from_index(place_span.start());
-    let debug_location = cg.dbg_builder.create_debug_location(
-        cg.ctx,
-        line_and_col.line,
-        line_and_col.col,
-        cg.dbg_scope.as_debug_info_scope(),
-        None,
-    );
-    cg.builder.set_current_debug_location(debug_location);
+    let _debug_location = cg.dbg_builder.as_ref().map(|dbg_builder| {
+        let dl = dbg_builder.create_debug_location(
+            cg.ctx,
+            line_and_col.line,
+            line_and_col.col,
+            cg.dbg_scope.expect("we have DI").as_debug_info_scope(),
+            None,
+        );
+        cg.builder.set_current_debug_location(dl);
+        dl
+    });
 
     match place.kind.into_value() {
         PlaceKind::Variable(x) => {

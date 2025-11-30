@@ -22,7 +22,7 @@ pub fn cg_for_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'input, 'ctx>,
-    lexical_block: DILexicalBlock<'ctx>,
+    lexical_block: Option<DILexicalBlock<'ctx>>,
     init: Option<Box<Vec<Spanned<LetDeclaration<'input>>>>>,
     cond: Option<TypedExpr<'input>>,
     post: Option<TypedExpr<'input>>,
@@ -124,7 +124,7 @@ pub fn cg_four_stmt<'ctx, 'input, 'gs, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'input, 'ctx>,
-    lexical_block: DILexicalBlock<'ctx>,
+    lexical_block: Option<DILexicalBlock<'ctx>>,
     body: Spanned<BlockMetadata<'input, 'gs>>,
 ) -> BasicBlock<'ctx> {
     let mut current_bb = bb;
@@ -186,7 +186,7 @@ pub fn cg_four_stmt<'ctx, 'input, 'gs, 'a>(
 pub fn cg_while_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     scope: &'a CgScope<'input, 'ctx>,
-    lexical_block: DILexicalBlock<'ctx>,
+    lexical_block: Option<DILexicalBlock<'ctx>>,
     cond: TypedExpr<'input>,
     body: Spanned<BlockMetadata<'input, '_>>,
 ) -> BasicBlock<'ctx> {
@@ -247,7 +247,7 @@ pub fn cg_while_stmt<'ctx, 'input, 'a>(
 pub fn cg_do_while_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     scope: &'a CgScope<'input, 'ctx>,
-    lexical_block: DILexicalBlock<'ctx>,
+    lexical_block: Option<DILexicalBlock<'ctx>>,
     body: Spanned<BlockMetadata<'input, '_>>,
     cond: TypedExpr<'input>,
 ) -> BasicBlock<'ctx> {

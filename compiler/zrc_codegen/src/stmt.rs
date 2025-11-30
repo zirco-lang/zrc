@@ -64,33 +64,41 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     parent_scope: &'a CgScope<'input, 'ctx>,
-    parent_lexical_block: DILexicalBlock<'ctx>,
+    parent_lexical_block: Option<DILexicalBlock<'ctx>>,
     block: Spanned<BlockMetadata<'input, '_>>,
     breakaway: &Option<LoopBreakaway<'ctx>>,
 ) -> Option<BasicBlock<'ctx>> {
     let mut scope = parent_scope.clone();
     let block_span = block.span();
     let block_line_col = cg.line_lookup.lookup_from_index(block_span.start());
-    let lexical_block = cg.dbg_builder.create_lexical_block(
-        parent_lexical_block.as_debug_info_scope(),
-        cg.compilation_unit.get_file(),
-        block_line_col.line,
-        block_line_col.col,
-    );
+
+    let lexical_block = cg.dbg_builder.as_ref().map(|dbg_builder| {
+        dbg_builder.create_lexical_block(
+            parent_lexical_block
+                .expect("We have DI")
+                .as_debug_info_scope(),
+            cg.compilation_unit.expect("We have DI").get_file(),
+            block_line_col.line,
+            block_line_col.col,
+        )
+    });
 
     let stmts = block.value().stmts.as_slice();
 
     stmts.iter().try_fold(bb, |bb, stmt| -> Option<BasicBlock> {
         let stmt_span = stmt.0.span();
         let stmt_line_col = cg.line_lookup.lookup_from_index(stmt_span.start());
-        let debug_location = cg.dbg_builder.create_debug_location(
-            cg.ctx,
-            stmt_line_col.line,
-            stmt_line_col.col,
-            lexical_block.as_debug_info_scope(),
-            None,
-        );
-        cg.builder.set_current_debug_location(debug_location);
+        cg.dbg_builder.as_ref().map(|dbg_builder| {
+            let debug_location = dbg_builder.create_debug_location(
+                cg.ctx,
+                stmt_line_col.line,
+                stmt_line_col.col,
+                lexical_block.expect("We have DI").as_debug_info_scope(),
+                None,
+            );
+            cg.builder.set_current_debug_location(debug_location);
+            debug_location
+        });
 
         match stmt.0.value() {
             TypedStmtKind::UnreachableStmt => {
