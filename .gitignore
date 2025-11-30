@@ -1,4 +1,5 @@
 /target
+/bindings/zrc_wasm/target
 lcov.info
 .direnv
 /examples/**/out

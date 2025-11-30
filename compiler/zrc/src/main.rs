@@ -59,13 +59,14 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 mod build_info;
-mod cli;
-mod compile;
 mod ice;
 
 use anyhow::bail;
 use clap::Parser;
-use cli::{Cli, OutputFormat};
+use zrc::{
+    cli::{self, Cli, OutputFormat},
+    compile,
+};
 use zrc_codegen::DebugLevel;
 use zrc_utils::io;
 

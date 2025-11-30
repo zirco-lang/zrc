@@ -7,7 +7,7 @@ use derive_more::Display;
 use zrc_codegen::OptimizationLevel;
 
 /// The official Zirco compiler
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(version=None)]
 pub struct Cli {
     /// See what version of zrc you are using
@@ -124,6 +124,7 @@ pub enum OutputFormat {
 }
 
 /// Get the include paths from the CLI environment and -I arguments
+#[must_use]
 pub fn get_include_paths(cli: &Cli) -> Vec<&'static Path> {
     // append paths in the following order:
     // 1. CLI

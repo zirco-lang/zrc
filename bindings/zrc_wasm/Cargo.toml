@@ -1,0 +1,12 @@
+[package]
+name = "zrc_wasm"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2.106"
+zrc = { path = "../../compiler/zrc" }
+zrc_codegen = { path = "../../compiler/zrc_codegen" }
