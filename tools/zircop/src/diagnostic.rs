@@ -19,6 +19,8 @@ pub enum LintDiagnosticKind {
     UnderscoreVariableUsed(String),
     #[error("unused variable `{0}`")]
     UnusedVariable(String),
+    #[error("unreachable code")]
+    UnreachableCode,
 }
 
 /// A Zircop lint

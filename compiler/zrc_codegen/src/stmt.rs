@@ -86,7 +86,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
     let stmts = block.value().stmts.as_slice();
 
     stmts.iter().try_fold(bb, |bb, stmt| -> Option<BasicBlock> {
-        let stmt_span = stmt.0.span();
+        let stmt_span = stmt.kind.span();
         let stmt_line_col = cg.line_lookup.lookup_from_index(stmt_span.start());
         cg.dbg_builder.as_ref().map(|dbg_builder| {
             let debug_location = dbg_builder.create_debug_location(
@@ -100,7 +100,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
             debug_location
         });
 
-        match stmt.0.value() {
+        match stmt.kind.value() {
             TypedStmtKind::UnreachableStmt => {
                 cg.builder
                     .build_unreachable()
