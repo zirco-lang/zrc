@@ -129,9 +129,9 @@ pub fn process_let_declaration<'input>(
                     result_decl.name.value(),
                     ValueEntry {
                         ty: result_decl.ty.clone(),
-                        used: false,
                         declaration_span: let_decl_span,
                         is_constant: let_declaration.is_constant,
+                        referenced_spans: vec![],
                     },
                 );
                 Ok(result_decl.in_span(let_decl_span))
