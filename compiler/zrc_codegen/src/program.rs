@@ -73,10 +73,15 @@ fn eval_const_expr<'ctx>(
             .const_int((*value).into(), false)
             .as_basic_value_enum(),
         TypedExprKind::StringLiteral(string) => {
+            // Create a global constant string and return a pointer to it
             let bytes = string.as_bytes();
-            unit.ctx
-                .const_string(bytes.as_bytes(), false)
-                .as_basic_value_enum()
+            let string_value = unit.ctx.const_string(bytes.as_bytes(), false);
+            let global = unit
+                .module
+                .add_global(string_value.get_type(), None, ".str");
+            global.set_initializer(&string_value);
+            global.set_constant(true);
+            global.as_pointer_value().as_basic_value_enum()
         }
         TypedExprKind::CharLiteral(ch) => unit
             .ctx
@@ -729,5 +734,19 @@ mod tests {
                     return x;
                 }
             "});
+    }
+
+    /// Regression test for <https://github.com/zirco-lang/zrc/issues/441>
+    /// Global string variables should compile without ICE
+    #[test]
+    fn global_string_variable_compiles() {
+        cg_snapshot_test!(indoc! {r#"
+            let x = "hello";
+            let y = "world";
+
+            fn main() -> i32 {
+                return 0;
+            }
+        "#});
     }
 }
