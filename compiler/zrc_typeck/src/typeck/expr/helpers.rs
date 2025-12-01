@@ -4,9 +4,12 @@ use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpanExt};
 use zrc_parser::ast::expr::{Assignment, Expr, ExprKind};
 use zrc_utils::span::{Span, Spannable};
 
-use crate::tast::{
-    expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
-    ty::Type as TastType,
+use crate::{
+    tast::{
+        expr::{Place, PlaceKind, TypedExpr, TypedExprKind},
+        ty::Type as TastType,
+    },
+    typeck::Scope,
 };
 
 /// Desugar an assignment like `x += y` to `x = x + y`.
@@ -39,7 +42,11 @@ pub fn desugar_assignment<'input>(
 }
 
 /// Validate an expr into a place
-pub fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, Diagnostic> {
+pub fn expr_to_place<'input>(
+    scope: &Scope<'input, '_>,
+    span: Span,
+    expr: TypedExpr<'input>,
+) -> Result<Place<'input>, Diagnostic> {
     let kind_span = expr.kind.span();
     let stringified = expr.inferred_type.to_string();
 
@@ -49,6 +56,15 @@ pub fn expr_to_place(span: Span, expr: TypedExpr) -> Result<Place, Diagnostic> {
             inferred_type: expr.inferred_type,
             kind: PlaceKind::Deref(x).in_span(kind_span),
         },
+        TypedExprKind::Identifier(x)
+            if scope
+                .values
+                .resolve(x)
+                .is_some_and(|entry| entry.borrow().is_constant) =>
+        {
+            return Err(DiagnosticKind::AssignmentToConstant(x.to_string()).error_in(kind_span));
+        }
+        // not constant
         TypedExprKind::Identifier(x) => Place {
             inferred_type: expr.inferred_type,
             kind: PlaceKind::Variable(x).in_span(kind_span),

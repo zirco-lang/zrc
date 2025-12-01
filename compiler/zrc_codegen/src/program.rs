@@ -73,10 +73,15 @@ fn eval_const_expr<'ctx>(
             .const_int((*value).into(), false)
             .as_basic_value_enum(),
         TypedExprKind::StringLiteral(string) => {
+            // Create a global constant string and return a pointer to it
             let bytes = string.as_bytes();
-            unit.ctx
-                .const_string(bytes.as_bytes(), false)
-                .as_basic_value_enum()
+            let string_value = unit.ctx.const_string(bytes.as_bytes(), false);
+            let global = unit
+                .module
+                .add_global(string_value.get_type(), None, ".str");
+            global.set_initializer(&string_value);
+            global.set_constant(true);
+            global.as_pointer_value().as_basic_value_enum()
         }
         TypedExprKind::CharLiteral(ch) => unit
             .ctx
@@ -118,12 +123,19 @@ pub fn cg_init_extern_fn<'ctx>(
         })
         .unzip();
 
+    let arg_dbg_types: Option<Vec<_>> = arg_dbg_types.iter().all(Option::is_some).then(|| {
+        arg_dbg_types
+            .into_iter()
+            .map(|x| x.expect("we have DI"))
+            .collect()
+    });
+
     let (fn_type, _, _) = create_fn(
         unit,
         ret_type.as_any_type_enum(),
         ret_dbg_type,
         arg_types.as_slice(),
-        arg_dbg_types.as_slice(),
+        arg_dbg_types.as_deref(),
         is_variadic,
     );
 
@@ -139,7 +151,7 @@ pub fn cg_init_fn<'ctx>(
     ret: &Type,
     args: &[&Type],
     is_variadic: bool,
-) -> (FunctionValue<'ctx>, DISubprogram<'ctx>) {
+) -> (FunctionValue<'ctx>, Option<DISubprogram<'ctx>>) {
     let (ret_type, ret_dbg_type) = llvm_type(unit, ret);
     let (arg_types, arg_dbg_types): (Vec<_>, Vec<_>) = args
         .iter()
@@ -152,38 +164,54 @@ pub fn cg_init_fn<'ctx>(
         })
         .unzip();
 
+    let arg_dbg_types: Option<Vec<_>> = arg_dbg_types.iter().all(Option::is_some).then(|| {
+        arg_dbg_types
+            .into_iter()
+            .map(|x| x.expect("we have DI"))
+            .collect()
+    });
+
     let (fn_type, fn_dbg_subroutine, _fn_dbg_type) = create_fn(
         unit,
         ret_type.as_any_type_enum(),
         ret_dbg_type,
         arg_types.as_slice(),
-        arg_dbg_types.as_slice(),
+        arg_dbg_types.as_deref(),
         is_variadic,
     );
 
-    let fn_subprogram = unit.dbg_builder.create_function(
-        unit.compilation_unit.as_debug_info_scope(),
-        name,
-        None,
-        unit.compilation_unit.get_file(),
-        line_no,
-        fn_dbg_subroutine,
-        // REVIEW: Are these values correct? They're the only values that seem to prevent invalid
-        // codegen
-        // This is not local to our unit -- it is exported.
-        false,
-        // This is, in fact, a definition.
-        true,
-        line_no,
-        0,
-        false,
-    );
+    let fn_subprogram = unit.dbg_builder.as_ref().map(|dbg_builder| {
+        dbg_builder.create_function(
+            unit.compilation_unit
+                .expect("We have a builder so must have a CU")
+                .as_debug_info_scope(),
+            name,
+            None,
+            unit.compilation_unit
+                .expect("We have a builder so must have a CU")
+                .get_file(),
+            line_no,
+            fn_dbg_subroutine.expect("we have DI"),
+            // REVIEW: Are these values correct? They're the only values that seem to prevent
+            // invalid codegen
+            // This is not local to our unit -- it is exported.
+            false,
+            // This is, in fact, a definition.
+            true,
+            line_no,
+            0,
+            false,
+        )
+    });
 
     let fn_val = unit
         .module
         .get_function(name)
         .unwrap_or_else(|| unit.module.add_function(name, fn_type, None));
-    fn_val.set_subprogram(fn_subprogram);
+
+    if let Some(fn_subprogram) = fn_subprogram {
+        fn_val.set_subprogram(fn_subprogram);
+    }
 
     (fn_val, fn_subprogram)
 }
@@ -227,38 +255,67 @@ fn cg_program_without_optimization<'ctx>(
     let module = ctx.create_module(file_name);
 
     let debug_metadata_version = ctx.i32_type().const_int(3, false);
-    module.add_basic_value_flag(
-        "Debug Info Version",
-        FlagBehavior::Warning,
-        debug_metadata_version,
-    );
 
-    let (dbg_builder, compilation_unit) = module.create_debug_info_builder(
-        true,
-        // closest equivalent to Zirco
-        DWARFSourceLanguage::C,
-        file_name,
-        parent_directory,
-        frontend_version_string,
-        false,
-        // We do not directly obtain the args here because the test executables have a path in them
-        // and that would change and mess up snapshotflagting
-        cli_args,
-        0,
-        "",
-        debug_level,
-        0,
-        false,
-        false,
-        "",
-        "",
-    );
+    if debug_level != DWARFEmissionKind::None {
+        module.add_basic_value_flag(
+            "Debug Info Version",
+            FlagBehavior::Warning,
+            debug_metadata_version,
+        );
+    }
+
+    let (dbg_builder, compilation_unit) = match debug_level {
+        DWARFEmissionKind::Full => {
+            let (dbg, cu) = module.create_debug_info_builder(
+                true,
+                // closest equivalent to Zirco
+                DWARFSourceLanguage::C,
+                file_name,
+                parent_directory,
+                frontend_version_string,
+                false,
+                // We do not directly obtain the args here because the test executables have a path
+                // in them and that would change and mess up snapshotting
+                cli_args,
+                0,
+                "",
+                debug_level,
+                0,
+                false,
+                false,
+                "",
+                "",
+            );
+            (Some(dbg), Some(cu))
+        }
+        DWARFEmissionKind::LineTablesOnly => {
+            let (dbg, cu) = module.create_debug_info_builder(
+                true,
+                DWARFSourceLanguage::C,
+                file_name,
+                parent_directory,
+                frontend_version_string,
+                false,
+                cli_args,
+                0,
+                "",
+                DWARFEmissionKind::LineTablesOnly,
+                0,
+                false,
+                false,
+                "",
+                "",
+            );
+            (Some(dbg), Some(cu))
+        }
+        DWARFEmissionKind::None => (None, None),
+    };
 
     let unit = CompilationUnitCtx {
         builder: &builder,
-        compilation_unit: &compilation_unit,
+        compilation_unit: compilation_unit.as_ref(),
         ctx,
-        dbg_builder: &dbg_builder,
+        dbg_builder: dbg_builder.as_ref(),
         line_lookup,
         module: &module,
         target_machine,
@@ -301,21 +358,29 @@ fn cg_program_without_optimization<'ctx>(
 
                 let line_and_col = line_lookup.lookup_from_index(body_span.start());
 
-                let lexical_block = dbg_builder.create_lexical_block(
-                    fn_subprogram.as_debug_info_scope(),
-                    compilation_unit.get_file(),
-                    line_and_col.line,
-                    line_and_col.col,
-                );
+                let (lexical_block, _debug_location) = dbg_builder
+                    .as_ref()
+                    .map(|dbg_builder| {
+                        let lexical_block = dbg_builder.create_lexical_block(
+                            fn_subprogram.expect("We have DI").as_debug_info_scope(),
+                            compilation_unit
+                                .expect("We have a builder so we must have a unit")
+                                .get_file(),
+                            line_and_col.line,
+                            line_and_col.col,
+                        );
 
-                let debug_location = dbg_builder.create_debug_location(
-                    ctx,
-                    line_and_col.line,
-                    line_and_col.col,
-                    lexical_block.as_debug_info_scope(),
-                    None,
-                );
-                builder.set_current_debug_location(debug_location);
+                        let debug_location = dbg_builder.create_debug_location(
+                            ctx,
+                            line_and_col.line,
+                            line_and_col.col,
+                            lexical_block.as_debug_info_scope(),
+                            None,
+                        );
+                        builder.set_current_debug_location(debug_location);
+                        (lexical_block, debug_location)
+                    })
+                    .unzip();
 
                 for (n, ArgumentDeclaration { name, ty }) in
                     parameters.value().as_arguments().iter().enumerate()
@@ -434,7 +499,9 @@ fn cg_program_without_optimization<'ctx>(
         }
     }
 
-    dbg_builder.finalize();
+    if let Some(dbg_builder) = dbg_builder {
+        dbg_builder.finalize();
+    }
 
     match module.verify() {
         Ok(()) => {}
@@ -667,5 +734,19 @@ mod tests {
                     return x;
                 }
             "});
+    }
+
+    /// Regression test for <https://github.com/zirco-lang/zrc/issues/441>
+    /// Global string variables should compile without ICE
+    #[test]
+    fn global_string_variable_compiles() {
+        cg_snapshot_test!(indoc! {r#"
+            let x = "hello";
+            let y = "world";
+
+            fn main() -> i32 {
+                return 0;
+            }
+        "#});
     }
 }

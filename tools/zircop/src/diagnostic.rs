@@ -19,6 +19,16 @@ pub enum LintDiagnosticKind {
     UnderscoreVariableUsed(String),
     #[error("unused variable `{0}`")]
     UnusedVariable(String),
+    #[error("unreachable code")]
+    UnreachableCode,
+    #[error("empty `if` block with an `else` block present - consider inverting the condition")]
+    EmptyIfBlock,
+    #[error("empty `else` block - consider removing the `else` block")]
+    EmptyElseBlock,
+    #[error(
+        "empty `while` loop body - consider adding statements to the body or removing the loop"
+    )]
+    EmptyWhileBody,
 }
 
 /// A Zircop lint

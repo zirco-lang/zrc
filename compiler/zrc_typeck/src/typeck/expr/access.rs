@@ -67,7 +67,7 @@ pub fn type_expr_dot<'input>(
         if let Some(ty) = fields.get(key.value()) {
             Ok(TypedExpr {
                 inferred_type: ty.clone(),
-                kind: TypedExprKind::Dot(Box::new(expr_to_place(obj_span, obj_t)?), key)
+                kind: TypedExprKind::Dot(Box::new(expr_to_place(scope, obj_span, obj_t)?), key)
                     .in_span(expr_span),
             })
         } else {

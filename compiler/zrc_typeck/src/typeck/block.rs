@@ -101,7 +101,10 @@ pub fn type_block<'input, 'gs>(
                         match stmt.0.into_value() {
                             StmtKind::EmptyStmt => Ok(None),
                             StmtKind::BreakStmt if can_use_break_continue => Ok(Some((
-                                TypedStmt(TypedStmtKind::BreakStmt.in_span(stmt_span)),
+                                TypedStmt {
+                                    kind: TypedStmtKind::BreakStmt.in_span(stmt_span),
+                                    return_actuality: BlockReturnActuality::NeverReturns,
+                                },
                                 BlockReturnActuality::NeverReturns,
                             ))),
                             StmtKind::BreakStmt => {
@@ -109,7 +112,10 @@ pub fn type_block<'input, 'gs>(
                             }
 
                             StmtKind::ContinueStmt if can_use_break_continue => Ok(Some((
-                                TypedStmt(TypedStmtKind::ContinueStmt.in_span(stmt_span)),
+                                TypedStmt {
+                                    kind: TypedStmtKind::ContinueStmt.in_span(stmt_span),
+                                    return_actuality: BlockReturnActuality::NeverReturns,
+                                },
                                 BlockReturnActuality::NeverReturns,
                             ))),
                             StmtKind::ContinueStmt => {
@@ -137,21 +143,26 @@ pub fn type_block<'input, 'gs>(
                             ),
 
                             StmtKind::UnreachableStmt => Ok(Some((
-                                TypedStmt(TypedStmtKind::UnreachableStmt.in_span(stmt_span)),
-                                // this may create some weird UB if used incorrectly, but it's on
-                                // the user to ensure they don't do that
+                                TypedStmt {
+                                    kind: TypedStmtKind::UnreachableStmt.in_span(stmt_span),
+                                    // this may create some weird UB if used incorrectly, but it's
+                                    // on the user to ensure
+                                    // they don't do that
+                                    return_actuality: BlockReturnActuality::AlwaysReturns,
+                                },
                                 BlockReturnActuality::AlwaysReturns,
                             ))),
 
                             StmtKind::DeclarationList(declarations) => Ok(Some((
-                                TypedStmt(
-                                    TypedStmtKind::DeclarationList(process_let_declaration(
+                                TypedStmt {
+                                    kind: TypedStmtKind::DeclarationList(process_let_declaration(
                                         &mut scope,
                                         declarations.clone().into_value(),
                                     )?)
                                     .in_span(stmt_span),
-                                ),
-                                // because expressions can't return...
+                                    // because expressions can't return...
+                                    return_actuality: BlockReturnActuality::NeverReturns,
+                                },
                                 BlockReturnActuality::NeverReturns,
                             ))),
 
@@ -206,18 +217,21 @@ pub fn type_block<'input, 'gs>(
                                 )?;
                                 let return_actuality = typed_block.return_actuality;
                                 Ok(Some((
-                                    TypedStmt(
-                                        TypedStmtKind::BlockStmt(typed_block).in_span(stmt_span),
-                                    ),
+                                    TypedStmt {
+                                        kind: TypedStmtKind::BlockStmt(typed_block)
+                                            .in_span(stmt_span),
+                                        return_actuality,
+                                    },
                                     return_actuality,
                                 )))
                             }
 
                             StmtKind::ExprStmt(expr) => Ok(Some((
-                                TypedStmt(
-                                    TypedStmtKind::ExprStmt(type_expr(&mut scope, expr)?)
+                                TypedStmt {
+                                    kind: TypedStmtKind::ExprStmt(type_expr(&mut scope, expr)?)
                                         .in_span(stmt_span),
-                                ),
+                                    return_actuality: BlockReturnActuality::NeverReturns,
+                                },
                                 BlockReturnActuality::NeverReturns,
                             ))),
                             StmtKind::ReturnStmt(value) => {
@@ -258,10 +272,12 @@ pub fn type_block<'input, 'gs>(
                                         };
 
                                         Ok(Some((
-                                            TypedStmt(
-                                                TypedStmtKind::ReturnStmt(coerced_value)
+                                            TypedStmt {
+                                                kind: TypedStmtKind::ReturnStmt(coerced_value)
                                                     .in_span(stmt_span),
-                                            ),
+                                                return_actuality:
+                                                    BlockReturnActuality::AlwaysReturns,
+                                            },
                                             BlockReturnActuality::AlwaysReturns,
                                         )))
                                     }
@@ -313,13 +329,14 @@ pub fn type_block<'input, 'gs>(
             BlockReturnAbility::MustReturn(return_ty),
             BlockReturnActuality::SometimesReturns | BlockReturnActuality::NeverReturns,
         ) if return_ty == TastType::unit() => {
-            tast_block.push(TypedStmt(TypedStmtKind::ReturnStmt(None).in_span(
-                Span::from_positions_and_file(
+            tast_block.push(TypedStmt {
+                kind: TypedStmtKind::ReturnStmt(None).in_span(Span::from_positions_and_file(
                     input_block_span.end() - 1,
                     input_block_span.end(),
                     input_block_span.file_name(),
-                ),
-            )));
+                )),
+                return_actuality: BlockReturnActuality::AlwaysReturns,
+            });
 
             Ok(BlockReturnActuality::AlwaysReturns)
         }

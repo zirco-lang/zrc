@@ -204,6 +204,15 @@ LetDeclaration: Vec<Spanned<LetDeclaration<'input>>> = {
         name: i,
         ty: t,
         value: v,
+        is_constant: false,
+    })).collect::<Vec<_>>(),
+    "const" <l:CommaSeparatedWithoutTrailing<
+        Spanned<(<Spanned<IDENTIFIER>> <(":" <Type>)?> <("=" <Assignment>)?>)>
+    >> ";" => l.into_iter().map(|sp| sp.map(|(i, t, v)| LetDeclaration {
+        name: i,
+        ty: t,
+        value: v,
+        is_constant: true,
     })).collect::<Vec<_>>(),
 };
 
@@ -216,6 +225,15 @@ pub Type: Type<'input> = {
         Type(<>.map(TypeKind::Union)),
     Spanned<("enum" <KeyTypeMapping>)> =>
         Type(<>.map(TypeKind::Enum)),
+
+    // We MANDATE the return type specification otherwise it creates a shift/reduce conflict with
+    // `typeof (fn x -> y)`
+    // `(typeof fn x)->y`
+    Spanned<("fn" "(" <ArgumentDeclarationList?> ")" <("->" <Type>)>)> =>
+        Type(<>.map(|(params, ret)| TypeKind::Function {
+            parameters: Box::new(params.unwrap_or_else(|| ArgumentDeclarationList::empty())),
+            return_type: Box::new(ret),
+        })),
 }
 
 TypeOrParenthesizedType: Type<'input> = {
@@ -468,6 +486,7 @@ extern {
         "continue" => lexer::Tok::Continue,
         "return" => lexer::Tok::Return,
         "let" => lexer::Tok::Let,
+        "const" => lexer::Tok::Const,
         "fn" => lexer::Tok::Fn,
         "as" => lexer::Tok::As,
         "struct" => lexer::Tok::Struct,

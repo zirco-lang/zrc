@@ -126,6 +126,8 @@ pub enum DiagnosticKind {
         "main() function may either have no parameters or two parameters, a `usize` and a `**u8`"
     )]
     MainFunctionInvalidParameters,
+    #[error("cannot use constant `{0}` as an lvalue")]
+    AssignmentToConstant(String),
 
     // PREPROCESSOR ERRORS
     #[error("unterminated include string")]

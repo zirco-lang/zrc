@@ -19,11 +19,21 @@ pub struct LetDeclaration<'input> {
     pub ty: Type<'input>, // types are definite after inference
     /// The value to associate with the new symbol.
     pub value: Option<TypedExpr<'input>>,
+    /// If the declaration is a constant
+    pub is_constant: bool,
 }
 
 /// A zirco statement after typeck
 #[derive(Debug, Clone, PartialEq)]
-pub struct TypedStmt<'input, 'gs>(pub Spanned<TypedStmtKind<'input, 'gs>>);
+pub struct TypedStmt<'input, 'gs> {
+    /// The actual statement kind with its span.
+    pub kind: Spanned<TypedStmtKind<'input, 'gs>>,
+
+    /// The return actuality of this statement. This describes whether this
+    /// statement is guaranteed to return, sometimes returns, or never returns.
+    /// Useful for control flow analysis and detecting unreachable code.
+    pub return_actuality: crate::typeck::BlockReturnActuality,
+}
 
 /// The enum representing all of the different kinds of statements in Zirco
 /// after type checking
@@ -184,7 +194,7 @@ impl Display for LetDeclaration<'_> {
 
 impl Display for TypedStmt<'_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.value())
+        write!(f, "{}", self.kind.value())
     }
 }
 
@@ -402,6 +412,7 @@ mod tests {
     use zrc_utils::spanned_test;
 
     use super::*;
+    use crate::typeck::BlockReturnActuality;
 
     #[test]
     fn let_declaration_displays_correctly() {
@@ -409,6 +420,7 @@ mod tests {
             name: spanned_test!(0, "x", 1),
             ty: Type::I32,
             value: None,
+            is_constant: false,
         };
         assert_eq!(decl.to_string(), "x: i32");
     }
@@ -422,6 +434,7 @@ mod tests {
                 inferred_type: Type::I32,
                 kind: spanned_test!(0, super::super::expr::TypedExprKind::Identifier("y"), 1),
             }),
+            is_constant: false,
         };
         let display = decl.to_string();
         assert!(display.contains("x: i32"));
@@ -430,19 +443,28 @@ mod tests {
 
     #[test]
     fn typed_stmt_continue_displays_correctly() {
-        let stmt = TypedStmt(spanned_test!(0, TypedStmtKind::ContinueStmt, 8));
+        let stmt = TypedStmt {
+            kind: spanned_test!(0, TypedStmtKind::ContinueStmt, 8),
+            return_actuality: BlockReturnActuality::NeverReturns,
+        };
         assert_eq!(stmt.to_string(), "continue;");
     }
 
     #[test]
     fn typed_stmt_break_displays_correctly() {
-        let stmt = TypedStmt(spanned_test!(0, TypedStmtKind::BreakStmt, 5));
+        let stmt = TypedStmt {
+            kind: spanned_test!(0, TypedStmtKind::BreakStmt, 5),
+            return_actuality: BlockReturnActuality::NeverReturns,
+        };
         assert_eq!(stmt.to_string(), "break;");
     }
 
     #[test]
     fn typed_stmt_return_without_value_displays_correctly() {
-        let stmt = TypedStmt(spanned_test!(0, TypedStmtKind::ReturnStmt(None), 6));
+        let stmt = TypedStmt {
+            kind: spanned_test!(0, TypedStmtKind::ReturnStmt(None), 6),
+            return_actuality: BlockReturnActuality::AlwaysReturns,
+        };
         assert_eq!(stmt.to_string(), "return;");
     }
 

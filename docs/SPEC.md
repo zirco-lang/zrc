@@ -423,6 +423,12 @@ Pointer types are formed by prefixing a type with `*`:
 
 **Syntax**: `*T` where `T` is any type.
 
+A function pointer is represented as a pointer to a function type:
+
+```zirco
+*(fn(a: i32, b: *u8) -> bool)  // pointer to function taking (i32, *u8) and returning bool
+```
+
 ### 3.5 Struct Types
 
 Structs are product types that group named fields together:

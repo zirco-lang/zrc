@@ -47,14 +47,17 @@ pub(crate) fn cg_expr<'ctx, 'input, 'a>(
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
     let expr_span = expr.kind.span();
     let line_and_col = cg.line_lookup.lookup_from_index(expr_span.start());
-    let debug_location = cg.dbg_builder.create_debug_location(
-        cg.ctx,
-        line_and_col.line,
-        line_and_col.col,
-        cg.dbg_scope.as_debug_info_scope(),
-        None,
-    );
-    cg.builder.set_current_debug_location(debug_location);
+    let _debug_location = cg.dbg_builder.as_ref().map(|dbg_builder| {
+        let dl = dbg_builder.create_debug_location(
+            cg.ctx,
+            line_and_col.line,
+            line_and_col.col,
+            cg.dbg_scope.expect("we have DI").as_debug_info_scope(),
+            None,
+        );
+        cg.builder.set_current_debug_location(dl);
+        dl
+    });
 
     let ce = CgExprArgs::<'ctx, 'input, 'a> {
         cg,

@@ -379,7 +379,7 @@ pub trait SemanticVisit<'input, 'gs> {
 
     /// Walk a typed statement's children (default traversal).
     fn walk_tc_stmt(&mut self, stmt: &TcStmt<'input, 'gs>) {
-        match stmt.0.value() {
+        match stmt.kind.value() {
             TcStmtKind::IfStmt(cond, if_true, maybe_false) => {
                 self.visit_tc_expr(cond);
                 self.visit_tc_block(if_true.value());
