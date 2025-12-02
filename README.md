@@ -126,6 +126,9 @@ If you're curious, here's our test coverage represented as a cool little chart:
       <td align="center" valign="top" width="14.28%"><a href="https://agentdid127.com"><img src="https://avatars.githubusercontent.com/u/27520129?v=4?s=100" width="100px;" alt="Cory Borek"/><br /><sub><b>Cory Borek</b></sub></a><br /><a href="#ideas-CoryBorek" title="Ideas, Planning, & Feedback">🤔</a> <a href="#bug-CoryBorek" title="Bug reports">🐛</a> <a href="#code-CoryBorek" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ddawn-ll"><img src="https://avatars.githubusercontent.com/u/245093789?v=4?s=100" width="100px;" alt="ddawn-ll"/><br /><sub><b>ddawn-ll</b></sub></a><br /><a href="#content-ddawn-ll" title="Content">🖋</a> <a href="#design-ddawn-ll" title="Design">🎨</a></td>
     </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ImTheShrub"><img src="https://avatars.githubusercontent.com/u/234684568?v=4?s=100" width="100px;" alt="ImTheShrub"/><br /><sub><b>ImTheShrub</b></sub></a><br /><a href="#ideas-ImTheShrub" title="Ideas, Planning, & Feedback">🤔</a></td>
+    </tr>
   </tbody>
 </table>
 
