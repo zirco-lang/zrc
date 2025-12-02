@@ -323,170 +323,66 @@ fn cg_program_without_optimization<'ctx>(
 
     let mut global_scope = CgScope::new();
 
-    for declaration in program {
+    // =========================================================================
+    // PASS 1: PROTOTYPES & GLOBALS
+    // We scan the file to register all Function Names and Global Variables first.
+    // This ensures that 'main' knows 'f' exists, even if 'f' is defined later.
+    // =========================================================================
+    for declaration in &program {
         let span = declaration.span();
 
-        match declaration.into_value() {
+        match declaration.value() {
             TypedDeclaration::FunctionDeclaration {
                 name,
                 parameters,
                 return_type,
-                body: Some(body),
+                body,
             } => {
-                let body_span = body.span();
+                // Collect argument types for the function signature
+                let arg_types: Vec<_> = parameters
+                    .value()
+                    .as_arguments()
+                    .iter()
+                    .map(|ArgumentDeclaration { ty, .. }| ty.value())
+                    .collect();
 
-                let (fn_value, fn_subprogram) = cg_init_fn(
-                    &unit,
-                    name.value(),
-                    line_lookup.lookup_from_index(span.start()).line,
-                    return_type.value(),
-                    parameters
-                        .value()
-                        .as_arguments()
-                        .iter()
-                        .map(|ArgumentDeclaration { ty, .. }| ty.value())
-                        .collect::<Vec<_>>()
-                        .as_slice(),
-                    parameters.value().is_variadic(),
-                );
-                global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
-                // must come after the insert call so that recursion is valid
-                let mut fn_scope = global_scope.clone();
+                let is_variadic = parameters.value().is_variadic();
 
-                let entry = ctx.append_basic_block(fn_value, "entry");
-                builder.position_at_end(entry);
-
-                let line_and_col = line_lookup.lookup_from_index(body_span.start());
-
-                let (lexical_block, _debug_location) = dbg_builder
-                    .as_ref()
-                    .map(|dbg_builder| {
-                        let lexical_block = dbg_builder.create_lexical_block(
-                            fn_subprogram.expect("We have DI").as_debug_info_scope(),
-                            compilation_unit
-                                .expect("We have a builder so we must have a unit")
-                                .get_file(),
-                            line_and_col.line,
-                            line_and_col.col,
+                // If it has a body, it's a normal function. If None, it's extern.
+                match body {
+                    Some(_) => {
+                        let (fn_value, _fn_subprogram) = cg_init_fn(
+                            &unit,
+                            name.value(),
+                            line_lookup.lookup_from_index(span.start()).line,
+                            return_type.value(),
+                            &arg_types,
+                            is_variadic,
                         );
-
-                        let debug_location = dbg_builder.create_debug_location(
-                            ctx,
-                            line_and_col.line,
-                            line_and_col.col,
-                            lexical_block.as_debug_info_scope(),
-                            None,
-                        );
-                        builder.set_current_debug_location(debug_location);
-                        (lexical_block, debug_location)
-                    })
-                    .unzip();
-
-                for (n, ArgumentDeclaration { name, ty }) in
-                    parameters.value().as_arguments().iter().enumerate()
-                {
-                    if entry.get_first_instruction().is_some() {
-                        builder.position_before(&entry.get_first_instruction().expect(
-                            ".gfi.is_some() should only return true if there is an instruction",
-                        ));
-                    } else {
-                        builder.position_at_end(entry);
+                        global_scope
+                            .insert(name.value(), fn_value.as_global_value().as_pointer_value());
                     }
-
-                    let (ty, _dbg_ty) = llvm_basic_type(&unit, ty.value());
-
-                    let alloc = builder
-                        .build_alloca(ty, &format!("arg_{name}"))
-                        .expect("alloca should generate successfully");
-
-                    builder.position_at_end(entry);
-
-                    builder
-                        .build_store::<BasicValueEnum>(
-                            alloc,
-                            fn_value
-                                .get_nth_param(
-                                    n.try_into()
-                                        .expect("over u32::MAX parameters in a function? HOW?"),
-                                )
-                                .expect("nth parameter from fn type should exist in fn value"),
-                        )
-                        .expect("store should generate successfully");
-
-                    // let ident_line_col = line_lookup.lookup_from_index(name.start());
-
-                    // let id_debug_location = dbg_builder.create_debug_location(
-                    //     ctx,
-                    //     ident_line_col.line,
-                    //     ident_line_col.col,
-                    //     lexical_block.as_debug_info_scope(),
-                    //     None,
-                    // );
-
-                    // let decl = dbg_builder.create_parameter_variable(
-                    //     fn_subprogram.as_debug_info_scope(),
-                    //     name.value(),
-                    //     u32::try_from(n)
-                    //         .expect("should not be more than u32::MAX args in a function"),
-                    //     compilation_unit.get_file(),
-                    //     ident_line_col.line,
-                    //     dbg_ty,
-                    //     true,
-                    //     0,
-                    // );
-
-                    // FIXME: Re-enable this when Inkwell resolves TheDan64/inkwell#613
-                    // dbg_builder.insert_declare_at_end(
-                    //     alloc,
-                    //     Some(decl),
-                    //     None,
-                    //     id_debug_location,
-                    //     entry,
-                    // );
-
-                    fn_scope.insert(name.value(), alloc);
+                    None => {
+                        let fn_value = cg_init_extern_fn(
+                            &unit,
+                            name.value(),
+                            return_type.value(),
+                            &arg_types,
+                            is_variadic,
+                        );
+                        global_scope
+                            .insert(name.value(), fn_value.as_global_value().as_pointer_value());
+                    }
                 }
-
-                cg_block(
-                    FunctionCtx::from_unit_and_fn(unit, fn_value),
-                    entry,
-                    &fn_scope,
-                    lexical_block,
-                    body,
-                    &None,
-                );
-            }
-            // We do not attach debugging information to extern functions, this is clang's behavior
-            // so I assume it's correct.
-            TypedDeclaration::FunctionDeclaration {
-                name,
-                parameters,
-                return_type,
-                body: None,
-            } => {
-                let fn_value = cg_init_extern_fn(
-                    &unit,
-                    name.value(),
-                    return_type.value(),
-                    parameters
-                        .value()
-                        .as_arguments()
-                        .iter()
-                        .map(|ArgumentDeclaration { ty, .. }| ty.value())
-                        .collect::<Vec<_>>()
-                        .as_slice(),
-                    parameters.value().is_variadic(),
-                );
-                global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
             }
             TypedDeclaration::GlobalLetDeclaration(declarations) => {
+                // Generate global variables immediately (they don't have bodies)
                 for let_decl in declarations {
                     let let_declaration = let_decl.value();
                     let (llvm_ty, _) = llvm_basic_type(&unit, &let_declaration.ty);
 
                     let global = module.add_global(llvm_ty, None, let_declaration.name.value());
 
-                    // Evaluate constant expression or use zero initializer
                     let initializer = let_declaration.value.as_ref().map_or_else(
                         || llvm_ty.const_zero(),
                         |value| eval_const_expr(&unit, value, &let_declaration.ty),
@@ -496,6 +392,117 @@ fn cg_program_without_optimization<'ctx>(
                     global_scope.insert(let_declaration.name.value(), global.as_pointer_value());
                 }
             }
+        }
+    }
+
+    // PASS 2: FUNCTION BODIES
+    // Now that all names are known, we go back and generate the code inside the functions.
+    for declaration in program {
+        // We only care about Functions with Bodies here.
+        // Globals and Externs were finished in Pass 1.
+        if let TypedDeclaration::FunctionDeclaration {
+            name,
+            parameters,
+            body: Some(body),
+            ..
+        } = declaration.into_value()
+        {
+            let body_span = body.span();
+
+            // Retrieve the function we created in Pass 1
+            // We use the module to get it because it's cleaner than casting raw pointers
+            let fn_value = module
+                .get_function(name.value())
+                .expect("Function should have been declared in Pass 1");
+
+            //  RE-SETUP SCOPE FOR BODY GENERATION
+            // We need to set up the arguments and debug info again for the builder context
+
+            // must come after the insert call so that recursion is valid
+            let mut fn_scope = global_scope.clone();
+
+            // We need the subprogram for debug info. Since we don't have it easily from Pass 1,
+            // we retrieve it from the LLVM function if debug info is enabled.
+            let fn_subprogram = if debug_level != DWARFEmissionKind::None {
+                fn_value.get_subprogram()
+            } else {
+                None
+            };
+
+            let entry = ctx.append_basic_block(fn_value, "entry");
+            builder.position_at_end(entry);
+
+            let line_and_col = line_lookup.lookup_from_index(body_span.start());
+
+            let (lexical_block, _debug_location) = dbg_builder
+                .as_ref()
+                .map(|dbg_builder| {
+                    let lexical_block = dbg_builder.create_lexical_block(
+                        fn_subprogram.expect("We have DI").as_debug_info_scope(),
+                        compilation_unit
+                            .expect("We have a builder so we must have a unit")
+                            .get_file(),
+                        line_and_col.line,
+                        line_and_col.col,
+                    );
+
+                    let debug_location = dbg_builder.create_debug_location(
+                        ctx,
+                        line_and_col.line,
+                        line_and_col.col,
+                        lexical_block.as_debug_info_scope(),
+                        None,
+                    );
+                    builder.set_current_debug_location(debug_location);
+                    (lexical_block, debug_location)
+                })
+                .unzip();
+
+            for (n, ArgumentDeclaration { name, ty }) in
+                parameters.value().as_arguments().iter().enumerate()
+            {
+                if entry.get_first_instruction().is_some() {
+                    builder.position_before(&entry.get_first_instruction().expect(
+                        ".gfi.is_some() should only return true if there is an instruction",
+                    ));
+                } else {
+                    builder.position_at_end(entry);
+                }
+
+                let (ty, _dbg_ty) = llvm_basic_type(&unit, ty.value());
+
+                let alloc = builder
+                    .build_alloca(ty, &format!("arg_{name}"))
+                    .expect("alloca should generate successfully");
+
+                builder.position_at_end(entry);
+
+                builder
+                    .build_store::<BasicValueEnum>(
+                        alloc,
+                        fn_value
+                            .get_nth_param(
+                                n.try_into()
+                                    .expect("over u32::MAX parameters in a function? HOW?"),
+                            )
+                            .expect("nth parameter from fn type should exist in fn value"),
+                    )
+                    .expect("store should generate successfully");
+
+                // note: The commented out debug code from original file is omitted for cleanliness,
+                // but the logic here handles the argument storage
+
+                fn_scope.insert(name.value(), alloc);
+            }
+
+            cg_block(
+                FunctionCtx::from_unit_and_fn(unit, fn_value),
+                entry,
+                &fn_scope,
+                lexical_block,
+                body,
+                &None,
+            );
         }
     }
 
