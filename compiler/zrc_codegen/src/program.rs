@@ -349,30 +349,29 @@ fn cg_program_without_optimization<'ctx>(
                 let is_variadic = parameters.value().is_variadic();
 
                 // If it has a body, it's a normal function. If None, it's extern.
-                match body {
-                    Some(_) => {
-                        let (fn_value, _fn_subprogram) = cg_init_fn(
-                            &unit,
-                            name.value(),
-                            line_lookup.lookup_from_index(span.start()).line,
-                            return_type.value(),
-                            &arg_types,
-                            is_variadic,
-                        );
-                        global_scope
-                            .insert(name.value(), fn_value.as_global_value().as_pointer_value());
-                    }
-                    None => {
-                        let fn_value = cg_init_extern_fn(
-                            &unit,
-                            name.value(),
-                            return_type.value(),
-                            &arg_types,
-                            is_variadic,
-                        );
-                        global_scope
-                            .insert(name.value(), fn_value.as_global_value().as_pointer_value());
-                    }
+                // Check if the body exists
+                if body.is_some() {
+                    let (fn_value, _fn_subprogram) = cg_init_fn(
+                        &unit,
+                        name.value(),
+                        line_lookup.lookup_from_index(span.start()).line,
+                        return_type.value(),
+                        &arg_types,
+                        is_variadic,
+                    );
+                    global_scope
+                        .insert(name.value(), fn_value.as_global_value().as_pointer_value());
+                } else {
+                    // Handle extern functions (no body)
+                    let fn_value = cg_init_extern_fn(
+                        &unit,
+                        name.value(),
+                        return_type.value(),
+                        &arg_types,
+                        is_variadic,
+                    );
+                    global_scope
+                        .insert(name.value(), fn_value.as_global_value().as_pointer_value());
                 }
             }
             TypedDeclaration::GlobalLetDeclaration(declarations) => {
@@ -396,7 +395,8 @@ fn cg_program_without_optimization<'ctx>(
     }
 
     // PASS 2: FUNCTION BODIES
-    // Now that all names are known, we go back and generate the code inside the functions.
+    // Now that all names are known, we go back and generate the code inside the
+    // functions.
     for declaration in program {
         // We only care about Functions with Bodies here.
         // Globals and Externs were finished in Pass 1.
@@ -421,12 +421,13 @@ fn cg_program_without_optimization<'ctx>(
             // must come after the insert call so that recursion is valid
             let mut fn_scope = global_scope.clone();
 
-            // We need the subprogram for debug info. Since we don't have it easily from Pass 1,
-            // we retrieve it from the LLVM function if debug info is enabled.
-            let fn_subprogram = if debug_level != DWARFEmissionKind::None {
-                fn_value.get_subprogram()
-            } else {
+            // We need the subprogram for debug info. Since we don't have it easily from
+            // Pass 1, we retrieve it from the LLVM function if debug info is
+            // enabled.
+            let fn_subprogram = if debug_level == DWARFEmissionKind::None {
                 None
+            } else {
+                fn_value.get_subprogram()
             };
 
             let entry = ctx.append_basic_block(fn_value, "entry");
@@ -489,8 +490,8 @@ fn cg_program_without_optimization<'ctx>(
                     )
                     .expect("store should generate successfully");
 
-                // note: The commented out debug code from original file is omitted for cleanliness,
-                // but the logic here handles the argument storage
+                // note: The commented out debug code from original file is omitted for
+                // cleanliness, but the logic here handles the argument storage
 
                 fn_scope.insert(name.value(), alloc);
             }
