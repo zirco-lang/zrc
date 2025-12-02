@@ -6,7 +6,6 @@
 //! to machine code.
 
 use inkwell::{
-    OptimizationLevel,
     context::Context,
     debug_info::{AsDIScope, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage},
     memory_buffer::MemoryBuffer,
@@ -17,6 +16,7 @@ use inkwell::{
     },
     types::{AnyType, BasicMetadataTypeEnum, BasicTypeEnum},
     values::{BasicValue, BasicValueEnum, FunctionValue},
+    OptimizationLevel,
 };
 use zrc_typeck::tast::{
     stmt::{ArgumentDeclaration, TypedDeclaration},
