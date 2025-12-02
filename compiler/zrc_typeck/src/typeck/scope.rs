@@ -163,8 +163,6 @@ impl Default for ValueCtx<'_> {
 }
 impl<'input> ValueCtx<'input> {
     /// Create a new empty [`ValueScope`].
-    // Does not impl [Default] because a default would be misleading: the "empty" scope is more
-    // accurate.
     #[must_use]
     pub fn new() -> Self {
         Self {

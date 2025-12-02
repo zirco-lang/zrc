@@ -348,31 +348,30 @@ fn cg_program_without_optimization<'ctx>(
 
                 let is_variadic = parameters.value().is_variadic();
 
-                // If it has a body, it's a normal function. If None, it's extern.
-                // Check if the body exists
-                if body.is_some() {
-                    let (fn_value, _fn_subprogram) = cg_init_fn(
+                // Calculate the function value (using if as an expression)
+                let fn_value = if body.is_some() {
+                    // Extract just the value (.0) from the tuple returned by cg_init_fn
+                    cg_init_fn(
                         &unit,
                         name.value(),
                         line_lookup.lookup_from_index(span.start()).line,
                         return_type.value(),
                         &arg_types,
                         is_variadic,
-                    );
-                    global_scope
-                        .insert(name.value(), fn_value.as_global_value().as_pointer_value());
+                    )
+                    .0
                 } else {
-                    // Handle extern functions (no body)
-                    let fn_value = cg_init_extern_fn(
+                    cg_init_extern_fn(
                         &unit,
                         name.value(),
                         return_type.value(),
                         &arg_types,
                         is_variadic,
-                    );
-                    global_scope
-                        .insert(name.value(), fn_value.as_global_value().as_pointer_value());
-                }
+                    )
+                };
+
+                // Insert into scope once
+                global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
             }
             TypedDeclaration::GlobalLetDeclaration(declarations) => {
                 // Generate global variables immediately (they don't have bodies)
