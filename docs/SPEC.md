@@ -62,7 +62,7 @@ Version 0.1.0 (Draft)
     - [Continue Statement](#511-continue-statement)
     - [Return Statement](#512-return-statement)
     - [Switch Statement](#513-switch-statement)
-    - [Match Statement](#514-match-statement]
+    - [Match Statement](#514-match-statement)
     - [Optimization Hints](#515-optimization-hints)
         - [Unreachable Statement](#5151-unreachable-statement)
 6. [Declarations](#6-declarations)
