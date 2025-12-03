@@ -87,6 +87,15 @@
       "contributions": [
         "ideas"
       ]
+    },
+    {
+      "login": "yamcodes",
+      "name": "Yam C Borodetsky",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2014360?v=4",
+      "profile": "https://yam.codes",
+      "contributions": [
+        "doc"
+      ]
     }
   ]
 }
