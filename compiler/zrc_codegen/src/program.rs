@@ -67,6 +67,13 @@ fn eval_const_expr<'ctx>(
                 .expect("number literal should have parsed correctly")
                 .as_basic_value_enum()
         }
+        TypedExprKind::UnaryMinus(inner) => {
+            // Recursively evaluate the inner constant expression
+            let inner_value = eval_const_expr(unit, inner, ty);
+            // Negate the value
+            let int_value = inner_value.into_int_value();
+            int_value.const_neg().as_basic_value_enum()
+        }
         TypedExprKind::BooleanLiteral(value) => unit
             .ctx
             .bool_type()

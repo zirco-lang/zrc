@@ -115,10 +115,10 @@ pub fn type_expr_binary_bitwise<'input>(
 
     if matches!(op, BinaryBitwise::Shl | BinaryBitwise::Shr) {
         // we can only shift by an unsigned integer
-        expect_is_unsigned_integer(&rhs_t.inferred_type, rhs_span)?;
+        let rhs_t_coerced = expect_is_unsigned_integer(rhs_t, rhs_span)?;
         Ok(TypedExpr {
             inferred_type: lhs_t.inferred_type.clone(),
-            kind: TypedExprKind::BinaryBitwise(op, Box::new(lhs_t), Box::new(rhs_t))
+            kind: TypedExprKind::BinaryBitwise(op, Box::new(lhs_t), Box::new(rhs_t_coerced))
                 .in_span(expr_span),
         })
     } else {

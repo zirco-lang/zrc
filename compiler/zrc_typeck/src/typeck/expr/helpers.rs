@@ -119,24 +119,54 @@ pub fn expect_is_integer(ty: &TastType, span: Span) -> Result<(), Diagnostic> {
     expect(ty.is_integer(), "integer".to_string(), ty.to_string(), span)
 }
 
-/// Assert that a type is a signed integer type
-pub fn expect_is_signed_integer(ty: &TastType, span: Span) -> Result<(), Diagnostic> {
-    expect(
-        ty.is_signed_integer(),
-        "signed integer".to_string(),
-        ty.to_string(),
-        span,
-    )
+/// Assert that a type is a signed integer type, coercing `{int}` to `i32` if
+/// needed. Returns the coerced expression if successful.
+pub fn expect_is_signed_integer(
+    expr: TypedExpr<'_>,
+    span: Span,
+) -> Result<TypedExpr<'_>, Diagnostic> {
+    if expr.inferred_type.is_signed_integer() {
+        // Already a signed integer, return as-is
+        Ok(expr)
+    } else if matches!(expr.inferred_type, TastType::Int) {
+        // {int} can be coerced to i32
+        Ok(TypedExpr {
+            inferred_type: TastType::I32,
+            kind: expr.kind,
+        })
+    } else {
+        // Not a signed integer and can't be coerced
+        Err(DiagnosticKind::ExpectedGot {
+            expected: "signed integer".to_string(),
+            got: expr.inferred_type.to_string(),
+        }
+        .error_in(span))
+    }
 }
 
-/// Assert that a type is an unsigned integer type
-pub fn expect_is_unsigned_integer(ty: &TastType, span: Span) -> Result<(), Diagnostic> {
-    expect(
-        ty.is_unsigned_integer(),
-        "unsigned integer".to_string(),
-        ty.to_string(),
-        span,
-    )
+/// Assert that a type is an unsigned integer type, coercing `{int}` to `u32`
+/// if needed. Returns the coerced expression if successful.
+pub fn expect_is_unsigned_integer(
+    expr: TypedExpr<'_>,
+    span: Span,
+) -> Result<TypedExpr<'_>, Diagnostic> {
+    if expr.inferred_type.is_unsigned_integer() {
+        // Already an unsigned integer, return as-is
+        Ok(expr)
+    } else if matches!(expr.inferred_type, TastType::Int) {
+        // {int} can be coerced to u32
+        Ok(TypedExpr {
+            inferred_type: TastType::U32,
+            kind: expr.kind,
+        })
+    } else {
+        // Not an unsigned integer and can't be coerced
+        Err(DiagnosticKind::ExpectedGot {
+            expected: "unsigned integer".to_string(),
+            got: expr.inferred_type.to_string(),
+        }
+        .error_in(span))
+    }
 }
 
 /// Try to coerce an expression to a target type if possible.
