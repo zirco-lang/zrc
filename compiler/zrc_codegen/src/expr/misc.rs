@@ -241,7 +241,8 @@ pub fn cg_struct_construction<'ctx, 'input>(
         | Type::Int
         | Type::Ptr(_)
         | Type::Fn(_)
-        | Type::Opaque(_) => {
+        | Type::Opaque(_)
+        | Type::Array { .. } => {
             unreachable!("struct construction should only be used with struct/union types")
         }
     }

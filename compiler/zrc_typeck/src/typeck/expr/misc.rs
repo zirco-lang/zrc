@@ -352,7 +352,8 @@ pub fn type_expr_struct_construction<'input>(
         | TastType::Int
         | TastType::Ptr(_)
         | TastType::Fn(_)
-        | TastType::Opaque(_) => {
+        | TastType::Opaque(_)
+        | TastType::Array { .. } => {
             return Err(DiagnosticKind::ExpectedGot {
                 expected: "struct or union type".to_string(),
                 got: resolved_ty.to_string(),
@@ -432,6 +433,50 @@ pub fn type_expr_struct_construction<'input>(
     Ok(TypedExpr {
         inferred_type: resolved_ty,
         kind: TypedExprKind::StructConstruction(initialized_fields).in_span(expr_span),
+    })
+}
+
+/// Typeck an array literal expr
+pub fn type_expr_array_literal<'input>(
+    scope: &mut Scope<'input, '_>,
+    expr_span: Span,
+    elements: Vec<Expr<'input>>,
+) -> Result<TypedExpr<'input>, Diagnostic> {
+    // Rules: All elements must have the same type
+    if elements.is_empty() {
+        // We cannot infer the element type of an empty array literal
+        return Err(DiagnosticKind::ExpectedGot {
+            expected: "at least one element in array literal".to_string(),
+            got: "zero elements".to_string(),
+        }
+        .error_in(expr_span));
+    }
+
+    let mut typed_elements = Vec::with_capacity(elements.len());
+    for element in elements {
+        let typed_element = type_expr(scope, element)?;
+        typed_elements.push(typed_element);
+    }
+
+    let first_element_type = &typed_elements[0].inferred_type;
+    for typed_element in &typed_elements[1..] {
+        if &typed_element.inferred_type != first_element_type {
+            return Err(DiagnosticKind::ExpectedSameType(
+                first_element_type.to_string(),
+                typed_element.inferred_type.to_string(),
+            )
+            .error_in(typed_element.kind.span()));
+        }
+    }
+
+    Ok(TypedExpr {
+        inferred_type: TastType::Array {
+            element_type: Box::new(first_element_type.clone()),
+            size: NumberLiteral::Decimal(Box::leak(
+                typed_elements.len().to_string().into_boxed_str(),
+            )),
+        },
+        kind: TypedExprKind::ArrayLiteral(typed_elements).in_span(expr_span),
     })
 }
 

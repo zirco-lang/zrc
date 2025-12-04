@@ -128,6 +128,8 @@ pub enum DiagnosticKind {
     MainFunctionInvalidParameters,
     #[error("cannot use constant `{0}` as an lvalue")]
     AssignmentToConstant(String),
+    #[error("array size must be non-zero")]
+    ArraySizeZero,
 
     // PREPROCESSOR ERRORS
     #[error("unterminated include string")]

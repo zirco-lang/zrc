@@ -225,6 +225,11 @@ pub Type: Type<'input> = {
         Type(<>.map(TypeKind::Union)),
     Spanned<("enum" <KeyTypeMapping>)> =>
         Type(<>.map(TypeKind::Enum)),
+    Spanned<("[" <NUMBER> "]" <TypeOrParenthesizedType>)> =>
+        Type(<>.map(|(size, ty)| TypeKind::Array {
+            element_type: Box::new(ty),
+            size,
+        })),
 
     // We MANDATE the return type specification otherwise it creates a shift/reduce conflict with
     // `typeof (fn x -> y)`
@@ -409,6 +414,11 @@ Primary: Expr<'input> = {
         Expr(spanned!(s, ExprKind::StructConstruction(
             ty, 
             spanned!(s, fields.unwrap_or(Vec::new()), e, file_name)
+        ), e, file_name)),
+    // Array init : [ expr, expr, ... ]
+    <s:@L> "[" <elements:CommaSeparated<Assignment>?> "]" <e:@R> =>
+        Expr(spanned!(s, ExprKind::ArrayLiteral(
+            elements.unwrap_or(Vec::new())
         ), e, file_name)),
     "(" <Expr> ")" => <>,
 };

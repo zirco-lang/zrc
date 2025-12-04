@@ -91,7 +91,7 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
             Type::Int => {
                 panic!("{{int}} type reached code generation, should be resolved in typeck")
             }
-            Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
+            Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) | Type::Array { .. } => {
                 panic!("not an integer type")
             }
             Type::Opaque(name) => {
@@ -202,6 +202,49 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
                     .as_type()
             }),
         ),
+        Type::Array { element_type, size } => {
+            // Resolve the element basic type
+            let (elem_basic_ty, _elem_dbg) = llvm_basic_type(ctx, element_type);
+
+            // Parse the size literal into usize
+            let size_val: u64 = size
+                .text_content()
+                .replace('_', "")
+                .parse()
+                .expect("array size literal should be a valid integer");
+
+            let array_ty = elem_basic_ty
+                .array_type(size_val as u32)
+                .as_basic_type_enum();
+
+            (
+                array_ty,
+                ctx.dbg_builder().map(|dbg_builder| {
+                    // Create a basic debug type for the array. This is a simplification
+                    // (we don't build a full DI array description). Use the textual
+                    // type name and bit size computed from the element type.
+                    let elem_bits = ctx
+                        .target_machine()
+                        .get_target_data()
+                        .get_bit_size(&elem_basic_ty);
+                    let total_bits = elem_bits * size_val as u64;
+
+                    dbg_builder
+                        .create_basic_type(
+                            &format!(
+                                "[{size}]{elem}",
+                                size = size.text_content(),
+                                elem = element_type.to_string()
+                            ),
+                            total_bits as u64,
+                            0,
+                            0,
+                        )
+                        .expect("basic type should be valid")
+                        .as_type()
+                }),
+            )
+        }
         Type::Union(fields) => {
             // Determine which field has the largest size. This is what we will allocate.
             let largest_field = fields
@@ -266,7 +309,8 @@ pub fn llvm_type<'ctx: 'a, 'a>(
         | Type::Isize
         | Type::Ptr(_)
         | Type::Struct(_)
-        | Type::Union(_) => {
+        | Type::Union(_)
+        | Type::Array { .. } => {
             let (ty, dbg_ty) = llvm_basic_type(ctx, ty);
             (ty.as_any_type_enum(), dbg_ty)
         }

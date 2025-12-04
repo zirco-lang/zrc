@@ -2,9 +2,12 @@
 
 use indexmap::IndexMap;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
-use zrc_parser::ast::{
-    stmt::ArgumentDeclarationList as AstADL,
-    ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind},
+use zrc_parser::{
+    ast::{
+        stmt::ArgumentDeclarationList as AstADL,
+        ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind},
+    },
+    lexer::NumberLiteral,
 };
 use zrc_utils::span::{Span, Spanned};
 
@@ -51,6 +54,10 @@ pub fn resolve_type<'input>(
                 ),
             ]))
         }
+        ParserTypeKind::Array { element_type, size } => TastType::Array {
+            element_type: Box::new(resolve_type(type_scope, *element_type)?),
+            size,
+        },
         ParserTypeKind::Function {
             parameters,
             return_type,
@@ -159,6 +166,24 @@ fn resolve_type_with_opaque<'input>(
                     )?)),
                 ),
             ]))
+        }
+        ParserTypeKind::Array { element_type, size } => {
+            // if the size is zero, we must error
+            if let NumberLiteral::Decimal("0")
+            | NumberLiteral::Hexadecimal("0")
+            | NumberLiteral::Binary("0") = size
+            {
+                return Err(DiagnosticKind::ArraySizeZero.error_in(span));
+            }
+
+            TastType::Array {
+                element_type: Box::new(resolve_type_with_opaque(
+                    type_scope,
+                    *element_type,
+                    opaque_name,
+                )?),
+                size,
+            }
         }
         ParserTypeKind::Function {
             parameters,

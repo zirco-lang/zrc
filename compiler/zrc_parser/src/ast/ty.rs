@@ -11,7 +11,7 @@ use zrc_utils::{
     spanned,
 };
 
-use crate::ast::stmt::ArgumentDeclarationList;
+use crate::{ast::stmt::ArgumentDeclarationList, lexer::NumberLiteral};
 
 /// A valid Zirco AST type
 #[derive(PartialEq, Eq, Debug, Clone, Display)]
@@ -52,6 +52,15 @@ pub enum TypeKind<'input> {
     /// A tagged union type
     #[display("enum {{ {_0} }}")]
     Enum(KeyTypeMapping<'input>),
+    /// An array type
+    #[display("[{size}]{element_type}")]
+    Array {
+        /// The element type
+        /// e.g. `i32` in `[4]i32`
+        element_type: Box<Type<'input>>,
+        /// The size integer
+        size: NumberLiteral<'input>,
+    },
     /// A function type
     /// `fn(params) -> return_type`
     #[display("fn({parameters}) -> {return_type}")]
