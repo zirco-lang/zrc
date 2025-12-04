@@ -6,7 +6,6 @@
 //! to machine code.
 
 use inkwell::{
-    OptimizationLevel,
     context::Context,
     debug_info::{AsDIScope, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage},
     memory_buffer::MemoryBuffer,
@@ -17,6 +16,7 @@ use inkwell::{
     },
     types::{AnyType, BasicMetadataTypeEnum, BasicTypeEnum},
     values::{BasicValue, BasicValueEnum, FunctionValue},
+    OptimizationLevel,
 };
 use zrc_typeck::tast::{
     stmt::{ArgumentDeclaration, TypedDeclaration},
@@ -66,6 +66,13 @@ fn eval_const_expr<'ctx>(
                 .const_int_from_string(&no_underscores, radix)
                 .expect("number literal should have parsed correctly")
                 .as_basic_value_enum()
+        }
+        TypedExprKind::UnaryMinus(inner) => {
+            // Recursively evaluate the inner constant expression
+            let inner_value = eval_const_expr(unit, inner, ty);
+            // Negate the value
+            let int_value = inner_value.into_int_value();
+            int_value.const_neg().as_basic_value_enum()
         }
         TypedExprKind::BooleanLiteral(value) => unit
             .ctx

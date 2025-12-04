@@ -19,15 +19,19 @@ use crate::{
 /// Check if an expression is a constant expression that can be evaluated at
 /// compile time.
 ///
-/// Currently, only literal expressions are considered constant.
-pub const fn is_constant_expr(expr: &TypedExpr) -> bool {
-    matches!(
-        expr.kind.value(),
+/// Currently, literal expressions and unary minus on literals are considered
+/// constant.
+#[expect(clippy::wildcard_enum_match_arm)]
+pub fn is_constant_expr(expr: &TypedExpr) -> bool {
+    match expr.kind.value() {
         TypedExprKind::NumberLiteral(_, _)
-            | TypedExprKind::BooleanLiteral(_)
-            | TypedExprKind::StringLiteral(_)
-            | TypedExprKind::CharLiteral(_)
-    )
+        | TypedExprKind::BooleanLiteral(_)
+        | TypedExprKind::StringLiteral(_)
+        | TypedExprKind::CharLiteral(_) => true,
+        // Unary minus on a constant is also a constant
+        TypedExprKind::UnaryMinus(inner) => is_constant_expr(inner),
+        _ => false,
+    }
 }
 
 /// Process a top-level [AST declaration](AstDeclaration), insert it into the

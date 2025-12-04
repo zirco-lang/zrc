@@ -61,11 +61,11 @@ pub fn type_expr_unary_minus<'input>(
     let x_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
 
-    expect_is_signed_integer(&x_ty.inferred_type, x_span)?;
+    let x_ty_coerced = expect_is_signed_integer(x_ty, x_span)?;
 
     Ok(TypedExpr {
-        inferred_type: x_ty.inferred_type.clone(),
-        kind: TypedExprKind::UnaryMinus(Box::new(x_ty)).in_span(expr_span),
+        inferred_type: x_ty_coerced.inferred_type.clone(),
+        kind: TypedExprKind::UnaryMinus(Box::new(x_ty_coerced)).in_span(expr_span),
     })
 }
 
