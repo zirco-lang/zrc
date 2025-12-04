@@ -21,7 +21,7 @@ struct Point {
 }
 
 // Construct an instance using the new keyword
-let origin = new Point { x: 0, y: 0 };
+let origin = Point { x: 0, y: 0 };
 
 // Access fields
 let x_value = origin.x;
@@ -68,7 +68,7 @@ is 25
 
 **✅ Parser**: Fully implemented and tested  
 **✅ Type Checker**: Fully implemented  
-**✅ Code Generator**: Fully implemented  
+**✅ Code Generator**: Fully implemented
 
 All components are complete and working!
 
@@ -76,14 +76,13 @@ All components are complete and working!
 
 This example showcases the `new` keyword syntax which was chosen to avoid LALR(1) parser ambiguities. The syntax is:
 
-- `new TypeName { field1: value1, field2: value2, ... }`
+-   `new TypeName { field1: value1, field2: value2, ... }`
 
 This works for both named types (like `Point` and `Color` in this example) and anonymous struct types.
 
 The type checker ensures:
-- All required struct fields are initialized
-- Field types match the struct definition
-- No duplicate field initializations
-- The constructed type is indeed a struct or union
 
-
+-   All required struct fields are initialized
+-   Field types match the struct definition
+-   No duplicate field initializations
+-   The constructed type is indeed a struct or union

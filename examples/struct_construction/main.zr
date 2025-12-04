@@ -24,27 +24,27 @@ fn main() -> i32 {
     
     // Named struct construction
     printf("\n1. Named struct construction:\n");
-    let origin = new Point { x: 0, y: 0 };
+    let origin = Point { x: 0, y: 0 };
     print_point(origin);
     
-    let center = new Point { x: 50, y: 50 };
+    let center = Point { x: 50, y: 50 };
     print_point(center);
     
     // Multiple field struct
     printf("\n2. Multi-field struct construction:\n");
-    let red = new Color { r: 255, g: 0, b: 0 };
+    let red = Color { r: 255, g: 0, b: 0 };
     print_color(red);
     
-    let green = new Color { r: 0, g: 255, b: 0 };
+    let green = Color { r: 0, g: 255, b: 0 };
     print_color(green);
     
-    let blue = new Color { r: 0, g: 0, b: 255 };
+    let blue = Color { r: 0, g: 0, b: 255 };
     print_color(blue);
     
     // Using constructed structs in expressions
     printf("\n3. Using struct fields in calculations:\n");
-    let p1 = new Point { x: 3, y: 4 };
-    let p2 = new Point { x: 6, y: 8 };
+    let p1 = Point { x: 3, y: 4 };
+    let p2 = Point { x: 6, y: 8 };
     
     let dx = p2.x - p1.x;
     let dy = p2.y - p1.y;

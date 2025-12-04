@@ -481,7 +481,7 @@ mod tests {
             #[test]
             fn struct_construction_with_named_type_parses() {
                 // Test: new Point { x: 1, y: 2 }
-                let result = parse_expr("new Point { x: 1, y: 2 }", "<test>");
+                let result = parse_expr("Point { x: 1, y: 2 }", "<test>");
                 assert!(
                     result.is_ok(),
                     "Failed to parse struct construction: {result:?}"
@@ -491,15 +491,15 @@ mod tests {
                 // Verify it's a struct construction by checking the display output
                 let output = format!("{expr}");
                 assert!(
-                    output.contains("new Point"),
-                    "Expected 'new Point' in output, got: {output}"
+                    output.contains("Point"),
+                    "Expected 'Point' in output, got: {output}"
                 );
             }
 
             #[test]
             fn struct_construction_with_empty_fields_parses() {
                 // Test: new EmptyStruct { }
-                let result = parse_expr("new EmptyStruct { }", "<test>");
+                let result = parse_expr("EmptyStruct { }", "<test>");
                 assert!(
                     result.is_ok(),
                     "Failed to parse empty struct construction: {result:?}"
@@ -509,7 +509,7 @@ mod tests {
             #[test]
             fn struct_construction_with_anonymous_type_parses() {
                 // Test: new struct { x: i32 } { x: 42 }
-                let result = parse_expr("new struct { x: i32 } { x: 42 }", "<test>");
+                let result = parse_expr("struct { x: i32 } { x: 42 }", "<test>");
                 assert!(
                     result.is_ok(),
                     "Failed to parse anonymous struct construction: {result:?}"
@@ -518,15 +518,15 @@ mod tests {
                 let expr = result.expect("Should have parsed successfully");
                 let output = format!("{expr}");
                 assert!(
-                    output.contains("new struct"),
-                    "Expected 'new struct' in output, got: {output}"
+                    output.contains("struct"),
+                    "Expected 'struct' in output, got: {output}"
                 );
             }
 
             #[test]
             fn struct_construction_with_multiple_fields_parses() {
                 // Test: new Color { r: 255, g: 128, b: 64 }
-                let result = parse_expr("new Color { r: 255, g: 128, b: 64 }", "<test>");
+                let result = parse_expr("Color { r: 255, g: 128, b: 64 }", "<test>");
                 assert!(
                     result.is_ok(),
                     "Failed to parse multi-field struct construction: {result:?}"
@@ -536,7 +536,7 @@ mod tests {
             #[test]
             fn struct_construction_with_expression_values_parses() {
                 // Test: new Point { x: 1 + 2, y: 3 * 4 }
-                let result = parse_expr("new Point { x: 1 + 2, y: 3 * 4 }", "<test>");
+                let result = parse_expr("Point { x: 1 + 2, y: 3 * 4 }", "<test>");
                 assert!(
                     result.is_ok(),
                     "Failed to parse struct construction with expressions: {result:?}"
