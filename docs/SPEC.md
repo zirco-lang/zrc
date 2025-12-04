@@ -441,7 +441,7 @@ Array types are fixed-size sequences of elements of a specified type.
 [N]T
 ```
 
-Where `N` is a positive integer representing the number of elements, and `T` is the element type.
+Where `N` is a positive integer (gt 0) representing the number of elements, and `T` is the element type.
 
 **Example**:
 
@@ -578,6 +578,8 @@ Zirco allows the following implicit type conversions:
     let arr: [5]i32 = [1, 2, 3, 4, 5];
     let ptr: *i32 = arr;  // Implicit conversion from [5]i32 to *i32
     ```
+
+**Semantics**: The pointer points to the first element of the array. The conversion applies in assignment, function argument, and indexing contexts.
 
 Note: Implicit conversions only apply in specific contexts such as function arguments. Most operations require explicit type matching or explicit casts using the `as` operator.
 
@@ -915,6 +917,19 @@ let arr = [1, 2, 3, 4, 5];
 -   Elements are evaluated in order
 -   Produces a fixed-size array value
 -   Requires at least one element
+
+**Type Specification**:
+
+-   Type can be inferred from element types: `let arr = [1, 2, 3];` infers `[3]i32`
+-   Type can be explicitly specified (syntax to be defined by implementation)
+-   All elements must have the same type; implicit conversions may apply in specific contexts
+
+**Example with Type Inference**:
+
+```zirco
+let arr1 = [1, 2, 3, 4, 5];        // inferred as [5]i32
+let arr2: [5]i32 = [1, 2, 3, 4, 5]; // explicit type annotation
+```
 
 ### 4.18 Increment and Decrement Expressions
 
