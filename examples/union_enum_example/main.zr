@@ -38,19 +38,19 @@ fn print_color(c: Color) -> struct {} {
 
 fn main() -> i32 {
     // Create union with inline type
-    let val1 = new union { i: i32, f: i64 } { i: 42 };
+    let val1 = union { i: i32, f: i64 } { i: 42 };
     print_as_int(val1);
     
     // Create union with named type
-    let val2 = new Value { f: 1000000000 };
+    let val2 = Value { f: 1000000000 };
     print_as_long(val2);
     
     // Create enum with inline type
-    let color1 = new enum { Red: i32, Green: i32, Blue: i32 } { Red: 255 };
+    let color1 = enum { Red: i32, Green: i32, Blue: i32 } { Red: 255 };
     print_color(color1);
     
     // Create enum with named type
-    let color2 = new Color { Green: 128 };
+    let color2 = Color { Green: 128 };
     print_color(color2);
     
     return 0;

@@ -241,6 +241,18 @@ TypeOrParenthesizedType: Type<'input> = {
     "(" <TypeOrParenthesizedType> ")" => <>,
 }
 
+// Only a subset of types can be constructed (structs, unions, enums, identifiers)
+// This prevents a grammar ambiguity as seen in #553
+ConstructibleType: Type<'input> = {
+    Spanned<IDENTIFIER> => Type(<>.map(|x| TypeKind::Identifier(x))),
+    Spanned<("struct" <KeyTypeMapping>)> => 
+        Type(<>.map(TypeKind::Struct)),
+    Spanned<("union" <KeyTypeMapping>)> =>
+        Type(<>.map(TypeKind::Union)),
+    Spanned<("enum" <KeyTypeMapping>)> =>
+        Type(<>.map(TypeKind::Enum)),
+}
+
 FlowStmt: StmtKind<'input> = {
     "continue" ";" => StmtKind::ContinueStmt,
     "break" ";" => StmtKind::BreakStmt,
@@ -404,10 +416,10 @@ Primary: Expr<'input> = {
     Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
     Spanned<("sizeof" <Type>)> => Expr(<>.map(|t| ExprKind::SizeOfType(t))),
     Spanned<("sizeof" "(" <Expr> ")")> => Expr(<>.map(|ex| ExprKind::SizeOfExpr(Box::new(ex)))),
-    // Struct construction: new Type { fields }
-    <s:@L> "new" <ty:Type> "{" <fields:StructFieldInitList?> "}" <e:@R> => 
+    // Struct construction: ID { fields }
+    <s:@L> <ty:ConstructibleType> "{" <fields:StructFieldInitList?> "}" <e:@R> => 
         Expr(spanned!(s, ExprKind::StructConstruction(
-            ty, 
+            ty,
             spanned!(s, fields.unwrap_or(Vec::new()), e, file_name)
         ), e, file_name)),
     "(" <Expr> ")" => <>,

@@ -243,7 +243,7 @@ pub enum ExprKind<'input> {
     /// `sizeof(expr)`
     SizeOfExpr(Box<Expr<'input>>),
 
-    /// Struct construction: `new Type { field1: value1, field2: value2 }`
+    /// Struct construction: `Type { field1: value1, field2: value2 }`
     #[expect(clippy::type_complexity)]
     StructConstruction(
         Type<'input>,
@@ -469,7 +469,7 @@ impl std::fmt::Display for ExprKind<'_> {
             Self::SizeOfType(ty) => write!(f, "sizeof {ty}"),
             Self::SizeOfExpr(expr) => write!(f, "sizeof({expr})"),
             Self::StructConstruction(ty, fields) => {
-                write!(f, "new {ty} {{ ")?;
+                write!(f, "{ty} {{ ")?;
                 let field_list: Vec<String> = fields
                     .value()
                     .iter()
