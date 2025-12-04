@@ -40,29 +40,26 @@ pub fn type_expr_index<'input>(
         .error_in(offset_t.kind.span()));
     };
 
-    // Allow arrays to implicitly coerce to pointers to their element type.
+    // Allow arrays or pointers to be indexed. For pointer operands we keep the
+    // existing coercion behavior; for arrays we do NOT mutate the original
+    // expression into a pointer here. Instead we return an `Index` node whose
+    // left-hand side may still be an array-valued expression and rely on
+    // codegen to implement array-to-pointer decay (taking the element's
+    // address) when generating the place. This avoids producing expressions
+    // whose `kind` disagrees with their `inferred_type`.
     if let TastType::Ptr(points_to_ty) = ptr_t.inferred_type.clone() {
         Ok(TypedExpr {
             inferred_type: *points_to_ty,
             kind: TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_final)).in_span(expr_span),
         })
     } else if let TastType::Array { element_type, .. } = ptr_t.inferred_type.clone() {
-        // Try to coerce the array expression to a pointer to its element type
-        let target_ptr = TastType::Ptr(Box::new((*element_type).clone()));
-        let coerced_ptr = try_coerce_to(ptr_t, &target_ptr);
-
-        if let TastType::Ptr(points_to_ty) = coerced_ptr.inferred_type.clone() {
-            Ok(TypedExpr {
-                inferred_type: *points_to_ty,
-                kind: TypedExprKind::Index(Box::new(coerced_ptr), Box::new(offset_final))
-                    .in_span(expr_span),
-            })
-        } else {
-            Err(
-                DiagnosticKind::CannotIndexIntoNonPointer(coerced_ptr.inferred_type.to_string())
-                    .error_in(expr_span),
-            )
-        }
+        // Do not coerce the array expression here; indexing yields the
+        // element type. Codegen will decay array values to pointers when
+        // necessary.
+        Ok(TypedExpr {
+            inferred_type: *element_type,
+            kind: TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_final)).in_span(expr_span),
+        })
     } else {
         Err(
             DiagnosticKind::CannotIndexIntoNonPointer(ptr_t.inferred_type.to_string())

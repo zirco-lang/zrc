@@ -18,10 +18,12 @@ entry:
   store i32 3, ptr %elem_ptr2, align 4, !dbg !12
   %array_val = load [3 x i32], ptr %array_tmp, align 4, !dbg !12
   store [3 x i32] %array_val, ptr %let_x, align 4, !dbg !13
-  %load = load ptr, ptr %let_x, align 8, !dbg !14
-  %gep = getelementptr i32, ptr %load, i64 1, !dbg !15
-  %load3 = load i32, ptr %gep, align 4, !dbg !15
-  ret i32 %load3, !dbg !15
+  %load = load [3 x i32], ptr %let_x, align 4, !dbg !14
+  %array_tmp3 = alloca [3 x i32], align 4, !dbg !15
+  store [3 x i32] %load, ptr %array_tmp3, align 4, !dbg !15
+  %gep = getelementptr i32, ptr %array_tmp3, i64 1, !dbg !15
+  %load4 = load i32, ptr %gep, align 4, !dbg !15
+  ret i32 %load4, !dbg !15
 }
 
 !llvm.module.flags = !{!0}

@@ -10,6 +10,7 @@
 //! by the `Place`.
 
 use inkwell::{
+    AddressSpace,
     basic_block::BasicBlock,
     debug_info::AsDIScope,
     values::{BasicValue, PointerValue},
@@ -64,15 +65,51 @@ pub fn cg_place<'ctx>(
         }
 
         PlaceKind::Index(ptr, idx) => {
-            let ptr = unpack!(bb = cg_expr(cg, bb, *ptr));
+            let ptr_val = unpack!(bb = cg_expr(cg, bb, *ptr));
             let idx = unpack!(bb = cg_expr(cg, bb, *idx));
 
-            // SAFETY: This can segfault if indices are used incorrectly
-            // This is only used for pointer arithmetic, so the indices should be correct
+            // If the left-hand side already yields a pointer, behave as
+            // before. If it yields an aggregate (e.g., an array value), we
+            // need to decay it to a pointer to its first element by
+            // allocating a temporary on the stack, storing the aggregate
+            // into it, and then bitcasting that allocation to a pointer to
+            // the element type before performing GEP.
+            let ptr_to_use = if ptr_val.is_pointer_value() {
+                ptr_val.into_pointer_value()
+            } else {
+                // Allocate space for the aggregate value on the stack
+                let agg_ty = ptr_val.get_type();
+                let agg_alloc = cg
+                    .builder
+                    .build_alloca(agg_ty, "array_tmp")
+                    .expect("alloca for aggregate temporary should succeed");
+
+                // Store the aggregate into the temporary
+                cg.builder
+                    .build_store(agg_alloc, ptr_val)
+                    .expect("storing aggregate into temporary should succeed");
+
+                // Bitcast the allocation (pointer to aggregate) to an opaque
+                // pointer; we'll treat it as a pointer to the element and
+                // let GEP work from there. Use the context pointer type to
+                // avoid deprecated `.ptr_type` calls.
+                cg.builder
+                    .build_bit_cast(
+                        agg_alloc,
+                        cg.ctx.ptr_type(AddressSpace::default()),
+                        "array_field_ptr",
+                    )
+                    .expect("bitcast should succeed")
+                    .into_pointer_value()
+            };
+
+            // SAFETY: This can segfault if indices are used incorrectly; the
+            // tests ensure indices are well-formed. `place.inferred_type` is
+            // the element type.
             let reg = unsafe {
                 cg.builder.build_gep(
                     llvm_basic_type(&cg, &place.inferred_type).0,
-                    ptr.into_pointer_value(),
+                    ptr_to_use,
                     &[idx.into_int_value()],
                     "gep",
                 )

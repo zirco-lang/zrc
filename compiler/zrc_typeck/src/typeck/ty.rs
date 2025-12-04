@@ -2,12 +2,9 @@
 
 use indexmap::IndexMap;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
-use zrc_parser::{
-    ast::{
-        stmt::ArgumentDeclarationList as AstADL,
-        ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind},
-    },
-    lexer::NumberLiteral,
+use zrc_parser::ast::{
+    stmt::ArgumentDeclarationList as AstADL,
+    ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind},
 };
 use zrc_utils::span::{Span, Spanned};
 
@@ -22,6 +19,7 @@ use crate::tast::{
 /// # Errors
 /// Errors if the identifier is not found in the type scope or a key is
 /// double-defined.
+#[expect(clippy::missing_panics_doc)]
 pub fn resolve_type<'input>(
     type_scope: &TypeCtx<'input>,
     ty: ParserType<'input>,
@@ -54,10 +52,20 @@ pub fn resolve_type<'input>(
                 ),
             ]))
         }
-        ParserTypeKind::Array { element_type, size } => TastType::Array {
-            element_type: Box::new(resolve_type(type_scope, *element_type)?),
-            size,
-        },
+        ParserTypeKind::Array { element_type, size } => {
+            let text_without_underscores = size.text_content().replace('_', "");
+            let parsed_value = u128::from_str_radix(&text_without_underscores, size.radix())
+                .expect("Number literal should have been valid");
+
+            if parsed_value == 0 {
+                return Err(DiagnosticKind::ArraySizeZero.error_in(span));
+            }
+
+            TastType::Array {
+                element_type: Box::new(resolve_type(type_scope, *element_type)?),
+                size,
+            }
+        }
         ParserTypeKind::Function {
             parameters,
             return_type,
@@ -168,11 +176,11 @@ fn resolve_type_with_opaque<'input>(
             ]))
         }
         ParserTypeKind::Array { element_type, size } => {
-            // if the size is zero, we must error
-            if let NumberLiteral::Decimal("0")
-            | NumberLiteral::Hexadecimal("0")
-            | NumberLiteral::Binary("0") = size
-            {
+            let text_without_underscores = size.text_content().replace('_', "");
+            let parsed_value = u128::from_str_radix(&text_without_underscores, size.radix())
+                .expect("Number literal should have been valid");
+
+            if parsed_value == 0 {
                 return Err(DiagnosticKind::ArraySizeZero.error_in(span));
             }
 
