@@ -141,8 +141,8 @@ pub fn expect_is_signed_integer(
             "signed integer".to_string(),
             expr.inferred_type.to_string(),
             span,
-        )
-        .map(|()| expr)
+        )?;
+        unreachable!("expect with false always returns Err")
     }
 }
 
@@ -168,8 +168,8 @@ pub fn expect_is_unsigned_integer(
             "unsigned integer".to_string(),
             expr.inferred_type.to_string(),
             span,
-        )
-        .map(|()| expr)
+        )?;
+        unreachable!("expect with false always returns Err")
     }
 }
 
