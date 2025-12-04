@@ -213,6 +213,7 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
                 .parse()
                 .expect("array size literal should be a valid integer");
 
+            #[expect(clippy::as_conversions, clippy::cast_possible_truncation)]
             let array_ty = elem_basic_ty
                 .array_type(size_val as u32)
                 .as_basic_type_enum();
@@ -227,16 +228,12 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
                         .target_machine()
                         .get_target_data()
                         .get_bit_size(&elem_basic_ty);
-                    let total_bits = elem_bits * size_val as u64;
+                    let total_bits = elem_bits * size_val;
 
                     dbg_builder
                         .create_basic_type(
-                            &format!(
-                                "[{size}]{elem}",
-                                size = size.text_content(),
-                                elem = element_type.to_string()
-                            ),
-                            total_bits as u64,
+                            &format!("[{}]{element_type}", size.text_content(),),
+                            total_bits,
                             0,
                             0,
                         )

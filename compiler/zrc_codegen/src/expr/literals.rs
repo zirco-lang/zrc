@@ -1,6 +1,7 @@
 //! code generation for literal expressions
 
 use inkwell::{
+    AddressSpace,
     types::StringRadix,
     values::{BasicValue, BasicValueEnum},
 };
@@ -136,6 +137,7 @@ pub fn cg_array_literal<'ctx, 'input>(
         .expect("array allocation should have compiled successfully");
 
     // Extract element type so we can GEP into elements
+    #[expect(clippy::wildcard_enum_match_arm)]
     let element_type = match &inferred_type {
         Type::Array { element_type, .. } => element_type.as_ref(),
         _ => panic!("array literal has non-array inferred type"),
@@ -145,7 +147,6 @@ pub fn cg_array_literal<'ctx, 'input>(
 
     // Bitcast the `ptr to [N x T]` into a `ptr to T` so we can index elements
     // with a single index. This avoids mismatches in the GEP element type.
-    use inkwell::AddressSpace;
 
     // LLVM 15+ uses opaque pointers; use the context's pointer type as the
     // destination for the pointer cast rather than trying to construct a
@@ -160,6 +161,7 @@ pub fn cg_array_literal<'ctx, 'input>(
         let el_val = unpack!(bb = super::cg_expr(cg, bb, el));
 
         // Use pointer-sized index for indexing
+        #[expect(clippy::as_conversions)]
         let idx_const = cg
             .ctx
             .ptr_sized_int_type(&cg.target_machine.get_target_data(), None)
