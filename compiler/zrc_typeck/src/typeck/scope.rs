@@ -156,10 +156,13 @@ pub struct ValueCtx<'input> {
     /// sibling scopes.
     mappings: HashMap<&'input str, Rc<RefCell<ValueEntry<'input>>>>,
 }
+impl Default for ValueCtx<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl<'input> ValueCtx<'input> {
     /// Create a new empty [`ValueScope`].
-    // Does not impl [Default] because a default would be misleading: the "empty" scope is more
-    // accurate.
     #[must_use]
     pub fn new() -> Self {
         Self {
