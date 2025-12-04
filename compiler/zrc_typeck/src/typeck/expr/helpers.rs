@@ -136,13 +136,11 @@ pub fn expect_is_signed_integer(
         })
     } else {
         // Not a signed integer and can't be coerced
-        expect(
-            false,
-            "signed integer".to_string(),
-            expr.inferred_type.to_string(),
-            span,
-        )?;
-        unreachable!("expect with false always returns Err")
+        Err(DiagnosticKind::ExpectedGot {
+            expected: "signed integer".to_string(),
+            got: expr.inferred_type.to_string(),
+        }
+        .error_in(span))
     }
 }
 
@@ -163,13 +161,11 @@ pub fn expect_is_unsigned_integer(
         })
     } else {
         // Not an unsigned integer and can't be coerced
-        expect(
-            false,
-            "unsigned integer".to_string(),
-            expr.inferred_type.to_string(),
-            span,
-        )?;
-        unreachable!("expect with false always returns Err")
+        Err(DiagnosticKind::ExpectedGot {
+            expected: "unsigned integer".to_string(),
+            got: expr.inferred_type.to_string(),
+        }
+        .error_in(span))
     }
 }
 
