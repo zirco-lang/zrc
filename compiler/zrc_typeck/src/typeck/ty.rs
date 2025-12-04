@@ -51,6 +51,16 @@ pub fn resolve_type<'input>(
                 ),
             ]))
         }
+        ParserTypeKind::Array { element_type, size } => {
+            if size.into_parsed_value() == 0 {
+                return Err(DiagnosticKind::ArraySizeZero.error_in(span));
+            }
+
+            TastType::Array {
+                element_type: Box::new(resolve_type(type_scope, *element_type)?),
+                size,
+            }
+        }
         ParserTypeKind::Function {
             parameters,
             return_type,
@@ -159,6 +169,20 @@ fn resolve_type_with_opaque<'input>(
                     )?)),
                 ),
             ]))
+        }
+        ParserTypeKind::Array { element_type, size } => {
+            if size.into_parsed_value() == 0 {
+                return Err(DiagnosticKind::ArraySizeZero.error_in(span));
+            }
+
+            TastType::Array {
+                element_type: Box::new(resolve_type_with_opaque(
+                    type_scope,
+                    *element_type,
+                    opaque_name,
+                )?),
+                size,
+            }
         }
         ParserTypeKind::Function {
             parameters,

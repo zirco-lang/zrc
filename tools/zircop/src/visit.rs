@@ -43,6 +43,11 @@ pub trait SyntacticVisit<'input> {
                 self.visit_expr(lhs.as_ref());
                 self.visit_expr(rhs.as_ref());
             }
+            AstExprKind::ArrayLiteral(items) => {
+                for item in items {
+                    self.visit_expr(item);
+                }
+            }
             AstExprKind::Call(func, args) => {
                 self.visit_expr(func.as_ref());
                 for arg in args.value() {
@@ -347,6 +352,11 @@ pub trait SemanticVisit<'input, 'gs> {
                 self.visit_place(place.as_ref());
                 for arg in args {
                     self.visit_tc_expr(arg);
+                }
+            }
+            TcExprKind::ArrayLiteral(items) => {
+                for item in items {
+                    self.visit_tc_expr(item);
                 }
             }
             TcExprKind::Ternary(cond, if_true, if_false) => {

@@ -24,11 +24,12 @@ Version 0.1.0 (Draft)
     - [Type Syntax](#32-type-syntax)
     - [Primitive Types](#33-primitive-types)
     - [Pointer Types](#34-pointer-types)
-    - [Struct Types](#35-struct-types)
-    - [Union Types](#36-union-types)
-    - [Enum Types](#37-enum-types)
-    - [Type Aliases](#38-type-aliases)
-    - [Type Inference and Implicit Conversions](#39-type-inference-and-implicit-conversions)
+    - [Array Types](#35-array-types)
+    - [Struct Types](#36-struct-types)
+    - [Union Types](#37-union-types)
+    - [Enum Types](#38-enum-types)
+    - [Type Aliases](#39-type-aliases)
+    - [Type Inference and Implicit Conversions](#310-type-inference-and-implicit-conversions)
 4. [Expressions](#4-expressions)
     - [Expression Overview](#41-expression-overview)
     - [Operator Precedence](#42-operator-precedence)
@@ -46,7 +47,8 @@ Version 0.1.0 (Draft)
     - [Ternary Conditional Expression](#414-ternary-conditional-expression)
     - [Sizeof Expressions](#415-sizeof-expressions)
     - [Comma Expression](#416-comma-expression)
-    - [Increment and Decrement Expressions](#417-increment-and-decrement-expressions)
+    - [Array Construction Expression](#417-array-construction-expression)
+    - [Increment and Decrement Expressions](#418-increment-and-decrement-expressions)
 5. [Statements](#5-statements)
     - [Statement Overview](#51-statement-overview)
     - [Expression Statements](#52-expression-statements)
@@ -429,7 +431,26 @@ A function pointer is represented as a pointer to a function type:
 *(fn(a: i32, b: *u8) -> bool)  // pointer to function taking (i32, *u8) and returning bool
 ```
 
-### 3.5 Struct Types
+### 3.5 Array Types
+
+Array types are fixed-size sequences of elements of a specified type.
+
+**Array Syntax**:
+
+```zirco
+[N]T
+```
+
+Where `N` is a positive integer (gt 0) representing the number of elements, and `T` is the element type.
+
+**Example**:
+
+```zirco
+[5]i32        // array of 5 i32 elements
+[10]*u8      // array of 10 pointers to u8
+```
+
+### 3.6 Struct Types
 
 Structs are product types that group named fields together:
 
@@ -471,7 +492,7 @@ struct Company {
 }
 ```
 
-### 3.6 Union Types
+### 3.7 Union Types
 
 Unions are sum types where a value can be one of several different types:
 
@@ -499,7 +520,7 @@ type Value = union { i: i32, f: f32 };
 -   Fields are accessed using the `.` operator
 -   Reading an inactive field is undefined behavior
 
-### 3.7 Enum Types
+### 3.8 Enum Types
 
 Enums are tagged unions, or sum types where a value must be _verified_ to be one of
 several types before use.
@@ -516,7 +537,7 @@ union MyUnion {
 
 These variants are used in the match statements.
 
-### 3.8 Type Aliases
+### 3.9 Type Aliases
 
 Type aliases create alternate names for existing types:
 
@@ -530,7 +551,7 @@ type ComplexStruct = struct { a: i32, b: *u8 };
 
 Type aliases are transparent - they create a new name but not a new type. The alias and the original type are interchangeable.
 
-### 3.9 Type Inference and Implicit Conversions
+### 3.10 Type Inference and Implicit Conversions
 
 **Type Inference**:
 
@@ -550,6 +571,15 @@ Zirco allows the following implicit type conversions:
     ```
 
 2. **Untyped Integer Literals**: Integer literals without a type suffix can be implicitly converted to any integer type when used in contexts where the target type is known (implementation-defined behavior).
+
+3. **Arrays to Pointers**: An array type `[N]T` can be implicitly converted to a pointer type `*T` when used in expressions.
+
+    ```zirco
+    let arr: [5]i32 = [1, 2, 3, 4, 5];
+    let ptr: *i32 = arr;  // Implicit conversion from [5]i32 to *i32
+    ```
+
+**Semantics**: The pointer points to the first element of the array. The conversion applies in assignment, function argument, and indexing contexts.
 
 Note: Implicit conversions only apply in specific contexts such as function arguments. Most operations require explicit type matching or explicit casts using the `as` operator.
 
@@ -871,7 +901,37 @@ let x = (a = 5, b = 10, a + b);  // x is 15
 -   Result is the value of the rightmost expression
 -   Primarily used for side effects
 
-### 4.17 Increment and Decrement Expressions
+### 4.17 Array Construction Expression
+
+Array construction creates an array from a list of expressions:
+
+```zirco
+let arr = [1, 2, 3, 4, 5];
+```
+
+**Rules**:
+
+-   All elements must be of the same type
+-   The resulting array type is `[N]T` where `N` is the number
+    of elements and `T` is the element type
+-   Elements are evaluated in order
+-   Produces a fixed-size array value
+-   Requires at least one element
+
+**Type Specification**:
+
+-   Type can be inferred from element types: `let arr = [1, 2, 3];` infers `[3]i32`
+-   Type can be explicitly specified (syntax to be defined by implementation)
+-   All elements must have the same type; implicit conversions may apply in specific contexts
+
+**Example with Type Inference**:
+
+```zirco
+let arr1 = [1, 2, 3, 4, 5];        // inferred as [5]i32
+let arr2: [5]i32 = [1, 2, 3, 4, 5]; // explicit type annotation
+```
+
+### 4.18 Increment and Decrement Expressions
 
 Zirco supports both prefix and postfix increment and decrement operators for integer types.
 
