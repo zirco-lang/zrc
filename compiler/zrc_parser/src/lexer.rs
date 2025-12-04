@@ -236,6 +236,18 @@ impl<'input> NumberLiteral<'input> {
             Self::Binary(_) => 2,
         }
     }
+
+    /// Get the parsed value of this [`NumberLiteral`] as a `u128`
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number literal could not be parsed as a `u128`.
+    #[must_use]
+    pub fn into_parsed_value(&self) -> u128 {
+        let text_without_underscores = self.text_content().replace('_', "");
+        u128::from_str_radix(&text_without_underscores, self.radix())
+            .expect("Number literal should have been valid")
+    }
 }
 
 /// Enum representing all of the result tokens in the Zirco lexer

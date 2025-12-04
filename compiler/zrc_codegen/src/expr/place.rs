@@ -10,7 +10,6 @@
 //! by the `Place`.
 
 use inkwell::{
-    AddressSpace,
     basic_block::BasicBlock,
     debug_info::AsDIScope,
     values::{BasicValue, PointerValue},
@@ -89,18 +88,7 @@ pub fn cg_place<'ctx>(
                     .build_store(agg_alloc, ptr_val)
                     .expect("storing aggregate into temporary should succeed");
 
-                // Bitcast the allocation (pointer to aggregate) to an opaque
-                // pointer; we'll treat it as a pointer to the element and
-                // let GEP work from there. Use the context pointer type to
-                // avoid deprecated `.ptr_type` calls.
-                cg.builder
-                    .build_bit_cast(
-                        agg_alloc,
-                        cg.ctx.ptr_type(AddressSpace::default()),
-                        "array_field_ptr",
-                    )
-                    .expect("bitcast should succeed")
-                    .into_pointer_value()
+                agg_alloc
             };
 
             // SAFETY: This can segfault if indices are used incorrectly; the

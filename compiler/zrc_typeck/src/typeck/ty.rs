@@ -19,7 +19,6 @@ use crate::tast::{
 /// # Errors
 /// Errors if the identifier is not found in the type scope or a key is
 /// double-defined.
-#[expect(clippy::missing_panics_doc)]
 pub fn resolve_type<'input>(
     type_scope: &TypeCtx<'input>,
     ty: ParserType<'input>,
@@ -53,11 +52,7 @@ pub fn resolve_type<'input>(
             ]))
         }
         ParserTypeKind::Array { element_type, size } => {
-            let text_without_underscores = size.text_content().replace('_', "");
-            let parsed_value = u128::from_str_radix(&text_without_underscores, size.radix())
-                .expect("Number literal should have been valid");
-
-            if parsed_value == 0 {
+            if size.into_parsed_value() == 0 {
                 return Err(DiagnosticKind::ArraySizeZero.error_in(span));
             }
 
@@ -176,11 +171,7 @@ fn resolve_type_with_opaque<'input>(
             ]))
         }
         ParserTypeKind::Array { element_type, size } => {
-            let text_without_underscores = size.text_content().replace('_', "");
-            let parsed_value = u128::from_str_radix(&text_without_underscores, size.radix())
-                .expect("Number literal should have been valid");
-
-            if parsed_value == 0 {
+            if size.into_parsed_value() == 0 {
                 return Err(DiagnosticKind::ArraySizeZero.error_in(span));
             }
 
