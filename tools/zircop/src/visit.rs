@@ -80,6 +80,11 @@ pub trait SyntacticVisit<'input> {
                     self.visit_expr(&fv.1);
                 }
             }
+            AstExprKind::ArrayLiteral(elements) => {
+                for elem in elements.value() {
+                    self.visit_expr(elem);
+                }
+            }
             AstExprKind::NumberLiteral(_, ty) => {
                 if let Some(ty) = ty.as_ref() {
                     self.visit_type(ty);
@@ -362,6 +367,11 @@ pub trait SemanticVisit<'input, 'gs> {
             TcExprKind::StructConstruction(fields) => {
                 for (_name, expr) in fields {
                     self.visit_tc_expr(expr);
+                }
+            }
+            TcExprKind::ArrayLiteral(elements) => {
+                for elem in elements {
+                    self.visit_tc_expr(elem);
                 }
             }
             TcExprKind::NumberLiteral(_, _)

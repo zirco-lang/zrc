@@ -35,6 +35,10 @@ pub fn resolve_type<'input>(
         ParserTypeKind::Ptr(pointee_ty) => {
             TastType::Ptr(Box::new(resolve_type(type_scope, *pointee_ty)?))
         }
+        ParserTypeKind::Array { size, element_type } => TastType::Array {
+            size,
+            element_type: Box::new(resolve_type(type_scope, *element_type)?),
+        },
         ParserTypeKind::Struct(members) => {
             TastType::Struct(resolve_key_type_mapping(type_scope, members)?)
         }
@@ -136,6 +140,14 @@ fn resolve_type_with_opaque<'input>(
             *pointee_ty,
             opaque_name,
         )?)),
+        ParserTypeKind::Array { size, element_type } => TastType::Array {
+            size,
+            element_type: Box::new(resolve_type_with_opaque(
+                type_scope,
+                *element_type,
+                opaque_name,
+            )?),
+        },
         ParserTypeKind::Struct(members) => TastType::Struct(resolve_key_type_mapping_with_opaque(
             type_scope,
             members,
@@ -223,6 +235,10 @@ fn check_opaque_behind_pointer<'input>(
             // Anything behind a pointer is OK, even opaque types
             Ok(())
         }
+        TastType::Array { element_type, .. } => {
+            // Check the element type for opaque references
+            check_opaque_behind_pointer(element_type, opaque_name, ty_span)
+        }
         TastType::Struct(members) | TastType::Union(members) => {
             for (_, member_ty) in members {
                 check_opaque_behind_pointer(member_ty, opaque_name, ty_span)?;
@@ -276,6 +292,10 @@ fn replace_opaque_with_concrete<'input>(
                 other => TastType::Ptr(Box::new(replace_opaque_with_concrete(other, opaque_name))),
             }
         }
+        TastType::Array { size, element_type } => TastType::Array {
+            size,
+            element_type: Box::new(replace_opaque_with_concrete(*element_type, opaque_name)),
+        },
         TastType::Struct(members) => TastType::Struct(
             members
                 .into_iter()

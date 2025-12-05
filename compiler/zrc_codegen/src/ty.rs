@@ -91,7 +91,7 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
             Type::Int => {
                 panic!("{{int}} type reached code generation, should be resolved in typeck")
             }
-            Type::Ptr(_) | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
+            Type::Ptr(_) | Type::Array { .. } | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
                 panic!("not an integer type")
             }
             Type::Opaque(name) => {
@@ -145,6 +145,32 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
                     .as_type()
             }),
         ),
+        Type::Array { size, element_type } => {
+            let (elem_ty, elem_dbg_ty) = llvm_basic_type(ctx, element_type);
+            (
+                {
+                    #[expect(clippy::cast_possible_truncation, clippy::as_conversions)]
+                    elem_ty.array_type(*size as u32).as_basic_type_enum()
+                },
+                ctx.dbg_builder().map(|dbg_builder| {
+                    let elem_size_in_bits = elem_ty
+                        .size_of()
+                        .expect("element type should have size")
+                        .get_zero_extended_constant()
+                        .expect("size should be constant")
+                        * 8;
+                    #[expect(clippy::cast_possible_truncation, clippy::as_conversions)]
+                    dbg_builder
+                        .create_array_type(
+                            elem_dbg_ty.expect("we have DI"),
+                            *size,
+                            elem_size_in_bits as u32,
+                            &[],
+                        )
+                        .as_type()
+                }),
+            )
+        }
         Type::Fn(_) => panic!("function is not a basic type"),
         Type::Opaque(name) => {
             panic!("opaque type '{name}' reached code generation, should be resolved in typeck")
@@ -266,6 +292,7 @@ pub fn llvm_type<'ctx: 'a, 'a>(
         | Type::Isize
         | Type::Ptr(_)
         | Type::Struct(_)
+        | Type::Array { .. }
         | Type::Union(_) => {
             let (ty, dbg_ty) = llvm_basic_type(ctx, ty);
             (ty.as_any_type_enum(), dbg_ty)

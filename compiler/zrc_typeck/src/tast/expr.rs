@@ -114,6 +114,9 @@ pub enum TypedExprKind<'input> {
     /// `new Type { field1: value1, field2: value2, ... }`
     StructConstruction(indexmap::IndexMap<&'input str, TypedExpr<'input>>),
 
+    /// `[expr1, expr2, expr3, ...]` - array literal
+    ArrayLiteral(Vec<TypedExpr<'input>>),
+
     /// Any numeric literal.
     NumberLiteral(NumberLiteral<'input>, Type<'input>),
     /// Any string literal.
@@ -209,7 +212,8 @@ impl TypedExprKind<'_> {
             | Self::CharLiteral(_)
             | Self::Identifier(_)
             | Self::BooleanLiteral(_)
-            | Self::StructConstruction(_) => Precedence::Primary,
+            | Self::StructConstruction(_)
+            | Self::ArrayLiteral(_) => Precedence::Primary,
         }
     }
 
@@ -360,6 +364,17 @@ impl Display for TypedExprKind<'_> {
                     fields
                         .iter()
                         .map(|(name, expr)| format!("{name}: ({expr})"))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }
+            Self::ArrayLiteral(elements) => {
+                write!(
+                    f,
+                    "[{}]",
+                    elements
+                        .iter()
+                        .map(ToString::to_string)
                         .collect::<Vec<String>>()
                         .join(", ")
                 )

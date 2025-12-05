@@ -45,6 +45,20 @@ pub fn type_expr_index<'input>(
             inferred_type: *points_to_ty,
             kind: TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_final)).in_span(expr_span),
         })
+    } else if let TastType::Array { element_type, .. } = ptr_t.inferred_type.clone() {
+        // Arrays decay to pointers when indexed
+        // Convert the array to a pointer to its first element
+        let place = expr_to_place(scope, expr_span, ptr_t)?;
+        let array_ptr_expr = TypedExpr {
+            inferred_type: TastType::Ptr(element_type.clone()),
+            kind: TypedExprKind::UnaryAddressOf(Box::new(place)).in_span(expr_span),
+        };
+
+        Ok(TypedExpr {
+            inferred_type: *element_type,
+            kind: TypedExprKind::Index(Box::new(array_ptr_expr), Box::new(offset_final))
+                .in_span(expr_span),
+        })
     } else {
         Err(
             DiagnosticKind::CannotIndexIntoNonPointer(ptr_t.inferred_type.to_string())

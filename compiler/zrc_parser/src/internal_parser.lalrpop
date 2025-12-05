@@ -219,6 +219,14 @@ LetDeclaration: Vec<Spanned<LetDeclaration<'input>>> = {
 pub Type: Type<'input> = {
     Spanned<IDENTIFIER> => Type(<>.map(|x| TypeKind::Identifier(x))),
     Spanned<("*" <TypeOrParenthesizedType>)> => Type(<>.map(|x| TypeKind::Ptr(Box::new(x)))),
+    <s:@L> "[" <size:NUMBER> "]" <element_type:TypeOrParenthesizedType> <e:@R> => {
+        let size_val = match size {
+            lexer::NumberLiteral::Decimal(s) => s.parse::<u64>().expect("array size should be a valid u64"),
+            lexer::NumberLiteral::Hexadecimal(s) => u64::from_str_radix(&s[2..], 16).expect("array size should be a valid hex u64"),
+            lexer::NumberLiteral::Binary(s) => u64::from_str_radix(&s[2..], 2).expect("array size should be a valid binary u64"),
+        };
+        Type::build_array(spanned!(s, (), e, file_name).span(), size_val, element_type)
+    },
     Spanned<("struct" <KeyTypeMapping>)> => 
         Type(<>.map(TypeKind::Struct)),
     Spanned<("union" <KeyTypeMapping>)> =>
@@ -416,6 +424,9 @@ Primary: Expr<'input> = {
     Spanned<"false"> => Expr(<>.map(|_| ExprKind::BooleanLiteral(false))),
     Spanned<("sizeof" <Type>)> => Expr(<>.map(|t| ExprKind::SizeOfType(t))),
     Spanned<("sizeof" "(" <Expr> ")")> => Expr(<>.map(|ex| ExprKind::SizeOfExpr(Box::new(ex)))),
+    // Array literal: [expr1, expr2, ...] - uses Assignment to avoid comma operator ambiguity
+    <s:@L> "[" <elements:CommaSeparated<Assignment>?> "]" <e:@R> => 
+        Expr::build_array_literal(spanned!(s, elements.unwrap_or(Vec::new()), e, file_name)),
     // Struct construction: ID { fields }
     <s:@L> <ty:ConstructibleType> "{" <fields:StructFieldInitList?> "}" <e:@R> => 
         Expr(spanned!(s, ExprKind::StructConstruction(

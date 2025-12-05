@@ -429,7 +429,47 @@ A function pointer is represented as a pointer to a function type:
 *(fn(a: i32, b: *u8) -> bool)  // pointer to function taking (i32, *u8) and returning bool
 ```
 
-### 3.5 Struct Types
+
+### 3.5 Array Types
+
+Array types represent fixed-size sequences of elements of the same type stored contiguously in memory.
+
+**Syntax**: `[N]Type` where `N` is a compile-time constant integer representing the number of elements.
+
+**Examples**:
+
+```zirco
+[5]i32         // Array of 5 i32 elements
+[10]*u8        // Array of 10 pointers to u8
+[3][4]i64      // Array of 3 arrays of 4 i64 elements (3x4 matrix)
+```
+
+**Array Literals**:
+
+Arrays can be initialized using array literal syntax:
+
+```zirco
+let arr: [5]i32 = [1, 2, 3, 4, 5];
+let matrix: [2][3]i32 = [[1, 2, 3], [4, 5, 6]];
+```
+
+**Array-to-Pointer Decay**:
+
+Arrays automatically decay to pointers to their first element when indexed or used in pointer contexts:
+
+```zirco
+let arr: [5]i32 = [1, 2, 3, 4, 5];
+let first = arr[0];   // Arrays decay to pointers when indexed
+```
+
+**Indexing**:
+
+Array elements are accessed using zero-based indexing with the `[]` operator.
+
+**Note**: Array bounds are not checked at runtime. Accessing an array out of bounds is undefined behavior.
+
+### 3.6 Struct Types
+### 3.10 Struct Types
 
 Structs are product types that group named fields together:
 
@@ -471,7 +511,7 @@ struct Company {
 }
 ```
 
-### 3.6 Union Types
+### 3.10 Union Types
 
 Unions are sum types where a value can be one of several different types:
 
@@ -499,7 +539,7 @@ type Value = union { i: i32, f: f32 };
 -   Fields are accessed using the `.` operator
 -   Reading an inactive field is undefined behavior
 
-### 3.7 Enum Types
+### 3.10 Enum Types
 
 Enums are tagged unions, or sum types where a value must be _verified_ to be one of
 several types before use.
@@ -516,7 +556,7 @@ union MyUnion {
 
 These variants are used in the match statements.
 
-### 3.8 Type Aliases
+### 3.10 Type Aliases
 
 Type aliases create alternate names for existing types:
 
@@ -530,7 +570,7 @@ type ComplexStruct = struct { a: i32, b: *u8 };
 
 Type aliases are transparent - they create a new name but not a new type. The alias and the original type are interchangeable.
 
-### 3.9 Type Inference and Implicit Conversions
+### 3.10 Type Inference and Implicit Conversions
 
 **Type Inference**:
 

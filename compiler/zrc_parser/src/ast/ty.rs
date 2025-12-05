@@ -43,6 +43,14 @@ pub enum TypeKind<'input> {
     /// `*T`
     #[display("*{_0}")]
     Ptr(Box<Type<'input>>),
+    /// `[N]T` - array of N elements of type T
+    #[display("[{size}]{element_type}")]
+    Array {
+        /// The size of the array
+        size: u64,
+        /// The element type
+        element_type: Box<Type<'input>>,
+    },
     /// A direct struct type
     #[display("struct {{ {_0} }}")]
     Struct(KeyTypeMapping<'input>),
@@ -97,6 +105,17 @@ impl<'input> Type<'input> {
     pub fn build_ptr(span: Span, ty: Self) -> Self {
         Self(TypeKind::Ptr(Box::new(ty)).in_span(span))
     }
+
+    #[must_use]
+    pub fn build_array(span: Span, size: u64, element_type: Self) -> Self {
+        Self(
+            TypeKind::Array {
+                size,
+                element_type: Box::new(element_type),
+            }
+            .in_span(span),
+        )
+    }
 }
 
 #[cfg(test)]
@@ -109,6 +128,8 @@ mod tests {
         let test_cases = vec![
             "i32",
             "*i32",
+            "[4]i32",
+            "[10]*i8",
             "struct { a: i32, b: i32 }",
             "union { a: i32, b: i32 }",
             "enum { Eight: i8, Sixteen: i16 }",

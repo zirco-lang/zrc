@@ -240,6 +240,7 @@ pub fn cg_struct_construction<'ctx, 'input>(
         | Type::Bool
         | Type::Int
         | Type::Ptr(_)
+        | Type::Array { .. }
         | Type::Fn(_)
         | Type::Opaque(_) => {
             unreachable!("struct construction should only be used with struct/union types")

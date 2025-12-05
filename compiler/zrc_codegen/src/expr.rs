@@ -125,5 +125,6 @@ pub(crate) fn cg_expr<'ctx, 'input, 'a>(
         TypedExprKind::Cast(x, ty) => misc::cg_cast(ce, x, &ty),
         TypedExprKind::SizeOf(ty) => misc::cg_size_of(ce, &ty),
         TypedExprKind::StructConstruction(fields) => misc::cg_struct_construction(ce, &fields),
+        TypedExprKind::ArrayLiteral(elements) => literals::cg_array_literal(ce, elements),
     }
 }
