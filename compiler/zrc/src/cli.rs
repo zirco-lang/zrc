@@ -123,7 +123,25 @@ pub enum OutputFormat {
     Object,
 }
 
+/// Resolve a path to an absolute path based on the current working directory.
+///
+/// If the path is relative, it is resolved to an absolute path by joining it
+/// with the current working directory and canonicalizing it. If the path is
+/// already absolute or canonicalization fails, the path is returned as-is.
+fn resolve_include_path(path: &Path) -> PathBuf {
+    if path.is_relative() {
+        std::env::current_dir()
+            .ok()
+            .and_then(|cwd| cwd.join(path).canonicalize().ok())
+            .unwrap_or_else(|| path.to_path_buf())
+    } else {
+        path.to_path_buf()
+    }
+}
+
 /// Get the include paths from the CLI environment and -I arguments
+///
+/// Relative paths are resolved relative to the current working directory.
 pub fn get_include_paths(cli: &Cli) -> Vec<&'static Path> {
     // append paths in the following order:
     // 1. CLI
@@ -131,15 +149,19 @@ pub fn get_include_paths(cli: &Cli) -> Vec<&'static Path> {
     let mut include_paths: Vec<&'static Path> = Vec::new();
 
     for path in &cli.include_paths {
+        let resolved_path = resolve_include_path(path);
+
         // SAFETY: we leak the PathBuf to get a 'static lifetime
-        let static_path: &'static Path = Box::leak(path.clone().into_boxed_path());
+        let static_path: &'static Path = Box::leak(resolved_path.into_boxed_path());
         include_paths.push(static_path);
     }
 
     if let Ok(env_paths) = std::env::var("ZIRCO_INCLUDE_PATH") {
         for path_str in std::env::split_paths(&env_paths) {
+            let resolved_path = resolve_include_path(&path_str);
+
             // SAFETY: we leak the PathBuf to get a 'static lifetime
-            let static_path: &'static Path = Box::leak(path_str.into_boxed_path());
+            let static_path: &'static Path = Box::leak(resolved_path.into_boxed_path());
             include_paths.push(static_path);
         }
     }
@@ -185,5 +207,53 @@ mod tests {
         assert_eq!(OutputFormat::Tast.to_string(), "tast");
         assert_eq!(OutputFormat::Asm.to_string(), "asm");
         assert_eq!(OutputFormat::Object.to_string(), "object");
+    }
+
+    #[test]
+    fn get_include_paths_resolves_relative_paths_to_absolute() {
+        // Create a CLI with a relative path
+        let cli = Cli {
+            version: false,
+            path: None,
+            out_file: PathBuf::from("-"),
+            emit: OutputFormat::Llvm,
+            force: false,
+            target: None,
+            cpu: String::from("generic"),
+            opt_level: FrontendOptLevel::O2,
+            debug: false,
+            include_paths: vec![PathBuf::from(".")],
+        };
+
+        let paths = get_include_paths(&cli);
+
+        // The relative path "." should be resolved to an absolute path
+        assert_eq!(paths.len(), 1);
+        assert!(paths[0].is_absolute(), "Path should be absolute");
+    }
+
+    #[test]
+    fn get_include_paths_preserves_absolute_paths() {
+        // Create a CLI with an absolute path
+        let absolute_path = PathBuf::from("/tmp");
+        let cli = Cli {
+            version: false,
+            path: None,
+            out_file: PathBuf::from("-"),
+            emit: OutputFormat::Llvm,
+            force: false,
+            target: None,
+            cpu: String::from("generic"),
+            opt_level: FrontendOptLevel::O2,
+            debug: false,
+            include_paths: vec![absolute_path.clone()],
+        };
+
+        let paths = get_include_paths(&cli);
+
+        // The absolute path should be preserved
+        assert_eq!(paths.len(), 1);
+        assert!(paths[0].is_absolute(), "Path should be absolute");
+        assert_eq!(paths[0], absolute_path.as_path());
     }
 }
