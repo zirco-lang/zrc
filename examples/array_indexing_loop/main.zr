@@ -1,0 +1,10 @@
+#include <stdio.zh>
+
+fn main(argc: usize, argv: **u8) -> i32 {
+   let x: [4]i32 = [2 as i32, 3 as i32, 5 as i32, 7 as i32];
+   for (let i = 0; i < 4; i++) {
+       printf("arr[%d] = %d\n", i, x[i as usize]);
+   }
+
+   return 0;
+}

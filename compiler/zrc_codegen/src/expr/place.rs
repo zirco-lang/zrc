@@ -246,6 +246,23 @@ mod tests {
     }
 
     #[test]
+    fn array_value_indexing_in_loop() {
+        cg_snapshot_test!(indoc! {"
+                fn test() {
+                    let x: [3]i32 = [1i32, 2i32, 3i32];
+                    let sum = 0;
+
+                    // TEST: This tests that the temporary allocation for array value
+                    // indexing happens in the entry block, not inside the loop.
+                    // The alloca for array_tmp should appear at the top of the function.
+                    for (let i = 0; i < 3; i++) {
+                        sum = sum + x[i as usize];
+                    }
+                }
+            "});
+    }
+
+    #[test]
     fn union_property_access_in_place_position() {
         cg_snapshot_test!(indoc! {"
                 union U { x: i32, y: i8 }
