@@ -1,11 +1,10 @@
 //! code generation for literal expressions
 
 use inkwell::{
-    AddressSpace,
     types::StringRadix,
     values::{BasicValue, BasicValueEnum},
 };
-use zrc_typeck::tast::expr::{NumberLiteral, Place, PlaceKind, StringTok, TypedExpr, ZrcString};
+use zrc_typeck::tast::expr::{NumberLiteral, Place, PlaceKind, StringTok, ZrcString};
 use zrc_utils::span::Spannable;
 
 use super::place::cg_place;
@@ -114,82 +113,6 @@ pub fn cg_identifier<'ctx, 'input>(
     bb.and(reg.as_basic_value_enum())
 }
 
-/// Generate LLVM IR for an array literal
-pub fn cg_array_literal<'ctx, 'input>(
-    CgExprArgs {
-        cg,
-        mut bb,
-        inferred_type,
-        ..
-    }: CgExprArgs<'ctx, 'input, '_>,
-    elements: Vec<TypedExpr<'input>>,
-) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
-    use zrc_typeck::tast::ty::Type;
-
-    // Obtain the LLVM array type
-    let array_basic = llvm_basic_type(&cg, &inferred_type).0;
-    let array_type = array_basic.into_array_type();
-
-    // Allocate on the stack
-    let array_ptr = cg
-        .builder
-        .build_alloca(array_type, "array_tmp")
-        .expect("array allocation should have compiled successfully");
-
-    // Extract element type so we can GEP into elements
-    #[expect(clippy::wildcard_enum_match_arm)]
-    let element_type = match &inferred_type {
-        Type::Array { element_type, .. } => element_type.as_ref(),
-        _ => panic!("array literal has non-array inferred type"),
-    };
-
-    let elem_basic = llvm_basic_type(&cg, element_type).0;
-
-    // Bitcast the `ptr to [N x T]` into a `ptr to T` so we can index elements
-    // with a single index. This avoids mismatches in the GEP element type.
-
-    // LLVM 15+ uses opaque pointers; use the context's pointer type as the
-    // destination for the pointer cast rather than trying to construct a
-    // pointer type from the `BasicTypeEnum` (which is deprecated / awkward).
-    let elem_ptr_type = cg.ctx.ptr_type(AddressSpace::default());
-    let array_as_elem_ptr = cg
-        .builder
-        .build_pointer_cast(array_ptr, elem_ptr_type, "array_as_elem_ptr")
-        .expect("pointer cast should succeed");
-
-    for (i, el) in elements.into_iter().enumerate() {
-        let el_val = unpack!(bb = super::cg_expr(cg, bb, el));
-
-        // Use pointer-sized index for indexing
-        #[expect(clippy::as_conversions)]
-        let idx_const = cg
-            .ctx
-            .ptr_sized_int_type(&cg.target_machine.get_target_data(), None)
-            .const_int(i as u64, false);
-
-        // SAFETY: indices are known-good compile-time constants and the
-        // casted pointer points at the first element of the array allocation.
-        let gep = unsafe {
-            cg.builder
-                .build_gep(elem_basic, array_as_elem_ptr, &[idx_const], "elem_ptr")
-        }
-        .expect("building GEP for array element should succeed");
-
-        let gep_ptr = gep.as_basic_value_enum().into_pointer_value();
-
-        cg.builder
-            .build_store(gep_ptr, el_val)
-            .expect("store should have compiled successfully");
-    }
-
-    let reg = cg
-        .builder
-        .build_load(array_type, array_ptr, "array_val")
-        .expect("load should have compiled successfully");
-
-    bb.and(reg.as_basic_value_enum())
-}
-
 #[cfg(test)]
 mod tests {
     // Please read the "Common patterns in tests" section of crate::test_utils for
@@ -230,16 +153,6 @@ mod tests {
                 fn test() {
                     let a = 0b10_10;
                     let b = 0x1F_A4;
-                }
-            "});
-    }
-
-    #[test]
-    fn array_literal_generates_properly() {
-        cg_snapshot_test!(indoc! {"
-                fn test() -> i32 {
-                    let x = [1i32, 2i32, 3i32];
-                    return x[1usize];
                 }
             "});
     }

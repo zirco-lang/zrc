@@ -249,8 +249,6 @@ pub enum ExprKind<'input> {
         Type<'input>,
         Spanned<Vec<Spanned<(Spanned<&'input str>, Expr<'input>)>>>,
     ),
-    /// Array literal: `[expr1, expr2, ...]`
-    ArrayLiteral(Vec<Expr<'input>>),
 
     /// Any numeric literal.
     NumberLiteral(NumberLiteral<'input>, Option<Type<'input>>),
@@ -310,8 +308,7 @@ impl ExprKind<'_> {
             | Self::CharLiteral(_)
             | Self::Identifier(_)
             | Self::BooleanLiteral(_)
-            | Self::StructConstruction(_, _)
-            | Self::ArrayLiteral(_) => Precedence::Primary,
+            | Self::StructConstruction(_, _) => Precedence::Primary,
         }
     }
 
@@ -495,12 +492,6 @@ impl std::fmt::Display for ExprKind<'_> {
             Self::CharLiteral(character) => write!(f, "'{character}'"),
             Self::Identifier(name) => write!(f, "{name}"),
             Self::BooleanLiteral(boolean) => write!(f, "{boolean}"),
-            Self::ArrayLiteral(els) => {
-                write!(f, "[")?;
-                let el_list: Vec<String> = els.iter().map(ToString::to_string).collect();
-                write!(f, "{}", el_list.join(", "))?;
-                write!(f, "]")
-            }
         }
     }
 }

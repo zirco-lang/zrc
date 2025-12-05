@@ -9,7 +9,6 @@ use std::fmt::Display;
 
 use derive_more::Display;
 use indexmap::IndexMap;
-use zrc_parser::lexer::NumberLiteral;
 
 use super::stmt::ArgumentDeclarationList;
 
@@ -72,13 +71,6 @@ pub enum Type<'input> {
     Struct(IndexMap<&'input str, Self>),
     /// Union type literals. Ordered by declaration order.
     Union(IndexMap<&'input str, Self>),
-    /// Array type `[N]T`
-    Array {
-        /// The element type
-        element_type: Box<Self>,
-        /// The size integer
-        size: NumberLiteral<'input>,
-    },
     /// Opaque type placeholder used during type resolution for self-referential
     /// types. This is a temporary type that should be replaced with a void
     /// pointer (`*struct{}`) after the type definition is fully resolved.
@@ -125,7 +117,6 @@ impl Display for Type<'_> {
                     .join(", ")
             ),
             Self::Opaque(name) => write!(f, "{name}"),
-            Self::Array { element_type, size } => write!(f, "[{size}]{element_type}"),
         }
     }
 }
@@ -223,19 +214,6 @@ impl<'input> Type<'input> {
             && fields.is_empty()
         {
             // Target is *struct{}, allow implicit cast from any *T
-            return true;
-        }
-
-        // Allow arrays to implicitly cast to pointers to their element type
-        if let (
-            Type::Array {
-                element_type: from_element,
-                ..
-            },
-            Type::Ptr(to_pointee),
-        ) = (self, target)
-            && **to_pointee == **from_element
-        {
             return true;
         }
 
@@ -368,8 +346,7 @@ mod tests {
             | Type::Ptr(_)
             | Type::Fn(_)
             | Type::Union(_)
-            | Type::Opaque(_)
-            | Type::Array { .. } => panic!("unit should be an empty struct"),
+            | Type::Opaque(_) => panic!("unit should be an empty struct"),
         }
     }
 
