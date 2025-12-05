@@ -40,24 +40,9 @@ pub fn type_expr_index<'input>(
         .error_in(offset_t.kind.span()));
     };
 
-    // Allow arrays or pointers to be indexed. For pointer operands we keep the
-    // existing coercion behavior; for arrays we do NOT mutate the original
-    // expression into a pointer here. Instead we return an `Index` node whose
-    // left-hand side may still be an array-valued expression and rely on
-    // codegen to implement array-to-pointer decay (taking the element's
-    // address) when generating the place. This avoids producing expressions
-    // whose `kind` disagrees with their `inferred_type`.
     if let TastType::Ptr(points_to_ty) = ptr_t.inferred_type.clone() {
         Ok(TypedExpr {
             inferred_type: *points_to_ty,
-            kind: TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_final)).in_span(expr_span),
-        })
-    } else if let TastType::Array { element_type, .. } = ptr_t.inferred_type.clone() {
-        // Do not coerce the array expression here; indexing yields the
-        // element type. Codegen will decay array values to pointers when
-        // necessary.
-        Ok(TypedExpr {
-            inferred_type: *element_type,
             kind: TypedExprKind::Index(Box::new(ptr_t), Box::new(offset_final)).in_span(expr_span),
         })
     } else {

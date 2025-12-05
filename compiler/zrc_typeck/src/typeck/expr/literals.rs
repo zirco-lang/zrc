@@ -39,7 +39,9 @@ pub fn type_expr_number_literal<'input>(
 
     // Check the bounds of the number literal
     // Note: We skip usize/isize since their size is platform-dependent
-    let parsed_value = n.into_parsed_value();
+    let text_without_underscores = n.text_content().replace('_', "");
+    let parsed_value = u128::from_str_radix(&text_without_underscores, n.radix())
+        .expect("Number literal should have been valid");
 
     // Check bounds based on type
     #[expect(clippy::wildcard_enum_match_arm)]
