@@ -195,8 +195,9 @@ pub fn try_coerce_to<'input>(
         {
             let expr_span = expr.kind.span();
             let expr_kind = expr.kind.into_value();
+            
+            // For array literals, recursively coerce each element
             if let TypedExprKind::ArrayLiteral(elements) = expr_kind {
-                // Recursively coerce each element
                 let coerced_elements: Vec<TypedExpr<'input>> = elements
                     .into_iter()
                     .map(|elem| try_coerce_to(elem, to_element))
@@ -207,7 +208,10 @@ pub fn try_coerce_to<'input>(
                     kind: TypedExprKind::ArrayLiteral(coerced_elements).in_span(expr_span),
                 };
             }
-            // If not an ArrayLiteral, put it back (shouldn't happen but handle gracefully)
+            
+            // For non-literal array expressions (e.g., function returns, variables),
+            // just update the inferred type without modifying the expression.
+            // This is safe because the elements are already type-checked.
             return TypedExpr {
                 inferred_type: target_type.clone(),
                 kind: expr_kind.in_span(expr_span),

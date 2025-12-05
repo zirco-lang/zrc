@@ -257,7 +257,10 @@ impl<'input> Type<'input> {
             },
         ) = (self, target)
         {
-            // Arrays must have the same size (compare numeric values, not string representation)
+            // Arrays must have the same size (compare numeric values, not string
+            // representation). Note: into_parsed_value() parses on each call,
+            // but this is acceptable since this comparison only happens during
+            // type checking (not at runtime) and is not a hot path.
             if from_size.into_parsed_value() == to_size.into_parsed_value()
                 && from_element.can_implicitly_cast_to(to_element)
             {
