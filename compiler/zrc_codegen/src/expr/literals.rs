@@ -4,10 +4,13 @@ use inkwell::{
     types::StringRadix,
     values::{BasicValue, BasicValueEnum},
 };
-use zrc_typeck::tast::expr::{NumberLiteral, Place, PlaceKind, StringTok, ZrcString};
+use zrc_typeck::tast::{
+    expr::{NumberLiteral, Place, PlaceKind, StringTok, TypedExpr, ZrcString},
+    ty::Type,
+};
 use zrc_utils::span::Spannable;
 
-use super::place::cg_place;
+use super::{cg_expr, place::cg_place};
 use crate::{
     bb::{BasicBlockAnd, BasicBlockExt},
     expr::CgExprArgs,
@@ -156,4 +159,60 @@ mod tests {
                 }
             "});
     }
+}
+
+/// Code generate an array literal
+pub fn cg_array_literal<'ctx, 'input>(
+    ce: CgExprArgs<'ctx, 'input, '_>,
+    elements: Vec<TypedExpr<'input>>,
+) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
+    let CgExprArgs {
+        cg,
+        mut bb,
+        inferred_type,
+        expr_span: _,
+    } = ce;
+
+    // Extract array size and element type
+    let (_size, _element_type) = match &inferred_type {
+        Type::Array { size, element_type } => (*size, element_type.as_ref()),
+        _ => panic!("array literal must have array type"),
+    };
+
+    // Create an alloca for the array
+    let array_type = llvm_basic_type(&cg, &inferred_type).0;
+    let array_alloca = cg
+        .builder
+        .build_alloca(array_type, "array_literal")
+        .expect("alloca should succeed");
+
+    // Store each element
+    for (idx, elem) in elements.into_iter().enumerate() {
+        let elem_value = unpack!(bb = cg_expr(cg, bb, elem));
+
+        // Get pointer to the array element using GEP
+        let zero = cg.ctx.i64_type().const_zero();
+        let idx_val = cg.ctx.i64_type().const_int(idx as u64, false);
+
+        // SAFETY: We're using GEP to get a pointer to an array element,
+        // which is safe as long as the index is within bounds (which it is by
+        // construction)
+        let elem_ptr = unsafe {
+            cg.builder
+                .build_gep(array_type, array_alloca, &[zero, idx_val], "array_elem_ptr")
+        }
+        .expect("GEP should succeed");
+
+        cg.builder
+            .build_store(elem_ptr, elem_value)
+            .expect("store should succeed");
+    }
+
+    // Return the array value (loaded from alloca)
+    let array_value = cg
+        .builder
+        .build_load(array_type, array_alloca, "array_value")
+        .expect("load should succeed");
+
+    bb.and(array_value.as_basic_value_enum())
 }

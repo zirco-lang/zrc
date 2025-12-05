@@ -351,6 +351,7 @@ pub fn type_expr_struct_construction<'input>(
         | TastType::Bool
         | TastType::Int
         | TastType::Ptr(_)
+        | TastType::Array { .. }
         | TastType::Fn(_)
         | TastType::Opaque(_) => {
             return Err(DiagnosticKind::ExpectedGot {

@@ -65,6 +65,13 @@ pub enum Type<'input> {
     Int,
     /// `*T`
     Ptr(Box<Self>),
+    /// `[N]T` - array of N elements of type T
+    Array {
+        /// The size of the array
+        size: u64,
+        /// The element type
+        element_type: Box<Self>,
+    },
     /// `fn(A, B) -> T`
     Fn(Fn<'input>),
     /// Struct type literals. Ordered by declaration order.
@@ -95,6 +102,7 @@ impl Display for Type<'_> {
             Self::Bool => write!(f, "bool"),
             Self::Int => write!(f, "{{int}}"),
             Self::Ptr(pointee_ty) => write!(f, "*{pointee_ty}"),
+            Self::Array { size, element_type } => write!(f, "[{size}]{element_type}"),
             Self::Fn(fn_data) => write!(f, "{fn_data}"),
             Self::Struct(fields) if fields.is_empty() => write!(f, "struct {{}}"),
             Self::Struct(fields) => write!(
@@ -344,6 +352,7 @@ mod tests {
             | Type::Bool
             | Type::Int
             | Type::Ptr(_)
+            | Type::Array { .. }
             | Type::Fn(_)
             | Type::Union(_)
             | Type::Opaque(_) => panic!("unit should be an empty struct"),

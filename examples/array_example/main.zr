@@ -1,0 +1,12 @@
+fn main() -> i32 {
+    // Array literal with explicit type
+    let arr: [5]i32 = [1, 2, 3, 4, 5];
+    
+    // Access array elements using indexing
+    let first = arr[0];
+    let second = arr[1];
+    let third = arr[2];
+    
+    // Sum of the first three elements
+    return first + second + third;
+}

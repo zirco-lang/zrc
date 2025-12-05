@@ -152,6 +152,55 @@ pub fn type_expr_boolean_literal<'input>(
     }
 }
 
+/// Typeck an array literal
+pub fn type_expr_array_literal<'input>(
+    scope: &mut Scope<'input, '_>,
+    expr_span: Span,
+    elements: zrc_utils::span::Spanned<Vec<zrc_parser::ast::expr::Expr<'input>>>,
+) -> Result<TypedExpr<'input>, Diagnostic> {
+    let elements_vec = elements.into_value();
+    
+    if elements_vec.is_empty() {
+        return Err(DiagnosticKind::EmptyArrayLiteral.error_in(expr_span));
+    }
+
+    let mut typed_elements = Vec::with_capacity(elements_vec.len());
+    for elem in elements_vec {
+        typed_elements.push(super::type_expr(scope, elem)?);
+    }
+
+    let mut element_type = typed_elements[0].inferred_type.clone();
+    
+    if element_type == TastType::Int {
+        element_type = TastType::I32;
+    }
+    
+    #[expect(clippy::cast_possible_truncation, clippy::as_conversions)]
+    let array_size = typed_elements.len() as u64;
+
+    for (idx, elem) in typed_elements.iter_mut().enumerate() {
+        let coerced_elem = super::try_coerce_to(elem.clone(), &element_type);
+        if coerced_elem.inferred_type != element_type {
+            return Err(DiagnosticKind::ArrayElementTypeMismatch {
+                expected: element_type.to_string(),
+                found: elem.inferred_type.to_string(),
+                index: idx,
+            }
+            .error_in(elem.kind.span()));
+        }
+        *elem = coerced_elem;
+    }
+
+    let inferred_type = TastType::Array {
+        size: array_size,
+        element_type: Box::new(element_type),
+    };
+
+    Ok(TypedExpr {
+        inferred_type,
+        kind: TypedExprKind::ArrayLiteral(typed_elements).in_span(expr_span),
+    })
+}
 #[cfg(test)]
 mod tests {
     use zrc_parser::{ast::ty::Type as AstType, lexer::NumberLiteral};

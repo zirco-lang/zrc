@@ -82,6 +82,14 @@ pub enum DiagnosticKind {
     IdentifierAlreadyInUse(String),
     #[error("no explicit variable type present and no value to infer from")]
     NoTypeNoValue,
+    #[error("empty array literals are not allowed")]
+    EmptyArrayLiteral,
+    #[error("array element at index {index} has type `{found}`, expected `{expected}`")]
+    ArrayElementTypeMismatch {
+        expected: String,
+        found: String,
+        index: usize,
+    },
     #[error("cannot use `break` outside of loop")]
     CannotUseBreakOutsideOfLoop,
     #[error("cannot use `continue` outside of loop")]
