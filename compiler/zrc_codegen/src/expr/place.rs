@@ -76,14 +76,32 @@ pub fn cg_place<'ctx>(
             let ptr_to_use = if ptr_val.is_pointer_value() {
                 ptr_val.into_pointer_value()
             } else {
-                // Allocate space for the aggregate value on the stack
+                // Allocate space for the aggregate value on the stack.
+                // IMPORTANT: We must allocate at the entry block to avoid UB
+                // when indexing happens inside loops or other control flow.
                 let agg_ty = ptr_val.get_type();
-                let agg_alloc = cg
-                    .builder
+
+                // Create a builder positioned at the entry block
+                let entry_block_builder = cg.ctx.create_builder();
+                let first_bb = cg
+                    .fn_value
+                    .get_first_basic_block()
+                    .expect("function should have at least one basic block");
+
+                match first_bb.get_first_instruction() {
+                    Some(first_instruction) => {
+                        entry_block_builder.position_before(&first_instruction);
+                    }
+                    None => {
+                        entry_block_builder.position_at_end(first_bb);
+                    }
+                }
+
+                let agg_alloc = entry_block_builder
                     .build_alloca(agg_ty, "array_tmp")
                     .expect("alloca for aggregate temporary should succeed");
 
-                // Store the aggregate into the temporary
+                // Store the aggregate into the temporary (using the current builder)
                 cg.builder
                     .build_store(agg_alloc, ptr_val)
                     .expect("storing aggregate into temporary should succeed");
