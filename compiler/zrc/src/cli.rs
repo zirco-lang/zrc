@@ -226,7 +226,7 @@ mod tests {
         };
 
         let paths = get_include_paths(&cli);
-        
+
         // The relative path "." should be resolved to an absolute path
         assert_eq!(paths.len(), 1);
         assert!(paths[0].is_absolute(), "Path should be absolute");
@@ -250,7 +250,7 @@ mod tests {
         };
 
         let paths = get_include_paths(&cli);
-        
+
         // The absolute path should be preserved
         assert_eq!(paths.len(), 1);
         assert!(paths[0].is_absolute(), "Path should be absolute");
