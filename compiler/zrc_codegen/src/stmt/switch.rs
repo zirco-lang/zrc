@@ -103,7 +103,6 @@ mod tests {
     use crate::cg_snapshot_test;
 
     #[test]
-    #[ignore = "currently fails due to #451"]
     fn enum_match_generates_as_expected() {
         cg_snapshot_test!(indoc! {"
             enum VarInt {
