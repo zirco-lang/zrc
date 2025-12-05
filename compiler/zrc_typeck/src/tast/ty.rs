@@ -257,8 +257,8 @@ impl<'input> Type<'input> {
             },
         ) = (self, target)
         {
-            // Arrays must have the same size
-            if from_size.to_string() == to_size.to_string()
+            // Arrays must have the same size (compare numeric values, not string representation)
+            if from_size.into_parsed_value() == to_size.into_parsed_value()
                 && from_element.can_implicitly_cast_to(to_element)
             {
                 return true;
@@ -465,5 +465,17 @@ mod tests {
 
         // Arrays with different concrete element types should not cast
         assert!(!array_i32.can_implicitly_cast_to(&array_u8));
+
+        // Test with different number representations (hex vs decimal)
+        let array_hex_10 = Type::Array {
+            element_type: Box::new(Type::Int),
+            size: NumberLiteral::Hexadecimal("A"), // 0xA = 10
+        };
+        let array_decimal_10 = Type::Array {
+            element_type: Box::new(Type::I32),
+            size: NumberLiteral::Decimal("10"),
+        };
+        // These should be equal (both represent size 10)
+        assert!(array_hex_10.can_implicitly_cast_to(&array_decimal_10));
     }
 }
