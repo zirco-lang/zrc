@@ -13,6 +13,43 @@ use zrc_utils::line_finder::LineLookup;
 
 use crate::scope::CgScope;
 
+/// Trait for contexts that can create a builder positioned at the entry block
+pub trait HasEntryBlockBuilder<'ctx> {
+    /// Get the LLVM context
+    fn ctx(&self) -> &'ctx Context;
+    
+    /// Get the function value
+    fn fn_value(&self) -> FunctionValue<'ctx>;
+
+    /// Create a builder positioned at the entry block
+    ///
+    /// This is useful for allocating stack space that should live for the
+    /// entire function, not just a specific basic block. The builder will be
+    /// positioned before the first instruction in the entry block, or at the
+    /// end if there are no instructions yet.
+    ///
+    /// This is commonly used for allocating temporaries that need to persist
+    /// across loop iterations or other control flow.
+    fn create_entry_block_builder(&self) -> Builder<'ctx> {
+        let entry_block_builder = self.ctx().create_builder();
+        let first_bb = self
+            .fn_value()
+            .get_first_basic_block()
+            .expect("function should have at least one basic block");
+
+        match first_bb.get_first_instruction() {
+            Some(first_instruction) => {
+                entry_block_builder.position_before(&first_instruction);
+            }
+            None => {
+                entry_block_builder.position_at_end(first_bb);
+            }
+        }
+
+        entry_block_builder
+    }
+}
+
 /// Trait for any context with at least the fields of [`CompilationUnitCtx`]
 #[allow(dead_code)]
 pub trait AsCompilationUnitCtx<'ctx: 'a, 'a> {
@@ -158,33 +195,15 @@ impl<'ctx, 'a> FunctionCtx<'ctx, 'a> {
             fn_value,
         }
     }
+}
 
-    /// Create a builder positioned at the entry block
-    ///
-    /// This is useful for allocating stack space that should live for the
-    /// entire function, not just a specific basic block. The builder will be
-    /// positioned before the first instruction in the entry block, or at the
-    /// end if there are no instructions yet.
-    ///
-    /// This is commonly used for allocating temporaries that need to persist
-    /// across loop iterations or other control flow.
-    pub fn create_entry_block_builder(&self) -> Builder<'ctx> {
-        let entry_block_builder = self.ctx.create_builder();
-        let first_bb = self
-            .fn_value
-            .get_first_basic_block()
-            .expect("function should have at least one basic block");
+impl<'ctx> HasEntryBlockBuilder<'ctx> for FunctionCtx<'ctx, '_> {
+    fn ctx(&self) -> &'ctx Context {
+        self.ctx
+    }
 
-        match first_bb.get_first_instruction() {
-            Some(first_instruction) => {
-                entry_block_builder.position_before(&first_instruction);
-            }
-            None => {
-                entry_block_builder.position_at_end(first_bb);
-            }
-        }
-
-        entry_block_builder
+    fn fn_value(&self) -> FunctionValue<'ctx> {
+        self.fn_value
     }
 }
 
@@ -254,32 +273,14 @@ impl<'ctx, 'input, 'a> BlockCtx<'ctx, 'input, 'a> {
             dbg_scope,
         }
     }
+}
 
-    /// Create a builder positioned at the entry block
-    ///
-    /// This is useful for allocating stack space that should live for the
-    /// entire function, not just a specific basic block. The builder will be
-    /// positioned before the first instruction in the entry block, or at the
-    /// end if there are no instructions yet.
-    ///
-    /// This is commonly used for allocating temporaries that need to persist
-    /// across loop iterations or other control flow.
-    pub fn create_entry_block_builder(&self) -> Builder<'ctx> {
-        let entry_block_builder = self.ctx.create_builder();
-        let first_bb = self
-            .fn_value
-            .get_first_basic_block()
-            .expect("function should have at least one basic block");
+impl<'ctx> HasEntryBlockBuilder<'ctx> for BlockCtx<'ctx, '_, '_> {
+    fn ctx(&self) -> &'ctx Context {
+        self.ctx
+    }
 
-        match first_bb.get_first_instruction() {
-            Some(first_instruction) => {
-                entry_block_builder.position_before(&first_instruction);
-            }
-            None => {
-                entry_block_builder.position_at_end(first_bb);
-            }
-        }
-
-        entry_block_builder
+    fn fn_value(&self) -> FunctionValue<'ctx> {
+        self.fn_value
     }
 }

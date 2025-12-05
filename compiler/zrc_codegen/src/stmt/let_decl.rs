@@ -11,7 +11,7 @@ use zrc_typeck::tast::{
 use zrc_utils::span::{Spannable, Spanned};
 
 use crate::{
-    ctx::{BlockCtx, FunctionCtx},
+    ctx::{BlockCtx, FunctionCtx, HasEntryBlockBuilder},
     expr::cg_expr,
     scope::CgScope,
     ty::llvm_basic_type,

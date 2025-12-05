@@ -22,7 +22,7 @@ use zrc_typeck::tast::{
 use super::cg_expr;
 use crate::{
     bb::{BasicBlockAnd, BasicBlockExt},
-    ctx::BlockCtx,
+    ctx::{BlockCtx, HasEntryBlockBuilder},
     ty::llvm_basic_type,
     unpack,
 };
