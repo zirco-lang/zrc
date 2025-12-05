@@ -91,8 +91,11 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
             Type::Int => {
                 panic!("{{int}} type reached code generation, should be resolved in typeck")
             }
-            _ => {
+            Type::Ptr(_) | Type::Array { .. } | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
                 panic!("not an integer type")
+            }
+            Type::Opaque(name) => {
+                panic!("opaque type '{name}' reached code generation, should be resolved in typeck")
             }
         },
         ctx.dbg_builder().map(|dbg_builder| {
@@ -145,7 +148,10 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
         Type::Array { size, element_type } => {
             let (elem_ty, elem_dbg_ty) = llvm_basic_type(ctx, element_type);
             (
-                elem_ty.array_type(*size as u32).as_basic_type_enum(),
+                {
+                    #[expect(clippy::cast_possible_truncation, clippy::as_conversions)]
+                    elem_ty.array_type(*size as u32).as_basic_type_enum()
+                },
                 ctx.dbg_builder().map(|dbg_builder| {
                     let elem_size_in_bits = elem_ty
                         .size_of()

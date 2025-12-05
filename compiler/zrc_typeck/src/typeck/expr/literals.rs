@@ -2,7 +2,7 @@
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::{
-    ast::ty::Type,
+    ast::{expr::Expr as AstExpr, ty::Type},
     lexer::{NumberLiteral, StringTok, ZrcString},
 };
 use zrc_utils::span::{Span, Spannable};
@@ -156,10 +156,10 @@ pub fn type_expr_boolean_literal<'input>(
 pub fn type_expr_array_literal<'input>(
     scope: &mut Scope<'input, '_>,
     expr_span: Span,
-    elements: zrc_utils::span::Spanned<Vec<zrc_parser::ast::expr::Expr<'input>>>,
+    elements: zrc_utils::span::Spanned<Vec<AstExpr<'input>>>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let elements_vec = elements.into_value();
-    
+
     if elements_vec.is_empty() {
         return Err(DiagnosticKind::EmptyArrayLiteral.error_in(expr_span));
     }
@@ -170,12 +170,12 @@ pub fn type_expr_array_literal<'input>(
     }
 
     let mut element_type = typed_elements[0].inferred_type.clone();
-    
+
     if element_type == TastType::Int {
         element_type = TastType::I32;
     }
-    
-    #[expect(clippy::cast_possible_truncation, clippy::as_conversions)]
+
+    #[expect(clippy::as_conversions)]
     let array_size = typed_elements.len() as u64;
 
     for (idx, elem) in typed_elements.iter_mut().enumerate() {
