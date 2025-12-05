@@ -82,20 +82,7 @@ pub fn cg_place<'ctx>(
                 let agg_ty = ptr_val.get_type();
 
                 // Create a builder positioned at the entry block
-                let entry_block_builder = cg.ctx.create_builder();
-                let first_bb = cg
-                    .fn_value
-                    .get_first_basic_block()
-                    .expect("function should have at least one basic block");
-
-                match first_bb.get_first_instruction() {
-                    Some(first_instruction) => {
-                        entry_block_builder.position_before(&first_instruction);
-                    }
-                    None => {
-                        entry_block_builder.position_at_end(first_bb);
-                    }
-                }
+                let entry_block_builder = cg.create_entry_block_builder();
 
                 let agg_alloc = entry_block_builder
                     .build_alloca(agg_ty, "array_tmp")

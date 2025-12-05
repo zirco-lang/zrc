@@ -50,20 +50,7 @@ pub fn cg_let_declaration<'ctx, 'input, 'a>(
         // at the beginning of the entry block, and that is easier than trying to
         // somehow save our position.
 
-        let entry_block_builder = cg.ctx.create_builder();
-        let first_bb = cg
-            .fn_value
-            .get_first_basic_block()
-            .expect("function should have at least one basic block");
-
-        match first_bb.get_first_instruction() {
-            Some(first_instruction) => {
-                entry_block_builder.position_before(&first_instruction);
-            }
-            None => {
-                entry_block_builder.position_at_end(first_bb);
-            }
-        }
+        let entry_block_builder = cg.create_entry_block_builder();
 
         let (ty, _dbg_ty) = llvm_basic_type(&cg, &let_declaration.ty);
 
