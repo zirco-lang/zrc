@@ -171,6 +171,7 @@ pub fn expect_is_unsigned_integer(
 
 /// Try to coerce an expression to a target type if possible.
 /// If the expression type is `{int}`, it will be resolved to the target type.
+/// For array literals with `{int}` elements, recursively coerces each element.
 /// Returns the coerced expression if successful, or the original if types
 /// already match.
 pub fn try_coerce_to<'input>(
@@ -180,6 +181,39 @@ pub fn try_coerce_to<'input>(
     if expr.inferred_type == *target_type {
         expr
     } else if expr.inferred_type.can_implicitly_cast_to(target_type) {
+        // Special handling for array literals: recursively coerce elements
+        if let (
+            TastType::Array {
+                element_type: _from_element,
+                ..
+            },
+            TastType::Array {
+                element_type: to_element,
+                ..
+            },
+        ) = (&expr.inferred_type, target_type)
+        {
+            let expr_span = expr.kind.span();
+            let expr_kind = expr.kind.into_value();
+            if let TypedExprKind::ArrayLiteral(elements) = expr_kind {
+                // Recursively coerce each element
+                let coerced_elements: Vec<TypedExpr<'input>> = elements
+                    .into_iter()
+                    .map(|elem| try_coerce_to(elem, to_element))
+                    .collect();
+
+                return TypedExpr {
+                    inferred_type: target_type.clone(),
+                    kind: TypedExprKind::ArrayLiteral(coerced_elements).in_span(expr_span),
+                };
+            }
+            // If not an ArrayLiteral, put it back (shouldn't happen but handle gracefully)
+            return TypedExpr {
+                inferred_type: target_type.clone(),
+                kind: expr_kind.in_span(expr_span),
+            };
+        }
+
         TypedExpr {
             inferred_type: target_type.clone(),
             kind: expr.kind,

@@ -244,6 +244,27 @@ impl<'input> Type<'input> {
             return true;
         }
 
+        // Allow arrays with {int} elements to implicitly cast to arrays with concrete
+        // integer elements
+        if let (
+            Type::Array {
+                element_type: from_element,
+                size: from_size,
+            },
+            Type::Array {
+                element_type: to_element,
+                size: to_size,
+            },
+        ) = (self, target)
+        {
+            // Arrays must have the same size
+            if from_size.to_string() == to_size.to_string()
+                && from_element.can_implicitly_cast_to(to_element)
+            {
+                return true;
+            }
+        }
+
         false
     }
 }
@@ -405,5 +426,44 @@ mod tests {
         assert!(Type::Int.is_integer());
         assert!(!Type::Int.is_signed_integer());
         assert!(!Type::Int.is_unsigned_integer());
+    }
+
+    #[test]
+    fn test_array_with_int_elements_implicit_cast() {
+        // Create array types
+        let array_int = Type::Array {
+            element_type: Box::new(Type::Int),
+            size: NumberLiteral::Decimal("2"),
+        };
+        let array_i32 = Type::Array {
+            element_type: Box::new(Type::I32),
+            size: NumberLiteral::Decimal("2"),
+        };
+        let array_u8 = Type::Array {
+            element_type: Box::new(Type::U8),
+            size: NumberLiteral::Decimal("2"),
+        };
+        let array_i64 = Type::Array {
+            element_type: Box::new(Type::I64),
+            size: NumberLiteral::Decimal("2"),
+        };
+
+        // [2]{int} should implicitly cast to arrays with concrete integer element types
+        assert!(array_int.can_implicitly_cast_to(&array_i32));
+        assert!(array_int.can_implicitly_cast_to(&array_u8));
+        assert!(array_int.can_implicitly_cast_to(&array_i64));
+
+        // Arrays with concrete types should not cast to {int} arrays
+        assert!(!array_i32.can_implicitly_cast_to(&array_int));
+
+        // Arrays with different sizes should not cast
+        let array_int_3 = Type::Array {
+            element_type: Box::new(Type::Int),
+            size: NumberLiteral::Decimal("3"),
+        };
+        assert!(!array_int_3.can_implicitly_cast_to(&array_i32));
+
+        // Arrays with different concrete element types should not cast
+        assert!(!array_i32.can_implicitly_cast_to(&array_u8));
     }
 }
