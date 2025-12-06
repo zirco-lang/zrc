@@ -12,7 +12,7 @@ use crate::{
     ctx::{BlockCtx, FunctionCtx},
     expr::cg_expr,
     scope::CgScope,
-    stmt::{cg_block, LoopBreakaway},
+    stmt::{LoopBreakaway, cg_block},
 };
 
 /// Code generates a for statement
