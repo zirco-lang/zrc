@@ -22,6 +22,39 @@ pub struct Fn<'input> {
     pub returns: Box<Type<'input>>,
 }
 
+impl Fn<'_> {
+    /// Compare two function types for semantic equality, ignoring spans.
+    ///
+    /// This is used when checking for conflicting function declarations,
+    /// where we only care if the types match, not if they were declared
+    /// at the same location in the source.
+    #[must_use]
+    pub fn types_equal(&self, other: &Self) -> bool {
+        // Check if both are variadic or both are non-variadic
+        if self.arguments.is_variadic() != other.arguments.is_variadic() {
+            return false;
+        }
+
+        let self_args = self.arguments.as_arguments();
+        let other_args = other.arguments.as_arguments();
+
+        // Check if argument counts match
+        if self_args.len() != other_args.len() {
+            return false;
+        }
+
+        // Compare each argument's type (ignoring spans)
+        for (self_arg, other_arg) in self_args.iter().zip(other_args.iter()) {
+            if self_arg.ty.value() != other_arg.ty.value() {
+                return false;
+            }
+        }
+
+        // Compare return types (ignoring spans)
+        *self.returns == *other.returns
+    }
+}
+
 /// Auxillary data attached to a [`Fn`] in the Global Scope
 #[derive(Debug, Clone)]
 pub struct FunctionDeclarationGlobalMetadata<'input> {
@@ -391,5 +424,107 @@ mod tests {
         assert!(Type::Int.is_integer());
         assert!(!Type::Int.is_signed_integer());
         assert!(!Type::Int.is_unsigned_integer());
+    }
+
+    #[test]
+    fn test_fn_types_equal_ignores_spans() {
+        use zrc_utils::spanned_test;
+
+        use super::super::stmt::{ArgumentDeclaration, ArgumentDeclarationList};
+
+        // Create two function types with the same signature but different spans
+        let fn1 = Fn {
+            arguments: ArgumentDeclarationList::NonVariadic(vec![
+                ArgumentDeclaration {
+                    name: spanned_test!(5, "buffer", 11),
+                    ty: spanned_test!(13, Type::Ptr(Box::new(Type::U8)), 16),
+                },
+                ArgumentDeclaration {
+                    name: spanned_test!(18, "start", 23),
+                    ty: spanned_test!(25, Type::Usize, 30),
+                },
+            ]),
+            returns: Box::new(Type::Usize),
+        };
+
+        let fn2 = Fn {
+            arguments: ArgumentDeclarationList::NonVariadic(vec![
+                ArgumentDeclaration {
+                    name: spanned_test!(55, "buffer", 61),
+                    ty: spanned_test!(63, Type::Ptr(Box::new(Type::U8)), 66),
+                },
+                ArgumentDeclaration {
+                    name: spanned_test!(68, "start", 73),
+                    ty: spanned_test!(75, Type::Usize, 80),
+                },
+            ]),
+            returns: Box::new(Type::Usize),
+        };
+
+        // Should be equal despite different spans
+        assert!(fn1.types_equal(&fn2));
+        assert!(fn2.types_equal(&fn1));
+    }
+
+    #[test]
+    fn test_fn_types_equal_detects_different_types() {
+        use zrc_utils::spanned_test;
+
+        use super::super::stmt::{ArgumentDeclaration, ArgumentDeclarationList};
+
+        let fn1 = Fn {
+            arguments: ArgumentDeclarationList::NonVariadic(vec![ArgumentDeclaration {
+                name: spanned_test!(5, "x", 6),
+                ty: spanned_test!(8, Type::I32, 11),
+            }]),
+            returns: Box::new(Type::Usize),
+        };
+
+        let fn2 = Fn {
+            arguments: ArgumentDeclarationList::NonVariadic(vec![ArgumentDeclaration {
+                name: spanned_test!(55, "x", 56),
+                ty: spanned_test!(58, Type::U32, 61), // Different type
+            }]),
+            returns: Box::new(Type::Usize),
+        };
+
+        // Should not be equal due to different parameter types
+        assert!(!fn1.types_equal(&fn2));
+    }
+
+    #[test]
+    fn test_fn_types_equal_detects_different_return_types() {
+        use super::super::stmt::ArgumentDeclarationList;
+
+        let fn1 = Fn {
+            arguments: ArgumentDeclarationList::NonVariadic(vec![]),
+            returns: Box::new(Type::I32),
+        };
+
+        let fn2 = Fn {
+            arguments: ArgumentDeclarationList::NonVariadic(vec![]),
+            returns: Box::new(Type::U32), // Different return type
+        };
+
+        // Should not be equal due to different return types
+        assert!(!fn1.types_equal(&fn2));
+    }
+
+    #[test]
+    fn test_fn_types_equal_detects_variadic_mismatch() {
+        use super::super::stmt::ArgumentDeclarationList;
+
+        let fn1 = Fn {
+            arguments: ArgumentDeclarationList::NonVariadic(vec![]),
+            returns: Box::new(Type::I32),
+        };
+
+        let fn2 = Fn {
+            arguments: ArgumentDeclarationList::Variadic(vec![]),
+            returns: Box::new(Type::I32),
+        };
+
+        // Should not be equal due to variadic vs non-variadic
+        assert!(!fn1.types_equal(&fn2));
     }
 }
