@@ -12,8 +12,7 @@ use crate::{
     ctx::{BlockCtx, FunctionCtx},
     expr::cg_expr,
     scope::CgScope,
-    stmt::{LoopBreakaway, cg_block},
-    unpack,
+    stmt::{cg_block, LoopBreakaway},
 };
 
 /// Code generates a for statement
@@ -61,9 +60,7 @@ pub fn cg_for_stmt<'ctx, 'input, 'a>(
     // Generate the header.
     cg.builder.position_at_end(header);
     if let Some(cond) = cond {
-        let mut cond_bb = header;
-
-        let cond = unpack!(cond_bb = cg_expr(expr_cg, cond_bb, cond));
+        let BasicBlockAnd { value: cond, .. } = cg_expr(expr_cg, header, cond);
 
         cg.builder
             .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -206,8 +203,7 @@ pub fn cg_while_stmt<'ctx, 'input, 'a>(
 
     cg.builder.position_at_end(header);
 
-    let mut cond_bb = header;
-    let cond = unpack!(cond_bb = cg_expr(expr_cg, cond_bb, cond));
+    let BasicBlockAnd { value: cond, .. } = cg_expr(expr_cg, header, cond);
 
     cg.builder
         .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -416,9 +412,13 @@ mod tests {
         cg_snapshot_test!(indoc! {"
                     fn skip_white(buffer: *u8, start: usize) -> usize {
                         let out: usize = 0;
-                        // TEST: chained OR in while condition should generate valid PHI nodes
-                        // where the loop body branches back to the correct header block
-                        while (buffer[start + out] == 32 || buffer[start + out] == 9 || buffer[start + out] == 10 || buffer[start + out] == 13) {
+                        // TEST: chained OR in while condition should generate valid PHI
+                        // nodes where the loop body branches back to the correct header
+                        while (buffer[start + out] == 32
+                            || buffer[start + out] == 9
+                            || buffer[start + out] == 10
+                            || buffer[start + out] == 13)
+                        {
                             out += 1;
                         }
                         return out;
@@ -431,9 +431,13 @@ mod tests {
         cg_snapshot_test!(indoc! {"
                     fn next_tok(buffer: *u8, start: usize) -> usize {
                         let out: usize = 0;
-                        // TEST: chained AND in while condition should generate valid PHI nodes
-                        // where the loop body branches back to the correct header block
-                        while (buffer[start + out] != 32 && buffer[start + out] != 9 && buffer[start + out] != 10 && buffer[start + out] != 0) {
+                        // TEST: chained AND in while condition should generate valid PHI
+                        // nodes where the loop body branches back to the correct header
+                        while (buffer[start + out] != 32
+                            && buffer[start + out] != 9
+                            && buffer[start + out] != 10
+                            && buffer[start + out] != 0)
+                        {
                             out += 1;
                         }
                         return out;
@@ -446,8 +450,8 @@ mod tests {
         cg_snapshot_test!(indoc! {"
                     fn test_for(buffer: *u8, len: usize) -> usize {
                         let count: usize = 0;
-                        // TEST: chained AND in for condition should generate valid PHI nodes
-                        // where the loop body and latch branch back to the correct header block
+                        // TEST: chained AND in for condition should generate valid PHI
+                        // nodes where the loop body and latch branch to correct header
                         for (let i: usize = 0; i < len && buffer[i] != 0; i += 1) {
                             count += 1;
                         }

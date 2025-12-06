@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/stmt/loops.rs
-description: "fn next_tok(buffer: *u8, start: usize) -> usize {\n    let out: usize = 0;\n    // TEST: chained AND in while condition should generate valid PHI nodes\n    // where the loop body branches back to the correct header block\n    while (buffer[start + out] != 32 && buffer[start + out] != 9 && buffer[start + out] != 10 && buffer[start + out] != 0) {\n        out += 1;\n    }\n    return out;\n}\n"
+description: "fn next_tok(buffer: *u8, start: usize) -> usize {\n    let out: usize = 0;\n    // TEST: chained AND in while condition should generate valid PHI\n    // nodes where the loop body branches back to the correct header\n    while (buffer[start + out] != 32\n        && buffer[start + out] != 9\n        && buffer[start + out] != 10\n        && buffer[start + out] != 0)\n    {\n        out += 1;\n    }\n    return out;\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -99,19 +99,19 @@ land_end4:                                        ; preds = %land_rhs3, %header
 !14 = !DILocation(line: 5, column: 19, scope: !11)
 !15 = !DILocation(line: 5, column: 27, scope: !11)
 !16 = !DILocation(line: 5, column: 35, scope: !11)
-!17 = !DILocation(line: 6, column: 9, scope: !18)
-!18 = distinct !DILexicalBlock(scope: !11, file: !2, line: 5, column: 124)
-!19 = !DILocation(line: 6, column: 16, scope: !18)
-!20 = !DILocation(line: 8, column: 12, scope: !11)
-!21 = !DILocation(line: 5, column: 98, scope: !11)
-!22 = !DILocation(line: 5, column: 105, scope: !11)
-!23 = !DILocation(line: 5, column: 113, scope: !11)
-!24 = !DILocation(line: 5, column: 121, scope: !11)
-!25 = !DILocation(line: 5, column: 69, scope: !11)
-!26 = !DILocation(line: 5, column: 76, scope: !11)
-!27 = !DILocation(line: 5, column: 84, scope: !11)
-!28 = !DILocation(line: 5, column: 92, scope: !11)
-!29 = !DILocation(line: 5, column: 41, scope: !11)
-!30 = !DILocation(line: 5, column: 48, scope: !11)
-!31 = !DILocation(line: 5, column: 56, scope: !11)
-!32 = !DILocation(line: 5, column: 64, scope: !11)
+!17 = !DILocation(line: 10, column: 9, scope: !18)
+!18 = distinct !DILexicalBlock(scope: !11, file: !2, line: 9, column: 5)
+!19 = !DILocation(line: 10, column: 16, scope: !18)
+!20 = !DILocation(line: 12, column: 12, scope: !11)
+!21 = !DILocation(line: 8, column: 12, scope: !11)
+!22 = !DILocation(line: 8, column: 19, scope: !11)
+!23 = !DILocation(line: 8, column: 27, scope: !11)
+!24 = !DILocation(line: 8, column: 35, scope: !11)
+!25 = !DILocation(line: 7, column: 12, scope: !11)
+!26 = !DILocation(line: 7, column: 19, scope: !11)
+!27 = !DILocation(line: 7, column: 27, scope: !11)
+!28 = !DILocation(line: 7, column: 35, scope: !11)
+!29 = !DILocation(line: 6, column: 12, scope: !11)
+!30 = !DILocation(line: 6, column: 19, scope: !11)
+!31 = !DILocation(line: 6, column: 27, scope: !11)
+!32 = !DILocation(line: 6, column: 35, scope: !11)
