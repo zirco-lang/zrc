@@ -14,7 +14,7 @@ zrc_codegen = { version = "0.1.0", path = "../zrc_codegen" }
 anyhow = "1.0.82"
 zrc_diagnostics = { version = "0.1.0", path = "../zrc_diagnostics" }
 clap = { version = "4.5.4", features = ["derive"] }
-shadow-rs = "1.4.0"
+shadow-rs = { version = "1.4.0", default-features = false }
 derive_more = { version = "2.0.1", features = ["display"] }
 mimalloc = "0.1.48"
 
