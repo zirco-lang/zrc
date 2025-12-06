@@ -48,11 +48,21 @@
               pkg-config
               libffi
               libxml2
+              makeWrapper
             ];
+
+
             postInstall = ''
-		cp -r $src/include $out
+              cp -r $src/include $out/include
+              
+              wrapProgram $out/bin/zrc \
+                --set ZIRCO_INCLUDE_PATH $out/include
+
+              wrapProgram $out/bin/zircop \
+                --set ZIRCO_INCLUDE_PATH $out/include
             '';
-	    LLVM_SYS_201_PREFIX = llvm.llvm.dev;
+
+            LLVM_SYS_201_PREFIX = llvm.llvm.dev;
          };
 
         packages.default = self.packages.${system}.zrc;
