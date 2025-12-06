@@ -451,7 +451,8 @@ mod tests {
                     fn test_for(buffer: *u8, len: usize) -> usize {
                         let count: usize = 0;
                         // TEST: chained AND in for condition should generate valid PHI
-                        // nodes where the loop body and latch branch to correct header
+                        // nodes where the loop body and latch branch back to the
+                        // correct header
                         for (let i: usize = 0; i < len && buffer[i] != 0; i += 1) {
                             count += 1;
                         }
