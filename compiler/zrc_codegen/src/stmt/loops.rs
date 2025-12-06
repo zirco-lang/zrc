@@ -13,7 +13,6 @@ use crate::{
     expr::cg_expr,
     scope::CgScope,
     stmt::{LoopBreakaway, cg_block},
-    unpack,
 };
 
 /// Code generates a for statement
@@ -60,27 +59,18 @@ pub fn cg_for_stmt<'ctx, 'input, 'a>(
 
     // Generate the header.
     cg.builder.position_at_end(header);
-    let header = cond.map_or_else(
-        || {
-            // If there is no condition, we always branch to the body.
-            cg.builder
-                .build_unconditional_branch(body_bb)
-                .expect("branch should generate successfully");
+    if let Some(cond) = cond {
+        let BasicBlockAnd { value: cond, .. } = cg_expr(expr_cg, header, cond);
 
-            header
-        },
-        |cond| {
-            let mut header = header;
-
-            let cond = unpack!(header = cg_expr(expr_cg, header, cond));
-
-            cg.builder
-                .build_conditional_branch(cond.into_int_value(), body_bb, exit)
-                .expect("branch should generate successfully");
-
-            header
-        },
-    );
+        cg.builder
+            .build_conditional_branch(cond.into_int_value(), body_bb, exit)
+            .expect("branch should generate successfully");
+    } else {
+        // If there is no condition, we always branch to the body.
+        cg.builder
+            .build_unconditional_branch(body_bb)
+            .expect("branch should generate successfully");
+    }
 
     // Generate the body.
     cg.builder.position_at_end(body_bb);
@@ -201,7 +191,7 @@ pub fn cg_while_stmt<'ctx, 'input, 'a>(
     // `break` => exit
     // `continue` => header
 
-    let mut header = cg.ctx.append_basic_block(cg.fn_value, "header");
+    let header = cg.ctx.append_basic_block(cg.fn_value, "header");
 
     let body_bb = cg.ctx.append_basic_block(cg.fn_value, "body");
 
@@ -213,7 +203,7 @@ pub fn cg_while_stmt<'ctx, 'input, 'a>(
 
     cg.builder.position_at_end(header);
 
-    let cond = unpack!(header = cg_expr(expr_cg, header, cond));
+    let BasicBlockAnd { value: cond, .. } = cg_expr(expr_cg, header, cond);
 
     cg.builder
         .build_conditional_branch(cond.into_int_value(), body_bb, exit)
@@ -413,6 +403,60 @@ mod tests {
                             }
                         }
                         post();
+                    }
+                "});
+    }
+
+    #[test]
+    fn while_loop_with_chained_logical_or_generates_valid_phi_nodes() {
+        cg_snapshot_test!(indoc! {"
+                    fn skip_white(buffer: *u8, start: usize) -> usize {
+                        let out: usize = 0;
+                        // TEST: chained OR in while condition should generate valid PHI
+                        // nodes where the loop body branches back to the correct header
+                        while (buffer[start + out] == 32
+                            || buffer[start + out] == 9
+                            || buffer[start + out] == 10
+                            || buffer[start + out] == 13)
+                        {
+                            out += 1;
+                        }
+                        return out;
+                    }
+                "});
+    }
+
+    #[test]
+    fn while_loop_with_chained_logical_and_generates_valid_phi_nodes() {
+        cg_snapshot_test!(indoc! {"
+                    fn next_tok(buffer: *u8, start: usize) -> usize {
+                        let out: usize = 0;
+                        // TEST: chained AND in while condition should generate valid PHI
+                        // nodes where the loop body branches back to the correct header
+                        while (buffer[start + out] != 32
+                            && buffer[start + out] != 9
+                            && buffer[start + out] != 10
+                            && buffer[start + out] != 0)
+                        {
+                            out += 1;
+                        }
+                        return out;
+                    }
+                "});
+    }
+
+    #[test]
+    fn for_loop_with_chained_logical_and_generates_valid_phi_nodes() {
+        cg_snapshot_test!(indoc! {"
+                    fn test_for(buffer: *u8, len: usize) -> usize {
+                        let count: usize = 0;
+                        // TEST: chained AND in for condition should generate valid PHI
+                        // nodes where the loop body and latch branch back to the
+                        // correct header
+                        for (let i: usize = 0; i < len && buffer[i] != 0; i += 1) {
+                            count += 1;
+                        }
+                        return count;
                     }
                 "});
     }

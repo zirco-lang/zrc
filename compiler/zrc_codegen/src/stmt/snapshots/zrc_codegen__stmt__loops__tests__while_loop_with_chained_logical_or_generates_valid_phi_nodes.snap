@@ -1,0 +1,117 @@
+---
+source: compiler/zrc_codegen/src/stmt/loops.rs
+description: "fn skip_white(buffer: *u8, start: usize) -> usize {\n    let out: usize = 0;\n    // TEST: chained OR in while condition should generate valid PHI\n    // nodes where the loop body branches back to the correct header\n    while (buffer[start + out] == 32\n        || buffer[start + out] == 9\n        || buffer[start + out] == 10\n        || buffer[start + out] == 13)\n    {\n        out += 1;\n    }\n    return out;\n}\n"
+expression: resulting_ir
+---
+; ModuleID = 'test.zr'
+source_filename = "test.zr"
+
+define i64 @skip_white(ptr %0, i64 %1) !dbg !3 {
+entry:
+  %let_out = alloca i64, align 8, !dbg !8
+  %arg_start = alloca i64, align 8, !dbg !8
+  %arg_buffer = alloca ptr, align 8, !dbg !8
+  store ptr %0, ptr %arg_buffer, align 8, !dbg !8
+  store i64 %1, ptr %arg_start, align 4, !dbg !8
+  store i64 0, ptr %let_out, align 4, !dbg !10
+  br label %header, !dbg !12
+
+header:                                           ; preds = %body, %entry
+  %load = load ptr, ptr %arg_buffer, align 8, !dbg !13
+  %load5 = load i64, ptr %arg_start, align 4, !dbg !14
+  %load6 = load i64, ptr %let_out, align 4, !dbg !15
+  %add = add i64 %load5, %load6, !dbg !15
+  %gep = getelementptr i8, ptr %load, i64 %add, !dbg !15
+  %load7 = load i8, ptr %gep, align 1, !dbg !15
+  %cmp = icmp eq i8 %load7, 32, !dbg !16
+  br i1 %cmp, label %lor_end4, label %lor_rhs3, !dbg !16
+
+body:                                             ; preds = %lor_end
+  %load31 = load i64, ptr %let_out, align 4, !dbg !17
+  %add32 = add i64 %load31, 1, !dbg !19
+  store i64 %add32, ptr %let_out, align 4, !dbg !17
+  br label %header, !dbg !17
+
+exit:                                             ; preds = %lor_end
+  %load33 = load i64, ptr %let_out, align 4, !dbg !20
+  ret i64 %load33, !dbg !20
+
+lor_rhs:                                          ; preds = %lor_end2
+  %load23 = load ptr, ptr %arg_buffer, align 8, !dbg !21
+  %load24 = load i64, ptr %arg_start, align 4, !dbg !22
+  %load25 = load i64, ptr %let_out, align 4, !dbg !23
+  %add26 = add i64 %load24, %load25, !dbg !23
+  %gep27 = getelementptr i8, ptr %load23, i64 %add26, !dbg !23
+  %load28 = load i8, ptr %gep27, align 1, !dbg !23
+  %cmp29 = icmp eq i8 %load28, 13, !dbg !24
+  br label %lor_end, !dbg !24
+
+lor_end:                                          ; preds = %lor_rhs, %lor_end2
+  %lor_result30 = phi i1 [ true, %lor_end2 ], [ %cmp29, %lor_rhs ], !dbg !24
+  br i1 %lor_result30, label %body, label %exit, !dbg !24
+
+lor_rhs1:                                         ; preds = %lor_end4
+  %load15 = load ptr, ptr %arg_buffer, align 8, !dbg !25
+  %load16 = load i64, ptr %arg_start, align 4, !dbg !26
+  %load17 = load i64, ptr %let_out, align 4, !dbg !27
+  %add18 = add i64 %load16, %load17, !dbg !27
+  %gep19 = getelementptr i8, ptr %load15, i64 %add18, !dbg !27
+  %load20 = load i8, ptr %gep19, align 1, !dbg !27
+  %cmp21 = icmp eq i8 %load20, 10, !dbg !28
+  br label %lor_end2, !dbg !28
+
+lor_end2:                                         ; preds = %lor_rhs1, %lor_end4
+  %lor_result22 = phi i1 [ true, %lor_end4 ], [ %cmp21, %lor_rhs1 ], !dbg !28
+  br i1 %lor_result22, label %lor_end, label %lor_rhs, !dbg !28
+
+lor_rhs3:                                         ; preds = %header
+  %load8 = load ptr, ptr %arg_buffer, align 8, !dbg !29
+  %load9 = load i64, ptr %arg_start, align 4, !dbg !30
+  %load10 = load i64, ptr %let_out, align 4, !dbg !31
+  %add11 = add i64 %load9, %load10, !dbg !31
+  %gep12 = getelementptr i8, ptr %load8, i64 %add11, !dbg !31
+  %load13 = load i8, ptr %gep12, align 1, !dbg !31
+  %cmp14 = icmp eq i8 %load13, 9, !dbg !32
+  br label %lor_end4, !dbg !32
+
+lor_end4:                                         ; preds = %lor_rhs3, %header
+  %lor_result = phi i1 [ true, %header ], [ %cmp14, %lor_rhs3 ], !dbg !32
+  br i1 %lor_result, label %lor_end2, label %lor_rhs1, !dbg !32
+}
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "zrc test runner", isOptimized: false, flags: "zrc --fake-args", runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false)
+!2 = !DIFile(filename: "test.zr", directory: "/fake/path")
+!3 = distinct !DISubprogram(name: "skip_white", linkageName: "skip_white", scope: null, file: !2, line: 1, type: !4, scopeLine: 1, spFlags: DISPFlagDefinition, unit: !1)
+!4 = !DISubroutineType(types: !5)
+!5 = !{!6, !7, !6}
+!6 = !DIBasicType(name: "usize")
+!7 = !DIBasicType(name: "u8")
+!8 = !DILocation(line: 1, column: 51, scope: !9)
+!9 = distinct !DILexicalBlock(scope: !3, file: !2, line: 1, column: 51)
+!10 = !DILocation(line: 2, column: 9, scope: !11)
+!11 = distinct !DILexicalBlock(scope: !9, file: !2, line: 1, column: 51)
+!12 = !DILocation(line: 5, column: 5, scope: !11)
+!13 = !DILocation(line: 5, column: 12, scope: !11)
+!14 = !DILocation(line: 5, column: 19, scope: !11)
+!15 = !DILocation(line: 5, column: 27, scope: !11)
+!16 = !DILocation(line: 5, column: 35, scope: !11)
+!17 = !DILocation(line: 10, column: 9, scope: !18)
+!18 = distinct !DILexicalBlock(scope: !11, file: !2, line: 9, column: 5)
+!19 = !DILocation(line: 10, column: 16, scope: !18)
+!20 = !DILocation(line: 12, column: 12, scope: !11)
+!21 = !DILocation(line: 8, column: 12, scope: !11)
+!22 = !DILocation(line: 8, column: 19, scope: !11)
+!23 = !DILocation(line: 8, column: 27, scope: !11)
+!24 = !DILocation(line: 8, column: 35, scope: !11)
+!25 = !DILocation(line: 7, column: 12, scope: !11)
+!26 = !DILocation(line: 7, column: 19, scope: !11)
+!27 = !DILocation(line: 7, column: 27, scope: !11)
+!28 = !DILocation(line: 7, column: 35, scope: !11)
+!29 = !DILocation(line: 6, column: 12, scope: !11)
+!30 = !DILocation(line: 6, column: 19, scope: !11)
+!31 = !DILocation(line: 6, column: 27, scope: !11)
+!32 = !DILocation(line: 6, column: 35, scope: !11)
