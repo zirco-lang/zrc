@@ -73,7 +73,7 @@ pub fn register_function_declaration<'input>(
                     .get(name.value())
                     .expect("global_scope.declarations was not populated with function properly");
 
-                if canonical.fn_type != fn_type {
+                if !canonical.fn_type.types_equal(&fn_type) {
                     return Err(name.error(|_| {
                         DiagnosticKind::ConflictingFunctionDeclarations(
                             canonical.fn_type.to_string(),
@@ -280,5 +280,93 @@ mod tests {
             )
             .is_ok()
         );
+    }
+
+    #[test]
+    fn re_declaration_with_different_spans_is_accepted() {
+        use crate::tast::stmt::ArgumentDeclaration as TastArgumentDeclaration;
+
+        // First declaration at span 0..10
+        let mut scope = GlobalScope {
+            global_values: ValueCtx::from_unused([(
+                "read",
+                TastType::Fn(Fn {
+                    arguments: TastArgumentDeclarationList::NonVariadic(vec![
+                        TastArgumentDeclaration {
+                            name: spanned_test!(5, "buffer", 11),
+                            ty: spanned_test!(13, TastType::Ptr(Box::new(TastType::U8)), 16),
+                        },
+                        TastArgumentDeclaration {
+                            name: spanned_test!(18, "start", 23),
+                            ty: spanned_test!(25, TastType::Usize, 30),
+                        },
+                    ]),
+                    returns: Box::new(TastType::Usize),
+                }),
+            )]),
+            types: TypeCtx::from([("u8", TastType::U8), ("usize", TastType::Usize)]),
+            declarations: HashMap::from([(
+                "read",
+                FunctionDeclarationGlobalMetadata {
+                    fn_type: Fn {
+                        arguments: TastArgumentDeclarationList::NonVariadic(vec![
+                            TastArgumentDeclaration {
+                                name: spanned_test!(5, "buffer", 11),
+                                ty: spanned_test!(13, TastType::Ptr(Box::new(TastType::U8)), 16),
+                            },
+                            TastArgumentDeclaration {
+                                name: spanned_test!(18, "start", 23),
+                                ty: spanned_test!(25, TastType::Usize, 30),
+                            },
+                        ]),
+                        returns: Box::new(TastType::Usize),
+                    },
+                    has_implementation: false,
+                },
+            )]),
+        };
+
+        // Second declaration at span 50..60 (different spans but same types)
+        let result = super::super::process_declaration(
+            &mut scope,
+            AstDeclaration::FunctionDeclaration {
+                name: spanned_test!(53, "read", 57),
+                parameters: spanned_test!(
+                    58,
+                    AstArgumentDeclarationList::NonVariadic(vec![
+                        spanned_test!(
+                            59,
+                            zrc_parser::ast::stmt::ArgumentDeclaration {
+                                name: spanned_test!(60, "buffer", 66),
+                                ty: Type(spanned_test!(
+                                    68,
+                                    TypeKind::Ptr(Box::new(Type(spanned_test!(
+                                        69,
+                                        TypeKind::Identifier("u8"),
+                                        71
+                                    )))),
+                                    72
+                                )),
+                            },
+                            73
+                        ),
+                        spanned_test!(
+                            74,
+                            zrc_parser::ast::stmt::ArgumentDeclaration {
+                                name: spanned_test!(75, "start", 80),
+                                ty: Type(spanned_test!(82, TypeKind::Identifier("usize"), 87)),
+                            },
+                            88
+                        ),
+                    ]),
+                    89
+                ),
+                return_type: Some(Type(spanned_test!(91, TypeKind::Identifier("usize"), 96))),
+                body: None,
+            },
+        );
+
+        // Should succeed because the types are the same, even though the spans differ
+        assert!(result.is_ok());
     }
 }
