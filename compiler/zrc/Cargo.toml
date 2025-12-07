@@ -1,11 +1,7 @@
 [package]
-name = "zrc_cli"
+name = "zrc"
 version = "0.1.0"
 edition = "2024"
-
-[[bin]]
-name = "zrc"
-path = "src/main.rs"
 
 [dependencies]
 zrc_parser = { version = "0.1.0", path = "../zrc_parser" }
@@ -13,8 +9,4 @@ zrc_preprocessor = { version = "0.1.0", path = "../zrc_preprocessor" }
 zrc_utils = { version = "0.1.0", path = "../zrc_utils" }
 zrc_typeck = { version = "0.1.0", path = "../zrc_typeck" }
 zrc_codegen = { version = "0.1.0", path = "../zrc_codegen" }
-anyhow = "1.0.82"
 zrc_diagnostics = { version = "0.1.0", path = "../zrc_diagnostics" }
-clap = { version = "4.5.4", features = ["derive"] }
-derive_more = { version = "2.0.1", features = ["display"] }
-mimalloc = "0.1.48"

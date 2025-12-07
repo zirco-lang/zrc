@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "compiler/zrc",
     "compiler/zrc_cli",
     "compiler/zrc_utils",
     "compiler/zrc_diagnostics",
