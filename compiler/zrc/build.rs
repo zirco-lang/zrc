@@ -50,7 +50,7 @@ fn get_git_string() -> String {
         .output()
         .ok()
         .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).to_string());
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim_end().to_string());
 
     match (commit, branch) {
         (Some(c), Some(b)) => format!("{b}@{c}"),
