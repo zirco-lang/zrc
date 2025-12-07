@@ -9,6 +9,7 @@ use zrc_codegen::OptimizationLevel;
 /// The official Zirco compiler
 #[derive(Parser)]
 #[command(version=None)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Cli {
     /// See what version of zrc you are using
     #[arg(short, long)]
@@ -54,6 +55,10 @@ pub struct Cli {
     /// Add a directory to the include path
     #[arg(short = 'I', long = "include", action = clap::ArgAction::Append)]
     pub include_paths: Vec<PathBuf>,
+
+    /// Display timing information for compilation phases
+    #[arg(long)]
+    pub timings: bool,
 }
 
 /// Configuration for the Zirco optimizer
@@ -223,6 +228,7 @@ mod tests {
             opt_level: FrontendOptLevel::O2,
             debug: false,
             include_paths: vec![PathBuf::from(".")],
+            timings: false,
         };
 
         let paths = get_include_paths(&cli);
@@ -247,6 +253,7 @@ mod tests {
             opt_level: FrontendOptLevel::O2,
             debug: false,
             include_paths: vec![absolute_path.clone()],
+            timings: false,
         };
 
         let paths = get_include_paths(&cli);

@@ -114,6 +114,7 @@ fn main() -> anyhow::Result<()> {
                 zrc_codegen::TargetTriple::create(&triple)
             }),
         &cli.cpu,
+        cli.timings,
     );
 
     match result {

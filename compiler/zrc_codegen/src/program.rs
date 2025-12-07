@@ -5,6 +5,8 @@
 //! intermediate representation (IR), which can then be optimized and compiled
 //! to machine code.
 
+use std::time::{Duration, Instant};
+
 use inkwell::{
     OptimizationLevel,
     context::Context,
@@ -30,6 +32,15 @@ use crate::{
     scope::CgScope,
     ty::{create_fn, llvm_basic_type, llvm_type},
 };
+
+/// Timing information for code generation phases
+#[derive(Debug, Clone, Copy)]
+pub struct CodegenTimings {
+    /// Time spent generating IR
+    pub ir_generation: Duration,
+    /// Time spent running the optimizer
+    pub optimization: Duration,
+}
 
 /// Evaluate a constant expression to an LLVM constant value.
 /// This is used for global variable initializers.
@@ -723,6 +734,136 @@ pub fn cg_program_to_buffer(
     target_machine
         .write_to_memory_buffer(&module, file_type)
         .expect("writing to memory buffer should succeed")
+}
+
+/// Code generate a LLVM program to a string with timing information.
+///
+/// Returns a tuple of the generated string and timing information.
+///
+/// # Panics
+/// Panics on internal code generation failure.
+#[must_use]
+#[expect(clippy::too_many_arguments)]
+pub fn cg_program_to_string_with_timings(
+    frontend_version_string: &str,
+    parent_directory: &str,
+    file_name: &str,
+    cli_args: &str,
+    source: &str,
+    program: Vec<Spanned<TypedDeclaration<'_, '_>>>,
+    optimization_level: OptimizationLevel,
+    debug_level: DWARFEmissionKind,
+    triple: &TargetTriple,
+    cpu: &str,
+) -> (String, CodegenTimings) {
+    let ctx = Context::create();
+
+    Target::initialize_all(&InitializationConfig::default());
+    let target = Target::from_triple(triple).expect("target should be ready and exist");
+
+    let target_machine = target
+        .create_target_machine(
+            triple,
+            cpu,
+            "",
+            optimization_level,
+            RelocMode::PIC,
+            CodeModel::Default,
+        )
+        .expect("target machine should be created successfully");
+
+    let ir_gen_start = Instant::now();
+    let module = cg_program_without_optimization(
+        frontend_version_string,
+        cli_args,
+        &ctx,
+        &target_machine,
+        debug_level,
+        parent_directory,
+        file_name,
+        &LineLookup::new(source),
+        program,
+    );
+    let ir_generation = ir_gen_start.elapsed();
+
+    let opt_start = Instant::now();
+    optimize_module(&module, &target_machine, optimization_level);
+    let optimization = opt_start.elapsed();
+
+    let result = module.print_to_string().to_string();
+    let timings = CodegenTimings {
+        ir_generation,
+        optimization,
+    };
+
+    (result, timings)
+}
+
+/// Code generate a LLVM program to a buffer with timing information.
+///
+/// Returns a tuple of the generated buffer and timing information.
+///
+/// # Panics
+/// Panics on internal code generation failure.
+#[must_use]
+#[expect(clippy::too_many_arguments)]
+pub fn cg_program_to_buffer_with_timings(
+    frontend_version_string: &str,
+    parent_directory: &str,
+    file_name: &str,
+    cli_args: &str,
+    source: &str,
+    program: Vec<Spanned<TypedDeclaration<'_, '_>>>,
+    file_type: FileType,
+    optimization_level: OptimizationLevel,
+    debug_level: DWARFEmissionKind,
+    triple: &TargetTriple,
+    cpu: &str,
+) -> (MemoryBuffer, CodegenTimings) {
+    let ctx = Context::create();
+
+    Target::initialize_all(&InitializationConfig::default());
+    let target = Target::from_triple(triple).expect("target should be ready and exist");
+
+    let target_machine = target
+        .create_target_machine(
+            triple,
+            cpu,
+            "",
+            optimization_level,
+            RelocMode::PIC,
+            CodeModel::Default,
+        )
+        .expect("target machine should be created successfully");
+
+    let ir_gen_start = Instant::now();
+    let module = cg_program_without_optimization(
+        frontend_version_string,
+        cli_args,
+        &ctx,
+        &target_machine,
+        debug_level,
+        parent_directory,
+        file_name,
+        &LineLookup::new(source),
+        program,
+    );
+    let ir_generation = ir_gen_start.elapsed();
+
+    let opt_start = Instant::now();
+    optimize_module(&module, &target_machine, optimization_level);
+    let optimization = opt_start.elapsed();
+
+    let buffer = target_machine
+        .write_to_memory_buffer(&module, file_type)
+        .expect("writing to memory buffer should succeed");
+
+    let timings = CodegenTimings {
+        ir_generation,
+        optimization,
+    };
+
+    (buffer, timings)
 }
 
 #[cfg(test)]
