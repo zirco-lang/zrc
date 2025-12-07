@@ -52,6 +52,7 @@
     clippy::missing_errors_doc
 )]
 
+mod build_info;
 mod cli;
 
 use std::{path::Path, process};
@@ -64,6 +65,11 @@ use zrc_utils::io;
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+
+    if cli.version {
+        println!("{}", build_info::VERSION_STRING);
+        return Ok(());
+    }
 
     let Some(ref path) = cli.path else {
         bail!("Error: No input file specified.");

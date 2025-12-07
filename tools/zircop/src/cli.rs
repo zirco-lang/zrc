@@ -9,8 +9,12 @@ use clap::Parser;
 
 /// The official Zirco linter
 #[derive(Parser)]
-#[command(version, short_flag = 'v')]
+#[command(version=None)]
 pub struct Cli {
+    /// See what version of zircop you are using
+    #[arg(short, long)]
+    pub version: bool,
+
     /// The path of the file to lint
     pub path: Option<PathBuf>,
 

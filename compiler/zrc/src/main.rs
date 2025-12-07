@@ -75,7 +75,7 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     if cli.version {
-        println!("{}", build_info::version());
+        println!("{}", build_info::VERSION_STRING);
         return Ok(());
     }
 
@@ -96,7 +96,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     let result = compile::compile(
-        &build_info::version(),
+        build_info::VERSION_STRING,
         cli::get_include_paths(&cli),
         &cli.emit,
         &directory_name,
