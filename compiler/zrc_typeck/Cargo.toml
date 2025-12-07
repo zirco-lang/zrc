@@ -8,6 +8,6 @@ edition = "2024"
 [dependencies]
 derive_more = { version = "2.0.1", features = ["display"] }
 indexmap = "2.2.6"
-zrc_diagnostics = { version = "0.1.0", path = "../zrc_diagnostics" }
-zrc_parser = { version = "0.1.0", path = "../zrc_parser" }
-zrc_utils = { version = "0.1.0", path = "../zrc_utils" }
+zrc_diagnostics = { path = "../zrc_diagnostics" }
+zrc_parser = { path = "../zrc_parser" }
+zrc_utils = { path = "../zrc_utils" }
