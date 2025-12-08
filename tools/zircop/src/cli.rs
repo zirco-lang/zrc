@@ -21,6 +21,11 @@ pub struct Cli {
     /// Add a directory to the include path
     #[arg(short = 'I', long = "include", action = clap::ArgAction::Append)]
     pub include_paths: Vec<PathBuf>,
+
+    /// Allow (ignore) specific lints by name. Can be specified multiple times.
+    /// Use "all" to ignore all lints.
+    #[arg(short = 'A', long = "allow", action = clap::ArgAction::Append)]
+    pub allowed_lints: Vec<String>,
 }
 
 /// Get the include paths from the CLI environment and -I arguments

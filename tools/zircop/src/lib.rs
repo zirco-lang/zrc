@@ -53,6 +53,7 @@
 )]
 
 pub mod diagnostic;
+pub mod ignore;
 pub mod lint;
 pub mod lints;
 pub mod pass;

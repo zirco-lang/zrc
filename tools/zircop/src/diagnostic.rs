@@ -31,6 +31,24 @@ pub enum LintDiagnosticKind {
     EmptyWhileBody,
 }
 
+impl LintDiagnosticKind {
+    /// Get the canonical name of this lint, which can be used to ignore it
+    /// via the CLI or in-code comments.
+    #[must_use]
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::AssignmentInCondition => "assignment_in_condition",
+            Self::EmptyStructUsed => "empty_struct_used",
+            Self::UnderscoreVariableUsed(_) => "underscore_variable_used",
+            Self::UnusedVariable(_) => "unused_variable",
+            Self::UnreachableCode => "unreachable_code",
+            Self::EmptyIfBlock => "empty_if_block",
+            Self::EmptyElseBlock => "empty_else_block",
+            Self::EmptyWhileBody => "empty_while_body",
+        }
+    }
+}
+
 /// A Zircop lint
 #[derive(Display, Debug, PartialEq, Eq)]
 #[display("{_0}")]
@@ -41,6 +59,12 @@ impl LintDiagnostic {
     #[must_use]
     pub const fn new(kind: Spanned<LintDiagnosticKind>) -> Self {
         Self(GenericDiagnostic(Severity::Warning, kind))
+    }
+
+    /// Get the kind of this lint diagnostic
+    #[must_use]
+    pub const fn kind(&self) -> &Spanned<LintDiagnosticKind> {
+        &self.0.1
     }
 
     /// Convert this [`LintDiagnostic`] to a printable string using ariadne. The

@@ -59,8 +59,8 @@ use std::{error::Error, fmt, path::Path, process};
 
 use clap::Parser;
 use cli::Cli;
-use zircop::runner;
-use zrc_utils::io;
+use zircop::{ignore, runner};
+use zrc_utils::{io, line_finder::LineLookup};
 
 /// An error produced by the zircop CLI
 #[derive(Debug)]
@@ -103,13 +103,50 @@ fn main() -> Result<(), Box<dyn Error>> {
             process::exit(1);
         }
         Ok(diagnostics) => {
-            for diag in &diagnostics {
+            // Parse in-code ignore directives
+            let in_code_ignores = ignore::parse_ignore_directives(&source_content);
+            let line_lookup = LineLookup::new(&source_content);
+
+            // Filter out allowed lints (both CLI and in-code)
+            let filtered_diagnostics: Vec<_> = diagnostics
+                .into_iter()
+                .filter(|diag| {
+                    let lint_name = diag.kind().value().name();
+
+                    // Check CLI allows
+                    if cli.allowed_lints.contains(&lint_name.to_string())
+                        || cli.allowed_lints.contains(&"all".to_string())
+                    {
+                        return false;
+                    }
+
+                    // Check in-code ignores
+                    let span = diag.kind().span();
+                    let line_and_col = line_lookup.lookup_from_index(span.start());
+                    #[expect(clippy::as_conversions)]
+                    let line = line_and_col.line as usize;
+
+                    if let Some(ignored_lints) = in_code_ignores.get(&line)
+                        && (ignored_lints.contains(&lint_name.to_string())
+                            || ignored_lints.contains(&"all".to_string()))
+                    {
+                        return false;
+                    }
+
+                    true
+                })
+                .collect();
+
+            for diag in &filtered_diagnostics {
                 eprintln!("{}", diag.print(Some(&source_content)));
             }
 
-            println!("Linting complete: {} issue(s) found.", diagnostics.len());
+            println!(
+                "Linting complete: {} issue(s) found.",
+                filtered_diagnostics.len()
+            );
 
-            if !diagnostics.is_empty() {
+            if !filtered_diagnostics.is_empty() {
                 process::exit(1);
             }
         }
