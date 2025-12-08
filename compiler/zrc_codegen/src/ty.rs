@@ -179,7 +179,7 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
             ctx.ctx()
                 .struct_type(
                     &fields
-                        .into_iter()
+                        .iter()
                         .map(|(_, key_ty)| llvm_basic_type(ctx, key_ty).0)
                         .collect::<Vec<_>>(),
                     false,
@@ -200,7 +200,7 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
                         0,
                         None,
                         &fields
-                            .into_iter()
+                            .iter()
                             .map(|(key, key_ty)| {
                                 ctx.dbg_builder()
                                     .expect("we have DI")
@@ -231,7 +231,7 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
         Type::Union(fields) => {
             // Determine which field has the largest size. This is what we will allocate.
             let largest_field = fields
-                .into_iter()
+                .iter()
                 .map(|(_, ty)| {
                     let ty = llvm_basic_type(ctx, ty).0;
                     let size = ctx.target_machine().get_target_data().get_bit_size(&ty);
@@ -260,7 +260,7 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
                             0,
                             0,
                             &fields
-                                .into_iter()
+                                .iter()
                                 .map(|(_, ty)| llvm_basic_type(ctx, ty).1.expect("we have DI"))
                                 .collect::<Vec<_>>(),
                             0,

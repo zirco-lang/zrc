@@ -15,7 +15,7 @@ use super::{
 use crate::{
     tast::{
         expr::{TypedExpr, TypedExprKind},
-        ty::Type as TastType,
+        ty::{OrderedValueFields, Type as TastType},
     },
     typeck::resolve_type,
 };
@@ -209,7 +209,7 @@ pub fn type_expr_struct_construction<'input>(
         Vec<zrc_utils::span::Spanned<(zrc_utils::span::Spanned<&'input str>, Expr<'input>)>>,
     >,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    use indexmap::IndexMap;
+    
     use zrc_parser::ast::ty::TypeKind as ParserTypeKind;
 
     // Check if we're constructing an enum before desugaring
@@ -268,7 +268,7 @@ pub fn type_expr_struct_construction<'input>(
         // Find the discriminant value (index of the variant)
         let discriminant = variant_types
             .iter()
-            .position(|(name, _)| name == variant_name_str)
+            .position(|(name, _)| name == *variant_name_str)
             .ok_or_else(|| {
                 DiagnosticKind::StructOrUnionDoesNotHaveMember(
                     resolved_ty.to_string(),
@@ -317,15 +317,15 @@ pub fn type_expr_struct_construction<'input>(
         };
 
         // Create the union construction for __value__
-        let mut union_fields = IndexMap::new();
-        union_fields.insert(*variant_name_str, typed_variant_expr);
+        let mut union_fields = OrderedValueFields::new();
+        union_fields.insert(variant_name_str, typed_variant_expr);
         let union_construction = TypedExpr {
             inferred_type: union_ty.clone(),
             kind: TypedExprKind::StructConstruction(union_fields).in_span(fields.span()),
         };
 
         // Create the final struct construction
-        let mut struct_fields = IndexMap::new();
+        let mut struct_fields = OrderedValueFields::new();
         struct_fields.insert("__discriminant__", discriminant_expr);
         struct_fields.insert("__value__", union_construction);
 
@@ -363,7 +363,7 @@ pub fn type_expr_struct_construction<'input>(
     };
 
     // Type check each field initialization
-    let mut initialized_fields: IndexMap<&'input str, TypedExpr<'input>> = IndexMap::new();
+    let mut initialized_fields = OrderedValueFields::new();
 
     for field_init in fields.value() {
         let (field_name, field_expr) = field_init.value();
@@ -419,7 +419,7 @@ pub fn type_expr_struct_construction<'input>(
 
     // For structs (not unions), verify all fields are initialized
     if matches!(resolved_ty, TastType::Struct(_)) {
-        for (field_name, _field_type) in &expected_fields {
+        for (field_name, _field_type) in expected_fields.iter() {
             if !initialized_fields.contains_key(field_name) {
                 return Err(DiagnosticKind::ExpectedGot {
                     expected: format!("initialization of field '{field_name}'"),

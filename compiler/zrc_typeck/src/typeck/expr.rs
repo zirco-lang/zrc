@@ -87,10 +87,8 @@ pub fn type_expr<'input>(
 
 #[cfg(test)]
 mod tests {
-
     use std::collections::HashMap;
 
-    use indexmap::IndexMap;
     use zrc_diagnostics::DiagnosticKind;
     use zrc_utils::spanned_test;
 
@@ -98,7 +96,7 @@ mod tests {
     use crate::{
         tast::{
             stmt::{ArgumentDeclaration, ArgumentDeclarationList},
-            ty::{Fn, Type as TastType},
+            ty::{Fn, OrderedTypeFields, Type as TastType},
         },
         typeck::scope::{GlobalScope, TypeCtx, ValueCtx},
     };
@@ -114,7 +112,7 @@ mod tests {
                 ("bool", TastType::Bool),
                 (
                     "s",
-                    TastType::Struct(IndexMap::from([("i8", TastType::I8)])),
+                    TastType::Struct(OrderedTypeFields::from(vec![("i8", TastType::I8)])),
                 ),
                 (
                     "get_bool",
@@ -160,7 +158,7 @@ mod tests {
             ])),
             types: TypeCtx::from_defaults_and_mappings(HashMap::from([(
                 "NonIntegerType",
-                TastType::Struct(IndexMap::from([])),
+                TastType::Struct(OrderedTypeFields::from(vec![])),
             )])),
             ..Default::default()
         };

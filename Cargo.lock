@@ -1095,7 +1095,6 @@ name = "zrc_codegen"
 version = "0.1.0"
 dependencies = [
  "cc",
- "indexmap",
  "indoc",
  "inkwell",
  "insta",
@@ -1141,7 +1140,6 @@ name = "zrc_typeck"
 version = "0.1.0"
 dependencies = [
  "derive_more",
- "indexmap",
  "zrc_diagnostics",
  "zrc_parser",
  "zrc_utils",

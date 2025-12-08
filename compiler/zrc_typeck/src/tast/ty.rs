@@ -8,7 +8,7 @@
 use std::fmt::Display;
 
 use derive_more::Display;
-use indexmap::IndexMap;
+use zrc_utils::ordered_fields::OrderedFields;
 
 use super::stmt::ArgumentDeclarationList;
 
@@ -65,6 +65,12 @@ pub struct FunctionDeclarationGlobalMetadata<'input> {
     pub has_implementation: bool,
 }
 
+/// The declaration ordered fields of a struct or union type
+pub type OrderedTypeFields<'input> = OrderedFields<'input, Type<'input>>;
+
+/// The ordered fields of a struct or union instantiation
+pub type OrderedValueFields<'input> = OrderedFields<'input, super::expr::TypedExpr<'input>>;
+
 /// The possible Zirco types
 #[derive(PartialEq, Debug, Clone)]
 pub enum Type<'input> {
@@ -108,9 +114,9 @@ pub enum Type<'input> {
     /// `fn(A, B) -> T`
     Fn(Fn<'input>),
     /// Struct type literals. Ordered by declaration order.
-    Struct(IndexMap<&'input str, Self>),
+    Struct(OrderedTypeFields<'input>),
     /// Union type literals. Ordered by declaration order.
-    Union(IndexMap<&'input str, Self>),
+    Union(OrderedTypeFields<'input>),
     /// Opaque type placeholder used during type resolution for self-referential
     /// types. This is a temporary type that should be replaced with a void
     /// pointer (`*struct{}`) after the type definition is fully resolved.
@@ -197,20 +203,20 @@ impl<'input> Type<'input> {
         }
     }
 
-    /// Try to access the struct's [`IndexMap`] if we are a struct
+    /// Try to access the struct's fields if we are a struct
     #[must_use]
     #[expect(clippy::wildcard_enum_match_arm)]
-    pub fn into_struct_contents(self) -> Option<IndexMap<&'input str, Self>> {
+    pub fn into_struct_contents(self) -> Option<OrderedTypeFields<'input>> {
         match self {
             Type::Struct(x) => Some(x),
             _ => None,
         }
     }
 
-    /// Try to access the union's [`IndexMap`] if we are a union
+    /// Try to access the union's fields if we are a union
     #[must_use]
     #[expect(clippy::wildcard_enum_match_arm)]
-    pub fn into_union_contents(self) -> Option<IndexMap<&'input str, Self>> {
+    pub fn into_union_contents(self) -> Option<OrderedTypeFields<'input>> {
         match self {
             Type::Union(x) => Some(x),
             _ => None,
@@ -219,8 +225,8 @@ impl<'input> Type<'input> {
 
     /// Get the unit type
     #[must_use]
-    pub fn unit() -> Self {
-        Type::Struct(IndexMap::new())
+    pub const fn unit() -> Self {
+        Type::Struct(OrderedTypeFields::new())
     }
 
     /// Check if this type can be implicitly cast to the target type.
@@ -274,12 +280,15 @@ mod tests {
     #[test]
     fn test_void_ptr_implicit_cast() {
         // Create a void pointer type (*struct{})
-        let void_ptr = Type::Ptr(Box::new(Type::Struct(IndexMap::new())));
+        let void_ptr = Type::Ptr(Box::new(Type::Struct(OrderedTypeFields::new())));
 
         // Create various pointer types
         let i32_ptr = Type::Ptr(Box::new(Type::I32));
         let bool_ptr = Type::Ptr(Box::new(Type::Bool));
-        let struct_ptr = Type::Ptr(Box::new(Type::Struct(IndexMap::from([("x", Type::I8)]))));
+        let struct_ptr = Type::Ptr(Box::new(Type::Struct(OrderedTypeFields::from(vec![(
+            "x",
+            Type::I8,
+        )]))));
 
         // All should be able to implicitly cast to void pointer
         assert!(i32_ptr.can_implicitly_cast_to(&void_ptr));
@@ -322,13 +331,13 @@ mod tests {
 
     #[test]
     fn type_display_works_for_empty_struct() {
-        let struct_type = Type::Struct(IndexMap::new());
+        let struct_type = Type::Struct(OrderedTypeFields::new());
         assert_eq!(struct_type.to_string(), "struct {}");
     }
 
     #[test]
     fn type_display_works_for_empty_union() {
-        let union_type = Type::Union(IndexMap::new());
+        let union_type = Type::Union(OrderedTypeFields::new());
         assert_eq!(union_type.to_string(), "union {}");
     }
 
@@ -345,7 +354,7 @@ mod tests {
 
     #[test]
     fn into_struct_contents_returns_fields_for_struct() {
-        let fields = IndexMap::from([("x", Type::I32)]);
+        let fields = OrderedTypeFields::from(vec![("x", Type::I32)]);
         let struct_type = Type::Struct(fields.clone());
         assert_eq!(struct_type.into_struct_contents(), Some(fields));
     }
@@ -357,7 +366,7 @@ mod tests {
 
     #[test]
     fn into_union_contents_returns_fields_for_union() {
-        let fields = IndexMap::from([("x", Type::I32)]);
+        let fields = OrderedTypeFields::from(vec![("x", Type::I32)]);
         let union_type = Type::Union(fields.clone());
         assert_eq!(union_type.into_union_contents(), Some(fields));
     }

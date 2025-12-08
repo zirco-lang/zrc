@@ -88,7 +88,7 @@ pub fn cg_place<'ctx>(
                 let x_ty = llvm_basic_type(&cg, &x.inferred_type).0;
                 let prop_idx = contents
                     .iter()
-                    .position(|(got_key, _)| *got_key == prop.into_value())
+                    .position(|(got_key, _)| *got_key == *prop.into_value())
                     .expect("invalid struct field");
 
                 let x = unpack!(bb = cg_place(cg, bb, *x));
