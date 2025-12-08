@@ -9,7 +9,6 @@ edition = "2024"
 inkwell = { git = "https://github.com/TheDan64/inkwell", version = "0.6.0", features = ["llvm20-1", "llvm20-1-prefer-static"] }
 zrc_typeck = { path = "../zrc_typeck" }
 zrc_utils = { path = "../zrc_utils" }
-indexmap = "2.2.6"
 
 [dev-dependencies]
 indoc = "2.0.5"

@@ -1,11 +1,13 @@
 //! code generation for misc expressions
 
-use indexmap::IndexMap;
 use inkwell::{
     types::BasicType,
     values::{BasicValue, BasicValueEnum},
 };
-use zrc_typeck::tast::{expr::TypedExpr, ty::Type};
+use zrc_typeck::tast::{
+    expr::TypedExpr,
+    ty::{OrderedValueFields, Type},
+};
 use zrc_utils::span::Spanned;
 
 use crate::{
@@ -139,7 +141,7 @@ pub fn cg_struct_construction<'ctx, 'input>(
         inferred_type,
         ..
     }: CgExprArgs<'ctx, 'input, '_>,
-    fields: &IndexMap<&'input str, TypedExpr<'input>>,
+    fields: &OrderedValueFields<'input>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
     match &inferred_type {
         Type::Struct(field_types) => {
@@ -192,7 +194,7 @@ pub fn cg_struct_construction<'ctx, 'input>(
 
             // Initialize the union with the provided field (if any)
             // In unions, all fields share the same memory space
-            for (field_name, _field_ty) in field_types {
+            for (field_name, _field_ty) in field_types.iter() {
                 if let Some(field_expr) = fields.get(field_name) {
                     // Evaluate the field value
                     let field_value = unpack!(bb = cg_expr(cg, bb, field_expr.clone()));

@@ -50,6 +50,8 @@
     clippy::doc_comment_double_space_linebreaks
 )]
 
+use std::{error::Error, fmt};
+
 use mimalloc::MiMalloc;
 /// Use the mimalloc allocator as the global allocator, as LLVM is heavy on heap
 /// allocations as a result of its OOP design. Some comparisons have shown
@@ -62,14 +64,23 @@ mod build_info;
 mod cli;
 mod ice;
 
-use anyhow::bail;
 use clap::Parser;
 use cli::Cli;
 use zrc::{codegen::DebugLevel, compile, utils::io};
 
 use crate::cli::FrontendOutputFormat;
 
-fn main() -> anyhow::Result<()> {
+/// An error produced by the zrc CLI
+#[derive(Debug)]
+struct CliError(String);
+impl fmt::Display for CliError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl Error for CliError {}
+
+fn main() -> Result<(), Box<dyn Error>> {
     ice::setup_panic_hook();
 
     let cli = Cli::parse();
@@ -80,7 +91,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     let Some(ref path) = cli.path else {
-        bail!("no input file provided");
+        return Err(Box::new(CliError("No input file provided".into())));
     };
 
     let (directory_name, file_name, mut input) = io::open_input(path)?;
@@ -92,7 +103,10 @@ fn main() -> anyhow::Result<()> {
         && !cli.force
         && cli.out_file.as_os_str().to_str().unwrap_or("-") == "-"
     {
-        bail!("emitting raw object code to stdout is not allowed. use --force to override this");
+        return Err(Box::new(CliError(
+            "emitting raw object code to stdout is not allowed. use --force to override this"
+                .into(),
+        )));
     }
 
     let result = compile(

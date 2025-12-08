@@ -51,4 +51,5 @@
 pub mod code_fmt;
 pub mod io;
 pub mod line_finder;
+pub mod ordered_fields;
 pub mod span;

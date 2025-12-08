@@ -52,7 +52,8 @@
     clippy::multiple_crate_versions,
     clippy::cargo_common_metadata,
     clippy::module_name_repetitions,
-    clippy::doc_comment_double_space_linebreaks
+    clippy::doc_comment_double_space_linebreaks,
+    clippy::boxed_local
 )]
 
 // Ordering matters! Declared here so other modules have access to `unpack!`

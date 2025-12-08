@@ -1058,7 +1058,6 @@ checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
 name = "zircop"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "clap",
  "derive_more",
  "indoc",
@@ -1086,9 +1085,7 @@ dependencies = [
 name = "zrc_cli"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "clap",
- "derive_more",
  "mimalloc",
  "zrc",
 ]
@@ -1098,7 +1095,6 @@ name = "zrc_codegen"
 version = "0.1.0"
 dependencies = [
  "cc",
- "indexmap",
  "indoc",
  "inkwell",
  "insta",
@@ -1144,7 +1140,6 @@ name = "zrc_typeck"
 version = "0.1.0"
 dependencies = [
  "derive_more",
- "indexmap",
  "zrc_diagnostics",
  "zrc_parser",
  "zrc_utils",

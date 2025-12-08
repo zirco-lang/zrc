@@ -1,9 +1,11 @@
 //! Command line interface declarations for the Zirco compiler
 
-use std::path::{Path, PathBuf};
+use std::{
+    fmt::Display,
+    path::{Path, PathBuf},
+};
 
 use clap::Parser;
-use derive_more::Display;
 use zrc::{OutputFormat, codegen::OptimizationLevel};
 
 /// The official Zirco compiler
@@ -88,39 +90,49 @@ impl From<FrontendOptLevel> for OptimizationLevel {
 /// The list of possible outputs `zrc` can emit in
 ///
 /// Usually you will want to use `llvm`.
-#[derive(Debug, Clone, clap::ValueEnum, PartialEq, Eq, Display)]
+#[derive(Debug, Clone, clap::ValueEnum, PartialEq, Eq)]
 pub enum FrontendOutputFormat {
     /// LLVM IR
-    #[display("llvm")]
     Llvm,
     /// The Zirco AST, in Rust-like format
-    #[display("ast-debug")]
     AstDebug,
     /// The Zirco AST, in Rust-like format with indentation
-    #[display("ast-debug-pretty")]
     AstDebugPretty,
     /// The Zirco AST, stringified to Zirco code again
     ///
     /// This usually looks like your code with a bunch of parenthesis added.
-    #[display("ast")]
     Ast,
     /// The Zirco TAST, in Rust-like format
-    #[display("tast-debug")]
     TastDebug,
     /// The Zirco TAST, in Rust-like format with indentation
-    #[display("tast-debug-pretty")]
     TastDebugPretty,
     /// The Zirco TAST, stringified to Zirco code again
     ///
     /// This usually looks like your code with a bunch of parenthesis added.
-    #[display("tast")]
     Tast,
     /// Assembly
-    #[display("asm")]
     Asm,
     /// Object file
-    #[display("object")]
     Object,
+}
+impl Display for FrontendOutputFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Llvm => "llvm",
+                Self::AstDebug => "ast-debug",
+                Self::AstDebugPretty => "ast-debug-pretty",
+                Self::Ast => "ast",
+                Self::TastDebug => "tast-debug",
+                Self::TastDebugPretty => "tast-debug-pretty",
+                Self::Tast => "tast",
+                Self::Asm => "asm",
+                Self::Object => "object",
+            }
+        )
+    }
 }
 
 impl From<FrontendOutputFormat> for OutputFormat {

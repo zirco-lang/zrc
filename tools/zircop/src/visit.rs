@@ -365,7 +365,7 @@ pub trait SemanticVisit<'input, 'gs> {
             }
             TcExprKind::SizeOf(ty) => self.visit_tc_type(ty),
             TcExprKind::StructConstruction(fields) => {
-                for (_name, expr) in fields {
+                for (_name, expr) in fields.iter() {
                     self.visit_tc_expr(expr);
                 }
             }

@@ -1,17 +1,19 @@
 //! for types
 
-use indexmap::IndexMap;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::{
     stmt::ArgumentDeclarationList as AstADL,
     ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind},
 };
-use zrc_utils::span::{Span, Spanned};
+use zrc_utils::{
+    ordered_fields::OrderedFields,
+    span::{Span, Spanned},
+};
 
 use super::scope::TypeCtx;
 use crate::tast::{
     stmt::{ArgumentDeclaration, ArgumentDeclarationList},
-    ty::{Fn, Type as TastType},
+    ty::{Fn, OrderedTypeFields, Type as TastType},
 };
 
 /// Resolve an identifier to its corresponding [`TastType`].
@@ -47,7 +49,7 @@ pub fn resolve_type<'input>(
         }
         ParserTypeKind::Enum(members) => {
             // Desugar an enum into its represented internal struct
-            TastType::Struct(IndexMap::from([
+            TastType::Struct(OrderedTypeFields::from(vec![
                 ("__discriminant__", TastType::Usize),
                 (
                     "__value__",
@@ -160,7 +162,7 @@ fn resolve_type_with_opaque<'input>(
         )?),
         ParserTypeKind::Enum(members) => {
             // Desugar an enum into its represented internal struct
-            TastType::Struct(IndexMap::from([
+            TastType::Struct(OrderedTypeFields::from(vec![
                 ("__discriminant__", TastType::Usize),
                 (
                     "__value__",
@@ -240,7 +242,7 @@ fn check_opaque_behind_pointer<'input>(
             check_opaque_behind_pointer(element_type, opaque_name, ty_span)
         }
         TastType::Struct(members) | TastType::Union(members) => {
-            for (_, member_ty) in members {
+            for (_, member_ty) in members.iter() {
                 check_opaque_behind_pointer(member_ty, opaque_name, ty_span)?;
             }
             Ok(())
@@ -312,7 +314,7 @@ fn replace_opaque_with_concrete<'input>(
     }
 }
 
-/// Resolve the types within the [`IndexMap`]s used by
+/// Resolve the types within the fields used by
 /// [`ParserTypeKind::Struct`] and ensure keys are unique, returning the value
 /// to be passed to [`TastType::Struct`].
 ///
@@ -321,23 +323,23 @@ fn replace_opaque_with_concrete<'input>(
 pub(super) fn resolve_key_type_mapping<'input>(
     type_scope: &TypeCtx<'input>,
     members: KeyTypeMapping<'input>,
-) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {
-    let mut map: IndexMap<&'input str, TastType> = IndexMap::new();
+) -> Result<OrderedTypeFields<'input>, Diagnostic> {
+    let mut fields = OrderedFields::new();
     for member in members.0.into_value() {
         let span = member.span();
         let (key, ast_type) = member.into_value();
 
-        if map.contains_key(key.value()) {
+        if fields.contains_key(key.value()) {
             return Err(
                 DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
             );
         }
-        map.insert(key.value(), resolve_type(type_scope, ast_type)?);
+        fields.insert(key.value(), resolve_type(type_scope, ast_type)?);
     }
-    Ok(map)
+    Ok(fields)
 }
 
-/// Resolve the types within the [`IndexMap`]s used by
+/// Resolve the types within the fields used by
 /// [`ParserTypeKind::Struct`] with opaque type support. Validates that any
 /// opaque types only appear behind pointers.
 ///
@@ -348,13 +350,13 @@ fn resolve_key_type_mapping_with_opaque<'input>(
     type_scope: &TypeCtx<'input>,
     members: KeyTypeMapping<'input>,
     opaque_name: &'input str,
-) -> Result<IndexMap<&'input str, TastType<'input>>, Diagnostic> {
-    let mut map: IndexMap<&'input str, TastType> = IndexMap::new();
+) -> Result<OrderedTypeFields<'input>, Diagnostic> {
+    let mut fields = OrderedTypeFields::new();
     for member in members.0.into_value() {
         let span = member.span();
         let (key, ast_type) = member.into_value();
 
-        if map.contains_key(key.value()) {
+        if fields.contains_key(key.value()) {
             return Err(
                 DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
             );
@@ -362,9 +364,9 @@ fn resolve_key_type_mapping_with_opaque<'input>(
         let resolved_type = resolve_type_with_opaque(type_scope, ast_type, opaque_name)?;
         // Check this specific field for invalid opaque references
         check_opaque_behind_pointer(&resolved_type, opaque_name, span)?;
-        map.insert(key.value(), resolved_type);
+        fields.insert(key.value(), resolved_type);
     }
-    Ok(map)
+    Ok(fields)
 }
 
 #[cfg(test)]
@@ -443,7 +445,7 @@ mod tests {
                     25
                 ))
             ),
-            Ok(TastType::Struct(IndexMap::from([
+            Ok(TastType::Struct(OrderedTypeFields::from(vec![
                 ("x", TastType::I32),
                 ("y", TastType::I32)
             ])))
@@ -491,11 +493,11 @@ mod tests {
                     15
                 ))
             ),
-            Ok(TastType::Struct(IndexMap::from([
+            Ok(TastType::Struct(OrderedTypeFields::from(vec![
                 ("__discriminant__", TastType::Usize),
                 (
                     "__value__",
-                    TastType::Union(IndexMap::from([
+                    TastType::Union(OrderedTypeFields::from(vec![
                         ("Eight", TastType::I8),
                         ("Sixteen", TastType::I16)
                     ]))

@@ -55,15 +55,24 @@
 mod build_info;
 mod cli;
 
-use std::{path::Path, process};
+use std::{error::Error, fmt, path::Path, process};
 
-use anyhow::bail;
 use clap::Parser;
 use cli::Cli;
 use zircop::runner;
 use zrc_utils::io;
 
-fn main() -> anyhow::Result<()> {
+/// An error produced by the zircop CLI
+#[derive(Debug)]
+struct CliError(String);
+impl fmt::Display for CliError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl Error for CliError {}
+
+fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
     if cli.version {
@@ -72,7 +81,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     let Some(ref path) = cli.path else {
-        bail!("Error: No input file specified.");
+        return Err(Box::new(CliError("No input file specified.".into())));
     };
 
     let (directory_name, file_name, mut input) = io::open_input(path)?;

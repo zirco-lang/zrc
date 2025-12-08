@@ -9,6 +9,7 @@ pub use zrc_parser::{
 use zrc_utils::span::Spanned;
 
 use super::ty::Type;
+use crate::tast::ty::OrderedValueFields;
 
 /// The left hand side of an assignment.
 #[derive(PartialEq, Debug, Clone)]
@@ -112,7 +113,7 @@ pub enum TypedExprKind<'input> {
     SizeOf(Type<'input>),
 
     /// `new Type { field1: value1, field2: value2, ... }`
-    StructConstruction(indexmap::IndexMap<&'input str, TypedExpr<'input>>),
+    StructConstruction(OrderedValueFields<'input>),
 
     /// `[expr1, expr2, expr3, ...]` - array literal
     ArrayLiteral(Vec<TypedExpr<'input>>),

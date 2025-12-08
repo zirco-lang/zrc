@@ -6,10 +6,9 @@ use std::{
     rc::Rc,
 };
 
-use indexmap::IndexMap;
 use zrc_utils::span::Span;
 
-use crate::tast::ty::{FunctionDeclarationGlobalMetadata, Type as TastType};
+use crate::tast::ty::{FunctionDeclarationGlobalMetadata, OrderedTypeFields, Type as TastType};
 
 /// Represents a typing scope: a scope that contains the mapping from a type's
 /// name to its internal [`TastType`] representation.
@@ -20,7 +19,7 @@ pub struct TypeCtx<'input> {
 }
 /// All types namable in the global scope
 /// Returns all types namable in the global scope
-fn all_namable_types<'input>() -> [(&'input str, TastType<'input>); 12] {
+const fn all_namable_types<'input>() -> [(&'input str, TastType<'input>); 12] {
     [
         ("i8", TastType::I8),
         ("u8", TastType::U8),
@@ -33,7 +32,7 @@ fn all_namable_types<'input>() -> [(&'input str, TastType<'input>); 12] {
         ("isize", TastType::Isize),
         ("usize", TastType::Usize),
         ("bool", TastType::Bool),
-        ("void", TastType::Struct(IndexMap::new())),
+        ("void", TastType::Struct(OrderedTypeFields::new())),
     ]
 }
 impl<'input> TypeCtx<'input> {
