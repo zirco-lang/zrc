@@ -209,7 +209,6 @@ pub fn type_expr_struct_construction<'input>(
         Vec<zrc_utils::span::Spanned<(zrc_utils::span::Spanned<&'input str>, Expr<'input>)>>,
     >,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    
     use zrc_parser::ast::ty::TypeKind as ParserTypeKind;
 
     // Check if we're constructing an enum before desugaring
