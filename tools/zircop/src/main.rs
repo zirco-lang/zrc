@@ -124,6 +124,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     // Check in-code ignores
                     let span = diag.kind().span();
                     let line_and_col = line_lookup.lookup_from_index(span.start());
+                    // SAFETY: u32 to usize cast is always safe on 32-bit and 64-bit systems
                     #[expect(clippy::as_conversions)]
                     let line = line_and_col.line as usize;
 

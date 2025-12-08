@@ -40,7 +40,7 @@ pub fn parse_ignore_directives(source: &str) -> HashMap<usize, Vec<String>> {
 
         // Look for single-line comments
         if let Some(comment_start) = line.find("//") {
-            let comment = &line[comment_start + COMMENT_PREFIX_LEN..].trim();
+            let comment = line[comment_start + COMMENT_PREFIX_LEN..].trim();
 
             // Check for zircop-ignore-next-line
             if let Some(rest) = comment.strip_prefix("zircop-ignore-next-line:") {
@@ -55,7 +55,7 @@ pub fn parse_ignore_directives(source: &str) -> HashMap<usize, Vec<String>> {
                     ignores.entry(line_number).or_default().push(lint_name);
                 }
             } else {
-                // Not a zircop directive, ignore
+                // Not a zircop directive - no action needed
             }
         }
     }
