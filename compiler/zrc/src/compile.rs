@@ -48,7 +48,7 @@ pub enum OutputFormat {
 /// # Arguments
 ///
 /// * `frontend_version_string` - A string representing the version of the
-///   frontend, obtained from [`crate::build_info`].
+///   frontend.
 /// * `emit` - The desired output format.
 /// * `parent_directory` - The parent directory of the source file.
 /// * `file_name` - The name of the source file.
