@@ -1074,16 +1074,23 @@ dependencies = [
 name = "zrc"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "clap",
- "derive_more",
- "mimalloc",
  "zrc_codegen",
  "zrc_diagnostics",
  "zrc_parser",
  "zrc_preprocessor",
  "zrc_typeck",
  "zrc_utils",
+]
+
+[[package]]
+name = "zrc_cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "derive_more",
+ "mimalloc",
+ "zrc",
 ]
 
 [[package]]

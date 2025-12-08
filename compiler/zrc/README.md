@@ -1,6 +1,6 @@
-# `zrc` --- the official Zirco compiler
+# The Zirco Compiler library
 
-This crate serves as the frontend and binary for `zrc`, the official compiler for the Zirco
-programming language.
+This crate re-exports the main components of the Zirco compiler, `zrc`, for use in other
+projects.
 
-When running `zrc`, you simply invoke it with one argument, which is the file to compile.
+It also includes the primary driver function for the `zrc` binary.

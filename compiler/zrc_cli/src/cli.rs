@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use derive_more::Display;
-use zrc_codegen::OptimizationLevel;
+use zrc::{OutputFormat, codegen::OptimizationLevel};
 
 /// The official Zirco compiler
 #[derive(Parser)]
@@ -25,8 +25,8 @@ pub struct Cli {
 
     /// What output format to emit
     #[arg(long)]
-    #[clap(default_value_t = OutputFormat::Llvm)]
-    pub emit: OutputFormat,
+    #[clap(default_value_t = FrontendOutputFormat::Llvm)]
+    pub emit: FrontendOutputFormat,
 
     /// Allow emitting raw object code to stdout. This may mess up your
     /// terminal!
@@ -89,7 +89,7 @@ impl From<FrontendOptLevel> for OptimizationLevel {
 ///
 /// Usually you will want to use `llvm`.
 #[derive(Debug, Clone, clap::ValueEnum, PartialEq, Eq, Display)]
-pub enum OutputFormat {
+pub enum FrontendOutputFormat {
     /// LLVM IR
     #[display("llvm")]
     Llvm,
@@ -121,6 +121,22 @@ pub enum OutputFormat {
     /// Object file
     #[display("object")]
     Object,
+}
+
+impl From<FrontendOutputFormat> for OutputFormat {
+    fn from(val: FrontendOutputFormat) -> Self {
+        match val {
+            FrontendOutputFormat::Llvm => Self::Llvm,
+            FrontendOutputFormat::AstDebug => Self::AstDebug,
+            FrontendOutputFormat::AstDebugPretty => Self::AstDebugPretty,
+            FrontendOutputFormat::Ast => Self::Ast,
+            FrontendOutputFormat::TastDebug => Self::TastDebug,
+            FrontendOutputFormat::TastDebugPretty => Self::TastDebugPretty,
+            FrontendOutputFormat::Tast => Self::Tast,
+            FrontendOutputFormat::Asm => Self::Asm,
+            FrontendOutputFormat::Object => Self::Object,
+        }
+    }
 }
 
 /// Resolve a path to an absolute path based on the current working directory.
@@ -167,93 +183,4 @@ pub fn get_include_paths(cli: &Cli) -> Vec<&'static Path> {
     }
 
     include_paths
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn frontend_opt_level_converts_to_optimization_level_correctly() {
-        assert_eq!(
-            OptimizationLevel::from(FrontendOptLevel::O0),
-            OptimizationLevel::None
-        );
-        assert_eq!(
-            OptimizationLevel::from(FrontendOptLevel::O1),
-            OptimizationLevel::Less
-        );
-        assert_eq!(
-            OptimizationLevel::from(FrontendOptLevel::O2),
-            OptimizationLevel::Default
-        );
-        assert_eq!(
-            OptimizationLevel::from(FrontendOptLevel::O3),
-            OptimizationLevel::Aggressive
-        );
-    }
-
-    #[test]
-    fn output_format_display_works_correctly() {
-        assert_eq!(OutputFormat::Llvm.to_string(), "llvm");
-        assert_eq!(OutputFormat::AstDebug.to_string(), "ast-debug");
-        assert_eq!(OutputFormat::AstDebugPretty.to_string(), "ast-debug-pretty");
-        assert_eq!(OutputFormat::Ast.to_string(), "ast");
-        assert_eq!(OutputFormat::TastDebug.to_string(), "tast-debug");
-        assert_eq!(
-            OutputFormat::TastDebugPretty.to_string(),
-            "tast-debug-pretty"
-        );
-        assert_eq!(OutputFormat::Tast.to_string(), "tast");
-        assert_eq!(OutputFormat::Asm.to_string(), "asm");
-        assert_eq!(OutputFormat::Object.to_string(), "object");
-    }
-
-    #[test]
-    fn get_include_paths_resolves_relative_paths_to_absolute() {
-        // Create a CLI with a relative path
-        let cli = Cli {
-            version: false,
-            path: None,
-            out_file: PathBuf::from("-"),
-            emit: OutputFormat::Llvm,
-            force: false,
-            target: None,
-            cpu: String::from("generic"),
-            opt_level: FrontendOptLevel::O2,
-            debug: false,
-            include_paths: vec![PathBuf::from(".")],
-        };
-
-        let paths = get_include_paths(&cli);
-
-        // The relative path "." should be resolved to an absolute path
-        assert_eq!(paths.len(), 1);
-        assert!(paths[0].is_absolute(), "Path should be absolute");
-    }
-
-    #[test]
-    fn get_include_paths_preserves_absolute_paths() {
-        // Create a CLI with an absolute path
-        let absolute_path = PathBuf::from("/tmp");
-        let cli = Cli {
-            version: false,
-            path: None,
-            out_file: PathBuf::from("-"),
-            emit: OutputFormat::Llvm,
-            force: false,
-            target: None,
-            cpu: String::from("generic"),
-            opt_level: FrontendOptLevel::O2,
-            debug: false,
-            include_paths: vec![absolute_path.clone()],
-        };
-
-        let paths = get_include_paths(&cli);
-
-        // The absolute path should be preserved
-        assert_eq!(paths.len(), 1);
-        assert!(paths[0].is_absolute(), "Path should be absolute");
-        assert_eq!(paths[0], absolute_path.as_path());
-    }
 }

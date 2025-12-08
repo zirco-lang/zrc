@@ -1,0 +1,15 @@
+[package]
+name = "zrc_cli"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "zrc"
+path = "src/main.rs"
+
+[dependencies]
+zrc = { path = "../zrc" }
+anyhow = "1.0.82"
+clap = { version = "4.5.4", features = ["derive"] }
+derive_more = { version = "2.0.1", features = ["display"] }
+mimalloc = "0.1.48"

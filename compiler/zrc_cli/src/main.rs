@@ -60,14 +60,14 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 mod build_info;
 mod cli;
-mod compile;
 mod ice;
 
 use anyhow::bail;
 use clap::Parser;
-use cli::{Cli, OutputFormat};
-use zrc_codegen::DebugLevel;
-use zrc_utils::io;
+use cli::Cli;
+use zrc::{codegen::DebugLevel, compile, utils::io};
+
+use crate::cli::FrontendOutputFormat;
 
 fn main() -> anyhow::Result<()> {
     ice::setup_panic_hook();
@@ -88,17 +88,17 @@ fn main() -> anyhow::Result<()> {
     let mut source_content = String::new();
     input.read_to_string(&mut source_content)?;
 
-    if cli.emit == OutputFormat::Object
+    if cli.emit == FrontendOutputFormat::Object
         && !cli.force
         && cli.out_file.as_os_str().to_str().unwrap_or("-") == "-"
     {
         bail!("emitting raw object code to stdout is not allowed. use --force to override this");
     }
 
-    let result = compile::compile(
+    let result = compile(
         build_info::VERSION_STRING,
         cli::get_include_paths(&cli),
-        &cli.emit,
+        &cli.emit.into(),
         &directory_name,
         &file_name,
         &std::env::args().collect::<Vec<_>>().join(" "),
@@ -110,8 +110,8 @@ fn main() -> anyhow::Result<()> {
             DebugLevel::None
         },
         &cli.target
-            .map_or_else(zrc_codegen::get_native_triple, |triple| {
-                zrc_codegen::TargetTriple::create(&triple)
+            .map_or_else(zrc::codegen::get_native_triple, |triple| {
+                zrc::codegen::TargetTriple::create(&triple)
             }),
         &cli.cpu,
     );

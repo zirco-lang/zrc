@@ -9,4 +9,4 @@ edition = "2024"
 ariadne = "0.6.0"
 derive_more = { version = "2.0.1", features = ["display"] }
 thiserror = "2.0.0"
-zrc_utils = { version = "0.1.0", path = "../zrc_utils" }
+zrc_utils = { path = "../zrc_utils" }
