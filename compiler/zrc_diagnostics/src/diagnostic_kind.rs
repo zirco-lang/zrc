@@ -136,6 +136,8 @@ pub enum DiagnosticKind {
     MainFunctionInvalidParameters,
     #[error("cannot use constant `{0}` as an lvalue")]
     AssignmentToConstant(String),
+    #[error("functions are not first-class values in Zirco; use a function pointer instead")]
+    FunctionNotFirstClass,
 
     // PREPROCESSOR ERRORS
     #[error("unterminated include string")]

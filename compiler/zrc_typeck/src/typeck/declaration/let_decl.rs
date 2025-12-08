@@ -44,12 +44,20 @@ pub fn process_let_declaration<'input>(
                     }
 
                     // Explicitly typed with no value
-                    (None, Some(ty)) => TastLetDeclaration {
-                        name: let_declaration.name,
-                        ty,
-                        value: None,
-                        is_constant: let_declaration.is_constant,
-                    },
+                    (None, Some(ty)) => {
+                        // Check if trying to declare a variable with function type
+                        if matches!(ty, TastType::Fn(_)) {
+                            return Err(
+                                DiagnosticKind::FunctionNotFirstClass.error_in(let_decl_span)
+                            );
+                        }
+                        TastLetDeclaration {
+                            name: let_declaration.name,
+                            ty,
+                            value: None,
+                            is_constant: let_declaration.is_constant,
+                        }
+                    }
 
                     // Infer type from value
                     (
@@ -59,6 +67,13 @@ pub fn process_let_declaration<'input>(
                         }),
                         None,
                     ) => {
+                        // Check if trying to infer a function type
+                        if matches!(inferred_type, TastType::Fn(_)) {
+                            return Err(
+                                DiagnosticKind::FunctionNotFirstClass.error_in(let_decl_span)
+                            );
+                        }
+
                         // If the inferred type is {int}, resolve it to i32
                         let resolved_type = if matches!(inferred_type, TastType::Int) {
                             TastType::I32
@@ -90,6 +105,13 @@ pub fn process_let_declaration<'input>(
                         }),
                         Some(resolved_ty),
                     ) => {
+                        // Check if trying to use a function type
+                        if matches!(resolved_ty, TastType::Fn(_)) {
+                            return Err(
+                                DiagnosticKind::FunctionNotFirstClass.error_in(let_decl_span)
+                            );
+                        }
+
                         if inferred_type == resolved_ty {
                             TastLetDeclaration {
                                 name: let_declaration.name,
@@ -138,4 +160,56 @@ pub fn process_let_declaration<'input>(
             },
         )
         .collect::<Result<Vec<_>, Diagnostic>>()
+}
+
+#[cfg(test)]
+mod tests {
+    use zrc_diagnostics::{DiagnosticKind, Severity};
+    use zrc_parser::parser::parse_program;
+
+    use crate::typeck::{scope::GlobalScope, type_program};
+
+    #[test]
+    fn test_function_type_in_let_declaration_is_rejected() {
+        let code = "fn some_function() {}\n\n\
+                    fn main() -> i32 {\n\
+                    \x20   let a = some_function;\n\
+                    \x20   return 0;\n\
+                    }\n";
+
+        let mut global_scope = GlobalScope::new();
+        let ast = parse_program(code, "<test>").expect("parsing should succeed");
+        let result = type_program(&mut global_scope, ast);
+
+        assert!(result.is_err());
+        if let Err(diagnostic) = result {
+            assert_eq!(diagnostic.0, Severity::Error);
+            assert!(matches!(
+                diagnostic.1.into_value(),
+                DiagnosticKind::FunctionNotFirstClass
+            ));
+        }
+    }
+
+    #[test]
+    fn test_explicit_function_type_in_let_declaration_is_rejected() {
+        let code = "fn some_function() -> i32 { return 0; }\n\n\
+                    fn main() -> i32 {\n\
+                    \x20   let a: fn() -> i32;\n\
+                    \x20   return 0;\n\
+                    }\n";
+
+        let mut global_scope = GlobalScope::new();
+        let ast = parse_program(code, "<test>").expect("parsing should succeed");
+        let result = type_program(&mut global_scope, ast);
+
+        assert!(result.is_err());
+        if let Err(diagnostic) = result {
+            assert_eq!(diagnostic.0, Severity::Error);
+            assert!(matches!(
+                diagnostic.1.into_value(),
+                DiagnosticKind::FunctionNotFirstClass
+            ));
+        }
+    }
 }
