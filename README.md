@@ -129,6 +129,7 @@ If you're curious, here's our test coverage represented as a cool little chart:
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ImTheShrub"><img src="https://avatars.githubusercontent.com/u/234684568?v=4?s=100" width="100px;" alt="ImTheShrub"/><br /><sub><b>ImTheShrub</b></sub></a><br /><a href="#ideas-ImTheShrub" title="Ideas, Planning, & Feedback">🤔</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://yam.codes"><img src="https://avatars.githubusercontent.com/u/2014360?v=4?s=100" width="100px;" alt="Yam C Borodetsky"/><br /><sub><b>Yam C Borodetsky</b></sub></a><br /><a href="#doc-yamcodes" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/EpicVon2468"><img src="https://avatars.githubusercontent.com/u/136974526?v=4?s=100" width="100px;" alt="EpicVon2468"/><br /><sub><b>EpicVon2468</b></sub></a><br /><a href="#bug-EpicVon2468" title="Bug reports">🐛</a> <a href="#userTesting-EpicVon2468" title="User Testing">📓</a></td>
     </tr>
   </tbody>
 </table>
