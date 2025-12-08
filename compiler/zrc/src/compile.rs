@@ -6,8 +6,37 @@
 use std::path::Path;
 
 use zrc_codegen::{DebugLevel, OptimizationLevel};
+use zrc_parser::parser;
+use zrc_typeck::typeck;
 
-use crate::OutputFormat;
+/// The list of possible outputs `zrc` can emit in
+///
+/// Usually you will want to use `llvm`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OutputFormat {
+    /// LLVM IR
+    Llvm,
+    /// The Zirco AST, in Rust-like format
+    AstDebug,
+    /// The Zirco AST, in Rust-like format with indentation
+    AstDebugPretty,
+    /// The Zirco AST, stringified to Zirco code again
+    ///
+    /// This usually looks like your code with a bunch of parenthesis added.
+    Ast,
+    /// The Zirco TAST, in Rust-like format
+    TastDebug,
+    /// The Zirco TAST, in Rust-like format with indentation
+    TastDebugPretty,
+    /// The Zirco TAST, stringified to Zirco code again
+    ///
+    /// This usually looks like your code with a bunch of parenthesis added.
+    Tast,
+    /// Assembly
+    Asm,
+    /// Object file
+    Object,
+}
 
 /// Drive the compilation process.
 ///
@@ -29,6 +58,11 @@ use crate::OutputFormat;
 /// * `debug_mode` - The debug level for code generation.
 /// * `triple` - The target triple for code generation.
 /// * `cpu` - The target CPU for code generation.
+///
+/// # Errors
+///
+/// Err variant contains a [`zrc_diagnostics::Diagnostic`] if any phase of the
+/// compilation fails.
 #[expect(
     clippy::too_many_arguments,
     clippy::wildcard_enum_match_arm,
@@ -58,7 +92,7 @@ pub fn compile(
     // === PARSER ===
     let mut ast = Vec::new();
     for chunk in &chunks {
-        let chunk_decls = zrc_parser::parser::parse_source_chunk(chunk)?;
+        let chunk_decls = parser::parse_source_chunk(chunk)?;
         ast.extend(chunk_decls);
     }
 
@@ -85,8 +119,8 @@ pub fn compile(
 
     // otherwise, move on:
     // === TYPE CHECKER ===
-    let mut global_scope = zrc_typeck::typeck::GlobalScope::new();
-    let typed_ast = zrc_typeck::typeck::type_program(&mut global_scope, ast)?;
+    let mut global_scope = typeck::GlobalScope::new();
+    let typed_ast = typeck::type_program(&mut global_scope, ast)?;
 
     // display the TAST if the user wants it
     if matches!(

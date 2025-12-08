@@ -55,6 +55,8 @@
     clippy::doc_comment_double_space_linebreaks
 )]
 
+pub mod compile;
+pub use compile::{OutputFormat, compile};
 pub use zrc_codegen as codegen;
 pub use zrc_diagnostics as diagnostics;
 pub use zrc_parser as parser;

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use derive_more::Display;
-use zrc_codegen::OptimizationLevel;
+use zrc::{OutputFormat, codegen::OptimizationLevel};
 
 /// The official Zirco compiler
 #[derive(Parser)]
@@ -25,8 +25,8 @@ pub struct Cli {
 
     /// What output format to emit
     #[arg(long)]
-    #[clap(default_value_t = OutputFormat::Llvm)]
-    pub emit: OutputFormat,
+    #[clap(default_value_t = FrontendOutputFormat::Llvm)]
+    pub emit: FrontendOutputFormat,
 
     /// Allow emitting raw object code to stdout. This may mess up your
     /// terminal!
@@ -89,7 +89,7 @@ impl From<FrontendOptLevel> for OptimizationLevel {
 ///
 /// Usually you will want to use `llvm`.
 #[derive(Debug, Clone, clap::ValueEnum, PartialEq, Eq, Display)]
-pub enum OutputFormat {
+pub enum FrontendOutputFormat {
     /// LLVM IR
     #[display("llvm")]
     Llvm,
@@ -121,6 +121,22 @@ pub enum OutputFormat {
     /// Object file
     #[display("object")]
     Object,
+}
+
+impl From<FrontendOutputFormat> for OutputFormat {
+    fn from(val: FrontendOutputFormat) -> Self {
+        match val {
+            FrontendOutputFormat::Llvm => Self::Llvm,
+            FrontendOutputFormat::AstDebug => Self::AstDebug,
+            FrontendOutputFormat::AstDebugPretty => Self::AstDebugPretty,
+            FrontendOutputFormat::Ast => Self::Ast,
+            FrontendOutputFormat::TastDebug => Self::TastDebug,
+            FrontendOutputFormat::TastDebugPretty => Self::TastDebugPretty,
+            FrontendOutputFormat::Tast => Self::Tast,
+            FrontendOutputFormat::Asm => Self::Asm,
+            FrontendOutputFormat::Object => Self::Object,
+        }
+    }
 }
 
 /// Resolve a path to an absolute path based on the current working directory.

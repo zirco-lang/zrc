@@ -8,13 +8,8 @@ name = "zrc"
 path = "src/main.rs"
 
 [dependencies]
-zrc_parser = { path = "../zrc_parser" }
-zrc_preprocessor = { path = "../zrc_preprocessor" }
-zrc_utils = { path = "../zrc_utils" }
-zrc_typeck = { path = "../zrc_typeck" }
-zrc_codegen = { path = "../zrc_codegen" }
+zrc = { path = "../zrc" }
 anyhow = "1.0.82"
-zrc_diagnostics = { path = "../zrc_diagnostics" }
 clap = { version = "4.5.4", features = ["derive"] }
 derive_more = { version = "2.0.1", features = ["display"] }
 mimalloc = "0.1.48"
