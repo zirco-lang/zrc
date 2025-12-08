@@ -2,6 +2,9 @@
 
 use std::collections::HashMap;
 
+/// The length of the comment prefix `//`
+const COMMENT_PREFIX_LEN: usize = 2;
+
 /// A parsed ignore directive from a source comment
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IgnoreDirective {
@@ -37,7 +40,7 @@ pub fn parse_ignore_directives(source: &str) -> HashMap<usize, Vec<String>> {
 
         // Look for single-line comments
         if let Some(comment_start) = line.find("//") {
-            let comment = &line[comment_start + 2..].trim();
+            let comment = &line[comment_start + COMMENT_PREFIX_LEN..].trim();
 
             // Check for zircop-ignore-next-line
             if let Some(rest) = comment.strip_prefix("zircop-ignore-next-line:") {

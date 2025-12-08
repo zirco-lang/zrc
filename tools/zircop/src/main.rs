@@ -55,7 +55,7 @@
 mod build_info;
 mod cli;
 
-use std::{error::Error, fmt, path::Path, process};
+use std::{collections::HashSet, error::Error, fmt, path::Path, process};
 
 use clap::Parser;
 use cli::Cli;
@@ -107,6 +107,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             let in_code_ignores = ignore::parse_ignore_directives(&source_content);
             let line_lookup = LineLookup::new(&source_content);
 
+            // Convert CLI allowed lints to a HashSet for O(1) lookups
+            let cli_allowed: HashSet<&str> = cli.allowed_lints.iter().map(String::as_str).collect();
+
             // Filter out allowed lints (both CLI and in-code)
             let filtered_diagnostics: Vec<_> = diagnostics
                 .into_iter()
@@ -114,9 +117,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     let lint_name = diag.kind().value().name();
 
                     // Check CLI allows
-                    if cli.allowed_lints.contains(&lint_name.to_string())
-                        || cli.allowed_lints.contains(&"all".to_string())
-                    {
+                    if cli_allowed.contains(lint_name) || cli_allowed.contains("all") {
                         return false;
                     }
 
@@ -127,8 +128,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     let line = line_and_col.line as usize;
 
                     if let Some(ignored_lints) = in_code_ignores.get(&line)
-                        && (ignored_lints.contains(&lint_name.to_string())
-                            || ignored_lints.contains(&"all".to_string()))
+                        && (ignored_lints
+                            .iter()
+                            .any(|lint| lint == lint_name || lint == "all"))
                     {
                         return false;
                     }
