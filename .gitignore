@@ -3,3 +3,4 @@ lcov.info
 .direnv
 /examples/**/out
 /result
+/libzr/dist
