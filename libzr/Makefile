@@ -25,3 +25,11 @@ out:
 .PHONY: clean
 clean:
 	rm -rf $(OUTDIR)
+
+.PHONY: lint
+lint:
+	@failed=0; \
+	for file in $(ZR_SOURCES); do \
+	  $(ZIRCOP) $(ZIRCOPFLAGS) $$file || failed=1; \
+	done; \
+	exit $$failed
