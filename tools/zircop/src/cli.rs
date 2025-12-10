@@ -23,7 +23,25 @@ pub struct Cli {
     pub include_paths: Vec<PathBuf>,
 }
 
+/// Resolve a path to an absolute path based on the current working directory.
+///
+/// If the path is relative, it is resolved to an absolute path by joining it
+/// with the current working directory and canonicalizing it. If the path is
+/// already absolute or canonicalization fails, the path is returned as-is.
+fn resolve_include_path(path: &Path) -> PathBuf {
+    if path.is_relative() {
+        env::current_dir()
+            .ok()
+            .and_then(|cwd| cwd.join(path).canonicalize().ok())
+            .unwrap_or_else(|| path.to_path_buf())
+    } else {
+        path.to_path_buf()
+    }
+}
+
 /// Get the include paths from the CLI environment and -I arguments
+///
+/// Relative paths are resolved relative to the current working directory.
 pub fn get_include_paths(cli: &Cli) -> Vec<&'static Path> {
     // append paths in the following order:
     // 1. CLI
@@ -31,15 +49,17 @@ pub fn get_include_paths(cli: &Cli) -> Vec<&'static Path> {
     let mut include_paths: Vec<&'static Path> = Vec::new();
 
     for path in &cli.include_paths {
+        let resolved_path = resolve_include_path(path);
         // SAFETY: we leak the PathBuf to get a 'static lifetime
-        let static_path: &'static Path = Box::leak(path.clone().into_boxed_path());
+        let static_path: &'static Path = Box::leak(resolved_path.clone().into_boxed_path());
         include_paths.push(static_path);
     }
 
     if let Ok(env_paths) = env::var("ZIRCO_INCLUDE_PATH") {
         for path_str in env::split_paths(&env_paths) {
+            let resolved_path = resolve_include_path(&path_str);
             // SAFETY: we leak the PathBuf to get a 'static lifetime
-            let static_path: &'static Path = Box::leak(path_str.into_boxed_path());
+            let static_path: &'static Path = Box::leak(resolved_path.into_boxed_path());
             include_paths.push(static_path);
         }
     }
