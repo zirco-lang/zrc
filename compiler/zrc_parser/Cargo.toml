@@ -8,7 +8,7 @@ edition = "2024"
 [dependencies]
 derive_more = { version = "2.0.1", features = ["display"] }
 lalrpop-util = { version = "0.22.0" }
-logos = "0.15.0"
+logos = "0.16.0"
 zrc_diagnostics = { path = "../zrc_diagnostics" }
 zrc_utils = { path = "../zrc_utils" }
 zrc_preprocessor = { path = "../zrc_preprocessor" }
