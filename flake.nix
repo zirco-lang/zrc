@@ -74,7 +74,9 @@
           };
 
         packages.libzr =
-          let zpkgs = self.packages.${system}; in
+          let
+            zpkgs = self.packages.${system};
+          in
           pkgs.stdenv.mkDerivation {
             pname = "libzr";
             version = "0.1.0";
