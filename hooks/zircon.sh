@@ -1,3 +1,4 @@
+#!/bin/sh
 # Zircon installation hook for the zrc compiler
 # This script is invoked by Zircon to compile the zrc source files.
 # CWD is the repo root, and ZIRCON_TOOLCHAIN_DIR is the destination.
