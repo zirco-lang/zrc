@@ -7,14 +7,23 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     naersk.url = "github:nix-community/naersk";
   };
-  
-  outputs = { self, nixpkgs, flake-utils, rust-overlay, naersk }:
-    flake-utils.lib.eachDefaultSystem(system:
+
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      rust-overlay,
+      naersk,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         overlays = [ rust-overlay.overlays.default ];
         pkgs = import nixpkgs { inherit system overlays; };
         llvm = pkgs.llvmPackages_20;
-      in {
+      in
+      {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             rust-bin.stable.latest.default
@@ -26,17 +35,22 @@
             pkg-config
             libffi
             libxml2
+
+            # for formatting .nix files
+            nixfmt-tree
           ];
 
           LLVM_SYS_201_PREFIX = llvm.llvm.dev;
         };
 
         packages.zrc =
-          let naerskLib = naersk.lib.${system}.override {
-            cargo = pkgs.rust-bin.stable.latest.default;
-            rustc = pkgs.rust-bin.stable.latest.default;
-          };
-          in naerskLib.buildPackage {
+          let
+            naerskLib = naersk.lib.${system}.override {
+              cargo = pkgs.rust-bin.stable.latest.default;
+              rustc = pkgs.rust-bin.stable.latest.default;
+            };
+          in
+          naerskLib.buildPackage {
             pname = "zrc";
             src = ./.;
             buildInputs = with pkgs; [
@@ -58,7 +72,7 @@
             setupHook = ./hooks/nix.sh;
 
             LLVM_SYS_201_PREFIX = llvm.llvm.dev;
-         };
+          };
 
         packages.default = self.packages.${system}.zrc;
       }
