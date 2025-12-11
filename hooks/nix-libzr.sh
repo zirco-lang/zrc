@@ -4,5 +4,5 @@
 # Get the directory of THIS script
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:$HOOK_DIR/../libzr/lib"
-export ZIRCO_INCLUDE_PATH="${ZIRCO_INCLUDE_PATH:-}:$HOOK_DIR/../libzr/include"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:$HOOK_DIR/../lib"
+export ZIRCO_INCLUDE_PATH="${ZIRCO_INCLUDE_PATH:-}:$HOOK_DIR/../include"
