@@ -51,16 +51,11 @@
               makeWrapper
             ];
 
-
             postInstall = ''
               cp -r $src/include $out/include
-              
-              wrapProgram $out/bin/zrc \
-                --set ZIRCO_INCLUDE_PATH $out/include
-
-              wrapProgram $out/bin/zircop \
-                --set ZIRCO_INCLUDE_PATH $out/include
             '';
+
+            setupHook = ./hooks/nix.sh;
 
             LLVM_SYS_201_PREFIX = llvm.llvm.dev;
          };
