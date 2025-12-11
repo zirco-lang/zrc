@@ -17,7 +17,7 @@ cargo build --release
 cp target/release/zrc "$ZIRCON_BIN_DIR/"
 cp target/release/zircop "$ZIRCON_BIN_DIR/"
 
-cp -r include "$ZIRCON_INCLUDE_DIR/"
+cp -r include/* "$ZIRCON_INCLUDE_DIR/"
 
 cat > "$ZIRCON_BIN_DIR/bin.sh" << EOF
 #!/bin/sh
