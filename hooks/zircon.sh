@@ -21,8 +21,8 @@ cp -r include/* "$ZIRCON_INCLUDE_DIR/"
 
 cat > "$ZIRCON_TOOLCHAIN_DIR/env.sh" << EOF
 #!/bin/sh
-export PATH="$ZIRCON_BIN_DIR:\$PATH"
-export ZIRCO_INCLUDE_PATH="$ZIRCON_INCLUDE_DIR:\$ZIRCO_INCLUDE_PATH"
+export PATH="$HOME/.zircon/toolchains/current/bin:\$PATH"
+export ZIRCO_INCLUDE_PATH="$HOME/.zircon/toolchains/current/include:\$ZIRCO_INCLUDE_PATH"
 EOF
 
 chmod +x "$ZIRCON_TOOLCHAIN_DIR/env.sh"
