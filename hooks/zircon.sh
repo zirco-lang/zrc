@@ -22,7 +22,7 @@ cp target/release/zircop "$ZIRCON_BIN_DIR/"
 cp -r include/* "$ZIRCON_INCLUDE_DIR/"
 
 # build std using the fresh compiler
-make -C libzr all ZRC=./target/release/zrc
+make -C libzr all ZRC=$ZIRCON_BIN_DIR/zrc
 
 cp libzr/dist/libzr.a "$ZIRCON_LIBZR_DIR/lib/"
 cp libzr/dist/libzr.so "$ZIRCON_LIBZR_DIR/lib/"
