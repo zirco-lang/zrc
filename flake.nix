@@ -48,17 +48,42 @@
               pkg-config
               libffi
               libxml2
-              makeWrapper
             ];
 
             postInstall = ''
               cp -r $src/include $out/include
             '';
 
-            setupHook = ./hooks/nix.sh;
+            setupHook = ./hooks/nix-zrc.sh;
 
             LLVM_SYS_201_PREFIX = llvm.llvm.dev;
          };
+
+        packages.libzr =
+          let zpkgs = self.packages.${system}; in
+          pkgs.stdenv.mkDerivation {
+            pname = "libzr";
+            version = "0.1.0";
+            src = ./libzr;
+            buildInputs = with pkgs; [
+              zpkgs.zrc
+              llvm.clang
+            ];
+
+            buildPhase = ''
+              make -C $src all OUTDIR=$PWD/dist ZRC=${zpkgs.zrc}/bin/zrc
+            '';
+
+            installPhase = ''
+              mkdir -p $out/lib
+              cp dist/libzr.a $out/lib/
+              cp dist/libzr.so $out/lib/
+              mkdir -p $out/include
+              cp -r include/* $out/include/
+            '';
+
+            setupHook = ./hooks/nix-libzr.sh;
+          };
 
         packages.default = self.packages.${system}.zrc;
       }

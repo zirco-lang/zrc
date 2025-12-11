@@ -12,8 +12,8 @@ ZR_OUTPUTS ?= $(ZR_SOURCES:$(SRCDIR)/%.zr=$(OUTDIR)/%.o)
 
 # make .so and .a files
 all: out $(ZR_OUTPUTS)
-	clang -shared -o $(OUTDIR)/libzrc.so $(ZR_OUTPUTS)
-	ar rcs $(OUTDIR)/libzrc.a $(ZR_OUTPUTS)
+	clang -shared -o $(OUTDIR)/libzr.so $(ZR_OUTPUTS)
+	ar rcs $(OUTDIR)/libzr.a $(ZR_OUTPUTS)
 
 $(OUTDIR)/%.o: $(SRCDIR)/%.zr
 	$(ZRC) --emit object $(ZRFLAGS) -o $@ $<
