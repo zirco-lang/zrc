@@ -115,7 +115,7 @@ jobs:
               run: chmod +x ./artifacts/zrc
             - name: Add zrc to PATH
               run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
-            - name: Build and test all examples
+            - name: Build libzr
               run: make -j2 -C libzr all ZRC=zrc
     lint-std:
         needs: build
@@ -138,5 +138,5 @@ jobs:
                   chmod +x ./artifacts/zircop
             - name: Add zrc and zircop to PATH
               run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
-            - name: Lint all examples
+            - name: Lint source for libzr
               run: make -j2 -C libzr lint ZIRCOP=zircop
