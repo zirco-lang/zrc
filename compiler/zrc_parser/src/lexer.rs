@@ -286,10 +286,10 @@ pub enum Tok<'input> {
 
     // === COMPARISON OPERATORS ===
     // Silly little error we raise if JavaScript-like equality operators are used
-    #[token("===", |_lex| {
+    #[token("===", |_| {
         Err::<Tok,InternalLexicalError>(InternalLexicalError::JavascriptUserDetected("=="))
     })]
-    #[token("!==", |_lex| {
+    #[token("!==", |_| {
         Err::<Tok,InternalLexicalError>(InternalLexicalError::JavascriptUserDetected("!="))
     })]
     /// The token `==`
@@ -581,14 +581,14 @@ pub enum Tok<'input> {
             contents[0].clone()
         })
     })]
-    #[regex(r"'([^'\\]|\\.)", |_lex| {
+    #[regex(r"'([^'\\]|\\.)", |_| {
         Err(InternalLexicalError::UnterminatedStringLiteral)
     })]
     #[display("'{_0}'")]
     CharLiteral(StringTok<'input>),
     /// Any string literal
     #[regex(r#""([^"\\]|\\.)*""#, |lex| lex_string_contents(lex).map(ZrcString))]
-    #[regex(r#""([^"\\]|\\.)*"#, |_lex| {
+    #[regex(r#""([^"\\]|\\.)*"#, |_| {
         Err(InternalLexicalError::UnterminatedStringLiteral)
     })]
     #[display("\"{_0}\"")]
