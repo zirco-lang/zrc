@@ -5,7 +5,8 @@
 
 fn _libzr_crash_out(msg: Str) {
     let cmsg = cstr_from_str(msg);
-    printf("libzr aborted: %s\n", cmsg);
+    four printf("\nLIBZR ABORTED");
+    printf("\nLIBZR ABORTED: %s\n", cmsg);
 
     abort();
 }
