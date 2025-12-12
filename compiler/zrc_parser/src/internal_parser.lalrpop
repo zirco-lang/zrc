@@ -132,18 +132,20 @@ Declaration: Declaration<'input> = {
 };
 
 FunctionDeclaration: Declaration<'input> = {
-    "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?>
+    <local:"local"?> "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?>
         <s:Spanned<("{" <StmtList?> "}")>> => Declaration::FunctionDeclaration {
         name: i,
         parameters: a.map(|inner| inner.unwrap_or(ArgumentDeclarationList::empty())),
         return_type: r,
         body: Some(s.map(|inner| inner.unwrap_or(Vec::new()))),
+        is_local: local.is_some(),
     },
-    "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?> ";" => Declaration::FunctionDeclaration {
+    <local:"local"?> "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?> ";" => Declaration::FunctionDeclaration {
         name: i,
         parameters: a.map(|inner| inner.unwrap_or(ArgumentDeclarationList::empty())),
         return_type: r,
         body: None,
+        is_local: local.is_some(),
     }
 };
 
@@ -511,6 +513,7 @@ extern {
         "let" => lexer::Tok::Let,
         "const" => lexer::Tok::Const,
         "fn" => lexer::Tok::Fn,
+        "local" => lexer::Tok::Local,
         "as" => lexer::Tok::As,
         "struct" => lexer::Tok::Struct,
         "union" => lexer::Tok::Union,

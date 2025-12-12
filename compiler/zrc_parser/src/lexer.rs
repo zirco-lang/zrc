@@ -516,6 +516,10 @@ pub enum Tok<'input> {
     #[token("fn")]
     #[display("fn")]
     Fn,
+    /// The keyword `local`
+    #[token("local")]
+    #[display("local")]
+    Local,
     /// The keyword `as`
     #[token("as")]
     #[display("as")]

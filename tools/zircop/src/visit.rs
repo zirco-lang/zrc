@@ -267,6 +267,7 @@ pub trait SyntacticVisit<'input> {
                 parameters,
                 return_type,
                 body,
+                is_local: _,
             } => {
                 self.visit_fn_decl(name, parameters, return_type, body);
             }
@@ -531,6 +532,7 @@ pub trait SemanticVisit<'input, 'gs> {
                 parameters,
                 return_type,
                 body,
+                is_local: _,
             } => {
                 self.visit_tc_fn_decl(name, parameters, return_type, body);
             }

@@ -106,6 +106,8 @@ pub enum TypedDeclaration<'input, 'gs> {
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
         body: Option<Spanned<BlockMetadata<'input, 'gs>>>,
+        /// Whether this function has local (internal) linkage.
+        is_local: bool,
     },
     /// A global let declaration
     GlobalLetDeclaration(Vec<Spanned<LetDeclaration<'input>>>),
@@ -377,9 +379,11 @@ impl Display for TypedDeclaration<'_, '_> {
                 parameters,
                 return_type,
                 body: Some(body),
+                is_local,
             } => write!(
                 f,
-                "fn {name}({parameters}) -> {return_type} {{\n{}\n}}",
+                "{}fn {name}({parameters}) -> {return_type} {{\n{}\n}}",
+                if *is_local { "local " } else { "" },
                 body.value()
                     .stmts
                     .iter()
@@ -392,7 +396,8 @@ impl Display for TypedDeclaration<'_, '_> {
                 parameters,
                 return_type,
                 body: None,
-            } => write!(f, "fn {name}({parameters}) -> {return_type};"),
+                is_local,
+            } => write!(f, "{}fn {name}({parameters}) -> {return_type};", if *is_local { "local " } else { "" }),
             Self::GlobalLetDeclaration(list) => {
                 write!(
                     f,

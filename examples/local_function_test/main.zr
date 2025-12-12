@@ -1,0 +1,23 @@
+#include <stdio.zh>
+
+// This helper function should have internal linkage
+local fn helper(x: i32) -> i32 {
+    let result: i32 = x * 2;
+    printf("Helper called with: %d\n", x);
+    return result;
+}
+
+// A regular function with external linkage
+fn public_helper(x: i32) -> i32 {
+    return x * 3;
+}
+
+fn main() -> i32 {
+    let result: i32 = helper(21);
+    printf("Result: %d\n", result);
+    
+    let result2: i32 = public_helper(10);
+    printf("Public result: %d\n", result2);
+    
+    return 0;
+}

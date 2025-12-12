@@ -225,6 +225,8 @@ pub enum Declaration<'input> {
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
         body: Option<Spanned<Vec<Stmt<'input>>>>,
+        /// Whether this function has local (internal) linkage.
+        is_local: bool,
     },
     /// A named type alias (`type U = T;`)
     /// This is also used for structs and unions.
@@ -245,9 +247,11 @@ impl Display for Declaration<'_> {
                 parameters,
                 return_type: Some(return_ty),
                 body: Some(body),
+                is_local,
             } => write!(
                 f,
-                "fn {name}({parameters}) -> {return_ty} {{\n{}\n}}",
+                "{}fn {name}({parameters}) -> {return_ty} {{\n{}\n}}",
+                if *is_local { "local " } else { "" },
                 body.value()
                     .iter()
                     .map(|stmt| indent_lines(&stmt.to_string(), "    "))
@@ -259,15 +263,18 @@ impl Display for Declaration<'_> {
                 parameters,
                 return_type: Some(return_ty),
                 body: None,
-            } => write!(f, "fn {name}({parameters}) -> {return_ty};"),
+                is_local,
+            } => write!(f, "{}fn {name}({parameters}) -> {return_ty};", if *is_local { "local " } else { "" }),
             Self::FunctionDeclaration {
                 name,
                 parameters,
                 return_type: None,
                 body: Some(body),
+                is_local,
             } => write!(
                 f,
-                "fn {name}({parameters}) {{\n{}\n}}",
+                "{}fn {name}({parameters}) {{\n{}\n}}",
+                if *is_local { "local " } else { "" },
                 body.value()
                     .iter()
                     .map(|stmt| indent_lines(&stmt.to_string(), "    "))
@@ -279,7 +286,8 @@ impl Display for Declaration<'_> {
                 parameters,
                 return_type: None,
                 body: None,
-            } => write!(f, "fn {name}({parameters});"),
+                is_local,
+            } => write!(f, "{}fn {name}({parameters});", if *is_local { "local " } else { "" }),
 
             Self::TypeAliasDeclaration { name, ty } => write!(f, "type {name} = {ty};"),
 

@@ -31,6 +31,7 @@ pub fn register_function_declaration<'input>(
     parameters: Spanned<ArgumentDeclarationList<'input>>,
     return_type: Option<Type<'input>>,
     body: Option<Spanned<Vec<Stmt<'input>>>>,
+    _is_local: bool,
 ) -> Result<(), Diagnostic> {
     let resolved_return_type = return_type
         .clone()
@@ -155,6 +156,7 @@ pub fn finalize_function_declaration<'input, 'gs>(
     parameters: Spanned<ArgumentDeclarationList<'input>>,
     return_type: Option<Type<'input>>,
     body: Option<Spanned<Vec<Stmt<'input>>>>,
+    is_local: bool,
 ) -> Result<Option<TypedDeclaration<'input, 'gs>>, Diagnostic> {
     let resolved_return_type = return_type
         .clone()
@@ -210,6 +212,7 @@ pub fn finalize_function_declaration<'input, 'gs>(
         } else {
             None
         },
+        is_local,
     }))
 }
 
@@ -275,7 +278,8 @@ mod tests {
                             0
                         ))],
                         0
-                    ))
+                    )),
+                    is_local: false,
                 }
             )
             .is_ok()
@@ -363,6 +367,7 @@ mod tests {
                 ),
                 return_type: Some(Type(spanned_test!(91, TypeKind::Identifier("usize"), 96))),
                 body: None,
+                is_local: false,
             },
         );
 

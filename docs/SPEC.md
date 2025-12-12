@@ -199,9 +199,10 @@ The following identifiers are reserved keywords and cannot be used as variable o
 
 ```
 as          break       continue    default     do
-else        false       fn          for         if
-let         return      sizeof      struct      switch
-true        type        union       while       four
+else        false       fn          for         four
+if          let         local       return      sizeof
+struct      switch      true        type        union
+while
 ```
 
 ### 2.6 Identifiers
@@ -1412,6 +1413,23 @@ fn print_hello() {
 
 **Syntax**: `fn name(parameters) -> return_type { body }`
 
+**Local Functions** (with internal linkage):
+
+Functions can be declared with the `local` keyword to restrict their visibility to the current compilation unit:
+
+```zirco
+local fn helper(x: i32) -> i32 {
+    return x * 2;
+}
+```
+
+**Rules**:
+
+-   Local functions have internal linkage (similar to C's `static` keyword)
+-   They are not visible outside the current compilation unit
+-   Cannot be called from other files
+-   Useful for implementation details that should not be exported
+
 ### 7.2 Function Parameters
 
 Parameters are declared with a name and type:
@@ -1585,6 +1603,23 @@ The following behaviors are undefined:
 
 ### 8.7 Linkage
 
+Zirco supports two types of function linkage:
+
+**External Linkage** (default):
+
+-   Functions are visible to other compilation units
+-   Can be called from other files when linked
+-   Used for public APIs and `main` function
+
+**Internal Linkage** (`local` functions):
+
+-   Functions declared with `local` keyword have internal linkage
+-   Not visible outside the current compilation unit
+-   Similar to C's `static` functions
+-   Used for private helper functions
+
+**External C Functions**:
+
 -   Functions can be declared as external to link with C libraries
 -   The linker combines compiled object files into executables
 -   Linking behavior follows the platform's standard
@@ -1623,9 +1658,9 @@ This section provides a high-level grammar summary. For complete details, refer 
 
 ```
 keyword ::= "as" | "break" | "continue" | "default" | "do" | "else"
-          | "false" | "fn" | "for" | "if" | "let" | "return"
-          | "sizeof" | "struct" | "switch" | "true" | "type"
-          | "union" | "while" | "four"
+          | "false" | "fn" | "for" | "four" | "if" | "let" | "local"
+          | "return" | "sizeof" | "struct" | "switch" | "true" | "type"
+          | "union" | "while"
 
 identifier ::= [a-zA-Z_][a-zA-Z0-9_]*
 

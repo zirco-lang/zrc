@@ -67,12 +67,14 @@ pub fn register_declaration_value<'input>(
             parameters,
             return_type,
             body,
+            is_local,
         } => func::register_function_declaration(
             global_scope,
             *name,
             parameters.clone(),
             return_type.clone(),
             body.clone(),
+            *is_local,
         ),
 
         AstDeclaration::TypeAliasDeclaration { name, ty } => {
@@ -125,7 +127,8 @@ pub fn finalize_declaration_value<'input, 'gs>(
             parameters,
             return_type,
             body,
-        } => func::finalize_function_declaration(global_scope, name, parameters, return_type, body),
+            is_local,
+        } => func::finalize_function_declaration(global_scope, name, parameters, return_type, body, is_local),
 
         AstDeclaration::TypeAliasDeclaration { .. } => Ok(None),
 

@@ -1,0 +1,3 @@
+Helper called with: 21
+Result: 42
+Public result: 30
