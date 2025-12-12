@@ -1,4 +1,4 @@
-#include <stdio.zh>
+#include <libc/stdio.zh>
 
 fn main(argc: usize, argv: **u8) -> i32 {
     printf("Argument count: %d\n", argc);

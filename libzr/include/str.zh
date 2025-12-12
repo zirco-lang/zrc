@@ -1,0 +1,12 @@
+#pragma once
+
+struct Str {
+    len: usize,
+    ptr: *u8,
+}
+
+fn str_from_cstr(s: *u8) -> Str;
+fn cstr_from_str(s: Str) -> *u8;
+fn str_clone(s: Str) -> Str;
+fn str_equal(a: Str, b: Str) -> bool;
+fn str_slice(s: Str, start: usize, end: usize) -> Str;

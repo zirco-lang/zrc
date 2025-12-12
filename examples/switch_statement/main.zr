@@ -1,4 +1,4 @@
-#include <stdio.zh>
+#include <libc/stdio.zh>
 
 fn main() -> i32 {
     let day: i32 = 1;

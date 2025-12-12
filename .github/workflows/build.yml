@@ -95,3 +95,48 @@ jobs:
               run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
             - name: Lint all examples
               run: make -j2 -C examples lint ZIRCOP=zircop
+    build-std:
+        needs: build
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  # Make sure the actual branch is checked out when running on pull requests
+                  ref: ${{ github.head_ref }}
+                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+            - name: Download build artifact
+              uses: actions/download-artifact@v6
+              with:
+                  name: zrc-debug
+                  path: ./artifacts
+            - name: Make zrc executable
+              run: chmod +x ./artifacts/zrc
+            - name: Add zrc to PATH
+              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
+            - name: Build libzr
+              run: make -j2 -C libzr all ZRC=zrc
+    lint-std:
+        needs: build
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  # Make sure the actual branch is checked out when running on pull requests
+                  ref: ${{ github.head_ref }}
+                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+            - name: Download build artifact
+              uses: actions/download-artifact@v6
+              with:
+                  name: zircop-debug
+                  path: ./artifacts
+            - name: Make zircop executable
+              run: |
+                  chmod +x ./artifacts/zircop
+            - name: Add zrc and zircop to PATH
+              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
+            - name: Lint source for libzr
+              run: make -j2 -C libzr lint ZIRCOP=zircop
