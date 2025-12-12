@@ -267,7 +267,7 @@ pub trait SyntacticVisit<'input> {
                 parameters,
                 return_type,
                 body,
-                ..
+                .. // Other fields (like is_local) are not relevant to the visitor
             } => {
                 self.visit_fn_decl(name, parameters, return_type, body);
             }
@@ -532,7 +532,7 @@ pub trait SemanticVisit<'input, 'gs> {
                 parameters,
                 return_type,
                 body,
-                ..
+                .. // Other fields (like is_local) are not relevant to the visitor
             } => {
                 self.visit_tc_fn_decl(name, parameters, return_type, body);
             }
