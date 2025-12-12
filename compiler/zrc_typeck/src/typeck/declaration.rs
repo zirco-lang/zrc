@@ -128,7 +128,14 @@ pub fn finalize_declaration_value<'input, 'gs>(
             return_type,
             body,
             is_local,
-        } => func::finalize_function_declaration(global_scope, name, parameters, return_type, body, is_local),
+        } => func::finalize_function_declaration(
+            global_scope,
+            name,
+            parameters,
+            return_type,
+            body,
+            is_local,
+        ),
 
         AstDeclaration::TypeAliasDeclaration { .. } => Ok(None),
 

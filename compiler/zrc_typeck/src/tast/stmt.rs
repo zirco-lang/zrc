@@ -397,7 +397,11 @@ impl Display for TypedDeclaration<'_, '_> {
                 return_type,
                 body: None,
                 is_local,
-            } => write!(f, "{}fn {name}({parameters}) -> {return_type};", if *is_local { "local " } else { "" }),
+            } => write!(
+                f,
+                "{}fn {name}({parameters}) -> {return_type};",
+                if *is_local { "local " } else { "" }
+            ),
             Self::GlobalLetDeclaration(list) => {
                 write!(
                     f,

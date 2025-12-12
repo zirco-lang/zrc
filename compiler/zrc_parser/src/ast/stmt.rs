@@ -264,7 +264,11 @@ impl Display for Declaration<'_> {
                 return_type: Some(return_ty),
                 body: None,
                 is_local,
-            } => write!(f, "{}fn {name}({parameters}) -> {return_ty};", if *is_local { "local " } else { "" }),
+            } => write!(
+                f,
+                "{}fn {name}({parameters}) -> {return_ty};",
+                if *is_local { "local " } else { "" }
+            ),
             Self::FunctionDeclaration {
                 name,
                 parameters,
@@ -287,7 +291,11 @@ impl Display for Declaration<'_> {
                 return_type: None,
                 body: None,
                 is_local,
-            } => write!(f, "{}fn {name}({parameters});", if *is_local { "local " } else { "" }),
+            } => write!(
+                f,
+                "{}fn {name}({parameters});",
+                if *is_local { "local " } else { "" }
+            ),
 
             Self::TypeAliasDeclaration { name, ty } => write!(f, "type {name} = {ty};"),
 

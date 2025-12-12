@@ -357,12 +357,12 @@ fn cg_program_without_optimization<'ctx>(
                         .as_slice(),
                     parameters.value().is_variadic(),
                 );
-                
+
                 // Set linkage based on is_local flag
                 if is_local {
                     fn_value.set_linkage(inkwell::module::Linkage::Internal);
                 }
-                
+
                 global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
                 // must come after the insert call so that recursion is valid
                 let mut fn_scope = global_scope.clone();
@@ -492,12 +492,12 @@ fn cg_program_without_optimization<'ctx>(
                         .as_slice(),
                     parameters.value().is_variadic(),
                 );
-                
+
                 // Set linkage based on is_local flag
                 if is_local {
                     fn_value.set_linkage(inkwell::module::Linkage::Internal);
                 }
-                
+
                 global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
             }
             TypedDeclaration::GlobalLetDeclaration(declarations) => {
