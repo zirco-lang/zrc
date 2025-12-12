@@ -1,0 +1,5 @@
+#pragma once
+
+// This header is located here to prevent use by libzr users.
+
+fn _libzr_crash_out(msg: Str);

@@ -1,0 +1,10 @@
+#include "internal.zh"
+#include <stdlib.zh>
+#include <stdio.zh>
+
+fn _libzr_crash_out(msg: Str) {
+    let cmsg = cstr_from_str(msg);
+    printf("libzr aborted: %s\n", cmsg);
+
+    abort();
+}
