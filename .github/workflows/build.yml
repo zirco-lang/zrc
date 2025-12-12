@@ -39,13 +39,13 @@ jobs:
               with:
                   command: build
             - name: Upload zrc build artifact
-              uses: actions/upload-artifact@v5
+              uses: actions/upload-artifact@v6
               with:
                   name: zrc-debug
                   path: target/debug/zrc
                   retention-days: 1
             - name: Upload zircop build artifact
-              uses: actions/upload-artifact@v5
+              uses: actions/upload-artifact@v6
               with:
                   name: zircop-debug
                   path: target/debug/zircop
@@ -62,7 +62,7 @@ jobs:
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
             - name: Download build artifact
-              uses: actions/download-artifact@v6
+              uses: actions/download-artifact@v7
               with:
                   name: zrc-debug
                   path: ./artifacts
@@ -84,7 +84,7 @@ jobs:
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
             - name: Download build artifact
-              uses: actions/download-artifact@v6
+              uses: actions/download-artifact@v7
               with:
                   name: zircop-debug
                   path: ./artifacts
@@ -107,7 +107,7 @@ jobs:
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
             - name: Download build artifact
-              uses: actions/download-artifact@v6
+              uses: actions/download-artifact@v7
               with:
                   name: zrc-debug
                   path: ./artifacts
@@ -129,7 +129,7 @@ jobs:
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
             - name: Download build artifact
-              uses: actions/download-artifact@v6
+              uses: actions/download-artifact@v7
               with:
                   name: zircop-debug
                   path: ./artifacts
