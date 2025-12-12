@@ -15,6 +15,9 @@ all: out $(ZR_OUTPUTS)
 	clang -shared -o $(OUTDIR)/libzr.so $(ZR_OUTPUTS)
 	ar rcs $(OUTDIR)/libzr.a $(ZR_OUTPUTS)
 
+all-opt: ZRFLAGS += -O3
+all-opt: all
+
 $(OUTDIR)/%.o: $(SRCDIR)/%.zr
 	$(ZRC) --emit object $(ZRFLAGS) -o $@ $<
 

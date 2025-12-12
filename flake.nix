@@ -87,7 +87,7 @@
             ];
 
             buildPhase = ''
-              make -C $src all OUTDIR=$PWD/dist ZRC=${zpkgs.zrc}/bin/zrc
+              make -C $src all-opt OUTDIR=$PWD/dist ZRC=${zpkgs.zrc}/bin/zrc
             '';
 
             installPhase = ''
