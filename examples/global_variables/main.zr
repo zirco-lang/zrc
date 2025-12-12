@@ -1,4 +1,4 @@
-#include <stdio.zh>
+#include <libc/stdio.zh>
 
 // Global constants with initializers
 let MAX_COUNT: i32 = 100;

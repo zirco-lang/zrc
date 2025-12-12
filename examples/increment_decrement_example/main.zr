@@ -1,6 +1,6 @@
 // Example demonstrating prefix and postfix increment/decrement operators
 
-#include <stdio.zh>
+#include <libc/stdio.zh>
 
 fn print_num(n: i32) {
     let neg = n < 0;

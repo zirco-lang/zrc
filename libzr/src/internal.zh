@@ -1,4 +1,5 @@
 #pragma once
+#include <str.zh>
 
 // This header is located here to prevent use by libzr users.
 

@@ -1,6 +1,7 @@
 #include "internal.zh"
-#include <stdlib.zh>
-#include <stdio.zh>
+#include <str.zh>
+#include <libc/stdlib.zh>
+#include <libc/stdio.zh>
 
 fn _libzr_crash_out(msg: Str) {
     let cmsg = cstr_from_str(msg);

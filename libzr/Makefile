@@ -2,7 +2,7 @@ MACOSX_DEPLOYMENT_TARGET ?= 13.0
 
 ZRC ?= ../target/debug/zrc
 ZIRCOP ?= ../target/debug/zircop
-ZRFLAGS ?= -I./include/
+ZRFLAGS ?= -I./include/ -I../include/
 ZIRCOPFLAGS ?= -I./include/
 OUTDIR ?= ./dist
 SRCDIR ?= ./src

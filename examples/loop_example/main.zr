@@ -1,4 +1,4 @@
-#include <stdio.zh>
+#include <libc/stdio.zh>
 
 fn print_numbers(n: i32) {
     for (let i = 1; i <= n; i = i + 1) {

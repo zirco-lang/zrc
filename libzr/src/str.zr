@@ -1,7 +1,7 @@
 #include "internal.zh"
 #include <str.zh>
-#include <stdlib.zh>
-#include <string.zh>
+#include <libc/stdlib.zh>
+#include <libc/string.zh>
 
 fn str_from_cstr(s: *u8) -> Str {
     return Str {
