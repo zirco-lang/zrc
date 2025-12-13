@@ -114,7 +114,7 @@ pub fn type_expr_cast<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_t = type_expr(scope, x)?;
     let ty_span = ty.0.span();
-    let resolved_ty = resolve_type(scope.types, ty)?;
+    let resolved_ty = resolve_type(scope, ty)?;
 
     // Handle {int} type resolution
     if matches!(x_t.inferred_type, TastType::Int) {
@@ -177,7 +177,7 @@ pub fn type_expr_size_of_type<'input>(
     expr_span: Span,
     ty: Type<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    let resolved_ty = resolve_type(scope.types, ty)?;
+    let resolved_ty = resolve_type(scope, ty)?;
     Ok(TypedExpr {
         inferred_type: TastType::Usize,
         kind: TypedExprKind::SizeOf(resolved_ty).in_span(expr_span),
@@ -215,7 +215,7 @@ pub fn type_expr_struct_construction<'input>(
     let is_enum_literal = matches!(ty.0.value(), ParserTypeKind::Enum(_));
 
     // Resolve the type being constructed
-    let resolved_ty = resolve_type(scope.types, ty)?;
+    let resolved_ty = resolve_type(scope, ty)?;
 
     // Check if the resolved type is an enum (desugared into a struct with
     // __discriminant__ and __value__)

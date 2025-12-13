@@ -1,7 +1,7 @@
 //! Defines all possible Zirco compile time diagnostics.
 
 use thiserror::Error;
-use zrc_utils::span::{Span, Spannable};
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 use crate::{Diagnostic, Severity};
 
@@ -162,6 +162,22 @@ impl DiagnosticKind {
     #[must_use]
     #[inline]
     pub fn error_in(self, span: Span) -> Diagnostic {
-        Diagnostic(Severity::Error, self.in_span(span))
+        Diagnostic(Severity::Error, self.in_span(span), vec![])
     }
+}
+
+/// The list of possible hints
+///
+/// Each variant represents a specific kind of diagnostic that can be
+/// raised during the compilation process.
+// These remain as Strings, not 'input str slices, to avoid circular dependencies (it's either use
+// String, or use Tok, because str would be to-string()d from some tokens)
+#[expect(missing_docs)]
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
+pub enum HintKind {
+    #[error("there is a type `{0}`, but expected a value")]
+    FoundTypeWithName(String),
+
+    #[error("a value named `{0}` exists, but it is being used as a type here")]
+    FoundValueWithName(String),
 }

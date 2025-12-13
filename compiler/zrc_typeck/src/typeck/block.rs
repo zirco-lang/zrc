@@ -268,6 +268,7 @@ pub fn type_block<'input, 'gs>(
                                                     expected: return_ty.to_string(),
                                                     got: inferred_return_type.to_string(),
                                                 }),
+                                                vec![],
                                             ));
                                         };
 

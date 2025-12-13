@@ -80,8 +80,11 @@ pub fn register_declaration_value<'input>(
                 return Err(name.error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())));
             }
 
-            let resolved_ty =
-                resolve_type_with_self_reference(&global_scope.types, ty.clone(), name.value())?;
+            let resolved_ty = resolve_type_with_self_reference(
+                &global_scope.create_subscope(),
+                ty.clone(),
+                name.value(),
+            )?;
             global_scope.types.insert(name.value(), resolved_ty);
             Ok(())
         }
