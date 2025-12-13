@@ -57,6 +57,7 @@ pub fn type_for<'input, 'gs>(
                     expected: "bool".to_string(),
                     got: inner_t_cond.inferred_type.to_string(),
                 }),
+            vec![],
         ));
     }
 

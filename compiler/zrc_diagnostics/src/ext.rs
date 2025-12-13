@@ -2,7 +2,7 @@
 
 use zrc_utils::span::{Span, Spannable, Spanned};
 
-use crate::{Diagnostic, DiagnosticKind, Severity};
+use crate::{Diagnostic, DiagnosticKind, Severity, diagnostic_kind::HintKind};
 
 /// A trait to easily create [`Diagnostic`]s from [`Span`]s
 /// See also: [`Spannable`]
@@ -14,7 +14,7 @@ pub trait SpanExt {
 impl SpanExt for Span {
     #[inline]
     fn error(self, kind: DiagnosticKind) -> Diagnostic {
-        Diagnostic(Severity::Error, kind.in_span(self))
+        Diagnostic(Severity::Error, kind.in_span(self), vec![])
     }
 }
 
@@ -28,7 +28,7 @@ pub trait SpannedExt<T> {
 impl<T> SpannedExt<T> for Spanned<T> {
     #[inline]
     fn error(self, f: impl Fn(T) -> DiagnosticKind) -> Diagnostic {
-        Diagnostic(Severity::Error, self.map(f))
+        Diagnostic(Severity::Error, self.map(f), vec![])
     }
 }
 

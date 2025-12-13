@@ -34,7 +34,7 @@ pub fn register_function_declaration<'input>(
 ) -> Result<(), Diagnostic> {
     let resolved_return_type = return_type
         .clone()
-        .map(|ty| resolve_type(&global_scope.types, ty))
+        .map(|ty| resolve_type(&global_scope.create_subscope(), ty))
         .transpose()?
         .unwrap_or_else(TastType::unit);
 
@@ -46,8 +46,11 @@ pub fn register_function_declaration<'input>(
         .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
             Ok(TastArgumentDeclaration {
                 name: parameter.value().name,
-                ty: resolve_type(&global_scope.types, parameter.value().ty.clone())?
-                    .in_span(parameter.span()),
+                ty: resolve_type(
+                    &global_scope.create_subscope(),
+                    parameter.value().ty.clone(),
+                )?
+                .in_span(parameter.span()),
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
@@ -119,10 +122,14 @@ pub fn register_function_declaration<'input>(
         match &parameters.value() {
             ArgumentDeclarationList::NonVariadic(params) if params.is_empty() => {}
             ArgumentDeclarationList::NonVariadic(params) if params.len() == 2 => {
-                let first_param_type =
-                    resolve_type(&global_scope.types, params[0].value().ty.clone())?;
-                let second_param_type =
-                    resolve_type(&global_scope.types, params[1].value().ty.clone())?;
+                let first_param_type = resolve_type(
+                    &global_scope.create_subscope(),
+                    params[0].value().ty.clone(),
+                )?;
+                let second_param_type = resolve_type(
+                    &global_scope.create_subscope(),
+                    params[1].value().ty.clone(),
+                )?;
 
                 if first_param_type != TastType::Usize
                     || second_param_type
@@ -158,7 +165,7 @@ pub fn finalize_function_declaration<'input, 'gs>(
 ) -> Result<Option<TypedDeclaration<'input, 'gs>>, Diagnostic> {
     let resolved_return_type = return_type
         .clone()
-        .map(|ty| resolve_type(&global_scope.types, ty))
+        .map(|ty| resolve_type(&global_scope.create_subscope(), ty))
         .transpose()?
         .unwrap_or_else(TastType::unit);
 
@@ -170,8 +177,11 @@ pub fn finalize_function_declaration<'input, 'gs>(
         .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
             Ok(TastArgumentDeclaration {
                 name: parameter.value().name,
-                ty: resolve_type(&global_scope.types, parameter.value().ty.clone())?
-                    .in_span(parameter.span()),
+                ty: resolve_type(
+                    &global_scope.create_subscope(),
+                    parameter.value().ty.clone(),
+                )?
+                .in_span(parameter.span()),
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;

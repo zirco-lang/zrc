@@ -14,7 +14,7 @@ use ariadne::{Color, Label, Report, ReportKind};
 use derive_more::Display;
 use zrc_utils::span::Spanned;
 
-use crate::DiagnosticKind;
+use crate::{DiagnosticKind, diagnostic_kind::HintKind};
 
 /// The severity of a [`Diagnostic`].
 #[derive(Clone, PartialEq, Eq, Debug, Display)]
@@ -49,11 +49,20 @@ impl Severity {
 /// A diagnostic message produced by one of the zrc tools
 #[derive(Debug, PartialEq, Eq, Display)]
 #[display("{_0}: {_1}")]
-pub struct GenericDiagnostic<Kind>(pub Severity, pub Spanned<Kind>)
+pub struct GenericDiagnostic<Kind, HintKind>(
+    pub Severity,
+    pub Spanned<Kind>,
+    pub Vec<Spanned<HintKind>>,
+)
 where
-    Kind: Debug + PartialEq + Eq + Display;
+    Kind: Debug + PartialEq + Eq + Display,
+    HintKind: Debug + PartialEq + Eq + Display;
 
-impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
+impl<K, HK> GenericDiagnostic<K, HK>
+where
+    K: Debug + PartialEq + Eq + Display,
+    HK: Debug + PartialEq + Eq + Display,
+{
     /// Convert this [`Diagnostic`] to a printable string using ariadne. The
     /// source code is provided directly as a string if it is not read from a
     /// file.
@@ -96,6 +105,11 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
                     .with_message(message)
                     .with_color(self.0.color()),
             )
+            .with_labels(self.2.iter().map(|hint| {
+                Label::new((path, hint.span().start()..hint.span().end()))
+                    .with_message(hint.to_string())
+                    .with_color(Color::Cyan)
+            }))
             .finish();
 
         // Write report to string
@@ -107,17 +121,26 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
         String::from_utf8(buffer).expect("diagnostic output should be valid UTF-8")
     }
 }
-impl<K: Debug + PartialEq + Eq + Display> Error for GenericDiagnostic<K> {}
+impl<K, HK> Error for GenericDiagnostic<K, HK>
+where
+    K: Debug + PartialEq + Eq + Display,
+    HK: Debug + PartialEq + Eq + Display,
+{
+}
 
 /// A diagnostic message produced by the Zirco compiler
 #[derive(Debug, PartialEq, Eq, Display)]
 #[display("{_0}: {_1}")]
-pub struct Diagnostic(pub Severity, pub Spanned<DiagnosticKind>);
+pub struct Diagnostic(
+    pub Severity,
+    pub Spanned<DiagnosticKind>,
+    pub Vec<Spanned<HintKind>>,
+);
 impl Diagnostic {
     /// Get a generic version of this diagnostic
     #[must_use]
-    pub fn as_generic(&self) -> GenericDiagnostic<DiagnosticKind> {
-        GenericDiagnostic(self.0.clone(), self.1.clone())
+    pub fn as_generic(&self) -> GenericDiagnostic<DiagnosticKind, HintKind> {
+        GenericDiagnostic(self.0.clone(), self.1.clone(), self.2.clone())
     }
 
     /// Convert this [`Diagnostic`] to a printable string using ariadne. The
@@ -160,6 +183,7 @@ mod tests {
         let diagnostic = Diagnostic(
             Severity::Error,
             spanned_test!(0, DiagnosticKind::InvalidToken, 4),
+            vec![],
         );
         let display = diagnostic.to_string();
         assert!(display.contains("error"));
@@ -172,6 +196,7 @@ mod tests {
         let diagnostic = Diagnostic(
             Severity::Error,
             spanned!(4, DiagnosticKind::InvalidToken, 5, "<stdin>"),
+            vec![],
         );
         let output = diagnostic.print(Some(source));
 
