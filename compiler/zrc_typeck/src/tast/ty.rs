@@ -13,7 +13,7 @@ use zrc_utils::ordered_fields::OrderedFields;
 use super::stmt::ArgumentDeclarationList;
 
 /// Data attached to a [`Type::Fn`]
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, Clone, Display)]
 #[display("(fn({arguments}) -> {returns})")]
 pub struct Fn<'input> {
     /// The function's arguments
@@ -21,6 +21,14 @@ pub struct Fn<'input> {
     /// The function's return type
     pub returns: Box<Type<'input>>,
 }
+
+impl PartialEq for Fn<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.types_equal(other)
+    }
+}
+
+impl Eq for Fn<'_> {}
 
 impl Fn<'_> {
     /// Compare two function types for semantic equality, ignoring spans.
@@ -535,5 +543,61 @@ mod tests {
 
         // Should not be equal due to variadic vs non-variadic
         assert!(!fn1.types_equal(&fn2));
+    }
+
+    #[test]
+    fn test_fn_types_ignore_parameter_names() {
+        use zrc_utils::spanned_test;
+
+        use super::super::stmt::{ArgumentDeclaration, ArgumentDeclarationList};
+
+        // Create two function types with same types but different parameter names
+        let fn1 = Fn {
+            arguments: ArgumentDeclarationList::NonVariadic(vec![ArgumentDeclaration {
+                name: spanned_test!(5, "s", 6),
+                ty: spanned_test!(8, Type::I32, 11),
+            }]),
+            returns: Box::new(Type::I32),
+        };
+
+        let fn2 = Fn {
+            arguments: ArgumentDeclarationList::NonVariadic(vec![ArgumentDeclaration {
+                name: spanned_test!(55, "x", 56),
+                ty: spanned_test!(58, Type::I32, 61),
+            }]),
+            returns: Box::new(Type::I32),
+        };
+
+        // Should be equal despite different parameter names
+        assert_eq!(fn1, fn2);
+        assert!(fn1 == fn2);
+        assert!(fn1.types_equal(&fn2));
+    }
+
+    #[test]
+    fn test_fn_type_equality_in_type_enum() {
+        use zrc_utils::spanned_test;
+
+        use super::super::stmt::{ArgumentDeclaration, ArgumentDeclarationList};
+
+        // Create two function types with same types but different parameter names
+        let type1 = Type::Fn(Fn {
+            arguments: ArgumentDeclarationList::NonVariadic(vec![ArgumentDeclaration {
+                name: spanned_test!(5, "s", 6),
+                ty: spanned_test!(8, Type::I32, 11),
+            }]),
+            returns: Box::new(Type::I32),
+        });
+
+        let type2 = Type::Fn(Fn {
+            arguments: ArgumentDeclarationList::NonVariadic(vec![ArgumentDeclaration {
+                name: spanned_test!(55, "x", 56),
+                ty: spanned_test!(58, Type::I32, 61),
+            }]),
+            returns: Box::new(Type::I32),
+        });
+
+        // Should be equal despite different parameter names
+        assert_eq!(type1, type2);
     }
 }
