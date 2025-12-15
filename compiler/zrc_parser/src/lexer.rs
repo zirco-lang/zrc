@@ -989,7 +989,7 @@ mod tests {
                     spanned!(
                         2,
                         Err(LexicalError::UnterminatedBlockComment(
-                            Span::from_positions_and_file(3, 4, "<unknown>")
+                            Span::from_positions_and_file(2, 4, "<test>")
                         )),
                         7,
                         "<test>"
