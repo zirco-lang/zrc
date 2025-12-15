@@ -41,31 +41,44 @@ fn parser_error_to_diagnostic(
     error: ParseError<usize, lexer::Tok, Spanned<LexicalError>>,
 ) -> Diagnostic {
     match error {
-        ParseError::InvalidToken { location } => DiagnosticKind::InvalidToken.error_in(
-            Span::from_positions_and_file(location, location, "<unknown>"),
-        ),
+        ParseError::InvalidToken { location } => {
+            let sp = Span::from_positions_and_file(location, location, "<unknown>");
+            DiagnosticKind::InvalidToken
+                .error_in(sp)
+                .with_label(GenericLabel::error(LabelKind::InvalidToken.in_span(sp)))
+        }
 
         ParseError::UnrecognizedEof { location, expected } => {
-            DiagnosticKind::UnexpectedEof(expected).error_in(Span::from_positions_and_file(
-                location - 1,
-                location,
-                "<unknown>",
-            ))
+            let sp = Span::from_positions_and_file(location, location, "<unknown>");
+            DiagnosticKind::UnexpectedEof
+                .error_in(sp)
+                .with_label(GenericLabel::error(LabelKind::UnexpectedEof.in_span(sp)))
+                .with_note(NoteKind::ExpectedOneOfTokens(expected))
         }
 
         ParseError::UnrecognizedToken {
             token: (start, token, end),
             expected,
-        } => DiagnosticKind::UnrecognizedToken(token.to_string(), expected)
-            .error_in(Span::from_positions_and_file(start, end, "<unknown>")),
+        } => {
+            let sp = Span::from_positions_and_file(start, end, "<unknown>");
+            DiagnosticKind::UnrecognizedToken(token.to_string())
+                .error_in(sp)
+                .with_label(GenericLabel::error(
+                    LabelKind::UnrecognizedToken(token.to_string()).in_span(sp),
+                ))
+                .with_note(NoteKind::ExpectedOneOfTokens(expected))
+        }
 
         ParseError::ExtraToken {
             token: (start, token, end),
-        } => DiagnosticKind::ExtraToken(token.to_string()).error_in(Span::from_positions_and_file(
-            start,
-            end,
-            "<unknown>",
-        )),
+        } => {
+            let sp = Span::from_positions_and_file(start, end, "<unknown>");
+            DiagnosticKind::ExtraToken(token.to_string())
+                .error_in(sp)
+                .with_label(GenericLabel::error(
+                    LabelKind::ExtraToken(token.to_string()).in_span(sp),
+                ))
+        }
 
         ParseError::User { error } => {
             let sp = error.span();
