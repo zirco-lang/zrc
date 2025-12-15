@@ -39,119 +39,118 @@ pub enum DiagnosticKind {
 
     // TYPE CHECKER ERRORS
     #[error("unable to resolve `{0}` to a type")]
-    UnableToResolveType(String),
+    UnableToResolveType(String), // TODO: Migrate to new diags
     #[error("unable to resolve identifier `{0}`")]
-    UnableToResolveIdentifier(String),
+    UnableToResolveIdentifier(String), // TODO: Migrate to new diags
     #[error("`{0}` is not a valid lvalue for assignment or address-of")]
-    NotAnLvalue(String),
+    NotAnLvalue(String), // TODO: Migrate to new diags
     #[error("expected `{expected}` on right hand side of assignment, got `{got}`")]
+    // TODO: Migrate to new diags
     InvalidAssignmentRightHandSideType { expected: String, got: String },
     #[error("cannot dereference non-pointer type `{0}`")]
-    CannotDereferenceNonPointer(String),
+    CannotDereferenceNonPointer(String), // TODO: Migrate to new diags
     #[error("cannot index into non-pointer type `{0}`")]
-    CannotIndexIntoNonPointer(String),
+    CannotIndexIntoNonPointer(String), // TODO: Migrate to new diags
     #[error("`{0}` does not have member `{1}`")]
-    StructOrUnionDoesNotHaveMember(String, String),
+    StructOrUnionDoesNotHaveMember(String, String), // TODO: Migrate to new diags
     #[error("cannot access member of non-struct type `{0}`")]
-    StructMemberAccessOnNonStruct(String),
+    StructMemberAccessOnNonStruct(String), // TODO: Migrate to new diags
     #[error("expected `{expected}` arguments, got `{got}`")]
-    FunctionArgumentCountMismatch { expected: String, got: String },
+    FunctionArgumentCountMismatch { expected: String, got: String }, // TODO: Migrate to new diags
     #[error("expected `{expected}` for argument `{n}`, got `{got}`")]
+    // TODO: Migrate to new diags
     FunctionArgumentTypeMismatch {
         n: usize, // counts from 0
         expected: String,
         got: String,
     },
     #[error("cannot call non-function type `{0}`")]
-    CannotCallNonFunction(String),
+    CannotCallNonFunction(String), // TODO: Migrate to new diags
     #[error("ternary arms must have same type, got `{0}` and `{1}`")]
-    TernaryArmsMustHaveSameType(String, String),
+    TernaryArmsMustHaveSameType(String, String), // TODO: Migrate to new diags
     #[error("expected `{expected}`, got `{got}`")]
-    ExpectedGot { expected: String, got: String },
+    ExpectedGot { expected: String, got: String }, // TODO: Migrate to new diags
     #[error("expected both sides to have the same type, got `{0}` and `{1}`")]
-    ExpectedSameType(String, String),
+    ExpectedSameType(String, String), // TODO: Migrate to new diags
     #[error(
         "expected both sides to be the same integer, boolean or pointer type, got `{0}` and `{1}`"
     )]
-    EqualityOperators(String, String),
+    EqualityOperators(String, String), // TODO: Migrate to new diags
     #[error("cannot cast `{0}` to `{1}`")]
-    InvalidCast(String, String),
+    InvalidCast(String, String), // TODO: Migrate to new diags
     #[error("identifier `{0}` already in use")]
-    IdentifierAlreadyInUse(String),
+    IdentifierAlreadyInUse(String), // TODO: Migrate to new diags
     #[error("no explicit variable type present and no value to infer from")]
-    NoTypeNoValue,
+    NoTypeNoValue, // TODO: Migrate to new diags
     #[error("empty array literals are not allowed")]
-    EmptyArrayLiteral,
+    EmptyArrayLiteral, // TODO: Migrate to new diags
     #[error("array element at index {index} has type `{found}`, expected `{expected}`")]
+    // TODO: Migrate to new diags
     ArrayElementTypeMismatch {
         expected: String,
         found: String,
         index: usize,
     },
     #[error("cannot use `break` outside of loop")]
-    CannotUseBreakOutsideOfLoop,
+    CannotUseBreakOutsideOfLoop, // TODO: Migrate to new diags
     #[error("cannot use `continue` outside of loop")]
-    CannotUseContinueOutsideOfLoop,
+    CannotUseContinueOutsideOfLoop, // TODO: Migrate to new diags
     #[error("cannot use `return` here")]
-    CannotReturnHere,
+    CannotReturnHere, // TODO: Migrate to new diags
     #[error("expected a block to be guaranteed to return")]
-    ExpectedABlockToReturn,
+    ExpectedABlockToReturn, // TODO: Migrate to new diags
     #[error("duplicate struct member `{0}`")]
-    DuplicateStructMember(String),
+    DuplicateStructMember(String), // TODO: Migrate to new diags
     #[error("cannot use variadic arguments (`...`) on a non-external function")]
-    VariadicFunctionMustBeExternal,
+    VariadicFunctionMustBeExternal, // TODO: Migrate to new diags
     #[error("cannot declare a variable of type `void` -- just discard the value")]
-    CannotDeclareVoid,
+    CannotDeclareVoid, // TODO: Migrate to new diags
     #[error("invalid pointer arithmetic operation `{0}`")]
-    InvalidPointerArithmeticOperation(String),
+    InvalidPointerArithmeticOperation(String), // TODO: Migrate to new diags
     #[error("declaration of type `{1}` conflicts with previous declaration with type `{0}`")]
-    ConflictingFunctionDeclarations(String, String),
+    ConflictingFunctionDeclarations(String, String), // TODO: Migrate to new diags
     #[error("function {0} has multiple implementations in this unit")]
-    ConflictingImplementations(String),
+    ConflictingImplementations(String), // TODO: Migrate to new diags
     #[error("type {0} cannot be used for number literals")]
-    InvalidNumberLiteralType(String),
+    InvalidNumberLiteralType(String), // TODO: Migrate to new diags
     #[error("a switch case statement must always end in a default block")]
-    SwitchCaseMissingTerminalDefault,
+    SwitchCaseMissingTerminalDefault, // TODO: Migrate to new diags
     #[error("multiple case statements are matching for the same value")]
-    MultipleCases,
+    MultipleCases, // TODO: Migrate to new diags
     #[error("self-referential type `{0}` must be behind a pointer (e.g., `*{0}`)")]
-    SelfReferentialTypeNotBehindPointer(String),
+    SelfReferentialTypeNotBehindPointer(String), // TODO: Migrate to new diags
     #[error("number literal `{0}` is out of bounds for type `{1}` (valid range: {2} to {3})")]
-    NumberLiteralOutOfBounds(String, String, String, String),
+    NumberLiteralOutOfBounds(String, String, String, String), // TODO: Migrate to new diags
     #[error("global variable initializer must be a constant expression")]
-    GlobalInitializerMustBeConstant,
+    GlobalInitializerMustBeConstant, // TODO: Migrate to new diags
     #[error("match on non-enum type `{0}`")]
-    MatchOnNonEnum(String),
+    MatchOnNonEnum(String), // TODO: Migrate to new diags
     #[error("there must be exactly one match arm for every enum variant")]
-    MatchCaseCountMismatch,
+    MatchCaseCountMismatch, // TODO: Migrate to new diags
     #[error("there must be a match arm for every enum variant")]
-    NonExhaustiveMatchCases,
+    NonExhaustiveMatchCases, // TODO: Migrate to new diags
     #[error("main() function must have return type `i32`, got `{0}`")]
-    MainFunctionMustReturnI32(String),
+    MainFunctionMustReturnI32(String), // TODO: Migrate to new diags
     #[error(
         "main() function may either have no parameters or two parameters, a `usize` and a `**u8`"
     )]
-    MainFunctionInvalidParameters,
+    MainFunctionInvalidParameters, // TODO: Migrate to new diags
     #[error("cannot use constant `{0}` as an lvalue")]
-    AssignmentToConstant(String),
+    AssignmentToConstant(String), // TODO: Migrate to new diags
     #[error("functions are not first-class values in Zirco; use a function pointer instead")]
-    FunctionNotFirstClass,
+    FunctionNotFirstClass, // TODO: Migrate to new diags
 
     // PREPROCESSOR ERRORS
-    #[error("unterminated include string")]
-    PreprocessorUnterminatedIncludeString,
-    #[error("unterminated include angle brackets")]
-    PreprocessorUnterminatedIncludeAngleBrackets,
-    #[error("include directive must use \"file\" or <file> syntax")]
+    #[error("unterminated include directive")]
+    PreprocessorUnterminatedIncludeDirective,
+    #[error("invalid include syntax")]
     PreprocessorInvalidIncludeSyntax,
-    #[error("cannot find include file: {0}")]
-    PreprocessorCannotFindIncludeFile(String),
-    #[error("cannot read include file {0}: {1}")]
-    PreprocessorCannotReadIncludeFile(String, String),
-    #[error("cannot determine parent directory for {0}")]
-    PreprocessorCannotDetermineParentDirectory(String),
-    #[error("unknown preprocessor directive: #{0}")]
-    PreprocessorUnknownDirective(String),
+    #[error("cannot find include file")]
+    PreprocessorCannotFindIncludeFile,
+    #[error("cannot read include file")]
+    PreprocessorCannotReadIncludeFile,
+    #[error("unknown preprocessor directive")]
+    PreprocessorUnknownDirective,
 }
 impl DiagnosticKind {
     /// Create a [error] diagnostic in a given [`Span`].
@@ -171,13 +170,11 @@ impl ErrorCode for DiagnosticKind {
         // 3xxx - Typeck
         // 4xxx-9xxx - (reserved for future use)
         match self {
-            Self::PreprocessorCannotDetermineParentDirectory(_) => "E1001",
-            Self::PreprocessorCannotFindIncludeFile(_) => "E1002",
-            Self::PreprocessorCannotReadIncludeFile(_, _) => "E1003",
-            Self::PreprocessorInvalidIncludeSyntax => "E1004",
-            Self::PreprocessorUnterminatedIncludeAngleBrackets => "E1005",
-            Self::PreprocessorUnterminatedIncludeString => "E1006",
-            Self::PreprocessorUnknownDirective(_) => "E1007",
+            Self::PreprocessorCannotFindIncludeFile => "E1001",
+            Self::PreprocessorCannotReadIncludeFile => "E1002",
+            Self::PreprocessorInvalidIncludeSyntax => "E1003",
+            Self::PreprocessorUnterminatedIncludeDirective => "E1004",
+            Self::PreprocessorUnknownDirective => "E1005",
 
             Self::UnknownToken(_) => "E2001",
             Self::UnterminatedStringLiteral => "E2002",
@@ -260,6 +257,16 @@ pub enum LabelKind {
     UnrecognizedToken(String),
     #[error("unexpected extra token `{0}`")]
     ExtraToken(String),
+    #[error("invalid include syntax")]
+    PreprocessorInvalidIncludeSyntax,
+    #[error("could not locate `{0}` in your include path")]
+    PreprocessorCannotFindIncludeFile(String),
+    #[error("failed to read include file `{0}`")]
+    PreprocessorCannotReadIncludeFile(String),
+    #[error("expected a closing {0}")]
+    ExpectedClosing(String),
+    #[error("unknown preprocessor directive")]
+    PreprocessorUnknownDirective,
 }
 
 /// The list of possible notes attached to a [`Diagnostic`]
@@ -272,6 +279,18 @@ pub enum NoteKind {
     NestedBlockComments,
     #[error("expected one of the following tokens: {x}", x = .0.join(", "))]
     ExpectedOneOfTokens(Vec<String>),
+    #[error(
+        "a string literal indicates a local file include; angle brackets indicate a system include"
+    )]
+    IncludeKinds,
+    #[error("valid include syntax examples:\n#include \"file.zr\"\n#include <file.zr>")]
+    ValidIncludeSyntax,
+    #[error("include file searched for in the following paths:\n{0}")]
+    IncludeSearchPaths(String),
+    #[error("read failed: {0}")]
+    ReadFailed(String),
+    #[error("Zirco does not support macros")]
+    MacrosNotSupported,
 }
 
 /// The list of possible help messages attached to a [`Diagnostic`]
