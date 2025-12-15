@@ -88,6 +88,30 @@ where
     /// The span and kind of this label
     pub kind: Spanned<LK>,
 }
+impl<LK> GenericLabel<LK>
+where
+    LK: Debug + PartialEq + Eq + Display,
+{
+    /// Create a new label with the given severity and kind.
+    pub const fn new(severity: LabelType, kind: Spanned<LK>) -> Self {
+        Self { severity, kind }
+    }
+
+    /// Create a new error label.
+    pub const fn error(kind: Spanned<LK>) -> Self {
+        Self::new(LabelType::Error, kind)
+    }
+
+    /// Create a new warning label.
+    pub const fn warning(kind: Spanned<LK>) -> Self {
+        Self::new(LabelType::Warning, kind)
+    }
+
+    /// Create a new note label.
+    pub const fn note(kind: Spanned<LK>) -> Self {
+        Self::new(LabelType::Note, kind)
+    }
+}
 
 /// Anything that can produce an error code, required for use in a
 /// [`GenericDiagnostic`]
@@ -162,7 +186,7 @@ where
         // read the source from the path inside of the span. if it is <stdin>, use
         // the provided piped source.
         let (source, path) = match span.file_name() {
-            "<stdin>" => (
+            "/dev/<stdin>" => (
                 piped_source
                     .expect("piped source must be provided for <stdin>")
                     .to_string(),
@@ -237,6 +261,27 @@ where
     /// Create a warning.
     pub const fn warning(kind: Spanned<K>) -> Self {
         Self::new_empty(Severity::Warning, kind)
+    }
+
+    /// Add a new label to this diagnostic.
+    #[must_use]
+    pub fn with_label(mut self, label: GenericLabel<LK>) -> Self {
+        self.labels.push(label);
+        self
+    }
+
+    /// Add a new note to this diagnostic.
+    #[must_use]
+    pub fn with_note(mut self, note: NK) -> Self {
+        self.notes.push(note);
+        self
+    }
+
+    /// Add a new help message to this diagnostic.
+    #[must_use]
+    pub fn with_help(mut self, help: HK) -> Self {
+        self.helps.push(help);
+        self
     }
 }
 impl<K, LK, NK, HK> Error for GenericDiagnostic<K, LK, NK, HK>

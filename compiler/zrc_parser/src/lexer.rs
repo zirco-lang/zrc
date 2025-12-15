@@ -52,7 +52,9 @@ pub enum InternalLexicalError {
     UnterminatedStringLiteral,
     /// A block comment ran to the end of the file. Remind the user that block
     /// comments nest.
-    UnterminatedBlockComment,
+    ///
+    /// The span is the start of the unterminated comment.
+    UnterminatedBlockComment(Span),
     /// An invalid escape sequence was found in a string literal
     /// The included [`Span`] is the specific span of the invalid sequence
     UnknownEscapeSequence(Span),
@@ -74,7 +76,9 @@ pub enum LexicalError<'input> {
     UnterminatedStringLiteral,
     /// A block comment ran to the end of the file. Remind the user that block
     /// comments nest.
-    UnterminatedBlockComment,
+    ///
+    /// The span is the starting delimiter of the block comment
+    UnterminatedBlockComment(Span),
     /// Produced from [`InternalLexicalError::NoMatchingRule`]
     UnknownEscapeSequence,
     /// `===` or `!==` was found in the input
@@ -159,6 +163,8 @@ fn handle_block_comment_start<'input>(
     // This contains all of the remaining tokens in our input except for the opening
     // to this comment -- that's already been consumed.
     let mut chars = lex.remainder().chars().peekable();
+    // Capture the span of the opening delimiter so we can report it if unterminated
+    let opening_span = lex.span();
 
     // We iterate over all of the remaining characters in the input...
     while let Some(char) = chars.next() {
@@ -201,7 +207,9 @@ fn handle_block_comment_start<'input>(
     } else {
         // This means we've reached the end of our input still in a comment.
         // We can throw an error here.
-        logos::FilterResult::Error(InternalLexicalError::UnterminatedBlockComment)
+        logos::FilterResult::Error(InternalLexicalError::UnterminatedBlockComment(
+            Span::from_positions_and_file(opening_span.start, opening_span.end, "<unknown>"),
+        ))
     }
 }
 
@@ -720,8 +728,12 @@ impl<'input> Iterator for ZircoLexer<'input> {
                     InternalLexicalError::NoMatchingRule => {
                         LexicalError::UnknownToken(self.lex.slice())
                     }
-                    InternalLexicalError::UnterminatedBlockComment => {
-                        LexicalError::UnterminatedBlockComment
+                    InternalLexicalError::UnterminatedBlockComment(opening) => {
+                        LexicalError::UnterminatedBlockComment(Span::from_positions_and_file(
+                            opening.start(),
+                            opening.end(),
+                            self.file_name,
+                        ))
                     }
                     InternalLexicalError::UnterminatedStringLiteral => {
                         LexicalError::UnterminatedStringLiteral
@@ -949,7 +961,14 @@ mod tests {
                 tokens,
                 vec![
                     spanned!(0, Ok(Tok::Identifier("a")), 1, "<test>"),
-                    spanned!(2, Err(LexicalError::UnterminatedBlockComment), 7, "<test>"),
+                    spanned!(
+                        2,
+                        Err(LexicalError::UnterminatedBlockComment(
+                            Span::from_positions_and_file(3, 4, "<unknown>")
+                        )),
+                        7,
+                        "<test>"
+                    ),
                 ]
             );
         }

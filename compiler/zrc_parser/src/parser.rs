@@ -21,7 +21,9 @@
 //! ```
 
 use lalrpop_util::ParseError;
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpannedExt};
+use zrc_diagnostics::{
+    Diagnostic, DiagnosticKind, HelpKind, LabelKind, NoteKind, diagnostic::GenericLabel,
+};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{
@@ -65,15 +67,49 @@ fn parser_error_to_diagnostic(
             "<unknown>",
         )),
 
-        ParseError::User { error } => error.error(|error| match error {
-            LexicalError::UnknownToken(token) => DiagnosticKind::UnknownToken(token.to_string()),
-            LexicalError::UnterminatedBlockComment => DiagnosticKind::UnterminatedBlockComment,
-            LexicalError::UnterminatedStringLiteral => DiagnosticKind::UnterminatedStringLiteral,
-            LexicalError::UnknownEscapeSequence => DiagnosticKind::UnknownEscapeSequence,
-            LexicalError::JavascriptUserDetected(expected) => {
-                DiagnosticKind::JavascriptUserDetected(expected)
+        ParseError::User { error } => {
+            let sp = error.span();
+            match error.into_value() {
+                LexicalError::UnknownToken(token) => {
+                    DiagnosticKind::UnknownToken(token.to_string())
+                        .error_in(sp)
+                        .with_label(GenericLabel::error(
+                            LabelKind::UnknownToken(token.to_string()).in_span(sp),
+                        ))
+                }
+                LexicalError::UnterminatedBlockComment(open_sp) => {
+                    DiagnosticKind::UnterminatedBlockComment
+                        .error_in(sp)
+                        .with_label(GenericLabel::error(
+                            LabelKind::UnterminatedBlockComment.in_span(sp),
+                        ))
+                        .with_label(GenericLabel::note(
+                            LabelKind::BlockCommentOpenedHere.in_span(open_sp),
+                        ))
+                        .with_note(NoteKind::NestedBlockComments)
+                }
+                LexicalError::UnterminatedStringLiteral => {
+                    DiagnosticKind::UnterminatedStringLiteral
+                        .error_in(sp)
+                        .with_label(GenericLabel::error(
+                            LabelKind::UnterminatedStringLiteral.in_span(sp),
+                        ))
+                }
+                LexicalError::UnknownEscapeSequence => DiagnosticKind::UnknownEscapeSequence
+                    .error_in(sp)
+                    .with_label(GenericLabel::error(
+                        LabelKind::UnknownEscapeSequence.in_span(sp),
+                    )),
+                LexicalError::JavascriptUserDetected(expected) => {
+                    DiagnosticKind::JavascriptUserDetected
+                        .error_in(sp)
+                        .with_label(GenericLabel::error(
+                            LabelKind::JavascriptUserDetected.in_span(sp),
+                        ))
+                        .with_help(HelpKind::JavascriptUserDetected(expected))
+                }
             }
-        }),
+        }
     }
 }
 
