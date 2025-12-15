@@ -67,7 +67,10 @@ where
     /// The span and kind of this diagnostic's main message
     pub kind: Spanned<K>,
 }
-impl<K: Debug + PartialEq + Eq + Display + ErrorCode> Display for GenericDiagnostic<K> {
+impl<K> Display for GenericDiagnostic<K>
+where
+    K: Debug + PartialEq + Eq + Display + ErrorCode,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -79,7 +82,10 @@ impl<K: Debug + PartialEq + Eq + Display + ErrorCode> Display for GenericDiagnos
     }
 }
 
-impl<K: Debug + PartialEq + Eq + Display + ErrorCode> GenericDiagnostic<K> {
+impl<K> GenericDiagnostic<K>
+where
+    K: Debug + PartialEq + Eq + Display + ErrorCode,
+{
     /// Convert this [`Diagnostic`] to a printable string using ariadne. The
     /// source code is provided directly as a string if it is not read from a
     /// file.
@@ -152,7 +158,7 @@ impl<K: Debug + PartialEq + Eq + Display + ErrorCode> GenericDiagnostic<K> {
         }
     }
 }
-impl<K: Debug + PartialEq + Eq + Display + ErrorCode> Error for GenericDiagnostic<K> {}
+impl<K> Error for GenericDiagnostic<K> where K: Debug + PartialEq + Eq + Display + ErrorCode {}
 
 /// A diagnostic message produced by the Zirco compiler
 pub type Diagnostic = GenericDiagnostic<DiagnosticKind>;
