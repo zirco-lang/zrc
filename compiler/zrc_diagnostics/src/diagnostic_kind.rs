@@ -30,11 +30,11 @@ pub enum DiagnosticKind {
     /// Generic parser error
     #[error("invalid token")]
     InvalidToken,
-    #[error("unexpected end of file, expected one of: {x}", x = .0.join(", "))]
-    UnexpectedEof(Vec<String>),
-    #[error("unrecognized token `{0}`, expected one of: {x}", x = .1.join(", "))]
-    UnrecognizedToken(String, Vec<String>),
-    #[error("extra token `{0}`")]
+    #[error("unexpected end of file")]
+    UnexpectedEof,
+    #[error("unrecognized token `{0}`")]
+    UnrecognizedToken(String),
+    #[error("unexpected extra token `{0}`")]
     ExtraToken(String),
 
     // TYPE CHECKER ERRORS
@@ -185,8 +185,8 @@ impl ErrorCode for DiagnosticKind {
             Self::UnknownEscapeSequence => "E2004",
             Self::JavascriptUserDetected => "E2005",
             Self::InvalidToken => "E2006",
-            Self::UnexpectedEof(_) => "E2101",
-            Self::UnrecognizedToken(_, _) => "E2102",
+            Self::UnexpectedEof => "E2101",
+            Self::UnrecognizedToken(_) => "E2102",
             Self::ExtraToken(_) => "E2103",
 
             Self::UnableToResolveType(_) => "E3001",
@@ -252,6 +252,14 @@ pub enum LabelKind {
     UnknownEscapeSequence,
     #[error("JavaScript user detected (unknown token)")]
     JavascriptUserDetected,
+    #[error("invalid token")]
+    InvalidToken,
+    #[error("unexpected end of file")]
+    UnexpectedEof,
+    #[error("unrecognized token `{0}`")]
+    UnrecognizedToken(String),
+    #[error("unexpected extra token `{0}`")]
+    ExtraToken(String),
 }
 
 /// The list of possible notes attached to a [`Diagnostic`]
@@ -262,6 +270,8 @@ pub enum NoteKind {
         "Zirco allows nested comments, so every opening `/*` must have a matching closing `*/`"
     )]
     NestedBlockComments,
+    #[error("expected one of the following tokens: {x}", x = .0.join(", "))]
+    ExpectedOneOfTokens(Vec<String>),
 }
 
 /// The list of possible help messages attached to a [`Diagnostic`]
