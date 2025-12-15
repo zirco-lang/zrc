@@ -23,10 +23,8 @@ pub enum DiagnosticKind {
     UnterminatedBlockComment,
     #[error("unknown escape sequence")]
     UnknownEscapeSequence,
-    /// Raised if `===` or `!==` is found in the input.
-    /// Parameter will be either `"=="` or `"!="` for what was expected.
-    #[error("JavaScript user detected -- did you mean `{0}`?")]
-    JavascriptUserDetected(&'static str),
+    #[error("JavaScript user detected")]
+    JavascriptUserDetected,
 
     // PARSER ERRORS
     /// Generic parser error
@@ -185,7 +183,7 @@ impl ErrorCode for DiagnosticKind {
             Self::UnterminatedStringLiteral => "E2002",
             Self::UnterminatedBlockComment => "E2003",
             Self::UnknownEscapeSequence => "E2004",
-            Self::JavascriptUserDetected(_) => "E2005",
+            Self::JavascriptUserDetected => "E2005",
             Self::InvalidToken => "E2006",
             Self::UnexpectedEof(_) => "E2101",
             Self::UnrecognizedToken(_, _) => "E2102",
@@ -240,12 +238,36 @@ impl ErrorCode for DiagnosticKind {
 
 /// The list of possible labels attached to a [`Diagnostic`]
 #[derive(Debug, PartialEq, Eq, Clone, Error)]
-pub enum LabelKind {}
+#[expect(missing_docs)]
+pub enum LabelKind {
+    #[error("unknown token `{0}`")]
+    UnknownToken(String),
+    #[error("expected closing `*/`, got EOF")]
+    UnterminatedBlockComment,
+    #[error("block comment opened here")]
+    BlockCommentOpenedHere,
+    #[error("unterminated string literal")]
+    UnterminatedStringLiteral,
+    #[error("unknown escape sequence")]
+    UnknownEscapeSequence,
+    #[error("JavaScript user detected (unknown token)")]
+    JavascriptUserDetected,
+}
 
 /// The list of possible notes attached to a [`Diagnostic`]
+#[expect(missing_docs)]
 #[derive(Debug, PartialEq, Eq, Clone, Error)]
-pub enum NoteKind {}
+pub enum NoteKind {
+    #[error(
+        "Zirco allows nested comments, so every opening `/*` must have a matching closing `*/`"
+    )]
+    NestedBlockComments,
+}
 
 /// The list of possible help messages attached to a [`Diagnostic`]
 #[derive(Debug, PartialEq, Eq, Clone, Error)]
-pub enum HelpKind {}
+#[expect(missing_docs)]
+pub enum HelpKind {
+    #[error("did you mean `{0}`?")]
+    JavascriptUserDetected(&'static str),
+}
