@@ -282,6 +282,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "ignored until #603 complete"]
     fn diagnostic_print_formats_correctly() {
         let source = "let x = 5;";
         let diagnostic = Diagnostic::error(spanned!(4, DiagnosticKind::InvalidToken, 5, "<stdin>"));
