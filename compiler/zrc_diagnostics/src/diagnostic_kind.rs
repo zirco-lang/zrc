@@ -3,7 +3,7 @@
 use thiserror::Error;
 use zrc_utils::span::{Span, Spannable};
 
-use crate::Diagnostic;
+use crate::{Diagnostic, diagnostic::ErrorCode};
 
 /// The list of possible errors
 ///
@@ -163,5 +163,77 @@ impl DiagnosticKind {
     #[inline]
     pub fn error_in(self, span: Span) -> Diagnostic {
         Diagnostic::error(self.in_span(span))
+    }
+}
+impl ErrorCode for DiagnosticKind {
+    fn error_code(&self) -> &'static str {
+        // 0xxx - (reserved for driver)
+        // 1xxx - Preprocessor
+        // 2xxx - Lexer and Parser
+        // 3xxx - Typeck
+        // 4xxx-9xxx - (reserved for future use)
+        match self {
+            Self::PreprocessorCannotDetermineParentDirectory(_) => "E1001",
+            Self::PreprocessorCannotFindIncludeFile(_) => "E1002",
+            Self::PreprocessorCannotReadIncludeFile(_, _) => "E1003",
+            Self::PreprocessorInvalidIncludeSyntax => "E1004",
+            Self::PreprocessorUnterminatedIncludeAngleBrackets => "E1005",
+            Self::PreprocessorUnterminatedIncludeString => "E1006",
+            Self::PreprocessorUnknownDirective(_) => "E1007",
+
+            Self::UnknownToken(_) => "E2001",
+            Self::UnterminatedStringLiteral => "E2002",
+            Self::UnterminatedBlockComment => "E2003",
+            Self::UnknownEscapeSequence => "E2004",
+            Self::JavascriptUserDetected(_) => "E2005",
+            Self::InvalidToken => "E2006",
+            Self::UnexpectedEof(_) => "E2101",
+            Self::UnrecognizedToken(_, _) => "E2102",
+            Self::ExtraToken(_) => "E2103",
+
+            Self::UnableToResolveType(_) => "E3001",
+            Self::UnableToResolveIdentifier(_) => "E3002",
+            Self::NotAnLvalue(_) => "E3003",
+            Self::InvalidAssignmentRightHandSideType { .. } => "E3004",
+            Self::CannotDereferenceNonPointer(_) => "E3005",
+            Self::CannotIndexIntoNonPointer(_) => "E3006",
+            Self::StructOrUnionDoesNotHaveMember(_, _) => "E3007",
+            Self::StructMemberAccessOnNonStruct(_) => "E3008",
+            Self::FunctionArgumentCountMismatch { .. } => "E3009",
+            Self::FunctionArgumentTypeMismatch { .. } => "E3010",
+            Self::CannotCallNonFunction(_) => "E3011",
+            Self::TernaryArmsMustHaveSameType(_, _) => "E3012",
+            Self::ExpectedGot { .. } => "E3013",
+            Self::ExpectedSameType(_, _) => "E3014",
+            Self::EqualityOperators(_, _) => "E3015",
+            Self::InvalidCast(_, _) => "E3016",
+            Self::IdentifierAlreadyInUse(_) => "E3017",
+            Self::NoTypeNoValue => "E3018",
+            Self::EmptyArrayLiteral => "E3019",
+            Self::ArrayElementTypeMismatch { .. } => "E3020",
+            Self::CannotUseBreakOutsideOfLoop => "E3021",
+            Self::CannotUseContinueOutsideOfLoop => "E3022",
+            Self::CannotReturnHere => "E3023",
+            Self::ExpectedABlockToReturn => "E3024",
+            Self::DuplicateStructMember(_) => "E3025",
+            Self::VariadicFunctionMustBeExternal => "E3026",
+            Self::CannotDeclareVoid => "E3027",
+            Self::InvalidPointerArithmeticOperation(_) => "E3028",
+            Self::ConflictingFunctionDeclarations(_, _) => "E3029",
+            Self::ConflictingImplementations(_) => "E3030",
+            Self::InvalidNumberLiteralType(_) => "E3031",
+            Self::SwitchCaseMissingTerminalDefault => "E3032",
+            Self::MultipleCases => "E3033",
+            Self::SelfReferentialTypeNotBehindPointer(_) => "E3034",
+            Self::NumberLiteralOutOfBounds(_, _, _, _) => "E3035",
+            Self::GlobalInitializerMustBeConstant => "E3036",
+            Self::MatchOnNonEnum(_) => "E3037",
+            Self::MatchCaseCountMismatch => "E3038",
+            Self::NonExhaustiveMatchCases => "E3039",
+            Self::MainFunctionMustReturnI32(_) => "E3040",
+            Self::MainFunctionInvalidParameters => "E3041",
+            Self::AssignmentToConstant(_) => "E3042",
+            Self::FunctionNotFirstClass => "E3043",
+        }
     }
 }

@@ -11,23 +11,27 @@ use std::{
 };
 
 use ariadne::{Color, Label, Report, ReportKind};
-use derive_more::Display;
 use zrc_utils::span::Spanned;
 
 use crate::DiagnosticKind;
 
 /// The severity of a [`Diagnostic`].
-#[derive(Clone, PartialEq, Eq, Debug, Display)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Severity {
     /// Error. Compilation will not continue.
-    #[display("error")]
     Error,
 
     /// Warning. Compilation may continue.
-    #[display("warning")]
     Warning,
 }
-
+impl Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Error => write!(f, "error"),
+            Self::Warning => write!(f, "warning"),
+        }
+    }
+}
 impl Severity {
     /// Convert severity to ariadne's [`ReportKind`]
     const fn to_report_kind(&self) -> ReportKind<'static> {
@@ -46,20 +50,36 @@ impl Severity {
     }
 }
 
+/// Anything that can produce an error code, required for use in a [`GenericDiagnostic`]
+pub trait ErrorCode {
+    /// Get the error code associated with this instance
+    fn error_code(&self) -> &'static str;
+}
+
 /// A diagnostic message produced by one of the zrc tools
-#[derive(Debug, PartialEq, Eq, Display)]
-#[display("{severity}: {kind}")]
+#[derive(Debug, PartialEq, Eq)]
 pub struct GenericDiagnostic<K>
 where
-    K: Debug + PartialEq + Eq + Display,
+    K: Debug + PartialEq + Eq + Display + ErrorCode,
 {
     /// The severity of this diagnostic
     pub severity: Severity,
     /// The span and kind of this diagnostic's main message
     pub kind: Spanned<K>,
 }
+impl<K: Debug + PartialEq + Eq + Display + ErrorCode> Display for GenericDiagnostic<K> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}[{}]: {}",
+            self.severity,
+            self.kind.value().error_code(),
+            self.kind
+        )
+    }
+}
 
-impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
+impl<K: Debug + PartialEq + Eq + Display + ErrorCode> GenericDiagnostic<K> {
     /// Convert this [`Diagnostic`] to a printable string using ariadne. The
     /// source code is provided directly as a string if it is not read from a
     /// file.
@@ -132,7 +152,7 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
         }
     }
 }
-impl<K: Debug + PartialEq + Eq + Display> Error for GenericDiagnostic<K> {}
+impl<K: Debug + PartialEq + Eq + Display + ErrorCode> Error for GenericDiagnostic<K> {}
 
 /// A diagnostic message produced by the Zirco compiler
 pub type Diagnostic = GenericDiagnostic<DiagnosticKind>;
