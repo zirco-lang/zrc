@@ -1,7 +1,7 @@
 //! Diagnostics producible by the Zircop tool
 
 use thiserror::Error;
-use zrc_diagnostics::diagnostic::GenericDiagnostic;
+use zrc_diagnostics::diagnostic::{ErrorCode, GenericDiagnostic};
 
 /// The list of possible lints Zircop can raise
 #[expect(missing_docs)]
@@ -25,6 +25,20 @@ pub enum LintDiagnosticKind {
         "empty `while` loop body - consider adding statements to the body or removing the loop"
     )]
     EmptyWhileBody,
+}
+impl ErrorCode for LintDiagnosticKind {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::AssignmentInCondition => "assignment_in_condition",
+            Self::EmptyStructUsed => "empty_struct_used",
+            Self::UnderscoreVariableUsed(_) => "underscore_variable_used",
+            Self::UnusedVariable(_) => "unused_variable",
+            Self::UnreachableCode => "unreachable_code",
+            Self::EmptyIfBlock => "empty_if_block",
+            Self::EmptyElseBlock => "empty_else_block",
+            Self::EmptyWhileBody => "empty_while_body",
+        }
+    }
 }
 
 /// A Zircop lint
