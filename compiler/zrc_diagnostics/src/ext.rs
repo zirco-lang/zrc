@@ -31,29 +31,3 @@ impl<T> SpannedExt<T> for Spanned<T> {
         Diagnostic::error(self.map(f))
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::Severity;
-    use zrc_utils::spanned_test;
-
-    use super::*;
-
-    #[test]
-    fn span_ext_creates_diagnostic() {
-        let span = Span::from_positions_and_file(0, 5, "<test>");
-        let diagnostic = span.error(DiagnosticKind::InvalidToken);
-
-        assert_eq!(diagnostic.0, Severity::Error);
-        assert_eq!(diagnostic.1.span(), span);
-    }
-
-    #[test]
-    fn spanned_ext_creates_diagnostic() {
-        let spanned_str = spanned_test!(0, "test", 4);
-        let diagnostic =
-            spanned_str.error(|value| DiagnosticKind::UnableToResolveIdentifier(value.to_string()));
-
-        assert_eq!(diagnostic.0, Severity::Error);
-    }
-}

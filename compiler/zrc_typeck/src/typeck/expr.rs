@@ -394,7 +394,7 @@ mod tests {
                         .expect("parsing should succeed")
                 )
                 .map(|result| result.inferred_type)
-                .map_err(|diagnostic| diagnostic.1.into_value()),
+                .map_err(|diagnostic| diagnostic.kind.into_value()),
                 expected_result
             );
         }

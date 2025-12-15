@@ -427,7 +427,7 @@ mod tests {
         assert!(result.is_err());
         let err = result.expect_err("expected a preprocessing error");
         // The error span should reference the actual file, not "<preprocessor>"
-        assert_eq!(err.1.span().file_name(), "/test/dir/main.zr");
+        assert_eq!(err.kind.span().file_name(), "/test/dir/main.zr");
     }
 
     #[test]
@@ -439,8 +439,8 @@ mod tests {
         assert!(result.is_err());
         let err = result.expect_err("expected a preprocessing error");
         // The error should start at byte 20 (after "// line 1\n// line 2\n")
-        assert_eq!(err.1.span().start(), 20);
-        assert_eq!(err.1.span().end(), 20 + "#unknown_directive".len());
+        assert_eq!(err.kind.span().start(), 20);
+        assert_eq!(err.kind.span().end(), 20 + "#unknown_directive".len());
     }
 
     #[test]
@@ -450,9 +450,9 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.expect_err("expected a preprocessing error");
-        assert_eq!(err.1.span().file_name(), "./test.zr");
-        assert_eq!(err.1.span().start(), 0);
-        assert_eq!(err.1.span().end(), content.len());
+        assert_eq!(err.kind.span().file_name(), "./test.zr");
+        assert_eq!(err.kind.span().start(), 0);
+        assert_eq!(err.kind.span().end(), content.len());
     }
 
     #[test]
@@ -462,9 +462,9 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.expect_err("expected a preprocessing error");
-        assert_eq!(err.1.span().file_name(), "./test.zr");
-        assert_eq!(err.1.span().start(), 0);
-        assert_eq!(err.1.span().end(), content.len());
+        assert_eq!(err.kind.span().file_name(), "./test.zr");
+        assert_eq!(err.kind.span().start(), 0);
+        assert_eq!(err.kind.span().end(), content.len());
     }
 
     #[test]
@@ -474,8 +474,8 @@ mod tests {
 
         assert!(result.is_err());
         let err = result.expect_err("expected a preprocessing error");
-        assert_eq!(err.1.span().file_name(), "./test.zr");
-        assert_eq!(err.1.span().start(), 0);
-        assert_eq!(err.1.span().end(), content.len());
+        assert_eq!(err.kind.span().file_name(), "./test.zr");
+        assert_eq!(err.kind.span().start(), 0);
+        assert_eq!(err.kind.span().end(), content.len());
     }
 }
