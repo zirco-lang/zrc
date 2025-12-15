@@ -106,32 +106,21 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
 
         String::from_utf8(buffer).expect("diagnostic output should be valid UTF-8")
     }
+
+    /// Create an error.
+    pub const fn error(span: Spanned<K>) -> Self {
+        Self(Severity::Error, span)
+    }
+
+    /// Create a warning.
+    pub const fn warning(span: Spanned<K>) -> Self {
+        Self(Severity::Warning, span)
+    }
 }
 impl<K: Debug + PartialEq + Eq + Display> Error for GenericDiagnostic<K> {}
 
 /// A diagnostic message produced by the Zirco compiler
-#[derive(Debug, PartialEq, Eq, Display)]
-#[display("{_0}: {_1}")]
-pub struct Diagnostic(pub Severity, pub Spanned<DiagnosticKind>);
-impl Diagnostic {
-    /// Get a generic version of this diagnostic
-    #[must_use]
-    pub fn as_generic(&self) -> GenericDiagnostic<DiagnosticKind> {
-        GenericDiagnostic(self.0.clone(), self.1.clone())
-    }
-
-    /// Convert this [`Diagnostic`] to a printable string using ariadne. The
-    /// source code is provided directly as a string if it is not read from a
-    /// file.
-    ///
-    /// # Panics
-    /// This function may panic if the span is invalid or if writing to the
-    /// buffer fails.
-    #[must_use]
-    pub fn print(&self, piped_source: Option<&str>) -> String {
-        self.as_generic().print(piped_source)
-    }
-}
+pub type Diagnostic = GenericDiagnostic<DiagnosticKind>;
 
 #[cfg(test)]
 mod tests {
@@ -157,10 +146,7 @@ mod tests {
 
     #[test]
     fn diagnostic_display_includes_severity_and_kind() {
-        let diagnostic = Diagnostic(
-            Severity::Error,
-            spanned_test!(0, DiagnosticKind::InvalidToken, 4),
-        );
+        let diagnostic = Diagnostic::error(spanned_test!(0, DiagnosticKind::InvalidToken, 4));
         let display = diagnostic.to_string();
         assert!(display.contains("error"));
         assert!(display.contains("invalid token"));
@@ -169,10 +155,7 @@ mod tests {
     #[test]
     fn diagnostic_print_formats_correctly() {
         let source = "let x = 5;";
-        let diagnostic = Diagnostic(
-            Severity::Error,
-            spanned!(4, DiagnosticKind::InvalidToken, 5, "<stdin>"),
-        );
+        let diagnostic = Diagnostic::error(spanned!(4, DiagnosticKind::InvalidToken, 5, "<stdin>"));
         let output = diagnostic.print(Some(source));
 
         assert!(output.contains("<stdin>"));

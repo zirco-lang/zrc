@@ -52,7 +52,7 @@ impl<'input> SyntacticVisit<'input> for Visit {
         if let TypeKind::Struct(struct_type) = ty.0.value()
             && struct_type.0.value().is_empty()
         {
-            self.diagnostics.push(LintDiagnostic::new(
+            self.diagnostics.push(LintDiagnostic::warning(
                 LintDiagnosticKind::EmptyStructUsed.in_span(sp),
             ));
         }
@@ -73,7 +73,7 @@ mod tests {
             struct EmptyStruct {}
         "},
         diagnostics: vec![
-            LintDiagnostic::new(
+            LintDiagnostic::warning(
                 spanned_test!(0, LintDiagnosticKind::EmptyStructUsed, 21)
             ),
         ]

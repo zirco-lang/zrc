@@ -1059,7 +1059,6 @@ name = "zircop"
 version = "0.1.0"
 dependencies = [
  "clap",
- "derive_more",
  "indoc",
  "thiserror",
  "zrc_diagnostics",

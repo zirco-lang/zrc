@@ -12,7 +12,6 @@ zrc_typeck = { path = "../../compiler/zrc_typeck" }
 zrc_diagnostics = { path = "../../compiler/zrc_diagnostics" }
 zrc_utils = { path = "../../compiler/zrc_utils" }
 thiserror = "2.0.17"
-derive_more = { version = "2.0.1", features = ["display"] }
 clap = { version = "4.5.52", features = ["derive"] }
 
 [dev-dependencies]

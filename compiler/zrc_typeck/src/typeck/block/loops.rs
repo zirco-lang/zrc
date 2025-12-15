@@ -1,6 +1,6 @@
 //! Type checking for if statements.
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::{
     expr::Expr,
     stmt::{LetDeclaration, Stmt},
@@ -49,8 +49,7 @@ pub fn type_for<'input, 'gs>(
     if let Some(inner_t_cond) = typed_cond.clone()
         && inner_t_cond.inferred_type != TastType::Bool
     {
-        return Err(Diagnostic(
-            Severity::Error,
+        return Err(Diagnostic::error(
             cond_span
                 .expect("span should exist if we unwrapped it")
                 .containing(DiagnosticKind::ExpectedGot {

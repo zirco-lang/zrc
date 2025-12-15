@@ -58,7 +58,7 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit {
             if found_always_returns {
                 // This statement is unreachable
                 let span = stmt.kind.span();
-                self.diagnostics.push(LintDiagnostic::new(
+                self.diagnostics.push(LintDiagnostic::warning(
                     LintDiagnosticKind::UnreachableCode.in_span(span),
                 ));
                 // Continue checking to report all unreachable statements
@@ -91,7 +91,7 @@ mod tests {
             }
         "},
         diagnostics: vec![
-            LintDiagnostic::new(
+            LintDiagnostic::warning(
                 spanned_test!(
                     34,
                     LintDiagnosticKind::UnreachableCode,
@@ -110,7 +110,7 @@ mod tests {
             }
         "},
         diagnostics: vec![
-            LintDiagnostic::new(
+            LintDiagnostic::warning(
                 spanned_test!(
                     30,
                     LintDiagnosticKind::UnreachableCode,
@@ -144,7 +144,7 @@ mod tests {
             }
         "},
         diagnostics: vec![
-            LintDiagnostic::new(
+            LintDiagnostic::warning(
                 spanned_test!(
                     68,
                     LintDiagnosticKind::UnreachableCode,
