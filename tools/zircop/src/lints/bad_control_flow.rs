@@ -55,13 +55,13 @@ impl<'input> SyntacticVisit<'input> for Visit {
                 if let StmtKind::BlockStmt(stmts) = then.0.value()
                     && stmts.is_empty()
                 {
-                    self.diagnostics.push(LintDiagnostic::new(
+                    self.diagnostics.push(LintDiagnostic::warning(
                         LintDiagnosticKind::EmptyIfBlock.in_span(else_block.0.span()),
                     ));
                 } else if let StmtKind::BlockStmt(stmts) = else_block.0.value()
                     && stmts.is_empty()
                 {
-                    self.diagnostics.push(LintDiagnostic::new(
+                    self.diagnostics.push(LintDiagnostic::warning(
                         LintDiagnosticKind::EmptyElseBlock.in_span(else_block.0.span()),
                     ));
                 }
@@ -71,7 +71,7 @@ impl<'input> SyntacticVisit<'input> for Visit {
             if let StmtKind::BlockStmt(stmts) = body.0.value()
                 && stmts.is_empty()
             {
-                self.diagnostics.push(LintDiagnostic::new(
+                self.diagnostics.push(LintDiagnostic::warning(
                     LintDiagnosticKind::EmptyWhileBody.in_span(body.0.span()),
                 ));
             }
@@ -97,7 +97,7 @@ mod tests {
             }
         "},
         diagnostics: vec![
-            LintDiagnostic::new(
+            LintDiagnostic::warning(
                 spanned_test!(
                     46,
                     LintDiagnosticKind::EmptyIfBlock,
@@ -117,7 +117,7 @@ mod tests {
             }
         "},
         diagnostics: vec![
-            LintDiagnostic::new(
+            LintDiagnostic::warning(
                 spanned_test!(
                     53,
                     LintDiagnosticKind::EmptyElseBlock,
@@ -136,7 +136,7 @@ mod tests {
             }
         "},
         diagnostics: vec![
-            LintDiagnostic::new(
+            LintDiagnostic::warning(
                 spanned_test!(
                     33,
                     LintDiagnosticKind::EmptyWhileBody,

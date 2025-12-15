@@ -74,7 +74,7 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit<'input> {
                 && !matches!(var_entry.ty, Type::Fn(_))
             {
                 let span = var_entry.declaration_span;
-                self.diagnostics.push(LintDiagnostic::new(
+                self.diagnostics.push(LintDiagnostic::warning(
                     LintDiagnosticKind::UnusedVariable(var_name.to_string()).in_span(span),
                 ));
                 self.reported_vars.push(var_name);
@@ -101,7 +101,7 @@ mod tests {
             }
         "},
         diagnostics: vec![
-            LintDiagnostic::new(
+            LintDiagnostic::warning(
                 spanned_test!(
                     24,
                     LintDiagnosticKind::UnusedVariable("unused".to_string()),

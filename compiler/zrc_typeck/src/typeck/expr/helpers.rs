@@ -203,8 +203,7 @@ pub fn resolve_binary_int_operands<'input>(
 
 #[cfg(test)]
 mod tests {
-
-    use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+    use zrc_diagnostics::{Diagnostic, DiagnosticKind};
     use zrc_parser::ast::expr::{Arithmetic, Assignment, Expr, ExprKind};
     use zrc_utils::{
         span::{Span, Spannable},
@@ -219,8 +218,7 @@ mod tests {
         let sample_span = Span::from_positions_and_file(0, 5, "<test>");
         assert_eq!(
             expect_identical_types(&TastType::I32, &TastType::I8, sample_span),
-            Err(Diagnostic(
-                Severity::Error,
+            Err(Diagnostic::error(
                 DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string())
                     .in_span(sample_span)
             ))
@@ -237,8 +235,7 @@ mod tests {
                 "got".to_string(),
                 sample_span
             ),
-            Err(Diagnostic(
-                Severity::Error,
+            Err(Diagnostic::error(
                 DiagnosticKind::ExpectedGot {
                     expected: "expected".to_string(),
                     got: "got".to_string()

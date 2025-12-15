@@ -3,7 +3,7 @@
 use thiserror::Error;
 use zrc_utils::span::{Span, Spannable};
 
-use crate::{Diagnostic, Severity};
+use crate::Diagnostic;
 
 /// The list of possible errors
 ///
@@ -162,6 +162,6 @@ impl DiagnosticKind {
     #[must_use]
     #[inline]
     pub fn error_in(self, span: Span) -> Diagnostic {
-        Diagnostic(Severity::Error, self.in_span(span))
+        Diagnostic::error(self.in_span(span))
     }
 }

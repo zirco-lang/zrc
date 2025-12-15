@@ -358,7 +358,6 @@ pub fn type_match<'input, 'gs>(
 
 #[cfg(test)]
 mod tests {
-    use zrc_diagnostics::Severity;
     use zrc_utils::spanned_test;
 
     use super::*;
@@ -386,14 +385,11 @@ mod tests {
 
         assert_eq!(
             diagnostic,
-            Diagnostic(
-                Severity::Error,
-                spanned_test!(
-                    20,
-                    DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string()),
-                    27
-                )
-            )
+            Diagnostic::error(spanned_test!(
+                20,
+                DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string()),
+                27
+            ))
         );
     }
 }
