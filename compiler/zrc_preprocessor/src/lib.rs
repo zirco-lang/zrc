@@ -296,6 +296,7 @@ fn preprocess_internal(
                                         .collect::<Vec<_>>()
                                         .join("\n"),
                                 ))
+                                .with_note(NoteKind::IncludeKinds)
                         })?
                         .to_string_lossy()
                         .to_string();
