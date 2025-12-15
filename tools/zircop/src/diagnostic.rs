@@ -41,5 +41,18 @@ impl ErrorCode for LintDiagnosticKind {
     }
 }
 
+/// The list of possible labels on Zircop lints
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
+pub enum LintLabelKind {}
+
+/// The list of possible notes on Zircop lints
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
+pub enum LintNoteKind {}
+
+/// The list of possible helps on Zircop lints
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
+pub enum LintHelpKind {}
+
 /// A Zircop lint
-pub type LintDiagnostic = GenericDiagnostic<LintDiagnosticKind>;
+pub type LintDiagnostic =
+    GenericDiagnostic<LintDiagnosticKind, LintLabelKind, LintNoteKind, LintHelpKind>;
