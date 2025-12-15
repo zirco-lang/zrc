@@ -125,6 +125,7 @@ where
             self.severity.to_report_kind(),
             (path, span.start()..span.end()),
         )
+        .with_code(self.kind.value().error_code())
         .with_message(message.clone())
         .with_label(
             Label::new((path, span.start()..span.end()))
