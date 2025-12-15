@@ -59,6 +59,6 @@ pub mod diagnostic;
 mod diagnostic_kind;
 mod ext;
 
-pub use diagnostic::{Diagnostic, Severity};
+pub use diagnostic::{Diagnostic, DiagnosticEmitFormat, Severity};
 pub use diagnostic_kind::{DiagnosticKind, HelpKind, LabelKind, NoteKind};
 pub use ext::{SpanExt, SpannedExt};

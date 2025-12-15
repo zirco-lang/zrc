@@ -11,6 +11,7 @@ use std::{
 };
 
 use ariadne::{Color, Label, Report, ReportKind};
+use serde::Serialize;
 use zrc_utils::span::Spanned;
 
 use crate::{
@@ -18,8 +19,17 @@ use crate::{
     diagnostic_kind::{HelpKind, LabelKind, NoteKind},
 };
 
+/// The format to emit diagnostics in
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagnosticEmitFormat {
+    /// Human-readable text format (default)
+    Human,
+    /// JSON format for machine consumption
+    Json,
+}
+
 /// The severity of a [`Diagnostic`].
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize)]
 pub enum Severity {
     /// Error. Compilation will not continue.
     Error,
@@ -55,7 +65,7 @@ impl Severity {
 }
 
 /// The severity of a [`Label`].
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Serialize)]
 pub enum LabelType {
     /// Error. Compilation will not continue.
     Error,
@@ -78,10 +88,10 @@ impl LabelType {
 }
 
 /// A label in the diagnostic window
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct GenericLabel<LK>
 where
-    LK: Debug + PartialEq + Eq + Display,
+    LK: Debug + PartialEq + Eq + Display + Serialize,
 {
     /// The severity of this label
     pub severity: LabelType,
@@ -90,7 +100,7 @@ where
 }
 impl<LK> GenericLabel<LK>
 where
-    LK: Debug + PartialEq + Eq + Display,
+    LK: Debug + PartialEq + Eq + Display + Serialize,
 {
     /// Create a new label with the given severity and kind.
     pub const fn new(severity: LabelType, kind: Spanned<LK>) -> Self {
@@ -121,13 +131,13 @@ pub trait ErrorCode {
 }
 
 /// A diagnostic message produced by one of the zrc tools
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub struct GenericDiagnostic<K, LK, NK, HK>
 where
-    K: Debug + PartialEq + Eq + Display + ErrorCode,
-    LK: Debug + PartialEq + Eq + Display,
-    NK: Debug + PartialEq + Eq + Display,
-    HK: Debug + PartialEq + Eq + Display,
+    K: Debug + PartialEq + Eq + Display + ErrorCode + Serialize,
+    LK: Debug + PartialEq + Eq + Display + Serialize,
+    NK: Debug + PartialEq + Eq + Display + Serialize,
+    HK: Debug + PartialEq + Eq + Display + Serialize,
 {
     /// The severity of this diagnostic
     pub severity: Severity,
@@ -148,10 +158,10 @@ where
 }
 impl<K, LK, NK, HK> Display for GenericDiagnostic<K, LK, NK, HK>
 where
-    K: Debug + PartialEq + Eq + Display + ErrorCode,
-    LK: Debug + PartialEq + Eq + Display,
-    HK: Debug + PartialEq + Eq + Display,
-    NK: Debug + PartialEq + Eq + Display,
+    K: Debug + PartialEq + Eq + Display + ErrorCode + Serialize,
+    LK: Debug + PartialEq + Eq + Display + Serialize,
+    HK: Debug + PartialEq + Eq + Display + Serialize,
+    NK: Debug + PartialEq + Eq + Display + Serialize,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -166,10 +176,10 @@ where
 
 impl<K, LK, NK, HK> GenericDiagnostic<K, LK, NK, HK>
 where
-    K: Debug + PartialEq + Eq + Display + ErrorCode,
-    LK: Debug + PartialEq + Eq + Display,
-    NK: Debug + PartialEq + Eq + Display,
-    HK: Debug + PartialEq + Eq + Display,
+    K: Debug + PartialEq + Eq + Display + ErrorCode + Serialize,
+    LK: Debug + PartialEq + Eq + Display + Serialize,
+    NK: Debug + PartialEq + Eq + Display + Serialize,
+    HK: Debug + PartialEq + Eq + Display + Serialize,
 {
     /// Convert this [`Diagnostic`] to a printable string using ariadne. The
     /// source code is provided directly as a string if it is not read from a
@@ -242,6 +252,31 @@ where
         String::from_utf8(buffer).expect("diagnostic output should be valid UTF-8")
     }
 
+    /// Convert this [`Diagnostic`] to JSON format using [`serde_json`].
+    ///
+    /// # Panics
+    /// This function may panic if serialization fails (which should not happen
+    /// in practice).
+    #[must_use]
+    pub fn print_json(&self) -> String {
+        serde_json::to_string(self).expect("diagnostic serialization should succeed")
+    }
+
+    /// Emit this diagnostic in the specified format.
+    ///
+    /// This is a convenience method that calls either [`Self::print`] or
+    /// [`Self::print_json`] based on the format.
+    ///
+    /// # Panics
+    /// See [`Self::print`] and [`Self::print_json`] for panic conditions.
+    #[must_use]
+    pub fn emit(&self, format: DiagnosticEmitFormat, piped_source: Option<&str>) -> String {
+        match format {
+            DiagnosticEmitFormat::Human => self.print(piped_source),
+            DiagnosticEmitFormat::Json => self.print_json(),
+        }
+    }
+
     /// Create a new empty diagnostic with the given severity and kind.
     const fn new_empty(severity: Severity, kind: Spanned<K>) -> Self {
         Self {
@@ -286,10 +321,10 @@ where
 }
 impl<K, LK, NK, HK> Error for GenericDiagnostic<K, LK, NK, HK>
 where
-    K: Debug + PartialEq + Eq + Display + ErrorCode,
-    LK: Debug + PartialEq + Eq + Display,
-    NK: Debug + PartialEq + Eq + Display,
-    HK: Debug + PartialEq + Eq + Display,
+    K: Debug + PartialEq + Eq + Display + ErrorCode + Serialize,
+    LK: Debug + PartialEq + Eq + Display + Serialize,
+    NK: Debug + PartialEq + Eq + Display + Serialize,
+    HK: Debug + PartialEq + Eq + Display + Serialize,
 {
 }
 
@@ -336,5 +371,74 @@ mod tests {
         assert!(output.contains("<stdin>"));
         assert!(output.contains("Error"));
         assert!(output.contains("invalid token"));
+    }
+
+    #[test]
+    fn diagnostic_print_json_produces_valid_json() {
+        let diagnostic = Diagnostic::error(spanned_test!(0, DiagnosticKind::InvalidToken, 4));
+        let json_output = diagnostic.print_json();
+
+        // Verify it's valid JSON by parsing it
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json_output).expect("should be valid JSON");
+
+        // Check that key fields exist
+        assert!(parsed.get("severity").is_some());
+        assert!(parsed.get("kind").is_some());
+    }
+
+    #[test]
+    #[ignore = "requires file access"]
+    fn diagnostic_emit_human_format_calls_print() {
+        let source = "let x = 5;";
+        let diagnostic = Diagnostic::error(spanned!(4, DiagnosticKind::InvalidToken, 5, "<test>"));
+        let output = diagnostic.emit(DiagnosticEmitFormat::Human, Some(source));
+
+        // Should contain human-readable formatting
+        assert!(output.contains("Error"));
+    }
+
+    #[test]
+    fn diagnostic_emit_json_format_produces_json() {
+        let diagnostic = Diagnostic::error(spanned_test!(0, DiagnosticKind::InvalidToken, 4));
+        let json_output = diagnostic.emit(DiagnosticEmitFormat::Json, None);
+
+        // Verify it's valid JSON
+        assert!(serde_json::from_str::<serde_json::Value>(&json_output).is_ok());
+    }
+
+    #[test]
+    fn diagnostic_with_labels_serializes_correctly() {
+        let diagnostic =
+            Diagnostic::error(spanned_test!(0, DiagnosticKind::InvalidToken, 4)).with_label(
+                GenericLabel::error(spanned_test!(0, LabelKind::InvalidToken, 4)),
+            );
+
+        let json_output = diagnostic.print_json();
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json_output).expect("should be valid JSON");
+
+        // Check that labels array exists and has content
+        let labels = parsed.get("labels").expect("should have labels field");
+        assert!(labels.is_array());
+        assert!(!labels.as_array().expect("should be array").is_empty());
+    }
+
+    #[test]
+    fn diagnostic_with_notes_and_helps_serializes_correctly() {
+        let diagnostic = Diagnostic::error(spanned_test!(0, DiagnosticKind::InvalidToken, 4))
+            .with_note(NoteKind::ExpectedOneOfTokens(vec![
+                "token1".to_string(),
+                "token2".to_string(),
+            ]))
+            .with_help(HelpKind::JavascriptUserDetected("=="));
+
+        let json_output = diagnostic.print_json();
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json_output).expect("should be valid JSON");
+
+        // Check that notes and helps arrays exist
+        assert!(parsed.get("notes").is_some());
+        assert!(parsed.get("helps").is_some());
     }
 }

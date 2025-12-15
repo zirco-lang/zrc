@@ -14,6 +14,8 @@ use std::{
     path::PathBuf,
 };
 
+use serde::Serialize;
+
 /// Represents the start and end of some segment of a string
 ///
 /// A span represents the start and end of some span within a string. It can be
@@ -25,7 +27,7 @@ use std::{
 /// - Direct construction ([`Span::from_positions_and_file`])
 /// - Methods on another Span ([`Span::intersect`])
 /// - Stripping the value from a [`Spanned<T>`] ([`Spanned::span`])
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Span(usize, usize, &'static str);
 impl Span {
     /// Create a new [`Span`] given a start and end location with a file name.
@@ -131,7 +133,7 @@ impl Debug for Span {
 /// - By attaching a value to a [`Span`] ([`Span::containing`])
 /// - By attaching a [`Span`] to a value (with the [`Spannable`] trait's
 ///   [`Spannable::in_span`] method)
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Spanned<T>(Span, T);
 impl<T> Spanned<T> {
     /// Create a new [`Spanned<T>`] instance from a [`Span`] and some value

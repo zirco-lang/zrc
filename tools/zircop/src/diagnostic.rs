@@ -1,11 +1,12 @@
 //! Diagnostics producible by the Zircop tool
 
+use serde::Serialize;
 use thiserror::Error;
 use zrc_diagnostics::diagnostic::{ErrorCode, GenericDiagnostic};
 
 /// The list of possible lints Zircop can raise
 #[expect(missing_docs)]
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, Clone, Serialize)]
 pub enum LintDiagnosticKind {
     #[error("assignment found in condition expression, consider using `==` or `!=` instead")]
     AssignmentInCondition,
@@ -42,15 +43,15 @@ impl ErrorCode for LintDiagnosticKind {
 }
 
 /// The list of possible labels on Zircop lints
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, Clone, Serialize)]
 pub enum LintLabelKind {}
 
 /// The list of possible notes on Zircop lints
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, Clone, Serialize)]
 pub enum LintNoteKind {}
 
 /// The list of possible helps on Zircop lints
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, Clone, Serialize)]
 pub enum LintHelpKind {}
 
 /// A Zircop lint

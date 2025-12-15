@@ -9,5 +9,6 @@ path = "src/main.rs"
 
 [dependencies]
 zrc = { path = "../zrc" }
+zrc_diagnostics = { path = "../zrc_diagnostics" }
 clap = { version = "4.5.4", features = ["derive"] }
 mimalloc = "0.1.48"

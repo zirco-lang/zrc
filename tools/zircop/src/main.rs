@@ -98,13 +98,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match diagnostics {
         Err(diagnostic) => {
-            eprintln!("{}", diagnostic.print(Some(&source_content)));
+            eprintln!(
+                "{}",
+                diagnostic.emit(cli.diagnostic_emit.into(), Some(&source_content))
+            );
             eprintln!("The above error originated from zrc - this is not a Zircop lint.");
             process::exit(1);
         }
         Ok(diagnostics) => {
             for diag in &diagnostics {
-                eprintln!("{}", diag.print(Some(&source_content)));
+                eprintln!(
+                    "{}",
+                    diag.emit(cli.diagnostic_emit.into(), Some(&source_content))
+                );
             }
 
             println!("Linting complete: {} issue(s) found.", diagnostics.len());

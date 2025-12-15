@@ -50,7 +50,7 @@
     clippy::doc_comment_double_space_linebreaks
 )]
 
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, io::Write};
 
 use mimalloc::MiMalloc;
 /// Use the mimalloc allocator as the global allocator, as LLVM is heavy on heap
@@ -132,7 +132,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match result {
         Err(diagnostic) => {
-            eprintln!("{}", diagnostic.print(Some(&source_content)));
+            eprintln!(
+                "{}",
+                diagnostic.emit(cli.diagnostic_emit.into(), Some(&source_content))
+            );
             std::process::exit(1);
         }
         Ok(x) => {

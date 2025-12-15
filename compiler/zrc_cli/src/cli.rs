@@ -7,6 +7,7 @@ use std::{
 
 use clap::Parser;
 use zrc::{OutputFormat, codegen::OptimizationLevel};
+use zrc_diagnostics::DiagnosticEmitFormat;
 
 /// The official Zirco compiler
 #[derive(Parser)]
@@ -56,6 +57,11 @@ pub struct Cli {
     /// Add a directory to the include path
     #[arg(short = 'I', long = "include", action = clap::ArgAction::Append)]
     pub include_paths: Vec<PathBuf>,
+
+    /// Set the diagnostic output format
+    #[arg(long = "diagnostic-emit")]
+    #[clap(default_value = "human")]
+    pub diagnostic_emit: DiagnosticFormat,
 }
 
 /// Configuration for the Zirco optimizer
@@ -147,6 +153,23 @@ impl From<FrontendOutputFormat> for OutputFormat {
             FrontendOutputFormat::Tast => Self::Tast,
             FrontendOutputFormat::Asm => Self::Asm,
             FrontendOutputFormat::Object => Self::Object,
+        }
+    }
+}
+
+/// The format to emit diagnostics in
+#[derive(Debug, Clone, Copy, clap::ValueEnum, PartialEq, Eq)]
+pub enum DiagnosticFormat {
+    /// Human-readable text format (default)
+    Human,
+    /// JSON format for machine consumption
+    Json,
+}
+impl From<DiagnosticFormat> for DiagnosticEmitFormat {
+    fn from(val: DiagnosticFormat) -> Self {
+        match val {
+            DiagnosticFormat::Human => Self::Human,
+            DiagnosticFormat::Json => Self::Json,
         }
     }
 }

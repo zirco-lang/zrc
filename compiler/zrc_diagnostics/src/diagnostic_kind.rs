@@ -1,5 +1,6 @@
 //! Defines all possible Zirco compile time diagnostics.
 
+use serde::Serialize;
 use thiserror::Error;
 use zrc_utils::span::{Span, Spannable};
 
@@ -12,7 +13,7 @@ use crate::{Diagnostic, diagnostic::ErrorCode};
 // These remain as Strings, not 'input str slices, to avoid circular dependencies (it's either use
 // String, or use Tok, because str would be to-string()d from some tokens)
 #[expect(missing_docs)]
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, Clone, Serialize)]
 pub enum DiagnosticKind {
     // LEXER ERRORS
     #[error("unknown token `{0}`")]
@@ -237,7 +238,7 @@ impl ErrorCode for DiagnosticKind {
 }
 
 /// The list of possible labels attached to a [`Diagnostic`]
-#[derive(Debug, PartialEq, Eq, Clone, Error)]
+#[derive(Debug, PartialEq, Eq, Clone, Error, Serialize)]
 #[expect(missing_docs)]
 pub enum LabelKind {
     #[error("unknown token `{0}`")]
@@ -264,7 +265,7 @@ pub enum LabelKind {
 
 /// The list of possible notes attached to a [`Diagnostic`]
 #[expect(missing_docs)]
-#[derive(Debug, PartialEq, Eq, Clone, Error)]
+#[derive(Debug, PartialEq, Eq, Clone, Error, Serialize)]
 pub enum NoteKind {
     #[error(
         "Zirco allows nested comments, so every opening `/*` must have a matching closing `*/`"
@@ -275,7 +276,7 @@ pub enum NoteKind {
 }
 
 /// The list of possible help messages attached to a [`Diagnostic`]
-#[derive(Debug, PartialEq, Eq, Clone, Error)]
+#[derive(Debug, PartialEq, Eq, Clone, Error, Serialize)]
 #[expect(missing_docs)]
 pub enum HelpKind {
     #[error("did you mean `{0}`?")]
