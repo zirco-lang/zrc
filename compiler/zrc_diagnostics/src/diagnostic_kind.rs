@@ -237,3 +237,15 @@ impl ErrorCode for DiagnosticKind {
         }
     }
 }
+
+/// The list of possible labels attached to a [`Diagnostic`]
+#[derive(Debug, PartialEq, Eq, Clone, Error)]
+pub enum LabelKind {}
+
+/// The list of possible notes attached to a [`Diagnostic`]
+#[derive(Debug, PartialEq, Eq, Clone, Error)]
+pub enum NoteKind {}
+
+/// The list of possible help messages attached to a [`Diagnostic`]
+#[derive(Debug, PartialEq, Eq, Clone, Error)]
+pub enum HelpKind {}
