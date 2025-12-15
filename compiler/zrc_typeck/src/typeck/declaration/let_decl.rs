@@ -183,9 +183,9 @@ mod tests {
 
         assert!(result.is_err());
         if let Err(diagnostic) = result {
-            assert_eq!(diagnostic.0, Severity::Error);
+            assert_eq!(diagnostic.severity, Severity::Error);
             assert!(matches!(
-                diagnostic.1.into_value(),
+                diagnostic.kind.into_value(),
                 DiagnosticKind::FunctionNotFirstClass
             ));
         }
@@ -205,9 +205,9 @@ mod tests {
 
         assert!(result.is_err());
         if let Err(diagnostic) = result {
-            assert_eq!(diagnostic.0, Severity::Error);
+            assert_eq!(diagnostic.severity, Severity::Error);
             assert!(matches!(
-                diagnostic.1.into_value(),
+                diagnostic.kind.into_value(),
                 DiagnosticKind::FunctionNotFirstClass
             ));
         }

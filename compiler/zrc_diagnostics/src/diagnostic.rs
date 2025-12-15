@@ -48,10 +48,16 @@ impl Severity {
 
 /// A diagnostic message produced by one of the zrc tools
 #[derive(Debug, PartialEq, Eq, Display)]
-#[display("{_0}: {_1}")]
-pub struct GenericDiagnostic<Kind>(pub Severity, pub Spanned<Kind>)
+#[display("{severity}: {kind}")]
+pub struct GenericDiagnostic<K>
 where
-    Kind: Debug + PartialEq + Eq + Display;
+    K: Debug + PartialEq + Eq + Display,
+{
+    /// The severity of this diagnostic
+    pub severity: Severity,
+    /// The span and kind of this diagnostic's main message
+    pub kind: Spanned<K>,
+}
 
 impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
     /// Convert this [`Diagnostic`] to a printable string using ariadne. The
@@ -63,8 +69,8 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
     /// buffer fails.
     #[must_use]
     pub fn print(&self, piped_source: Option<&str>) -> String {
-        let span = self.1.span();
-        let message = self.1.to_string();
+        let span = self.kind.span();
+        let message = self.kind.to_string();
 
         // read the source from the path inside of the span. if it is <stdin>, use
         // the provided piped source.
@@ -89,14 +95,17 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
         };
 
         // Create ariadne report using (filename, range) as the span type
-        let report = Report::build(self.0.to_report_kind(), (path, span.start()..span.end()))
-            .with_message(message.clone())
-            .with_label(
-                Label::new((path, span.start()..span.end()))
-                    .with_message(message)
-                    .with_color(self.0.color()),
-            )
-            .finish();
+        let report = Report::build(
+            self.severity.to_report_kind(),
+            (path, span.start()..span.end()),
+        )
+        .with_message(message.clone())
+        .with_label(
+            Label::new((path, span.start()..span.end()))
+                .with_message(message)
+                .with_color(self.severity.color()),
+        )
+        .finish();
 
         // Write report to string
         let mut buffer = Vec::new();
@@ -108,13 +117,19 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
     }
 
     /// Create an error.
-    pub const fn error(span: Spanned<K>) -> Self {
-        Self(Severity::Error, span)
+    pub const fn error(kind: Spanned<K>) -> Self {
+        Self {
+            severity: Severity::Error,
+            kind,
+        }
     }
 
     /// Create a warning.
-    pub const fn warning(span: Spanned<K>) -> Self {
-        Self(Severity::Warning, span)
+    pub const fn warning(kind: Spanned<K>) -> Self {
+        Self {
+            severity: Severity::Warning,
+            kind,
+        }
     }
 }
 impl<K: Debug + PartialEq + Eq + Display> Error for GenericDiagnostic<K> {}

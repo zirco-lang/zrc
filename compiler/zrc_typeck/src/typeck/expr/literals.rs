@@ -279,7 +279,7 @@ mod tests {
         );
         if let Err(diagnostic) = result {
             assert!(matches!(
-                diagnostic.1.into_value(),
+                diagnostic.kind.into_value(),
                 DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
             ));
         } else {
@@ -295,7 +295,7 @@ mod tests {
         );
         if let Err(diagnostic) = result {
             assert!(matches!(
-                diagnostic.1.into_value(),
+                diagnostic.kind.into_value(),
                 DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
             ));
         } else {
@@ -344,7 +344,7 @@ mod tests {
         );
         if let Err(diagnostic) = result {
             assert!(matches!(
-                diagnostic.1.into_value(),
+                diagnostic.kind.into_value(),
                 DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
             ));
         } else {
@@ -371,7 +371,7 @@ mod tests {
         );
         if let Err(diagnostic) = result {
             assert!(matches!(
-                diagnostic.1.into_value(),
+                diagnostic.kind.into_value(),
                 DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
             ));
         } else {
