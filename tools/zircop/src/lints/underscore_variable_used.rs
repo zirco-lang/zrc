@@ -11,6 +11,7 @@
 //! the variable is indeed used, or to rename the variable to avoid the
 //! underscore if it is meant to be used.
 
+use zrc_diagnostics::diagnostic::GenericLabel;
 use zrc_typeck::{
     tast::{stmt::TypedDeclaration, ty::Type},
     typeck::BlockMetadata,
@@ -18,7 +19,7 @@ use zrc_typeck::{
 use zrc_utils::span::{Spannable, Spanned};
 
 use crate::{
-    diagnostic::{LintDiagnostic, LintDiagnosticKind},
+    diagnostic::{LintDiagnostic, LintDiagnosticKind, LintHelpKind, LintLabelKind},
     lint::Lint,
     visit::SemanticVisit,
 };
@@ -68,7 +69,7 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit<'input> {
         // Check the current block's scope for underscore-used variables.
         for (var_name, var_entry_rc) in block.scope.values.iter() {
             let var_entry = var_entry_rc.borrow();
-            if !var_entry.referenced_spans.is_empty()
+            if let Some(first_use) = var_entry.referenced_spans.first()
                 && var_name.starts_with('_')
                 && !self.reported_vars.contains(&var_name)
                 // Functions are also stored as variables in the scope, but
@@ -77,9 +78,24 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit<'input> {
                 && !matches!(var_entry.ty, Type::Fn(_))
             {
                 let span = var_entry.declaration_span;
-                self.diagnostics.push(LintDiagnostic::warning(
-                    LintDiagnosticKind::UnderscoreVariableUsed(var_name.to_string()).in_span(span),
-                ));
+                self.diagnostics.push(
+                    LintDiagnostic::warning(
+                        LintDiagnosticKind::UnderscoreVariableUsed.in_span(span),
+                    )
+                    .with_label(GenericLabel::warning(
+                        LintLabelKind::UnderscoreVariableDeclaration.in_span(span),
+                    ))
+                    .with_label(GenericLabel::note(
+                        LintLabelKind::UnderscoreVariableUsage.in_span(*first_use),
+                    ))
+                    .with_help(LintHelpKind::RenameVariable(
+                        var_name
+                            .to_string()
+                            .strip_prefix("_")
+                            .expect("variable name already determined to start with underscore")
+                            .to_string(),
+                    )),
+                );
                 self.reported_vars.push(var_name);
             }
         }
@@ -106,9 +122,27 @@ mod tests {
             LintDiagnostic::warning(
                 spanned_test!(
                     24,
-                    LintDiagnosticKind::UnderscoreVariableUsed("_used".to_string()),
+                    LintDiagnosticKind::UnderscoreVariableUsed,
                     34
                 )
+            ).with_label(
+                GenericLabel::warning(
+                    spanned_test!(
+                        24,
+                        LintLabelKind::UnderscoreVariableDeclaration,
+                        34
+                    )
+                )
+            ).with_label(
+                GenericLabel::note(
+                    spanned_test!(
+                        47,
+                        LintLabelKind::UnderscoreVariableUsage,
+                        52
+                    )
+                )
+            ).with_help(
+                LintHelpKind::RenameVariable("used".to_string())
             ),
         ]
     }

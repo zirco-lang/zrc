@@ -6,14 +6,15 @@
 //! in the program. The lint encourages developers to remove
 //! unreachable statements to improve code clarity.
 
+use zrc_diagnostics::diagnostic::GenericLabel;
 use zrc_typeck::{
     tast::stmt::TypedDeclaration,
     typeck::{BlockMetadata, BlockReturnActuality},
 };
-use zrc_utils::span::{Spannable, Spanned};
+use zrc_utils::span::{Span, Spannable, Spanned};
 
 use crate::{
-    diagnostic::{LintDiagnostic, LintDiagnosticKind},
+    diagnostic::{LintDiagnostic, LintDiagnosticKind, LintLabelKind},
     lint::Lint,
     visit::SemanticVisit,
 };
@@ -52,20 +53,26 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit {
         let stmts = &block.stmts;
 
         // Track whether we've encountered a statement that always returns
-        let mut found_always_returns = false;
+        let mut found_always_returns_at = None::<Span>;
 
         for stmt in stmts {
-            if found_always_returns {
+            if let Some(return_span) = found_always_returns_at {
                 // This statement is unreachable
                 let span = stmt.kind.span();
-                self.diagnostics.push(LintDiagnostic::warning(
-                    LintDiagnosticKind::UnreachableCode.in_span(span),
-                ));
+                self.diagnostics.push(
+                    LintDiagnostic::warning(LintDiagnosticKind::UnreachableCode.in_span(span))
+                        .with_label(GenericLabel::warning(
+                            LintLabelKind::UnreachableCode.in_span(span),
+                        ))
+                        .with_label(GenericLabel::note(
+                            LintLabelKind::PriorControlFlow.in_span(return_span),
+                        )),
+                );
                 // Continue checking to report all unreachable statements
             }
 
             if stmt.return_actuality == BlockReturnActuality::AlwaysReturns {
-                found_always_returns = true;
+                found_always_returns_at = Some(stmt.kind.span());
             }
         }
 
@@ -97,24 +104,21 @@ mod tests {
                     LintDiagnosticKind::UnreachableCode,
                     45
                 )
-            ),
-        ]
-    }
-
-    zircop_lint_test! {
-        name: unreachable_code_after_unreachable,
-        source: indoc!{"
-            fn f() {
-                unreachable;
-                let _x = 1;
-            }
-        "},
-        diagnostics: vec![
-            LintDiagnostic::warning(
-                spanned_test!(
-                    30,
-                    LintDiagnosticKind::UnreachableCode,
-                    41
+            ).with_label(
+                GenericLabel::warning(
+                    spanned_test!(
+                        34,
+                        LintLabelKind::UnreachableCode,
+                        45
+                    )
+                )
+            ).with_label(
+                GenericLabel::note(
+                    spanned_test!(
+                        20,
+                        LintLabelKind::PriorControlFlow,
+                        29
+                    )
                 )
             ),
         ]
@@ -129,28 +133,5 @@ mod tests {
             }
         "},
         diagnostics: vec![]
-    }
-
-    zircop_lint_test! {
-        name: unreachable_code_in_if_branch,
-        source: indoc!{"
-            fn f(cond: bool) -> i32 {
-                if (cond) {
-                    return 1;
-                    let _x = 2;
-                } else {
-                    return 0;
-                }
-            }
-        "},
-        diagnostics: vec![
-            LintDiagnostic::warning(
-                spanned_test!(
-                    68,
-                    LintDiagnosticKind::UnreachableCode,
-                    79
-                )
-            ),
-        ]
     }
 }

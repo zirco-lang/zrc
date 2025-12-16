@@ -8,11 +8,12 @@
 //! Each of these patterns can lead to confusing or misleading code and should
 //! be avoided.
 
+use zrc_diagnostics::diagnostic::GenericLabel;
 use zrc_parser::ast::stmt::{Declaration, Stmt, StmtKind};
 use zrc_utils::span::{Spannable, Spanned};
 
 use crate::{
-    diagnostic::{LintDiagnostic, LintDiagnosticKind},
+    diagnostic::{LintDiagnostic, LintDiagnosticKind, LintHelpKind, LintLabelKind},
     lint::Lint,
     visit::SyntacticVisit,
 };
@@ -48,22 +49,38 @@ struct Visit {
 impl<'input> SyntacticVisit<'input> for Visit {
     fn visit_stmt(&mut self, stmt: &Stmt<'input>) {
         #[expect(clippy::else_if_without_else)]
-        if let StmtKind::IfStmt(_, then, then_else) = stmt.0.value() {
+        if let StmtKind::IfStmt(cond, then, then_else) = stmt.0.value() {
+            let then_span = then.0.span();
             if let Some(else_block) = then_else {
                 // 1. Empty if or else block
 
                 if let StmtKind::BlockStmt(stmts) = then.0.value()
                     && stmts.is_empty()
                 {
-                    self.diagnostics.push(LintDiagnostic::warning(
-                        LintDiagnosticKind::EmptyIfBlock.in_span(else_block.0.span()),
-                    ));
+                    self.diagnostics.push(
+                        LintDiagnostic::warning(
+                            LintDiagnosticKind::SussyControlFlow.in_span(else_block.0.span()),
+                        )
+                        .with_label(GenericLabel::note(
+                            LintLabelKind::EmptyIf.in_span(then_span),
+                        ))
+                        .with_label(GenericLabel::warning(
+                            LintLabelKind::NonEmptyElse.in_span(else_block.0.span()),
+                        ))
+                        .with_help(LintHelpKind::InvertIfCondition(cond.to_string())),
+                    );
                 } else if let StmtKind::BlockStmt(stmts) = else_block.0.value()
                     && stmts.is_empty()
                 {
-                    self.diagnostics.push(LintDiagnostic::warning(
-                        LintDiagnosticKind::EmptyElseBlock.in_span(else_block.0.span()),
-                    ));
+                    self.diagnostics.push(
+                        LintDiagnostic::warning(
+                            LintDiagnosticKind::SussyControlFlow.in_span(else_block.0.span()),
+                        )
+                        .with_label(GenericLabel::warning(
+                            LintLabelKind::EmptyElseBlock.in_span(else_block.0.span()),
+                        ))
+                        .with_help(LintHelpKind::RemoveElseBlock),
+                    );
                 }
             }
         } else if let StmtKind::WhileStmt(_, body) = stmt.0.value() {
@@ -82,7 +99,7 @@ impl<'input> SyntacticVisit<'input> for Visit {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use zrc_utils::spanned_test;
+    use zrc_utils::{span::Span, spanned_test};
 
     use super::*;
     use crate::zircop_lint_test;
@@ -100,9 +117,27 @@ mod tests {
             LintDiagnostic::warning(
                 spanned_test!(
                     46,
-                    LintDiagnosticKind::EmptyIfBlock,
+                    LintDiagnosticKind::SussyControlFlow,
                     55
                 )
+            ).with_label(
+                GenericLabel::note(
+                    LintLabelKind::EmptyIf.in_span(Span::from_positions_and_file(
+                        34,
+                        36,
+                        "<test>",
+                    )),
+                )
+            ).with_label(
+                GenericLabel::warning(
+                    LintLabelKind::NonEmptyElse.in_span(Span::from_positions_and_file(
+                        46,
+                        55,
+                        "<test>",
+                    )),
+                )
+            ).with_help(
+                LintHelpKind::InvertIfCondition("x".to_string())
             ),
         ]
     }
@@ -120,9 +155,19 @@ mod tests {
             LintDiagnostic::warning(
                 spanned_test!(
                     53,
-                    LintDiagnosticKind::EmptyElseBlock,
+                    LintDiagnosticKind::SussyControlFlow,
                     55
                 )
+            ).with_label(
+                GenericLabel::warning(
+                    LintLabelKind::EmptyElseBlock.in_span(Span::from_positions_and_file(
+                        53,
+                        55,
+                        "<test>",
+                    )),
+                )
+            ).with_help(
+                LintHelpKind::RemoveElseBlock
             ),
         ]
     }

@@ -7,20 +7,16 @@ use zrc_diagnostics::diagnostic::{ErrorCode, GenericDiagnostic};
 #[expect(missing_docs)]
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
 pub enum LintDiagnosticKind {
-    #[error("assignment found in condition expression, consider using `==` or `!=` instead")]
-    AssignmentInCondition,
-    #[error("empty struct used, consider using `void` instead")]
+    #[error("empty struct used where `void` would be more appropriate")]
     EmptyStructUsed,
-    #[error("underscore variable `{0}` used, consider renaming it")]
-    UnderscoreVariableUsed(String),
-    #[error("unused variable `{0}`")]
-    UnusedVariable(String),
+    #[error("variable with a '_' name has usages")]
+    UnderscoreVariableUsed,
+    #[error("unused variable")]
+    UnusedVariable,
     #[error("unreachable code")]
     UnreachableCode,
-    #[error("empty `if` block with an `else` block present - consider inverting the condition")]
-    EmptyIfBlock,
-    #[error("empty `else` block - consider removing the `else` block")]
-    EmptyElseBlock,
+    #[error("suspicious control flow")]
+    SussyControlFlow,
     #[error(
         "empty `while` loop body - consider adding statements to the body or removing the loop"
     )]
@@ -29,13 +25,11 @@ pub enum LintDiagnosticKind {
 impl ErrorCode for LintDiagnosticKind {
     fn error_code(&self) -> &'static str {
         match self {
-            Self::AssignmentInCondition => "assignment_in_condition",
             Self::EmptyStructUsed => "empty_struct_used",
-            Self::UnderscoreVariableUsed(_) => "underscore_variable_used",
-            Self::UnusedVariable(_) => "unused_variable",
+            Self::UnderscoreVariableUsed => "underscore_variable_used",
+            Self::UnusedVariable => "unused_variable",
             Self::UnreachableCode => "unreachable_code",
-            Self::EmptyIfBlock => "empty_if_block",
-            Self::EmptyElseBlock => "empty_else_block",
+            Self::SussyControlFlow => "suspicious_control_flow",
             Self::EmptyWhileBody => "empty_while_body",
         }
     }
@@ -43,15 +37,51 @@ impl ErrorCode for LintDiagnosticKind {
 
 /// The list of possible labels on Zircop lints
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
-pub enum LintLabelKind {}
+#[expect(missing_docs)]
+pub enum LintLabelKind {
+    #[error("this `if` block is empty")]
+    EmptyIf,
+    #[error("but this `else` block has contents")]
+    NonEmptyElse,
+    #[error("this `else` block is empty")]
+    EmptyElseBlock,
+    #[error("this type is equivalent to `void`")]
+    EmptyStructType,
+    #[error("this variable is declared with a '_' prefix indicating it is unused")]
+    UnderscoreVariableDeclaration,
+    #[error("but it is used here")]
+    UnderscoreVariableUsage,
+    #[error("this variable is never used")]
+    UnusedVariable,
+    #[error("this statement will never be executed")]
+    UnreachableCode,
+    #[error("because of this prior control flow statement")]
+    PriorControlFlow,
+}
 
 /// The list of possible notes on Zircop lints
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
-pub enum LintNoteKind {}
+#[expect(missing_docs)]
+pub enum LintNoteKind {
+    #[error("to suppress this warning, consider renaming the variable to `{}`", .0)]
+    UnusedVariableSuppress(String),
+}
 
 /// The list of possible helps on Zircop lints
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
-pub enum LintHelpKind {}
+#[expect(missing_docs)]
+pub enum LintHelpKind {
+    #[error("consider inverting the condition: `if (!{}) ...`", .0)]
+    InvertIfCondition(String),
+    #[error("consider removing the `else` block")]
+    RemoveElseBlock,
+    #[error("consider using `void` instead")]
+    UseVoidType,
+    #[error("consider renaming the variable to `{}`", .0)]
+    RenameVariable(String),
+    #[error("consider removing the variable declaration")]
+    RemoveVariableDeclaration,
+}
 
 /// A Zircop lint
 pub type LintDiagnostic =

@@ -6,6 +6,7 @@
 //! or variable declarations. Using `void` in these contexts can improve code
 //! clarity and intent.
 
+use zrc_diagnostics::diagnostic::GenericLabel;
 use zrc_parser::ast::{
     stmt::Declaration,
     ty::{Type, TypeKind},
@@ -13,7 +14,7 @@ use zrc_parser::ast::{
 use zrc_utils::span::{Spannable, Spanned};
 
 use crate::{
-    diagnostic::{LintDiagnostic, LintDiagnosticKind},
+    diagnostic::{LintDiagnostic, LintDiagnosticKind, LintHelpKind, LintLabelKind},
     lint::Lint,
     visit::SyntacticVisit,
 };
@@ -52,9 +53,13 @@ impl<'input> SyntacticVisit<'input> for Visit {
         if let TypeKind::Struct(struct_type) = ty.0.value()
             && struct_type.0.value().is_empty()
         {
-            self.diagnostics.push(LintDiagnostic::warning(
-                LintDiagnosticKind::EmptyStructUsed.in_span(sp),
-            ));
+            self.diagnostics.push(
+                LintDiagnostic::warning(LintDiagnosticKind::EmptyStructUsed.in_span(sp))
+                    .with_label(GenericLabel::warning(
+                        LintLabelKind::EmptyStructType.in_span(sp),
+                    ))
+                    .with_help(LintHelpKind::UseVoidType),
+            );
         }
     }
 }
@@ -75,6 +80,12 @@ mod tests {
         diagnostics: vec![
             LintDiagnostic::warning(
                 spanned_test!(0, LintDiagnosticKind::EmptyStructUsed, 21)
+            ).with_label(
+                GenericLabel::warning(
+                    spanned_test!(0, LintLabelKind::EmptyStructType, 21)
+                )
+            ).with_help(
+                LintHelpKind::UseVoidType
             ),
         ]
     }

@@ -7,6 +7,7 @@
 //! unnecessary variable declarations to improve code clarity and
 //! maintainability.
 
+use zrc_diagnostics::diagnostic::GenericLabel;
 use zrc_typeck::{
     tast::{stmt::TypedDeclaration, ty::Type},
     typeck::BlockMetadata,
@@ -14,7 +15,7 @@ use zrc_typeck::{
 use zrc_utils::span::{Spannable, Spanned};
 
 use crate::{
-    diagnostic::{LintDiagnostic, LintDiagnosticKind},
+    diagnostic::{LintDiagnostic, LintDiagnosticKind, LintHelpKind, LintLabelKind, LintNoteKind},
     lint::Lint,
     visit::SemanticVisit,
 };
@@ -74,9 +75,14 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit<'input> {
                 && !matches!(var_entry.ty, Type::Fn(_))
             {
                 let span = var_entry.declaration_span;
-                self.diagnostics.push(LintDiagnostic::warning(
-                    LintDiagnosticKind::UnusedVariable(var_name.to_string()).in_span(span),
-                ));
+                self.diagnostics.push(
+                    LintDiagnostic::warning(LintDiagnosticKind::UnusedVariable.in_span(span))
+                        .with_label(GenericLabel::warning(
+                            LintLabelKind::UnusedVariable.in_span(span),
+                        ))
+                        .with_help(LintHelpKind::RemoveVariableDeclaration)
+                        .with_note(LintNoteKind::UnusedVariableSuppress(format!("_{var_name}"))),
+                );
                 self.reported_vars.push(var_name);
             }
         }
@@ -104,9 +110,21 @@ mod tests {
             LintDiagnostic::warning(
                 spanned_test!(
                     24,
-                    LintDiagnosticKind::UnusedVariable("unused".to_string()),
+                    LintDiagnosticKind::UnusedVariable,
                     35
                 )
+            ).with_label(
+                GenericLabel::warning(
+                    spanned_test!(
+                        24,
+                        LintLabelKind::UnusedVariable,
+                        35
+                    )
+                )
+            ).with_help(
+                LintHelpKind::RemoveVariableDeclaration
+            ).with_note(
+                LintNoteKind::UnusedVariableSuppress("_unused".to_string())
             ),
         ]
     }
