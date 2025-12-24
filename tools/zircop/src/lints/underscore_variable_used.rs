@@ -68,12 +68,12 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit<'input> {
         // Check the current block's scope for underscore-used variables.
         for (var_name, var_entry_rc) in block.scope.values.iter() {
             let var_entry = var_entry_rc.borrow();
+            // Functions are also stored as variables in the scope, but
+            // we don't want to report them as underscore-prefixed functions
+            // are commonly used as private/internal helpers where usage is intentional
             if !var_entry.referenced_spans.is_empty()
                 && var_name.starts_with('_')
                 && !self.reported_vars.contains(&var_name)
-                // Functions are also stored as variables in the scope, but
-                // we don't want to report them as underscore-prefixed functions
-                // are commonly used as private/internal helpers where usage is intentional
                 && !matches!(var_entry.ty, Type::Fn(_))
             {
                 let span = var_entry.declaration_span;
