@@ -9,7 +9,14 @@ on:
 
 jobs:
     build:
-        runs-on: ubuntu-latest
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                os:
+                    - ubuntu-latest
+                    - ubuntu-latest-arm
+                    - macos-latest
+                    - macos-15-intel
         env:
             LLVM_SYS_201_PREFIX: /usr/lib/llvm-20
 
@@ -20,11 +27,17 @@ jobs:
                   # Make sure the actual branch is checked out when running on pull requests
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Install LLVM dependencies
+            - name: Install LLVM dependencies (Linux)
+              if: runner.os == 'Linux'
               uses: awalsh128/cache-apt-pkgs-action@latest
               with:
                   packages: llvm-20 llvm-20-dev libpolly-20-dev clang-20
                   version: 1.0
+            - name: Install LLVM dependencies (macOS)
+              if: runner.os == 'macOS'
+              run: |
+                  brew install llvm@20
+                  echo "LLVM_SYS_201_PREFIX=$(brew --prefix llvm@20)" >> $GITHUB_ENV
             - name: Set up Rust
               uses: actions-rs/toolchain@v1
               with:
