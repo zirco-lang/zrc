@@ -1,0 +1,10 @@
+#include <libc/stdio.zh>
+#include <math.zh>
+
+fn main() -> i32 {
+    let x: u8 = 1;
+    let y: u8 = shl_u8(x, 3);
+    printf("%d\n", y); // Should print 8
+
+    return 0;
+}

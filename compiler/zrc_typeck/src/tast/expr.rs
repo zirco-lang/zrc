@@ -153,20 +153,18 @@ enum Precedence {
     Equality = 9,
     /// Comparison operators
     Comparison = 10,
-    /// Bit shift operators
-    BitShift = 11,
     /// Addition and subtraction
-    Term = 12,
+    Term = 11,
     /// Multiplication, division, modulo
-    Factor = 13,
+    Factor = 12,
     /// Cast operator
-    Cast = 14,
+    Cast = 13,
     /// Unary operators
-    Unary = 15,
+    Unary = 14,
     /// Postfix operators (highest precedence)
-    Postfix = 16,
+    Postfix = 15,
     /// Primary expressions (literals, identifiers)
-    Primary = 17,
+    Primary = 16,
 }
 
 impl TypedExprKind<'_> {
@@ -181,9 +179,6 @@ impl TypedExprKind<'_> {
             Self::BinaryBitwise(BinaryBitwise::Or, _, _) => Precedence::BitwiseOr,
             Self::BinaryBitwise(BinaryBitwise::Xor, _, _) => Precedence::BitwiseXor,
             Self::BinaryBitwise(BinaryBitwise::And, _, _) => Precedence::BitwiseAnd,
-            Self::BinaryBitwise(BinaryBitwise::Shl | BinaryBitwise::Shr, _, _) => {
-                Precedence::BitShift
-            }
             Self::Equality(_, _, _) => Precedence::Equality,
             Self::Comparison(_, _, _) => Precedence::Comparison,
             Self::Arithmetic(Arithmetic::Addition | Arithmetic::Subtraction, _, _) => {

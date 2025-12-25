@@ -23,16 +23,11 @@ pub fn build_binary_bitwise<'ctx>(
     op: BinaryBitwise,
     lhs: IntValue<'ctx>,
     rhs: IntValue<'ctx>,
-    result_is_signed: bool,
 ) -> Result<IntValue<'ctx>, BuilderError> {
     match op {
         BinaryBitwise::And => cg.builder.build_and(lhs, rhs, "and"),
         BinaryBitwise::Or => cg.builder.build_or(lhs, rhs, "or"),
         BinaryBitwise::Xor => cg.builder.build_xor(lhs, rhs, "xor"),
-        BinaryBitwise::Shl => cg.builder.build_left_shift(lhs, rhs, "shl"),
-        BinaryBitwise::Shr => cg
-            .builder
-            .build_right_shift(lhs, rhs, result_is_signed, "shr"),
     }
 }
 /// Build the required instruction for an [`Arithmetic`] operation
@@ -60,12 +55,7 @@ pub fn build_arithmetic<'ctx>(
 
 /// Code generate a binary bitwise operation
 pub fn cg_binary_bitwise<'ctx, 'input>(
-    CgExprArgs {
-        cg,
-        mut bb,
-        inferred_type,
-        ..
-    }: CgExprArgs<'ctx, 'input, '_>,
+    CgExprArgs { cg, mut bb, .. }: CgExprArgs<'ctx, 'input, '_>,
     op: BinaryBitwise,
     lhs: Box<TypedExpr<'input>>,
     rhs: Box<TypedExpr<'input>>,
@@ -73,14 +63,8 @@ pub fn cg_binary_bitwise<'ctx, 'input>(
     let lhs = unpack!(bb = cg_expr(cg, bb, *lhs));
     let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
 
-    let reg = build_binary_bitwise(
-        cg,
-        op,
-        lhs.into_int_value(),
-        rhs.into_int_value(),
-        inferred_type.is_signed_integer(),
-    )
-    .expect("binary bitwise operation should have compiled successfully");
+    let reg = build_binary_bitwise(cg, op, lhs.into_int_value(), rhs.into_int_value())
+        .expect("binary bitwise operation should have compiled successfully");
 
     bb.and(reg.as_basic_value_enum())
 }

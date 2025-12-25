@@ -6,10 +6,7 @@ use zrc_utils::span::{Span, Spannable};
 
 use super::{
     super::scope::Scope,
-    helpers::{
-        expect, expect_is_integer, expect_is_unsigned_integer, resolve_binary_int_operands,
-        try_coerce_to,
-    },
+    helpers::{expect, expect_is_integer, resolve_binary_int_operands, try_coerce_to},
     type_expr,
 };
 use crate::tast::{
@@ -113,33 +110,23 @@ pub fn type_expr_binary_bitwise<'input>(
     expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
     expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
-    if matches!(op, BinaryBitwise::Shl | BinaryBitwise::Shr) {
-        // we can only shift by an unsigned integer
-        let rhs_t_coerced = expect_is_unsigned_integer(rhs_t, rhs_span)?;
-        Ok(TypedExpr {
-            inferred_type: lhs_t.inferred_type.clone(),
-            kind: TypedExprKind::BinaryBitwise(op, Box::new(lhs_t), Box::new(rhs_t_coerced))
-                .in_span(expr_span),
-        })
-    } else {
-        // otherwise these must be the same type (with {int} support)
-        let (result_type, final_lhs, final_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
+    // otherwise these must be the same type (with {int} support)
+    let (result_type, final_lhs, final_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
 
-        // Check if types match after resolution
-        if final_lhs.inferred_type != final_rhs.inferred_type {
-            return Err(DiagnosticKind::ExpectedSameType(
-                final_lhs.inferred_type.to_string(),
-                final_rhs.inferred_type.to_string(),
-            )
-            .error_in(expr_span));
-        }
-
-        Ok(TypedExpr {
-            inferred_type: result_type,
-            kind: TypedExprKind::BinaryBitwise(op, Box::new(final_lhs), Box::new(final_rhs))
-                .in_span(expr_span),
-        })
+    // Check if types match after resolution
+    if final_lhs.inferred_type != final_rhs.inferred_type {
+        return Err(DiagnosticKind::ExpectedSameType(
+            final_lhs.inferred_type.to_string(),
+            final_rhs.inferred_type.to_string(),
+        )
+        .error_in(expr_span));
     }
+
+    Ok(TypedExpr {
+        inferred_type: result_type,
+        kind: TypedExprKind::BinaryBitwise(op, Box::new(final_lhs), Box::new(final_rhs))
+            .in_span(expr_span),
+    })
 }
 
 /// Typeck a cmp expr

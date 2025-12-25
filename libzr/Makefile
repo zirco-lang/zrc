@@ -21,15 +21,18 @@ ifeq ($(shell uname),Darwin)
 CFLAGS += -mmacosx-version-min=26.0
 endif
 
-ZR_SOURCES ?= $(wildcard $(SRCDIR)/*.zr)
+ZR_SOURCES ?= $(wildcard $(SRCDIR)/*.zr) $(wildcard $(SRCDIR)/math/*.zr)
 ZR_OUTPUTS ?= $(ZR_SOURCES:$(SRCDIR)/%.zr=$(OUTDIR)/%.o)
 
+C_SOURCES ?= $(wildcard $(SRCDIR)/*.c) $(wildcard $(SRCDIR)/math/*.c)
+C_OUTPUTS ?= $(C_SOURCES:$(SRCDIR)/%.c=$(OUTDIR)/%.o)
+
 # make .so and .a files
-all: out $(ZR_OUTPUTS)
+all: out $(ZR_OUTPUTS) $(C_OUTPUTS)
 	$(ECHO) "  CCLD   libzr.so"
-	$(Q)$(CC) $(CFLAGS) -shared -o $(OUTDIR)/libzr.so $(ZR_OUTPUTS)
+	$(Q)$(CC) $(CFLAGS) -shared -o $(OUTDIR)/libzr.so $(ZR_OUTPUTS) $(C_OUTPUTS)
 	$(ECHO) "  AR     libzr.a"
-	$(Q)ar rcs $(OUTDIR)/libzr.a $(ZR_OUTPUTS)
+	$(Q)ar rcs $(OUTDIR)/libzr.a $(ZR_OUTPUTS) $(C_OUTPUTS)
 
 all-opt: ZRFLAGS += -O3
 all-opt: all
@@ -38,9 +41,14 @@ $(OUTDIR)/%.o: $(SRCDIR)/%.zr
 	$(ECHO) "  ZRC    $<"
 	$(Q)$(ZRC) --emit object $(ZRFLAGS) -o $@ $<
 
+$(OUTDIR)/%.o: $(SRCDIR)/%.c
+	$(ECHO) "  CC     $<"
+	$(Q)$(CC) $(CFLAGS) -c -o $@ $<
+
 .PHONY: out
 out:
 	$(Q)mkdir -p $(OUTDIR)
+	$(Q)mkdir -p $(OUTDIR)/math
 
 .PHONY: clean
 clean:

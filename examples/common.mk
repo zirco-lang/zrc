@@ -12,8 +12,8 @@ endif
 LIBZR_DIR ?= ../../libzr/dist/
 ZRC ?= ../../target/debug/zrc
 ZIRCOP ?= ../../target/debug/zircop
-ZRFLAGS ?= -I../../include/
-ZIRCOPFLAGS ?= -I../../include/
+ZRFLAGS ?= -I../../include/ -I../../libzr/include/
+ZIRCOPFLAGS ?= -I../../include/ -I../../libzr/include/
 CC ?= clang
 LDFLAGS ?= -lc $(LIBZR_DIR)/libzr.a
 OUTDIR ?= ./out
