@@ -62,7 +62,7 @@ jobs:
               run: |
                   cp -r include/ outputs/include/
             - name: Build standard library
-              run: make -j2 -C libzr all ZRC=target/release/zrc
+              run: make -j2 -C libzr all ZRC=../target/release/zrc
             - name: Copy libzr libraries to artifacts directory
               run: |
                   cp libzr/dist/libzr.a outputs/libzr/
