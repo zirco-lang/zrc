@@ -9,3 +9,9 @@ fn _libzr_crash_out(msg: Str) {
 
     abort();
 }
+
+fn _libzr_crash_out_cstr(msg: *u8) {
+    printf("libzr aborted: %s\n", msg);
+
+    abort();
+}

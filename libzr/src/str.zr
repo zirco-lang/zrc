@@ -35,7 +35,7 @@ fn str_equal(a: Str, b: Str) -> bool {
 
 fn str_slice(s: Str, start: usize, end: usize) -> Str {
     if (start > end || end > s.len) {
-        _libzr_crash_out(str_from_cstr("str_slice: invalid slice indices"));
+        _libzr_crash_out_cstr("str_slice: invalid slice indices");
     }
     return Str {
         len: end - start,
