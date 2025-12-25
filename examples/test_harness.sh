@@ -7,7 +7,7 @@ set +e
 
 [[ -f test/stdin.txt ]] && stdin_file="test/stdin.txt" || stdin_file="/dev/null"
 
-echo "[harness] running $1 $args < $stdin_file"
+[ "$V" -eq 1 ] && echo "[harness] running $1 $args < $stdin_file"
 $1 $args < $stdin_file > test/stdout.actual 2> test/stderr.actual
 exit_code=$?
 

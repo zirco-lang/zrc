@@ -1,34 +1,52 @@
-MACOSX_DEPLOYMENT_TARGET ?= 13.0
+V ?= 0
+
+ifeq ($(V),1)
+Q := 
+ECHO := @true
+else
+Q := @
+ECHO := @echo
+MAKEFLAGS += --no-print-directory
+endif
 
 ZRC ?= ../../target/debug/zrc
 ZIRCOP ?= ../../target/debug/zircop
 ZRFLAGS ?= -I../../include/
 ZIRCOPFLAGS ?= -I../../include/
+CC ?= clang
 LDFLAGS ?= -lc
 OUTDIR ?= ./out
+
+ifeq ($(shell uname),Darwin)
+CFLAGS += -mmacosx-version-min=26.0
+endif
 
 ZR_SOURCES ?= $(wildcard *.zr)
 ZR_OUTPUTS ?= $(ZR_SOURCES:%.zr=$(OUTDIR)/%.o)
 
 all: $(ZR_OUTPUTS)
-	clang -o $(OUTDIR)/run $(ZR_OUTPUTS) $(LDFLAGS)
+	$(ECHO) "  CCLD   run"
+	$(Q)$(CC) $(CFLAGS) -o $(OUTDIR)/run $(ZR_OUTPUTS) $(LDFLAGS)
 
 $(OUTDIR)/%.o: %.zr
-	@mkdir -p $(OUTDIR)
-	$(ZRC) --emit object $(ZRFLAGS) -o $@ $<
+	$(Q)mkdir -p $(OUTDIR)
+	$(ECHO) "  ZRC    $<"
+	$(Q)$(ZRC) --emit object $(ZRFLAGS) -o $@ $<
 
 .PHONY: clean
 clean:
-	rm -rf $(OUTDIR)
+	$(Q)rm -rf $(OUTDIR)
 
 .PHONY: test
 test: all
-	../test_harness.sh $(OUTDIR)/run
+	$(ECHO) -n "  CHECK: "
+	$(Q)V=$V ../test_harness.sh $(OUTDIR)/run
 
 .PHONY: lint
 lint:
-	@failed=0; \
+	$(Q)failed=0; \
 	for file in $(ZR_SOURCES); do \
+	  [ $(V) -eq 0 ] && echo "  ZIRCOP $$file"; \
 	  $(ZIRCOP) $(ZIRCOPFLAGS) $$file || failed=1; \
 	done; \
 	exit $$failed
