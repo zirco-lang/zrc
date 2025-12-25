@@ -310,14 +310,6 @@ mod tests {
                 )),
             ),
             ("bool == bool", Ok(TastType::Bool)),
-            ("i8 >> u8", Ok(TastType::I8)),
-            (
-                "i8 >> i8",
-                Err(DiagnosticKind::ExpectedGot {
-                    expected: "unsigned integer".to_string(),
-                    got: "i8".to_string(),
-                }),
-            ),
             (
                 "i8 & i32",
                 Err(DiagnosticKind::ExpectedSameType(

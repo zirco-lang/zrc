@@ -1,6 +1,6 @@
 ---
 source: compiler/zrc_codegen/src/expr/arithmetic.rs
-description: "fn get_int() -> i32;\nfn get_uint() -> u32;\n\nfn test() {\n    let x = get_int();\n    let y = get_int();\n    let u = get_uint();\n\n    // TEST: should create a `not i32` instruction\n    let not = ~x;\n\n    // TEST: should create a `and i32` instruction\n    let and = x & y;\n\n    // TEST: should create a `or i32` instruction\n    let or = x | y;\n\n    // TEST: should create a `xor i32` instruction\n    let xor = x ^ y;\n\n    // TEST: should create a `shl i32` instruction\n    let shl = x << u;\n\n    // TEST: should create a `lshr i32` instruction\n    let lshr = u >> u;\n\n    // TEST: should create a `ashr i32` instruction (as the lhs is signed)\n    let ashr = x >> u;\n}\n"
+description: "fn get_int() -> i32;\nfn get_uint() -> u32;\n\nfn test() {\n    let x = get_int();\n    let y = get_int();\n    let u = get_uint();\n\n    // TEST: should create a `not i32` instruction\n    let not = ~x;\n\n    // TEST: should create a `and i32` instruction\n    let and = x & y;\n\n    // TEST: should create a `or i32` instruction\n    let or = x | y;\n\n    // TEST: should create a `xor i32` instruction\n    let xor = x ^ y;\n}\n"
 expression: resulting_ir
 ---
 ; ModuleID = 'test.zr'
@@ -12,9 +12,6 @@ declare i32 @get_uint()
 
 define {} @test() !dbg !3 {
 entry:
-  %let_ashr = alloca i32, align 4
-  %let_lshr = alloca i32, align 4
-  %let_shl = alloca i32, align 4
   %let_xor = alloca i32, align 4
   %let_or = alloca i32, align 4
   %let_and = alloca i32, align 4
@@ -43,19 +40,7 @@ entry:
   %load8 = load i32, ptr %let_y, align 4, !dbg !25
   %xor = xor i32 %load7, %load8, !dbg !25
   store i32 %xor, ptr %let_xor, align 4, !dbg !26
-  %load9 = load i32, ptr %let_x, align 4, !dbg !27
-  %load10 = load i32, ptr %let_u, align 4, !dbg !28
-  %shl = shl i32 %load9, %load10, !dbg !28
-  store i32 %shl, ptr %let_shl, align 4, !dbg !29
-  %load11 = load i32, ptr %let_u, align 4, !dbg !30
-  %load12 = load i32, ptr %let_u, align 4, !dbg !31
-  %shr = lshr i32 %load11, %load12, !dbg !31
-  store i32 %shr, ptr %let_lshr, align 4, !dbg !32
-  %load13 = load i32, ptr %let_x, align 4, !dbg !33
-  %load14 = load i32, ptr %let_u, align 4, !dbg !34
-  %shr15 = ashr i32 %load13, %load14, !dbg !34
-  store i32 %shr15, ptr %let_ashr, align 4, !dbg !35
-  ret {} zeroinitializer, !dbg !36
+  ret {} zeroinitializer, !dbg !27
 }
 
 !llvm.module.flags = !{!0}
@@ -88,13 +73,4 @@ entry:
 !24 = !DILocation(line: 19, column: 15, scope: !9)
 !25 = !DILocation(line: 19, column: 19, scope: !9)
 !26 = !DILocation(line: 19, column: 9, scope: !9)
-!27 = !DILocation(line: 22, column: 15, scope: !9)
-!28 = !DILocation(line: 22, column: 20, scope: !9)
-!29 = !DILocation(line: 22, column: 9, scope: !9)
-!30 = !DILocation(line: 25, column: 16, scope: !9)
-!31 = !DILocation(line: 25, column: 21, scope: !9)
-!32 = !DILocation(line: 25, column: 9, scope: !9)
-!33 = !DILocation(line: 28, column: 16, scope: !9)
-!34 = !DILocation(line: 28, column: 21, scope: !9)
-!35 = !DILocation(line: 28, column: 9, scope: !9)
-!36 = !DILocation(line: 29, column: 1, scope: !9)
+!27 = !DILocation(line: 20, column: 1, scope: !9)

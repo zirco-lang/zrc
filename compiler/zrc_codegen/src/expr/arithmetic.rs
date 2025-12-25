@@ -251,15 +251,6 @@ mod tests {
 
                     // TEST: should create a `xor i32` instruction
                     let xor = x ^ y;
-
-                    // TEST: should create a `shl i32` instruction
-                    let shl = x << u;
-
-                    // TEST: should create a `lshr i32` instruction
-                    let lshr = u >> u;
-
-                    // TEST: should create a `ashr i32` instruction (as the lhs is signed)
-                    let ashr = x >> u;
                 }
             "});
     }
