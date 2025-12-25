@@ -234,7 +234,7 @@ jobs:
                   tar -czf zrc-macos-x64.tar.gz -C macOS-X64 .
                   tar -czf zrc-macos-arm64.tar.gz -C macOS-ARM64 .
             - name: Update `nightly` release
-              uses: softprops/action-gh-release@v1
+              uses: softprops/action-gh-release@v2
               with:
                   tag_name: nightly
                   name: Latest Build
