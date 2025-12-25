@@ -74,7 +74,7 @@ jobs:
               uses: actions/upload-artifact@v6
               with:
                   path: outputs
-                  name: zrc-${{ matrix.os }}-release
+                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
     lint-std:
         needs: build
         runs-on: ubuntu-24.04
@@ -89,7 +89,7 @@ jobs:
             - name: Download build artifact
               uses: actions/download-artifact@v7
               with:
-                  name: zrc-ubuntu-24.04-release
+                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
             - name: Add zrc and zircop to PATH
               run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
@@ -109,7 +109,7 @@ jobs:
             - name: Download zrc binary
               uses: actions/download-artifact@v7
               with:
-                  name: zrc-ubuntu-24.04-release
+                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
             - name: Add zrc to PATH
               run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
@@ -129,12 +129,9 @@ jobs:
             - name: Download zircop
               uses: actions/download-artifact@v7
               with:
-                  name: zircop-debug
+                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
-            - name: Make zircop executable
-              run: |
-                  chmod +x ./artifacts/zircop
             - name: Add zrc and zircop to PATH
-              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
+              run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Lint all examples
               run: make -j2 -C examples lint ZIRCOP=zircop
