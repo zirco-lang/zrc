@@ -28,14 +28,6 @@ cp libzr/dist/libzr.a "$ZIRCON_LIBZR_DIR/lib/"
 cp libzr/dist/libzr.so "$ZIRCON_LIBZR_DIR/lib/"
 cp -r libzr/include/* "$ZIRCON_LIBZR_DIR/include/"
 
-cat > "$ZIRCON_TOOLCHAIN_DIR/env.sh" << EOF
-#!/bin/sh
-export PATH="$HOME/.zircon/toolchains/current/bin:\$PATH"
-export ZIRCO_INCLUDE_PATH="$HOME/.zircon/toolchains/current/include:\$ZIRCO_INCLUDE_PATH"
-
-# libzr
-export LD_LIBRARY_PATH="$HOME/.zircon/toolchains/current/libzr/lib:\$LD_LIBRARY_PATH"
-export ZIRCO_INCLUDE_PATH="$HOME/.zircon/toolchains/current/libzr/include:\$ZIRCO_INCLUDE_PATH"
-EOF
+cp hooks/env.sh "$ZIRCON_TOOLCHAIN_DIR/env.sh"
 
 chmod +x "$ZIRCON_TOOLCHAIN_DIR/env.sh"
