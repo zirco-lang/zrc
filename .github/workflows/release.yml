@@ -1,0 +1,143 @@
+name: "release"
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    build-release:
+        runs-on: ubuntu-latest
+        env:
+            LLVM_SYS_201_PREFIX: /usr/lib/llvm-20
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              
+            - name: Install LLVM dependencies
+              uses: awalsh128/cache-apt-pkgs-action@latest
+              with:
+                  packages: llvm-20 llvm-20-dev libpolly-20-dev clang-20
+                  version: 1.0
+                  
+            - name: Set up Rust
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
+                  override: true
+                  
+            - name: Install Rust problem matchers
+              uses: r7kamura/rust-problem-matchers@v1
+              
+            - name: Use dependency cache
+              uses: Swatinem/rust-cache@v2
+              
+            - name: cargo build --release
+              uses: actions-rs/cargo@v1
+              with:
+                  command: build
+                  args: --release
+                  
+            - name: Upload zrc release artifact
+              uses: actions/upload-artifact@v6
+              with:
+                  name: zrc-release
+                  path: target/release/zrc
+                  retention-days: 7
+                  
+            - name: Upload zircop release artifact
+              uses: actions/upload-artifact@v6
+              with:
+                  name: zircop-release
+                  path: target/release/zircop
+                  retention-days: 7
+                  
+    build-libzr:
+        needs: build-release
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              
+            - name: Download zrc release artifact
+              uses: actions/download-artifact@v7
+              with:
+                  name: zrc-release
+                  path: ./artifacts
+                  
+            - name: Make zrc executable
+              run: chmod +x ./artifacts/zrc
+              
+            - name: Add zrc to PATH
+              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
+              
+            - name: Build libzr
+              run: make -j2 -C libzr all ZRC=zrc
+              
+            - name: Upload libzr static library artifact
+              uses: actions/upload-artifact@v6
+              with:
+                  name: libzr-release
+                  path: libzr/dist/libzr.a
+                  retention-days: 7
+                  
+    update-release:
+        needs: [build-release, build-libzr]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            
+        steps:
+            - name: Download zrc artifact
+              uses: actions/download-artifact@v7
+              with:
+                  name: zrc-release
+                  path: ./artifacts
+                  
+            - name: Download zircop artifact
+              uses: actions/download-artifact@v7
+              with:
+                  name: zircop-release
+                  path: ./artifacts
+                  
+            - name: Download libzr artifact
+              uses: actions/download-artifact@v7
+              with:
+                  name: libzr-release
+                  path: ./artifacts
+                  
+            - name: Make binaries executable
+              run: |
+                  chmod +x ./artifacts/zrc
+                  chmod +x ./artifacts/zircop
+                  
+            - name: Create tar archives
+              run: |
+                  cd artifacts
+                  tar -czf zrc-linux-x86_64.tar.gz zrc
+                  tar -czf zircop-linux-x86_64.tar.gz zircop
+                  tar -czf libzr-linux-x86_64.tar.gz libzr.a
+                  
+            - name: Update latest release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: latest
+                  name: Latest Build
+                  body: |
+                      Latest build from main branch.
+                      
+                      **Commit**: ${{ github.sha }}
+                      **Timestamp**: ${{ github.event.head_commit.timestamp }}
+                      
+                      This release contains:
+                      - `zrc` - The Zirco compiler
+                      - `zircop` - The Zirco code formatter
+                      - `libzr.a` - The Zirco standard library (static)
+                  files: |
+                      artifacts/zrc-linux-x86_64.tar.gz
+                      artifacts/zircop-linux-x86_64.tar.gz
+                      artifacts/libzr-linux-x86_64.tar.gz
+                  prerelease: true
+                  draft: false
