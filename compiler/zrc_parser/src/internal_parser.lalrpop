@@ -308,8 +308,6 @@ _Assignment: ExprKind<'input> = {
     <lhs:Unary> "&=" <rhs:Assignment> => ExprKind::Assignment(Assignment::BinaryBitwise(BinaryBitwise::And), Box::new(lhs), Box::new(rhs)),
     <lhs:Unary> "|=" <rhs:Assignment> => ExprKind::Assignment(Assignment::BinaryBitwise(BinaryBitwise::Or), Box::new(lhs), Box::new(rhs)),
     <lhs:Unary> "^=" <rhs:Assignment> => ExprKind::Assignment(Assignment::BinaryBitwise(BinaryBitwise::Xor), Box::new(lhs), Box::new(rhs)),
-    <lhs:Unary> "<<=" <rhs:Assignment> => ExprKind::Assignment(Assignment::BinaryBitwise(BinaryBitwise::Shl), Box::new(lhs), Box::new(rhs)),
-    <lhs:Unary> ">>=" <rhs:Assignment> => ExprKind::Assignment(Assignment::BinaryBitwise(BinaryBitwise::Shr), Box::new(lhs), Box::new(rhs)),
 };
 Assignment = ExprPrecedenceTier<_Assignment, Ternary>;
 
@@ -349,18 +347,12 @@ _Equality: ExprKind<'input> = {
 Equality: Expr<'input> = ExprPrecedenceTier<_Equality, Comparison>;
 
 _Comparison: ExprKind<'input> = {
-    <l:Comparison> ">" <r:BitShift> => ExprKind::Comparison(Comparison::Gt, Box::new(l), Box::new(r)),
-    <l:Comparison> ">=" <r:BitShift> => ExprKind::Comparison(Comparison::Gte, Box::new(l), Box::new(r)),
-    <l:Comparison> "<" <r:BitShift> => ExprKind::Comparison(Comparison::Lt, Box::new(l), Box::new(r)),
-    <l:Comparison> "<=" <r:BitShift> => ExprKind::Comparison(Comparison::Lte, Box::new(l), Box::new(r)),
+    <l:Comparison> ">" <r:Term> => ExprKind::Comparison(Comparison::Gt, Box::new(l), Box::new(r)),
+    <l:Comparison> ">=" <r:Term> => ExprKind::Comparison(Comparison::Gte, Box::new(l), Box::new(r)),
+    <l:Comparison> "<" <r:Term> => ExprKind::Comparison(Comparison::Lt, Box::new(l), Box::new(r)),
+    <l:Comparison> "<=" <r:Term> => ExprKind::Comparison(Comparison::Lte, Box::new(l), Box::new(r)),
 };
-Comparison: Expr<'input> = ExprPrecedenceTier<_Comparison, BitShift>;
-
-_BitShift: ExprKind<'input> = {
-    <l:BitShift> ">>" <r:Term> => ExprKind::BinaryBitwise(BinaryBitwise::Shr, Box::new(l), Box::new(r)),
-    <l:BitShift> "<<" <r:Term> => ExprKind::BinaryBitwise(BinaryBitwise::Shl, Box::new(l), Box::new(r)),
-};
-BitShift: Expr<'input> = ExprPrecedenceTier<_BitShift, Term>;
+Comparison: Expr<'input> = ExprPrecedenceTier<_Comparison, Term>;
 
 _Term: ExprKind<'input> = {
     <l:Term> "+" <r:Factor> => ExprKind::Arithmetic(Arithmetic::Addition, Box::new(l), Box::new(r)),
@@ -464,8 +456,6 @@ extern {
         "|" => lexer::Tok::BitwiseOr,
         "^" => lexer::Tok::BitwiseXor,
         "~" => lexer::Tok::BitwiseNot,
-        "<<" => lexer::Tok::BitwiseLeftShift,
-        ">>" => lexer::Tok::BitwiseRightShift,
 
         "=" => lexer::Tok::Assign,
         "+=" => lexer::Tok::PlusAssign,
@@ -476,8 +466,6 @@ extern {
         "&=" => lexer::Tok::BitwiseAndAssign,
         "|=" => lexer::Tok::BitwiseOrAssign,
         "^=" => lexer::Tok::BitwiseXorAssign,
-        "<<=" => lexer::Tok::BitwiseLeftShiftAssign,
-        ">>=" => lexer::Tok::BitwiseRightShiftAssign,
 
         ";" => lexer::Tok::Semicolon,
         "," => lexer::Tok::Comma,

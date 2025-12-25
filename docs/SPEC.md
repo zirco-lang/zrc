@@ -339,14 +339,14 @@ Zirco uses the following operators and punctuation:
 **Bitwise Operators**:
 
 ```
-&   |   ^   ~   <<  >>
+&   |   ^   ~
 ```
 
 **Assignment Operators**:
 
 ```
 =   +=  -=  *=  /=  %=
-&=  |=  ^=  <<=  >>=
+&=  |=  ^=
 ```
 
 **Other Operators**:
@@ -429,7 +429,6 @@ A function pointer is represented as a pointer to a function type:
 *(fn(a: i32, b: *u8) -> bool)  // pointer to function taking (i32, *u8) and returning bool
 ```
 
-
 ### 3.5 Array Types
 
 Array types represent fixed-size sequences of elements of the same type stored contiguously in memory.
@@ -469,6 +468,7 @@ Array elements are accessed using zero-based indexing with the `[]` operator.
 **Note**: Array bounds are not checked at runtime. Accessing an array out of bounds is undefined behavior.
 
 ### 3.6 Struct Types
+
 ### 3.10 Struct Types
 
 Structs are product types that group named fields together:
@@ -605,24 +605,23 @@ Expressions are combinations of values, variables, operators, and function calls
 
 Operators are listed from highest to lowest precedence:
 
-| Precedence | Operators                                                | Description                                                            | Associativity |
-| ---------- | -------------------------------------------------------- | ---------------------------------------------------------------------- | ------------- |
-| 1          | `x()` `x[]` `x.y` `x->y` `x++` `x--`                     | Function call, array index, member access, postfix increment/decrement | Left-to-right |
-| 2          | `!x` `-x` `~x` `&x` `*x` `++x` `--x`                     | Unary operators, prefix increment/decrement                            | Right-to-left |
-| 3          | `as`                                                     | Type cast                                                              | Left-to-right |
-| 4          | `*` `/` `%`                                              | Multiplication, division, modulo                                       | Left-to-right |
-| 5          | `+` `-`                                                  | Addition, subtraction                                                  | Left-to-right |
-| 6          | `<<` `>>`                                                | Bitwise shift                                                          | Left-to-right |
-| 7          | `<` `<=` `>` `>=`                                        | Comparison                                                             | Left-to-right |
-| 8          | `==` `!=`                                                | Equality                                                               | Left-to-right |
-| 9          | `&`                                                      | Bitwise AND                                                            | Left-to-right |
-| 10         | `^`                                                      | Bitwise XOR                                                            | Left-to-right |
-| 11         | `\|`                                                     | Bitwise OR                                                             | Left-to-right |
-| 12         | `&&`                                                     | Logical AND                                                            | Left-to-right |
-| 13         | `\|\|`                                                   | Logical OR                                                             | Left-to-right |
-| 14         | `? :`                                                    | Ternary conditional                                                    | Right-to-left |
-| 15         | `=` `+=` `-=` `*=` `/=` `%=` `&=` `\|=` `^=` `<<=` `>>=` | Assignment                                                             | Right-to-left |
-| 16         | `,`                                                      | Comma                                                                  | Left-to-right |
+| Precedence | Operators                                    | Description                                                            | Associativity |
+| ---------- | -------------------------------------------- | ---------------------------------------------------------------------- | ------------- |
+| 1          | `x()` `x[]` `x.y` `x->y` `x++` `x--`         | Function call, array index, member access, postfix increment/decrement | Left-to-right |
+| 2          | `!x` `-x` `~x` `&x` `*x` `++x` `--x`         | Unary operators, prefix increment/decrement                            | Right-to-left |
+| 3          | `as`                                         | Type cast                                                              | Left-to-right |
+| 4          | `*` `/` `%`                                  | Multiplication, division, modulo                                       | Left-to-right |
+| 5          | `+` `-`                                      | Addition, subtraction                                                  | Left-to-right |
+| 6          | `<` `<=` `>` `>=`                            | Comparison                                                             | Left-to-right |
+| 7          | `==` `!=`                                    | Equality                                                               | Left-to-right |
+| 8          | `&`                                          | Bitwise AND                                                            | Left-to-right |
+| 9          | `^`                                          | Bitwise XOR                                                            | Left-to-right |
+| 10         | `\|`                                         | Bitwise OR                                                             | Left-to-right |
+| 11         | `&&`                                         | Logical AND                                                            | Left-to-right |
+| 12         | `\|\|`                                       | Logical OR                                                             | Left-to-right |
+| 13         | `? :`                                        | Ternary conditional                                                    | Right-to-left |
+| 14         | `=` `+=` `-=` `*=` `/=` `%=` `&=` `\|=` `^=` | Assignment                                                             | Right-to-left |
+| 15         | `,`                                          | Comma                                                                  | Left-to-right |
 
 ### 4.3 Primary Expressions
 
@@ -731,8 +730,6 @@ let c = !true;           // false
 -   `&` Bitwise AND
 -   `|` Bitwise OR
 -   `^` Bitwise XOR
--   `<<` Left shift
--   `>>` Right shift
 
 **Unary Bitwise Operator**:
 
@@ -744,8 +741,6 @@ let c = !true;           // false
 let a = 0b1010 & 0b1100;   // 0b1000
 let b = 0b1010 | 0b1100;   // 0b1110
 let c = 0b1010 ^ 0b1100;   // 0b0110
-let d = 0b0001 << 3;       // 0b1000
-let e = 0b1000 >> 2;       // 0b0010
 let f = ~0b1010;           // bitwise negation
 ```
 
@@ -768,8 +763,6 @@ x %= 3;    // x = x % 3
 x &= 0xFF; // x = x & 0xFF
 x |= 0x0F; // x = x | 0x0F
 x ^= 0xAA; // x = x ^ 0xAA
-x <<= 2;   // x = x << 2
-x >>= 1;   // x = x >> 1
 ```
 
 **Rules**:

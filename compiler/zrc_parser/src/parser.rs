@@ -285,29 +285,6 @@ mod tests {
         }
 
         #[test]
-        fn bitwise_operators_parse_as_expected() {
-            assert_eq!(
-                parse_expr("1 & 1 | 1 ^ 1 << 1 >> 1", "<test>"),
-                Ok(Expr::build_bit_or(
-                    Expr::build_bit_and(
-                        Expr::build_number_dec(spanned_test!(0, "1", 1), None),
-                        Expr::build_number_dec(spanned_test!(4, "1", 5), None)
-                    ),
-                    Expr::build_bit_xor(
-                        Expr::build_number_dec(spanned_test!(8, "1", 9), None),
-                        Expr::build_shr(
-                            Expr::build_shl(
-                                Expr::build_number_dec(spanned_test!(12, "1", 13), None),
-                                Expr::build_number_dec(spanned_test!(17, "1", 18), None)
-                            ),
-                            Expr::build_number_dec(spanned_test!(22, "1", 23), None)
-                        )
-                    )
-                ))
-            );
-        }
-
-        #[test]
         fn logical_operators_parse_as_expected() {
             assert_eq!(
                 parse_expr("1 && 1 || 1", "<test>"),

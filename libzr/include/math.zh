@@ -1,0 +1,19 @@
+#pragma once
+
+// src/math/shifts.c
+fn shl_u8(a: u8, b: u32) -> u8;
+fn shl_u16(a: u16, b: u32) -> u16;
+fn shl_u32(a: u32, b: u32) -> u32;
+fn shl_u64(a: u64, b: u32) -> u64;
+fn shl_i8(a: i8, b: u32) -> i8;
+fn shl_i16(a: i16, b: u32) -> i16;
+fn shl_i32(a: i32, b: u32) -> i32;
+fn shl_i64(a: i64, b: u32) -> i64;
+fn shr_u8(a: u8, b: u32) -> u8;
+fn shr_u16(a: u16, b: u32) -> u16;
+fn shr_u32(a: u32, b: u32) -> u32;
+fn shr_u64(a: u64, b: u32) -> u64;
+fn shr_i8(a: i8, b: u32) -> i8;
+fn shr_i16(a: i16, b: u32) -> i16;
+fn shr_i32(a: i32, b: u32) -> i32;
+fn shr_i64(a: i64, b: u32) -> i64;

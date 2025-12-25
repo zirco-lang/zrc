@@ -348,18 +348,6 @@ pub enum Tok<'input> {
     #[token("~")]
     #[display("~")]
     BitwiseNot,
-    /// The token `<<`
-    #[token("<<")]
-    #[display("<<")]
-    BitwiseLeftShift,
-    // FIXME: The lexer could treat Foo<Bar>> as Foo < Bar >>, not Foo < Bar > >.
-    //        This is the classic Java generics problem. This might be a Logos
-    //        limitation and might require a custom state-machine lexer integrated
-    //        into the parser -- we'll see when we get to generics.
-    /// The token `>>`
-    #[token(">>")]
-    #[display(">>")]
-    BitwiseRightShift,
 
     // === ASSIGNMENT OPERATORS ===
     /// The token `=`
@@ -398,14 +386,6 @@ pub enum Tok<'input> {
     #[token("^=")]
     #[display("^=")]
     BitwiseXorAssign,
-    /// The token `<<=`
-    #[token("<<=")]
-    #[display("<<=")]
-    BitwiseLeftShiftAssign,
-    /// The token `>>=`
-    #[token(">>=")]
-    #[display(">>=")]
-    BitwiseRightShiftAssign,
 
     // === OTHER TOKENS ===
     /// The token `;`
@@ -800,11 +780,10 @@ mod tests {
     /// Tests that all tokens can be properly lexed, and that they all impl
     /// [`Display`] correctly.
     #[test]
-    #[expect(clippy::too_many_lines)]
     fn all_tokens_lex_and_display_correctly() {
         let input = concat!(
-            "++ -- + - * / % == != > >= < <= && || ! & | ^ ~ << >> ",
-            "= += -= *= /= %= &= |= ^= <<= >>= ; ,",
+            "++ -- + - * / % == != > >= < <= && || ! & | ^ ~",
+            " = += -= *= /= %= &= |= ^= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
             r#" struct union enum match sizeof type switch default four -> => "str" 7_000 0xF_A"#,
             " 0b1_0 abc const"
@@ -830,8 +809,6 @@ mod tests {
             Tok::BitwiseOr,
             Tok::BitwiseXor,
             Tok::BitwiseNot,
-            Tok::BitwiseLeftShift,
-            Tok::BitwiseRightShift,
             Tok::Assign,
             Tok::PlusAssign,
             Tok::MinusAssign,
@@ -841,8 +818,6 @@ mod tests {
             Tok::BitwiseAndAssign,
             Tok::BitwiseOrAssign,
             Tok::BitwiseXorAssign,
-            Tok::BitwiseLeftShiftAssign,
-            Tok::BitwiseRightShiftAssign,
             Tok::Semicolon,
             Tok::Comma,
             Tok::Dot,
