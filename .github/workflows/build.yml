@@ -54,8 +54,8 @@ jobs:
               run: mkdir -p outputs/{bin,include,libzr}
             - name: Copy built binaries to artifacts directory
               run: |
-                  cp target/debug/zrc outputs/bin
-                  cp target/debug/zircop outputs/bin
+                  cp target/release/zrc outputs/bin
+                  cp target/release/zircop outputs/bin
                   chmod +x outputs/bin/zrc
                   chmod +x outputs/bin/zircop
             - name: Copy headers to artifacts directory
