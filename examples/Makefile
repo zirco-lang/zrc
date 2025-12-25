@@ -17,7 +17,7 @@ all: $(EXAMPLES)
 
 $(EXAMPLES):
 	$(ECHO) "  BUILD  $@"
-	$(Q)$(MAKE) -C $@
+	$(Q)$(MAKE) -C $@ all
 
 test: $(EXAMPLES:%=%_test)
 	@echo "All examples passed!"
@@ -36,5 +36,5 @@ lint: $(EXAMPLES:%=%_lint)
 	$(Q)$(MAKE) -C $* clean
 
 %_lint:
-	$(ECHO) "  ZIRCOP $*"
+	$(ECHO) "  LINT   $*"
 	$(Q)$(MAKE) -C $* lint
