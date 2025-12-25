@@ -9,7 +9,14 @@ on:
 
 jobs:
     build:
-        runs-on: ubuntu-latest
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                os:
+                    - ubuntu-24.04
+                    - ubuntu-24.04-arm
+                    - macos-latest
+                    - macos-15-intel
         env:
             LLVM_SYS_201_PREFIX: /usr/lib/llvm-20
 
@@ -20,67 +27,49 @@ jobs:
                   # Make sure the actual branch is checked out when running on pull requests
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Install LLVM dependencies
+            - name: Install LLVM dependencies from the cache (Linux)
+              if: runner.os == 'Linux'
               uses: awalsh128/cache-apt-pkgs-action@latest
               with:
                   packages: llvm-20 llvm-20-dev libpolly-20-dev clang-20
                   version: 1.0
+            - name: Install LLVM dependencies from Homebrew (macOS)
+              if: runner.os == 'macOS'
+              run: |
+                  brew install llvm@20
+                  echo "LLVM_SYS_201_PREFIX=$(brew --prefix llvm@20)" >> $GITHUB_ENV
             - name: Set up Rust
               uses: actions-rs/toolchain@v1
               with:
                   toolchain: stable
                   override: true
-            - name: Install Rust problem matchers
-              uses: r7kamura/rust-problem-matchers@v1
             - name: Use dependency cache
               uses: Swatinem/rust-cache@v2
             - name: cargo build
               uses: actions-rs/cargo@v1
               with:
                   command: build
-            - name: Upload zrc build artifact
+                  args: --release
+            - name: Build standard library
+              run: make -j2 -C libzr all ZRC=../target/release/zrc
+            - name: Prepare artifacts directory
+              run: |
+                  mkdir -p outputs/{bin,include,libzr}
+                  cp target/release/zrc outputs/bin
+                  cp target/release/zircop outputs/bin
+                  cp -r include/ outputs/include/
+                  cp libzr/dist/libzr.a outputs/libzr/
+                  cp libzr/dist/libzr.so outputs/libzr/
+                  cp -r libzr/include/ outputs/libzr/include/
+                  cp hooks/env.sh outputs/
+            - name: Upload build artifacts
               uses: actions/upload-artifact@v6
               with:
-                  name: zrc-debug
-                  path: target/debug/zrc
-                  retention-days: 1
-            - name: Upload zircop build artifact
-              uses: actions/upload-artifact@v6
-              with:
-                  name: zircop-debug
-                  path: target/debug/zircop
-                  retention-days: 1
-    build-std:
-        needs: build
-        runs-on: ubuntu-latest
-
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v6
-              with:
-                  # Make sure the actual branch is checked out when running on pull requests
-                  ref: ${{ github.head_ref }}
-                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Download build artifact
-              uses: actions/download-artifact@v7
-              with:
-                  name: zrc-debug
-                  path: ./artifacts
-            - name: Make zrc executable
-              run: chmod +x ./artifacts/zrc
-            - name: Add zrc to PATH
-              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
-            - name: Build libzr
-              run: make -j2 -C libzr all ZRC=zrc
-            - name: Upload libzr static library artifact
-              uses: actions/upload-artifact@v6
-              with:
-                  name: libzr-static
-                  path: libzr/dist/libzr.a
-                  retention-days: 1
+                  path: outputs
+                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
     lint-std:
         needs: build
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
 
         steps:
             - name: Checkout
@@ -92,18 +81,17 @@ jobs:
             - name: Download build artifact
               uses: actions/download-artifact@v7
               with:
-                  name: zircop-debug
+                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
-            - name: Make zircop executable
-              run: |
-                  chmod +x ./artifacts/zircop
+            - name: Set permissions for zrc and zircop
+              run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
             - name: Add zrc and zircop to PATH
-              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
+              run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Lint source for libzr
               run: make -j2 -C libzr lint ZIRCOP=zircop
     verify-examples:
-        needs: [build, build-std]
-        runs-on: ubuntu-latest
+        needs: build
+        runs-on: ubuntu-24.04
 
         steps:
             - name: Checkout
@@ -112,22 +100,17 @@ jobs:
                   # Make sure the actual branch is checked out when running on pull requests
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Download zrc
+            - name: Download build artifact
               uses: actions/download-artifact@v7
               with:
-                  name: zrc-debug
+                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
-            - name: Download libzr static library
-              uses: actions/download-artifact@v7
-              with:
-                  name: libzr-static
-                  path: ./artifacts
-            - name: Make zrc executable
-              run: chmod +x ./artifacts/zrc
+            - name: Set permissions for zrc and zircop
+              run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
             - name: Add zrc to PATH
-              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
+              run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Build and test all examples
-              run: make -j2 -C examples test ZRC=zrc LIBZR_DIR=$(pwd)/artifacts/
+              run: make -j2 -C examples test ZRC=zrc LIBZR_DIR=$(pwd)/artifacts/libzr/
     lint-examples:
         needs: build
         runs-on: ubuntu-latest
@@ -139,15 +122,133 @@ jobs:
                   # Make sure the actual branch is checked out when running on pull requests
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Download zircop
+            - name: Download build artifact
               uses: actions/download-artifact@v7
               with:
-                  name: zircop-debug
+                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
-            - name: Make zircop executable
-              run: |
-                  chmod +x ./artifacts/zircop
+            - name: Set permissions for zrc and zircop
+              run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
             - name: Add zrc and zircop to PATH
-              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
+              run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Lint all examples
               run: make -j2 -C examples lint ZIRCOP=zircop
+    comment-artifacts:
+        needs: build
+        runs-on: ubuntu-latest
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+
+        steps:
+            - name: Comment on PR with artifact links
+              uses: actions/github-script@v8
+              with:
+                  script: |
+                      const runId = context.runId;
+                      const repoOwner = context.repo.owner;
+                      const repoName = context.repo.repo;
+                      const artifactUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${runId}`;
+
+                      const message = `🚀 **Build Artifacts**
+
+                      Build artifacts have been generated for this PR across multiple platforms.
+
+                      You can download the following artifacts from the [workflow run](${artifactUrl}):
+
+                      - **Linux x64**: \`zrc-Linux-X64-release\`
+                      - **Linux ARM64**: \`zrc-Linux-ARM64-release\`
+                      - **macOS ARM64**: \`zrc-macOS-ARM64-release\`
+                      - **macOS x64**: \`zrc-macOS-X64-release\`
+
+                      If you use the [Zircon toolchain manager](https://github.com/zirco-lang/zircon), you can easily install the built artifacts using these downloaded packages:
+                      \`\`\`bash
+                      zircon import ./zrc-Linux-X64-release.zip
+                      \`\`\``;
+
+                      // Find existing comment
+                      const comments = await github.rest.issues.listComments({
+                          issue_number: context.issue.number,
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                      });
+
+                      const botComment = comments.data.find(comment => 
+                          comment.user.type === 'Bot' && 
+                          comment.body.includes('🚀 **Build Artifacts**')
+                      );
+
+                      if (botComment) {
+                          // Update existing comment
+                          await github.rest.issues.updateComment({
+                              comment_id: botComment.id,
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              body: message
+                          });
+                      } else {
+                          // Create new comment
+                          await github.rest.issues.createComment({
+                              issue_number: context.issue.number,
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              body: message
+                          });
+                      }
+    release:
+        # only on commits to main
+        needs: build
+        if: github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Download X86 Linux build artifact
+              uses: actions/download-artifact@v7
+              with:
+                  name: zrc-Linux-X64-release
+                  path: Linux-X64
+            - name: Download ARM64 Linux build artifact
+              uses: actions/download-artifact@v7
+              with:
+                  name: zrc-Linux-ARM64-release
+                  path: Linux-ARM64
+            - name: Download X86 macOS build artifact
+              uses: actions/download-artifact@v7
+              with:
+                  name: zrc-macOS-X64-release
+                  path: macOS-X64
+            - name: Download ARM64 macOS build artifact
+              uses: actions/download-artifact@v7
+              with:
+                  name: zrc-macOS-ARM64-release
+                  path: macOS-ARM64
+            - name: Set executable permissions
+              run: |
+                  chmod +x Linux-X64/bin/zrc Linux-X64/bin/zircop
+                  chmod +x Linux-ARM64/bin/zrc Linux-ARM64/bin/zircop
+                  chmod +x macOS-X64/bin/zrc macOS-X64/bin/zircop
+                  chmod +x macOS-ARM64/bin/zrc macOS-ARM64/bin/zircop
+            - name: Create tar archives
+              run: |
+                  tar -czf zrc-linux-x64.tar.gz -C Linux-X64 .
+                  tar -czf zrc-linux-arm64.tar.gz -C Linux-ARM64 .
+                  tar -czf zrc-macos-x64.tar.gz -C macOS-X64 .
+                  tar -czf zrc-macos-arm64.tar.gz -C macOS-ARM64 .
+            - name: Update `nightly` release
+              uses: softprops/action-gh-release@v1
+              with:
+                  tag_name: nightly
+                  name: Latest Build
+                  body: |
+                      This is an automated build of the Zirco project from the `main` branch.
+
+                      **Commit:** ${{ github.sha }}
+                      **Date:** ${{ github.event.head_commit.timestamp }}
+                  draft: false
+                  prerelease: true
+                  files: |
+                      zrc-linux-x64.tar.gz
+                      zrc-linux-arm64.tar.gz
+                      zrc-macos-x64.tar.gz
+                      zrc-macos-arm64.tar.gz
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
