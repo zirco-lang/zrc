@@ -14,6 +14,7 @@ ZIRCOP ?= ../target/debug/zircop
 ZRFLAGS ?= -I./include/ -I../include/
 ZIRCOPFLAGS ?= -I./include/ -I../include/
 CC ?= clang
+CFLAGS ?= -I./include/ -I../include/
 OUTDIR ?= ./dist
 SRCDIR ?= ./src
 
