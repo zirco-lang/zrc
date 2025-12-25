@@ -132,3 +132,64 @@ jobs:
               run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Lint all examples
               run: make -j2 -C examples lint ZIRCOP=zircop
+    comment-artifacts:
+        needs: build
+        runs-on: ubuntu-latest
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+
+        steps:
+            - name: Comment on PR with artifact links
+              uses: actions/github-script@v8
+              with:
+                  script: |
+                      const runId = context.runId;
+                      const repoOwner = context.repo.owner;
+                      const repoName = context.repo.repo;
+                      const artifactUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${runId}`;
+
+                      const message = `🚀 **Build Artifacts**
+
+                      Build artifacts have been generated for this PR across multiple platforms.
+
+                      You can download the following artifacts from the [workflow run](${artifactUrl}):
+
+                      - **Linux x64**: \`zrc-Linux-X64-release\`
+                      - **Linux ARM64**: \`zrc-Linux-ARM64-release\`
+                      - **macOS ARM64**: \`zrc-macOS-ARM64-release\`
+                      - **macOS x64**: \`zrc-macOS-X64-release\`
+
+                      Each artifact contains:
+                      - \`bin/zrc\` - The Zirco compiler
+                      - \`bin/zircop\` - The Zirco linter
+                      - \`include/\` - C header files
+                      - \`libzr/\` - Standard library files`;
+
+                      // Find existing comment
+                      const comments = await github.rest.issues.listComments({
+                          issue_number: context.issue.number,
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                      });
+
+                      const botComment = comments.data.find(comment => 
+                          comment.user.type === 'Bot' && 
+                          comment.body.includes('🚀 **Build Artifacts**')
+                      );
+
+                      if (botComment) {
+                          // Update existing comment
+                          await github.rest.issues.updateComment({
+                              comment_id: botComment.id,
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              body: message
+                          });
+                      } else {
+                          // Create new comment
+                          await github.rest.issues.createComment({
+                              issue_number: context.issue.number,
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              body: message
+                          });
+                      }
