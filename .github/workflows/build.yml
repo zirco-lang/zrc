@@ -57,7 +57,7 @@ jobs:
                   mkdir -p outputs/{bin,include,libzr}
                   cp target/release/zrc outputs/bin
                   cp target/release/zircop outputs/bin
-                  cp -r include/ outputs/include/
+                  cp -r include outputs/include
                   cp libzr/dist/libzr.a outputs/libzr/
                   cp libzr/dist/libzr.so outputs/libzr/
                   cp -r libzr/include/ outputs/libzr/include/
