@@ -27,13 +27,13 @@ jobs:
                   # Make sure the actual branch is checked out when running on pull requests
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Install LLVM dependencies (Linux)
+            - name: Install LLVM dependencies from the cache (Linux)
               if: runner.os == 'Linux'
               uses: awalsh128/cache-apt-pkgs-action@latest
               with:
                   packages: llvm-20 llvm-20-dev libpolly-20-dev clang-20
                   version: 1.0
-            - name: Install LLVM dependencies (macOS)
+            - name: Install LLVM dependencies from Homebrew (macOS)
               if: runner.os == 'macOS'
               run: |
                   brew install llvm@20
@@ -43,57 +43,41 @@ jobs:
               with:
                   toolchain: stable
                   override: true
-            - name: Install Rust problem matchers
-              uses: r7kamura/rust-problem-matchers@v1
             - name: Use dependency cache
               uses: Swatinem/rust-cache@v2
             - name: cargo build
               uses: actions-rs/cargo@v1
               with:
                   command: build
-            - name: Upload zrc build artifact
+                  args: --release
+            - name: Prepare artifacts directory
+              run: mkdir -p outputs/{bin,include,libzr}
+            - name: Copy built binaries to artifacts directory
+              run: |
+                  cp target/debug/zrc outputs/bin
+                  cp target/debug/zircop outputs/bin
+                  chmod +x outputs/bin/zrc
+                  chmod +x outputs/bin/zircop
+            - name: Copy headers to artifacts directory
+              run: |
+                  cp -r include/ outputs/include/
+            - name: Build standard library
+              run: make -j2 -C libzr all ZRC=target/release/zrc
+            - name: Copy libzr libraries to artifacts directory
+              run: |
+                  cp libzr/dist/libzr.a outputs/libzr/
+                  cp libzr/dist/libzr.so outputs/libzr/
+            - name: Copy libzr headers to artifacts directory
+              run: |
+                  cp -r libzr/include/ outputs/libzr/include/
+            - name: Upload build artifacts
               uses: actions/upload-artifact@v6
               with:
-                  name: zrc-debug
-                  path: target/debug/zrc
-                  retention-days: 1
-            - name: Upload zircop build artifact
-              uses: actions/upload-artifact@v6
-              with:
-                  name: zircop-debug
-                  path: target/debug/zircop
-                  retention-days: 1
-    build-std:
-        needs: build
-        runs-on: ubuntu-latest
-
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v6
-              with:
-                  # Make sure the actual branch is checked out when running on pull requests
-                  ref: ${{ github.head_ref }}
-                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Download build artifact
-              uses: actions/download-artifact@v7
-              with:
-                  name: zrc-debug
-                  path: ./artifacts
-            - name: Make zrc executable
-              run: chmod +x ./artifacts/zrc
-            - name: Add zrc to PATH
-              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
-            - name: Build libzr
-              run: make -j2 -C libzr all ZRC=zrc
-            - name: Upload libzr static library artifact
-              uses: actions/upload-artifact@v6
-              with:
-                  name: libzr-static
-                  path: libzr/dist/libzr.a
-                  retention-days: 1
+                  path: outputs
+                  name: zrc-${{ matrix.os }}-release
     lint-std:
         needs: build
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
 
         steps:
             - name: Checkout
@@ -105,18 +89,15 @@ jobs:
             - name: Download build artifact
               uses: actions/download-artifact@v7
               with:
-                  name: zircop-debug
+                  name: zrc-ubuntu-24.04-release
                   path: ./artifacts
-            - name: Make zircop executable
-              run: |
-                  chmod +x ./artifacts/zircop
             - name: Add zrc and zircop to PATH
-              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
+              run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Lint source for libzr
               run: make -j2 -C libzr lint ZIRCOP=zircop
     verify-examples:
-        needs: [build, build-std]
-        runs-on: ubuntu-latest
+        needs: build
+        runs-on: ubuntu-24.04
 
         steps:
             - name: Checkout
@@ -125,22 +106,15 @@ jobs:
                   # Make sure the actual branch is checked out when running on pull requests
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Download zrc
+            - name: Download zrc binary
               uses: actions/download-artifact@v7
               with:
-                  name: zrc-debug
+                  name: zrc-ubuntu-24.04-release
                   path: ./artifacts
-            - name: Download libzr static library
-              uses: actions/download-artifact@v7
-              with:
-                  name: libzr-static
-                  path: ./artifacts
-            - name: Make zrc executable
-              run: chmod +x ./artifacts/zrc
             - name: Add zrc to PATH
-              run: echo "PATH=$(pwd)/artifacts:$PATH" >> $GITHUB_ENV
+              run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Build and test all examples
-              run: make -j2 -C examples test ZRC=zrc LIBZR_DIR=$(pwd)/artifacts/
+              run: make -j2 -C examples test ZRC=zrc LIBZR_DIR=$(pwd)/artifacts/libzr/
     lint-examples:
         needs: build
         runs-on: ubuntu-latest
