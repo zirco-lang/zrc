@@ -50,25 +50,16 @@ jobs:
               with:
                   command: build
                   args: --release
-            - name: Prepare artifacts directory
-              run: mkdir -p outputs/{bin,include,libzr}
-            - name: Copy built binaries to artifacts directory
-              run: |
-                  cp target/release/zrc outputs/bin
-                  cp target/release/zircop outputs/bin
-                  chmod +x outputs/bin/zrc
-                  chmod +x outputs/bin/zircop
-            - name: Copy headers to artifacts directory
-              run: |
-                  cp -r include/ outputs/include/
             - name: Build standard library
               run: make -j2 -C libzr all ZRC=../target/release/zrc
-            - name: Copy libzr libraries to artifacts directory
+            - name: Prepare artifacts directory
               run: |
+                  mkdir -p outputs/{bin,include,libzr}
+                  cp target/release/zrc outputs/bin
+                  cp target/release/zircop outputs/bin
+                  cp -r include/ outputs/include/
                   cp libzr/dist/libzr.a outputs/libzr/
                   cp libzr/dist/libzr.so outputs/libzr/
-            - name: Copy libzr headers to artifacts directory
-              run: |
                   cp -r libzr/include/ outputs/libzr/include/
             - name: Upload build artifacts
               uses: actions/upload-artifact@v6
@@ -91,6 +82,8 @@ jobs:
               with:
                   name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
+            - name: Set permissions for zrc and zircop
+              run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
             - name: Add zrc and zircop to PATH
               run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Lint source for libzr
@@ -106,11 +99,13 @@ jobs:
                   # Make sure the actual branch is checked out when running on pull requests
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Download zrc binary
+            - name: Download build artifact
               uses: actions/download-artifact@v7
               with:
                   name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
+            - name: Set permissions for zrc and zircop
+              run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
             - name: Add zrc to PATH
               run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Build and test all examples
@@ -126,11 +121,13 @@ jobs:
                   # Make sure the actual branch is checked out when running on pull requests
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Download zircop
+            - name: Download build artifact
               uses: actions/download-artifact@v7
               with:
                   name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
+            - name: Set permissions for zrc and zircop
+              run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
             - name: Add zrc and zircop to PATH
               run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Lint all examples
