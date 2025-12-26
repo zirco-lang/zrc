@@ -98,7 +98,7 @@ jobs:
             - name: Add zrc to PATH
               run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Build and test all examples
-              run: make -j2 -C examples test ZRC=zrc LIBZR_DIR=$(pwd)/artifacts/libzr/
+              run: make -j2 -C examples test ZRC=zrc LIBZR_DIR=$(pwd)/artifacts/libzr/lib/
     lint-examples:
         needs: build
         runs-on: ubuntu-latest
