@@ -1,6 +1,13 @@
+//! `division_by_constant_zero`: Lint that detects division by constant zero.
+//!
+//! This lint inspects arithmetic division operations in the typed AST
+//! and raises a warning if it detects a division by a constant zero literal.
+//! Dividing by zero is undefined behavior and should be avoided.
+
 use zrc_parser::{ast::expr::Arithmetic, lexer::NumberLiteral};
-use zrc_typeck::tast::expr::{
-    TypedExpr, TypedExpr as TcExpr, TypedExprKind, TypedExprKind as TcExprKind,
+use zrc_typeck::tast::{
+    expr::{TypedExpr, TypedExpr as TcExpr, TypedExprKind, TypedExprKind as TcExprKind},
+    stmt::TypedDeclaration,
 };
 use zrc_utils::span::{Spannable, Spanned};
 
@@ -10,18 +17,21 @@ use crate::{
     visit::SemanticVisit,
 };
 
+/// `division_by_constant_zero`: Division by constant zero detected
+///
+/// This lint inspects arithmetic division operations in the typed AST
+/// and raises a warning if it detects a division by a constant zero literal or
+/// simple expressions that evaluate to zero.
 pub struct DivisionByConstantZero;
 impl DivisionByConstantZero {
+    /// Initialize this lint
     pub fn init() -> Box<dyn Lint> {
         Box::new(Self)
     }
 }
 
 impl Lint for DivisionByConstantZero {
-    fn lint_tast(
-        &self,
-        program: Vec<Spanned<zrc_typeck::tast::stmt::TypedDeclaration<'_, '_>>>,
-    ) -> Vec<LintDiagnostic> {
+    fn lint_tast(&self, program: Vec<Spanned<TypedDeclaration<'_, '_>>>) -> Vec<LintDiagnostic> {
         let mut vis = Visit {
             diagnostics: Vec::new(),
         };
@@ -31,24 +41,25 @@ impl Lint for DivisionByConstantZero {
     }
 }
 
+/// TAST visitor for the `division_by_constant_zero` lint
 struct Visit {
+    /// The collected diagnostics
     diagnostics: Vec<LintDiagnostic>,
 }
 
-impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit {
+impl<'input> SemanticVisit<'input, '_> for Visit {
     fn visit_tc_expr(&mut self, expr: &TcExpr<'input>) {
-        if let TcExprKind::Arithmetic(op, _lhs, rhs) = expr.kind.value() {
-            if matches!(op, Arithmetic::Division) {
-                if is_literal_zero(rhs.as_ref()) {
-                    let span = expr.kind.span();
-                    self.diagnostics.push(LintDiagnostic::new(
-                        LintDiagnosticKind::DivisionByConstantZero.in_span(span),
-                    ));
-                }
-            }
-        }
-
         SemanticVisit::walk_tc_expr(self, expr);
+
+        if let TcExprKind::Arithmetic(op, _lhs, rhs) = expr.kind.value()
+            && matches!(op, Arithmetic::Division)
+            && is_literal_zero(rhs.as_ref())
+        {
+            let span = expr.kind.span();
+            self.diagnostics.push(LintDiagnostic::new(
+                LintDiagnosticKind::DivisionByConstantZero.in_span(span),
+            ));
+        }
     }
 }
 
@@ -64,16 +75,17 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit {
 /// Underscores in numeric literals are ignored.
 /// This function does not perform full constant evaluation.
 fn is_literal_zero(expr: &TypedExpr<'_>) -> bool {
+    #[expect(clippy::wildcard_enum_match_arm)]
     match expr.kind.value() {
         TypedExprKind::NumberLiteral(num, _ty) => {
             let raw = match num {
-                NumberLiteral::Binary(s)
-                | NumberLiteral::Decimal(s)
-                | NumberLiteral::Hexadecimal(s) => s,
+                NumberLiteral::Binary(val)
+                | NumberLiteral::Decimal(val)
+                | NumberLiteral::Hexadecimal(val) => val,
             };
-            let no_underscores: String = raw.chars().filter(|&c| c != '_').collect();
+            let no_underscores: String = raw.chars().filter(|&ch| ch != '_').collect();
 
-            !no_underscores.is_empty() && no_underscores.chars().all(|c| c == '0')
+            !no_underscores.is_empty() && no_underscores.chars().all(|ch| ch == '0')
         }
         TypedExprKind::UnaryMinus(inner) => is_literal_zero(inner),
         _ => false,
