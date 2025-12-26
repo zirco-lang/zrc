@@ -45,23 +45,11 @@ jobs:
                   override: true
             - name: Use dependency cache
               uses: Swatinem/rust-cache@v2
-            - name: cargo build
-              uses: actions-rs/cargo@v1
-              with:
-                  command: build
-                  args: --release
-            - name: Build standard library
-              run: make -j2 -C libzr all ZRC=../target/release/zrc
-            - name: Prepare artifacts directory
+            - name: Build project
               run: |
-                  mkdir -p outputs/{bin,include,libzr}
-                  cp target/release/zrc outputs/bin
-                  cp target/release/zircop outputs/bin
-                  cp -r include outputs/include
-                  cp libzr/dist/libzr.a outputs/libzr/
-                  cp libzr/dist/libzr.so outputs/libzr/
-                  cp -r libzr/include/ outputs/libzr/include/
-                  cp hooks/env.sh outputs/
+                  mkdir outputs
+                  ZIRCON_TOOLCHAIN_DIR=$(pwd)/outputs \
+                    bash hooks/zircon.sh
             - name: Upload build artifacts
               uses: actions/upload-artifact@v6
               with:
