@@ -189,6 +189,16 @@ jobs:
         permissions:
             contents: write
         steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+            - name: Update nightly tag
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+                  git tag -d nightly || true
+                  git push origin :refs/tags/nightly || true
+                  git tag nightly
+                  git push origin nightly
             - name: Download X86 Linux build artifact
               uses: actions/download-artifact@v7
               with:
