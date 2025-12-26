@@ -29,6 +29,8 @@ pub enum LintDiagnosticKind {
         "empty `while` loop body - consider adding statements to the body or removing the loop"
     )]
     EmptyWhileBody,
+    #[error("division by constant zero")]
+    DivisionByConstantZero,
 }
 
 /// A Zircop lint
