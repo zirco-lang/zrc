@@ -371,7 +371,6 @@ fn resolve_key_type_mapping_with_opaque<'input>(
 
 #[cfg(test)]
 mod tests {
-    use zrc_diagnostics::Severity;
     use zrc_utils::{span::Span, spanned_test};
 
     use super::*;
@@ -397,10 +396,11 @@ mod tests {
                 &TypeCtx::new_empty(),
                 ParserType::build_ident(spanned_test!(0, "x", 1))
             ),
-            Err(Diagnostic(
-                Severity::Error,
-                spanned_test!(0, DiagnosticKind::UnableToResolveType("x".to_string()), 1)
-            ))
+            Err(Diagnostic::error(spanned_test!(
+                0,
+                DiagnosticKind::UnableToResolveType("x".to_string()),
+                1
+            )))
         );
     }
 
@@ -546,14 +546,11 @@ mod tests {
                     )),
                 )
             ),
-            Err(Diagnostic(
-                Severity::Error,
-                spanned_test!(
-                    17,
-                    DiagnosticKind::DuplicateStructMember("x".to_string()),
-                    23
-                )
-            ))
+            Err(Diagnostic::error(spanned_test!(
+                17,
+                DiagnosticKind::DuplicateStructMember("x".to_string()),
+                23
+            )))
         );
     }
 
@@ -666,14 +663,11 @@ mod tests {
         let err = result.expect_err("should produce error");
         assert_eq!(
             err,
-            Diagnostic(
-                Severity::Error,
-                spanned_test!(
-                    21,
-                    DiagnosticKind::SelfReferentialTypeNotBehindPointer("Node".to_string()),
-                    31
-                )
-            )
+            Diagnostic::error(spanned_test!(
+                21,
+                DiagnosticKind::SelfReferentialTypeNotBehindPointer("Node".to_string()),
+                31
+            ))
         );
     }
 
