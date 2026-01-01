@@ -4,7 +4,7 @@
 
 ![Zirco banner](https://github.com/zirco-lang/assets/blob/main/png/wide-light.png)
 
-A modern programming language focusing on a strong type system and modern syntax
+<b>Bare metal power, modern clarity.</b>
 
 ![Alt](https://repobeats.axiom.co/api/embed/ba11a893172e06e66607b7949d986810ab7b42df.svg "Repobeats analytics image")
 
@@ -12,13 +12,9 @@ A modern programming language focusing on a strong type system and modern syntax
 
 ## About Zirco
 
-Zirco is an unstable work-in-progress compiled programming language with the goal of having an extremely strong runtime type system with a focus on the ability to easily represent states of a program.
+Zirco is an unstable work-in-progress compiled programming language focusing on its clean, expressive syntax without sacrificing clarity: no hidden memory allocations, no macros, just fast, explicit code.
 
 It started out as (and still is) a hobby project for me to learn more about the world of compiler development, so there are no real promises for Zirco's real production usability. However, it also serves as a well-implemented reference for designing a compiler.
-
-As of now, Zirco uses a C-like set of semantics with Rusty syntax.
-
-This repository contains the entire Zirco compiler and all of its development work, including language-related proposals.
 
 ## Toolchain Installation via Zircon
 
