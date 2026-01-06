@@ -440,6 +440,10 @@ pub enum Tok<'input> {
     RightBrace,
 
     // === KEYWORDS & BUILT-INS ===
+    /// The keyword `local`
+    #[token("local")]
+    #[display("local")]
+    Local,
     /// The boolean `true`
     #[token("true")]
     #[display("true")]
@@ -786,7 +790,7 @@ mod tests {
             " = += -= *= /= %= &= |= ^= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
             r#" struct union enum match sizeof type switch default four -> => "str" 7_000 0xF_A"#,
-            " 0b1_0 abc const"
+            " 0b1_0 abc const local"
         );
         let tokens: Vec<Tok> = vec![
             Tok::PlusPlus,
@@ -864,6 +868,7 @@ mod tests {
             Tok::NumberLiteral(NumberLiteral::Binary("1_0")),
             Tok::Identifier("abc"),
             Tok::Const,
+            Tok::Local,
         ];
 
         assert_eq!(

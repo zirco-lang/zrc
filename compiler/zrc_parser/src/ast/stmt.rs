@@ -225,6 +225,8 @@ pub enum Declaration<'input> {
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
         body: Option<Spanned<Vec<Stmt<'input>>>>,
+        /// If the value is a `local fn` (static linkage)
+        local: bool,
     },
     /// A named type alias (`type U = T;`)
     /// This is also used for structs and unions.
@@ -235,7 +237,7 @@ pub enum Declaration<'input> {
         ty: Type<'input>,
     },
     /// A global let declaration
-    GlobalLetDeclaration(Spanned<Vec<Spanned<LetDeclaration<'input>>>>),
+    GlobalLetDeclaration(GlobalLetDeclaration<'input>),
 }
 impl Display for Declaration<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -245,9 +247,11 @@ impl Display for Declaration<'_> {
                 parameters,
                 return_type: Some(return_ty),
                 body: Some(body),
+                local,
             } => write!(
                 f,
-                "fn {name}({parameters}) -> {return_ty} {{\n{}\n}}",
+                "{}fn {name}({parameters}) -> {return_ty} {{\n{}\n}}",
+                if *local { "local " } else { "" },
                 body.value()
                     .iter()
                     .map(|stmt| indent_lines(&stmt.to_string(), "    "))
@@ -259,15 +263,22 @@ impl Display for Declaration<'_> {
                 parameters,
                 return_type: Some(return_ty),
                 body: None,
-            } => write!(f, "fn {name}({parameters}) -> {return_ty};"),
+                local,
+            } => write!(
+                f,
+                "{}fn {name}({parameters}) -> {return_ty};",
+                if *local { "local " } else { "" }
+            ),
             Self::FunctionDeclaration {
                 name,
                 parameters,
                 return_type: None,
                 body: Some(body),
+                local,
             } => write!(
                 f,
-                "fn {name}({parameters}) {{\n{}\n}}",
+                "{}fn {name}({parameters}) {{\n{}\n}}",
+                if *local { "local " } else { "" },
                 body.value()
                     .iter()
                     .map(|stmt| indent_lines(&stmt.to_string(), "    "))
@@ -279,14 +290,21 @@ impl Display for Declaration<'_> {
                 parameters,
                 return_type: None,
                 body: None,
-            } => write!(f, "fn {name}({parameters});"),
+                local,
+            } => write!(
+                f,
+                "{}fn {name}({parameters});",
+                if *local { "local " } else { "" }
+            ),
 
             Self::TypeAliasDeclaration { name, ty } => write!(f, "type {name} = {ty};"),
 
-            Self::GlobalLetDeclaration(list) => write!(
+            Self::GlobalLetDeclaration(GlobalLetDeclaration { decls, local }) => write!(
                 f,
-                "let {};",
-                list.value()
+                "{}let {};",
+                if *local { "local " } else { "" },
+                decls
+                    .value()
                     .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<_>>()
@@ -294,6 +312,15 @@ impl Display for Declaration<'_> {
             ),
         }
     }
+}
+
+/// A global let declaration
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GlobalLetDeclaration<'input> {
+    /// The interior [`LetDeclaration`]s
+    pub decls: Spanned<Vec<Spanned<LetDeclaration<'input>>>>,
+    /// If this is a `local let`
+    pub local: bool,
 }
 
 /// The list of arguments on a [`Declaration::FunctionDeclaration`]

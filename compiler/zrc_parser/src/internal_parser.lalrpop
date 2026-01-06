@@ -132,18 +132,35 @@ Declaration: Declaration<'input> = {
 };
 
 FunctionDeclaration: Declaration<'input> = {
+    "local" "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?>
+        <s:Spanned<("{" <StmtList?> "}")>> => Declaration::FunctionDeclaration {
+        name: i,
+        parameters: a.map(|inner| inner.unwrap_or(ArgumentDeclarationList::empty())),
+        return_type: r,
+        body: Some(s.map(|inner| inner.unwrap_or(Vec::new()))),
+        local: true,
+    },
+    "local" "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?> ";" => Declaration::FunctionDeclaration {
+        name: i,
+        parameters: a.map(|inner| inner.unwrap_or(ArgumentDeclarationList::empty())),
+        return_type: r,
+        body: None,
+        local: true,
+    },
     "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?>
         <s:Spanned<("{" <StmtList?> "}")>> => Declaration::FunctionDeclaration {
         name: i,
         parameters: a.map(|inner| inner.unwrap_or(ArgumentDeclarationList::empty())),
         return_type: r,
         body: Some(s.map(|inner| inner.unwrap_or(Vec::new()))),
+        local: false,
     },
     "fn" <i:Spanned<IDENTIFIER>> "(" <a:Spanned<ArgumentDeclarationList?>> ")" <r:("->" <Type>)?> ";" => Declaration::FunctionDeclaration {
         name: i,
         parameters: a.map(|inner| inner.unwrap_or(ArgumentDeclarationList::empty())),
         return_type: r,
         body: None,
+        local: false,
     }
 };
 
@@ -155,7 +172,14 @@ TypeAliasDeclaration: Declaration<'input> = {
 }
 
 GlobalLetDeclaration: Declaration<'input> = {
-    <Spanned<LetDeclaration>> => Declaration::GlobalLetDeclaration(<>),
+    <Spanned<LetDeclaration>> => Declaration::GlobalLetDeclaration(GlobalLetDeclaration {
+        decls: <>,
+        local: false,
+    }),
+    "local" <Spanned<LetDeclaration>> => Declaration::GlobalLetDeclaration(GlobalLetDeclaration {
+        decls: <>,
+        local: true,
+    }),
 }
 
 // Type that allows parentheses - use in declaration contexts
@@ -498,6 +522,7 @@ extern {
         "return" => lexer::Tok::Return,
         "let" => lexer::Tok::Let,
         "const" => lexer::Tok::Const,
+        "local" => lexer::Tok::Local,
         "fn" => lexer::Tok::Fn,
         "as" => lexer::Tok::As,
         "struct" => lexer::Tok::Struct,

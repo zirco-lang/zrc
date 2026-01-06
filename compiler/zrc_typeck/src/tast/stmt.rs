@@ -108,7 +108,16 @@ pub enum TypedDeclaration<'input, 'gs> {
         body: Option<Spanned<BlockMetadata<'input, 'gs>>>,
     },
     /// A global let declaration
-    GlobalLetDeclaration(Vec<Spanned<LetDeclaration<'input>>>),
+    GlobalLetDeclaration(GlobalLetDeclaration<'input>),
+}
+
+/// A global let declaration, which may be a `local let`
+#[derive(Debug, Clone, PartialEq)]
+pub struct GlobalLetDeclaration<'input> {
+    /// The interior [`LetDeclaration`]s
+    pub decls: Vec<Spanned<LetDeclaration<'input>>>,
+    /// If this is a `local let`
+    pub local: bool,
 }
 
 /// The list of arguments on a [`TypedDeclaration::FunctionDeclaration`]

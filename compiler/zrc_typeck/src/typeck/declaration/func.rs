@@ -275,7 +275,8 @@ mod tests {
                             0
                         ))],
                         0
-                    ))
+                    )),
+                    local: false,
                 }
             )
             .is_ok()
@@ -363,6 +364,7 @@ mod tests {
                 ),
                 return_type: Some(Type(spanned_test!(91, TypeKind::Identifier("usize"), 96))),
                 body: None,
+                local: false,
             },
         );
 
