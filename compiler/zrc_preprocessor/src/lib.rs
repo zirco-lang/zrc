@@ -137,20 +137,22 @@ fn find_include_file(ctx: &PreprocessorCtx, include_file: &str) -> Option<PathBu
 ///
 /// # Errors
 /// Returns an error if a regex pattern is invalid
+#[expect(clippy::result_large_err)]
 fn apply_declarations(ctx: &mut PreprocessorCtx) -> Result<(), Diagnostic> {
-    // Sort declarations by name length (longest first) to handle overlapping names correctly
+    // Sort declarations by name length (longest first) to handle overlapping names
+    // correctly
     let mut declarations: Vec<_> = ctx.declarations.iter().collect();
     declarations.sort_by_key(|(name, _)| std::cmp::Reverse(name.len()));
 
     for chunk in &mut ctx.chunks {
         let mut content = chunk.content.clone();
-        
+
         for (name, value) in &declarations {
             // Create a regex that matches the identifier as a whole word
             // Use word boundaries to ensure we only match complete identifiers
             let pattern = format!(r"\b{}\b", regex::escape(name));
             let regex_result = Regex::new(&pattern);
-            
+
             let regex_obj = match regex_result {
                 Ok(regex) => regex,
                 Err(err) => {
@@ -158,22 +160,23 @@ fn apply_declarations(ctx: &mut PreprocessorCtx) -> Result<(), Diagnostic> {
                     let static_file_name: &'static str =
                         Box::leak(chunk.file_name.clone().into_boxed_str());
                     return Err(
-                        DiagnosticKind::PreprocessorInvalidDeclareRegex(err.to_string())
-                            .error_in(Span::from_positions_and_file(
+                        DiagnosticKind::PreprocessorInvalidDeclareRegex(err.to_string()).error_in(
+                            Span::from_positions_and_file(
                                 chunk.byte_offset,
                                 chunk.byte_offset + chunk.content.len(),
                                 static_file_name,
-                            )),
+                            ),
+                        ),
                     );
                 }
             };
-            
+
             content = regex_obj.replace_all(&content, *value).to_string();
         }
-        
+
         chunk.content = content;
     }
-    
+
     Ok(())
 }
 
@@ -198,10 +201,10 @@ pub fn preprocess(
 ) -> Result<Vec<SourceChunk>, Diagnostic> {
     let mut ctx = PreprocessorCtx::new(search_paths);
     preprocess_internal(base_path, file_name, content, &mut ctx)?;
-    
+
     // Apply text substitutions from #declare directives
     apply_declarations(&mut ctx)?;
-    
+
     Ok(ctx.chunks)
 }
 
