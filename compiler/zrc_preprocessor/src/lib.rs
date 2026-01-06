@@ -156,7 +156,8 @@ fn apply_declarations(ctx: &mut PreprocessorCtx) -> Result<(), Diagnostic> {
             let regex_obj = match regex_result {
                 Ok(regex) => regex,
                 Err(err) => {
-                    // Leak the file name to get a static lifetime
+                    // Using Box::leak is intentional here as file names need to outlive
+                    // the compilation process for error reporting
                     let static_file_name: &'static str =
                         Box::leak(chunk.file_name.clone().into_boxed_str());
                     return Err(
