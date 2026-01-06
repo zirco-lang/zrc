@@ -57,11 +57,12 @@
 )]
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
 };
 
+use regex::Regex;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_utils::span::Span;
 
@@ -105,6 +106,8 @@ struct PreprocessorCtx {
     chunks: Vec<SourceChunk>,
     /// The paths to search for bracket includes
     search_paths: Vec<&'static Path>,
+    /// Map of declared identifiers to their replacement values
+    declarations: HashMap<String, String>,
 }
 
 impl PreprocessorCtx {
@@ -114,6 +117,7 @@ impl PreprocessorCtx {
             pragma_once_files: HashSet::new(),
             chunks: Vec::new(),
             search_paths,
+            declarations: HashMap::new(),
         }
     }
 }
@@ -127,6 +131,50 @@ fn find_include_file(ctx: &PreprocessorCtx, include_file: &str) -> Option<PathBu
         }
     }
     None
+}
+
+/// Apply text substitutions from #declare directives to all chunks
+///
+/// # Errors
+/// Returns an error if a regex pattern is invalid
+fn apply_declarations(ctx: &mut PreprocessorCtx) -> Result<(), Diagnostic> {
+    // Sort declarations by name length (longest first) to handle overlapping names correctly
+    let mut declarations: Vec<_> = ctx.declarations.iter().collect();
+    declarations.sort_by_key(|(name, _)| std::cmp::Reverse(name.len()));
+
+    for chunk in &mut ctx.chunks {
+        let mut content = chunk.content.clone();
+        
+        for (name, value) in &declarations {
+            // Create a regex that matches the identifier as a whole word
+            // Use word boundaries to ensure we only match complete identifiers
+            let pattern = format!(r"\b{}\b", regex::escape(name));
+            let regex_result = Regex::new(&pattern);
+            
+            let regex_obj = match regex_result {
+                Ok(regex) => regex,
+                Err(err) => {
+                    // Leak the file name to get a static lifetime
+                    let static_file_name: &'static str =
+                        Box::leak(chunk.file_name.clone().into_boxed_str());
+                    return Err(
+                        DiagnosticKind::PreprocessorInvalidDeclareRegex(err.to_string())
+                            .error_in(Span::from_positions_and_file(
+                                chunk.byte_offset,
+                                chunk.byte_offset + chunk.content.len(),
+                                static_file_name,
+                            )),
+                    );
+                }
+            };
+            
+            content = regex_obj.replace_all(&content, *value).to_string();
+        }
+        
+        chunk.content = content;
+    }
+    
+    Ok(())
 }
 
 /// Process a Zirco source file with preprocessing directives
@@ -150,6 +198,10 @@ pub fn preprocess(
 ) -> Result<Vec<SourceChunk>, Diagnostic> {
     let mut ctx = PreprocessorCtx::new(search_paths);
     preprocess_internal(base_path, file_name, content, &mut ctx)?;
+    
+    // Apply text substitutions from #declare directives
+    apply_declarations(&mut ctx)?;
+    
     Ok(ctx.chunks)
 }
 
@@ -320,6 +372,42 @@ fn preprocess_internal(
 
                 chunk_start_line = line_num + 1;
                 chunk_start_byte = current_byte + line.len() + 1; // +1 for newline
+            } else if let Some(declare_content) = directive.strip_prefix("declare") {
+                // Flush current chunk if it has content
+                if !current_chunk_lines.is_empty() {
+                    ctx.chunks.push(SourceChunk::new(
+                        static_file_name.to_string(),
+                        chunk_start_line,
+                        chunk_start_byte,
+                        current_chunk_lines.join("\n"),
+                    ));
+                    current_chunk_lines.clear();
+                }
+
+                // Parse declare directive: #declare NAME VALUE
+                let declare_content = declare_content.trim();
+                let parts: Vec<&str> = declare_content.splitn(2, char::is_whitespace).collect();
+
+                if parts.len() != 2 || parts[0].is_empty() || parts[1].trim().is_empty() {
+                    return Err(DiagnosticKind::PreprocessorInvalidDeclareSyntax.error_in(
+                        Span::from_positions_and_file(
+                            current_byte,
+                            current_byte + line.len(),
+                            static_file_name,
+                        ),
+                    ));
+                }
+
+                let name = parts[0];
+                let value = parts[1].trim();
+
+                // Store the declaration
+                ctx.declarations.insert(name.to_string(), value.to_string());
+
+                // Don't add this line to chunks, it's just a directive
+                chunk_start_line = line_num + 1;
+                // Update byte offset to skip this line
+                chunk_start_byte = current_byte + line.len() + 1; // +1 for newline
             } else {
                 return Err(
                     DiagnosticKind::PreprocessorUnknownDirective(directive.to_string()).error_in(
@@ -477,5 +565,63 @@ mod tests {
         assert_eq!(err.1.span().file_name(), "./test.zr");
         assert_eq!(err.1.span().start(), 0);
         assert_eq!(err.1.span().end(), content.len());
+    }
+
+    #[test]
+    fn preprocess_with_declare_simple() {
+        let content = "#declare PI 3.14\nlet x = PI;";
+        let chunks =
+            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].start_line, 2);
+        assert_eq!(chunks[0].content, "let x = 3.14;");
+    }
+
+    #[test]
+    fn preprocess_with_declare_multiple() {
+        let content = "#declare FOO 42\n#declare BAR hello\nlet x = FOO;\nlet y = BAR;";
+        let chunks =
+            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].content, "let x = 42;\nlet y = hello;");
+    }
+
+    #[test]
+    fn preprocess_with_declare_word_boundary() {
+        // Should only replace whole words, not partial matches
+        let content = "#declare X 5\nlet XX = X + X;";
+        let chunks =
+            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].content, "let XX = 5 + 5;");
+    }
+
+    #[test]
+    fn preprocess_with_declare_multiword_value() {
+        let content = "#declare GREET Hello World\nprintf(GREET);";
+        let chunks =
+            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
+
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].content, "printf(Hello World);");
+    }
+
+    #[test]
+    fn preprocess_declare_invalid_syntax_no_value() {
+        let content = "#declare NAME";
+        let result = preprocess(Path::new("."), vec![], "test.zr", content);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn preprocess_declare_invalid_syntax_no_name() {
+        let content = "#declare";
+        let result = preprocess(Path::new("."), vec![], "test.zr", content);
+
+        assert!(result.is_err());
     }
 }

@@ -1,0 +1,15 @@
+#pragma once
+#declare MAX_COUNT 10
+#declare BUFFER_SIZE 256
+
+fn printf(fmt: *u8, ...) -> i32;
+
+fn main() -> i32 {
+    let count: i32 = MAX_COUNT;
+    let buffer: i32 = BUFFER_SIZE;
+    
+    printf("Count: %d\n", count);
+    printf("Buffer size: %d\n", buffer);
+    
+    return 0;
+}

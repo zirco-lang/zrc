@@ -1203,6 +1203,7 @@ dependencies = [
 name = "zrc_preprocessor"
 version = "0.1.0"
 dependencies = [
+ "regex",
  "zrc_diagnostics",
  "zrc_utils",
 ]

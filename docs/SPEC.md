@@ -15,6 +15,7 @@ Version 0.1.0 (Draft)
     - [Preprocessor](#24-preprocessor)
         - [Include Directive](#241-include-directive)
         - [Pragma Once](#242-pragma-once)
+        - [Declare Directive](#243-declare-directive)
     - [Keywords](#25-keywords)
     - [Identifiers](#26-identifiers)
     - [Literals](#27-literals)
@@ -192,6 +193,65 @@ fn main() {
     let p: Point = Point { x: 0, y: 0 };
 }
 ```
+
+#### 2.4.3 Declare Directive
+
+The `#declare` directive performs textual substitution of identifiers:
+
+```zirco
+#declare CONSTANT_VALUE 42
+#declare MAX_SIZE 1024
+#declare DEBUG_MODE true
+```
+
+**Syntax**:
+
+```
+#declare NAME VALUE
+```
+
+**Behavior**:
+
+-   The `NAME` must be a valid identifier
+-   The `VALUE` can be any text (single or multiple words)
+-   All occurrences of `NAME` as a complete identifier in the source code will be replaced with `VALUE`
+-   Replacements only match whole identifiers (word boundaries are respected)
+-   The substitution happens after all preprocessing directives are processed
+
+**Example**:
+
+```zirco
+#declare PI 3.14159
+#declare MAX_ARRAY_SIZE 100
+
+fn calculate_circle_area(radius: f64) -> f64 {
+    return PI * radius * radius;
+}
+
+fn main() {
+    let arr: [i32; MAX_ARRAY_SIZE];
+    let area = calculate_circle_area(5.0);
+}
+```
+
+After preprocessing, this becomes:
+
+```zirco
+fn calculate_circle_area(radius: f64) -> f64 {
+    return 3.14159 * radius * radius;
+}
+
+fn main() {
+    let arr: [i32; 100];
+    let area = calculate_circle_area(5.0);
+}
+```
+
+**Notes**:
+
+-   Partial matches are not replaced (e.g., `#declare X 5` will not replace `XX` with `5X`)
+-   The directive only performs simple text substitution and does not perform macro expansion
+-   Declarations are file-scoped and apply to all code after the directive, including included files
 
 ### 2.5 Keywords
 

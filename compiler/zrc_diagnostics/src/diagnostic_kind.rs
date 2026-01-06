@@ -154,6 +154,10 @@ pub enum DiagnosticKind {
     PreprocessorCannotDetermineParentDirectory(String),
     #[error("unknown preprocessor directive: #{0}")]
     PreprocessorUnknownDirective(String),
+    #[error("invalid #declare syntax: expected #declare NAME VALUE")]
+    PreprocessorInvalidDeclareSyntax,
+    #[error("invalid regex pattern in #declare: {0}")]
+    PreprocessorInvalidDeclareRegex(String),
 }
 impl DiagnosticKind {
     /// Create a [error] diagnostic in a given [`Span`].
