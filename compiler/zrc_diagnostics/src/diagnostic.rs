@@ -69,7 +69,7 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
         // read the source from the path inside of the span. if it is <stdin>, use
         // the provided piped source.
         let (source, path) = match span.file_name() {
-            "<stdin>" => (
+            "/dev/<stdin>" => (
                 piped_source
                     .expect("piped source must be provided for <stdin>")
                     .to_string(),
@@ -171,7 +171,7 @@ mod tests {
         let source = "let x = 5;";
         let diagnostic = Diagnostic(
             Severity::Error,
-            spanned!(4, DiagnosticKind::InvalidToken, 5, "<stdin>"),
+            spanned!(4, DiagnosticKind::InvalidToken, 5, "/dev/<stdin>"),
         );
         let output = diagnostic.print(Some(source));
 
