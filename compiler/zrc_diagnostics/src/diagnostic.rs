@@ -171,7 +171,7 @@ mod tests {
         let source = "let x = 5;";
         let diagnostic = Diagnostic(
             Severity::Error,
-            spanned!(4, DiagnosticKind::InvalidToken, 5, "<stdin>"),
+            spanned!(4, DiagnosticKind::InvalidToken, 5, "/dev/<stdin>"),
         );
         let output = diagnostic.print(Some(source));
 
