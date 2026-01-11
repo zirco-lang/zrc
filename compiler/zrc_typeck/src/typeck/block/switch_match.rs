@@ -267,7 +267,7 @@ pub fn type_match<'input, 'gs>(
     // Build switch cases for each variant
     let mut switch_cases = Vec::new();
 
-    for case in cases.iter() {
+    for case in &cases {
         let variant_name = case.value().variant;
         let var_binding = case.value().var;
         let body = case.value().body.clone();
