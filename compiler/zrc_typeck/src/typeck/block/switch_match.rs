@@ -1,5 +1,7 @@
 //! Type checking for switch case and match statements.
 
+use std::collections::HashMap;
+
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::{
     expr::{Expr, ExprKind},
@@ -239,6 +241,12 @@ pub fn type_match<'input, 'gs>(
         return Err(DiagnosticKind::NonExhaustiveMatchCases.error_in(stmt_span));
     }
 
+    let variant_to_discriminant: HashMap<&str, usize> = sorted_enum_variants
+        .iter()
+        .enumerate()
+        .map(|(idx, (name, _))| (*name, idx))
+        .collect();
+
     // The index into sorted_enum_variants is the discriminant value
     // We sorted both, so the indices line up
 
@@ -259,11 +267,15 @@ pub fn type_match<'input, 'gs>(
     // Build switch cases for each variant
     let mut switch_cases = Vec::new();
 
-    for (idx, case) in cases.iter().enumerate() {
+    for case in cases.iter() {
         let variant_name = case.value().variant;
         let var_binding = case.value().var;
         let body = case.value().body.clone();
         let case_span = case.span();
+
+        let discriminant_idx = *variant_to_discriminant
+            .get(&variant_name)
+            .expect("variant should be present in discriminant map");
 
         // Build let binding: let <var_binding> =
         // <scrutinee>.__value__.<variant_name>;
@@ -308,7 +320,9 @@ pub fn type_match<'input, 'gs>(
                 // SAFETY: We leak this string because the AST
                 // requires a &str for number literals and we need
                 // it to live long enough
-                zrc_parser::lexer::NumberLiteral::Decimal(Box::leak(Box::new(idx.to_string()))),
+                zrc_parser::lexer::NumberLiteral::Decimal(Box::leak(Box::new(
+                    discriminant_idx.to_string(),
+                ))),
                 None,
             ),
         ));
