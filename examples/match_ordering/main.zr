@@ -1,0 +1,54 @@
+#include <libc/stdio.zh>
+
+// This file demonstrates that matching an enum's discriminants is
+// order-independent
+
+/// This enum has its fields arranged alphabetically
+enum Forward {
+    A: void,
+    B: i32,
+}
+
+/// This enum has its fields arranged reverse-alphabetically
+enum Reverse {
+    B: i32,
+    A: void,
+}
+
+fn test_forward() {
+    let candidate = Forward { A: void {} };
+
+    // prints "Got Forward { A }\n"
+    match (candidate) {
+        A: value => printf("Got Forward { A }\n");
+        B: value => printf("Got Forward { B: %d }\n", value);
+    }
+    
+    // prints "Got Forward { A }\n"
+    match (candidate) {
+        B: value => printf("Got Forward { B: %d }\n", value);
+        A: value => printf("Got Forward { A }\n");
+    }
+}
+
+fn test_reverse() {
+    let candidate = Reverse { A: void {} };
+
+    // prints "Got Reverse { A }\n"
+    match (candidate) {
+        A: value => printf("Got Reverse { A }\n");
+        B: value => printf("Got Reverse { B: %d }\n", value);
+    }
+    
+    // prints "Got Reverse { A }\n"
+    match (candidate) {
+        B: value => printf("Got Reverse { B: %d }\n", value);
+        A: value => printf("Got Reverse { A }\n");
+    }
+}
+
+fn main() -> i32{
+    test_forward();
+    test_reverse();
+    return 0;
+}
