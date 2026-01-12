@@ -1,0 +1,36 @@
+#pragma once
+#include "ast.zh"
+// --- Parser Functions --- //
+
+/// The "Ok" result, contains both the expr and a pointer to the unconsumed bytes.
+struct ParseOk { expr: Expr, rest: *u8 }
+
+/// The result of `parse` and `number`
+enum ParseResult {
+    Err: *u8,
+    Ok: ParseOk,
+}
+
+/// Constructs a ParseResult { Err }
+fn Err(message: *u8) -> ParseResult;
+
+
+/// Parses an expression from a `line` at the specified binding `power`.
+fn parse(line: *u8, power: i32) -> ParseResult;
+
+
+/// The left and right binding powers for an infix expression
+struct InfBp { prev: i32, next: i32 }
+
+/// Returns the infix binding-powers for a given operator
+fn inf_bp(op: u8) -> InfBp;
+
+/// Returns the prefix binding-power for a given operator
+fn pre_bp(op: u8) -> i32;
+
+
+/// Tests if the `scrutinee` is between `begin` and `end`, inclusive
+fn in_range(scrutinee: u8, begin: u8, end: u8) -> bool;
+
+/// Skips whitespace
+fn space(line: *u8) -> *u8;
