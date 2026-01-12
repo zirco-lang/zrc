@@ -1,0 +1,92 @@
+#include "ast.zh"
+#include "parser.zh"
+
+#include <libc/stdio.zh>
+#include <libc/string.zh>
+
+
+/// Recursively pretty-prints an `Expr` to stdout
+fn print_expr(expr: Expr) {
+    match (expr) {
+        Atom: value => printf("%d", value);
+        Binary: b => {
+            printf("(");
+            print_expr(unbox(b.lhs));
+            printf(" %c ", b.op);
+            print_expr(unbox(b.rhs));
+            printf(")");
+        }
+        Unary: u => {
+            printf("%c(", u.op);
+            print_expr(unbox(u.expr));
+            printf(")");
+        }
+    }
+}
+
+/// Recursively evaluates an expression, returning the result
+fn evaluate_expr(expr: Expr) -> i32 {
+    match (expr) {
+        Atom: a => return a.value;
+        Binary: b => switch (b.op) {
+            '*' => return evaluate_expr(unbox(b.lhs)) * evaluate_expr(unbox(b.rhs));
+            '/' => return evaluate_expr(unbox(b.lhs)) / evaluate_expr(unbox(b.rhs));
+            '%' => return evaluate_expr(unbox(b.lhs)) % evaluate_expr(unbox(b.rhs));
+            '+' => return evaluate_expr(unbox(b.lhs)) + evaluate_expr(unbox(b.rhs));
+            '-' => return evaluate_expr(unbox(b.lhs)) - evaluate_expr(unbox(b.rhs));
+            default => printf("Invalid operator for binary expression: '%c'\n", b.op);
+        }
+        Unary: u => switch (u.op) {
+            '-' => return - evaluate_expr(unbox(u.expr));
+            default => printf("Invalid operator for unary expression: '%c'\n", u.op);
+        }
+    }
+    return 0;
+}
+
+
+/// Emulates POSIX getline, but doesn't refer to stdin/stdout
+/// 
+/// prompt:  null-terminated ASCII string to be printed to the user
+/// buf:     output buffer
+/// max_len: length of the output buffer
+fn getline(prompt: *u8, buf: *u8, max_len: usize) -> usize {
+    let len = 0usize;
+    while (*prompt != 0) {
+        putchar(*prompt as i32);
+        prompt += 1;
+    }
+    while(len < max_len) {
+        let c = getchar() as u8;
+        if (c == '\n' || c == '\0') break;
+        buf[len++] = c;
+    }
+    buf[len] = 0;
+    return len;
+}
+
+
+
+/// Performs one iteration of the REPL
+fn read_evaluate_print() -> usize {
+    let buf: [1024]u8;
+    let len: usize = getline("> ", &buf as *u8, sizeof(buf));
+
+    if (strcmp(&buf as *u8, "exit") == 0) return 0;
+
+    let presult = parse(&buf as *u8, 0);
+    match (presult) {
+        Err: e => {
+            printf("Error: %s\n", e);
+            return 0;
+        }
+        Ok: res => {
+            let value = evaluate_expr(res.expr);
+            print_expr(res.expr);
+            printf(" = %d\n", value);
+            free_expr(&res.expr);
+        }
+    }
+
+    return len;
+}

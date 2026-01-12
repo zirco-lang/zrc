@@ -1,0 +1,11 @@
+#include <libc/stdio.zh>
+#include "repl.zh" // read_evaluate_print
+
+
+fn main() -> i32 {
+    while (read_evaluate_print() != 0);
+
+    puts("");
+
+    return 0;
+}

@@ -1,0 +1,99 @@
+#include "parser.zh"
+#include "ast.zh"
+
+#include <libc/stdlib.zh>
+#include <libc/stdio.zh>
+#include <libc/string.zh>
+
+
+fn Err(message: *u8) -> ParseResult {
+    return ParseResult { Err: message };
+}
+
+fn parse(line: *u8, power: i32) -> ParseResult {
+    let res: ParseOk = ParseOk { expr: Atom(0), rest: line};
+    line = space(line);
+    if (*line == 0) return Err("Expression must not be empty!");
+
+    if (in_range(*line, '0', '9')) {
+        let value: i32 = 0i32;
+        for (; in_range(*line, '0', '9'); line += 1) {
+            value = value * 10 + (*line - '0') as i32;
+        }
+        res = ParseOk { expr: Atom(value), rest: line };
+
+    } else if (*line == '(') {
+        // the scrutinee of `match` must be a Place
+        let presult = parse(line + 1, 0);
+        match (presult) {
+            Err: msg => return Err(msg);
+            Ok: ok => res = ok;
+        }
+        if (*res.rest != ')') return Err("Parentheses must be closed!");
+        res.rest += 1;
+
+    } else {
+        let op = *line;
+        line += 1;
+
+        let presult = parse(line, pre_bp(op));
+        match (presult) {
+            Err: msg => return Err(msg);
+            Ok: ok => res = ok;
+        }
+        res.expr = Unary(op, res.expr);
+    }
+
+    let lhs = res.expr;
+
+    while (line = space(res.rest), *line != 0 && *line != ')') {
+        let op = *line;
+        line += 1;
+
+        let prec = inf_bp(op);
+        if (prec.prev < power) break;
+
+        let presult = parse(line, prec.next);
+        match (presult) {
+            Err: msg => return Err(msg);
+            Ok: ok => {
+                lhs = Binary(op, lhs, ok.expr);
+                res = ok;
+            }
+        }
+    }
+    
+    res.expr = lhs;
+    return ParseResult { Ok: res };
+}
+
+
+fn inf_bp(op: u8) -> InfBp {
+    switch (op) {
+        '*' => return InfBp { prev: 6, next: 7 };
+        '/' => return InfBp { prev: 6, next: 7 };
+        '%' => return InfBp { prev: 6, next: 7 };
+        '+' => return InfBp { prev: 4, next: 5 };
+        '-' => return InfBp { prev: 4, next: 5 };
+        default => ;
+    }
+    return InfBp { prev: -1, next: -1 };
+}
+
+fn pre_bp(op: u8) -> i32 {
+    switch (op) {
+        '-' => return 10;
+        default => ;
+    }
+    return -1;
+}
+
+
+fn in_range(scrutinee: u8, begin: u8, end: u8) -> bool {
+    return begin <= scrutinee && scrutinee <= end;
+}
+
+fn space(line: *u8) -> *u8 {
+    while (*line == ' ' || *line == '\n') line += 1;
+    return line;
+}
