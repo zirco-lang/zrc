@@ -17,10 +17,6 @@ pub enum LintDiagnosticKind {
     UnreachableCode,
     #[error("suspicious control flow")]
     SussyControlFlow,
-    #[error(
-        "empty `while` loop body - consider adding statements to the body or removing the loop"
-    )]
-    EmptyWhileBody,
     #[error("division by constant zero")]
     DivisionByConstantZero,
 }
@@ -32,7 +28,6 @@ impl ErrorCode for LintDiagnosticKind {
             Self::UnusedVariable => "unused_variable",
             Self::UnreachableCode => "unreachable_code",
             Self::SussyControlFlow => "suspicious_control_flow",
-            Self::EmptyWhileBody => "empty_while_body",
             Self::DivisionByConstantZero => "division_by_constant_zero",
         }
     }

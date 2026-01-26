@@ -3,7 +3,6 @@
 //! This lint detects the following bad control flow:
 //! - Empty `else` blocks
 //! - Empty `if` blocks with an `else` block present
-//! - `while` loops with an empty body
 //!
 //! Each of these patterns can lead to confusing or misleading code and should
 //! be avoided.
@@ -21,8 +20,8 @@ use crate::{
 /// `bad_control_flow`: Bad control flow practices
 ///
 /// This lint recursively scans the typed AST for bad control flow patterns
-/// such as empty `else` blocks, empty `if` blocks with an `else` block present,
-/// and `while` loops with empty bodies.
+/// such as empty `else` blocks, and empty `if` blocks with an `else` block
+/// present.
 pub struct BadControlFlowLint;
 impl BadControlFlowLint {
     /// Initialize this lint
@@ -82,15 +81,6 @@ impl<'input> SyntacticVisit<'input> for Visit {
                         .with_help(LintHelpKind::RemoveElseBlock),
                     );
                 }
-            }
-        } else if let StmtKind::WhileStmt(_, body) = stmt.0.value() {
-            // 2. Empty while body
-            if let StmtKind::BlockStmt(stmts) = body.0.value()
-                && stmts.is_empty()
-            {
-                self.diagnostics.push(LintDiagnostic::warning(
-                    LintDiagnosticKind::EmptyWhileBody.in_span(body.0.span()),
-                ));
             }
         }
     }
@@ -168,25 +158,6 @@ mod tests {
                 )
             ).with_help(
                 LintHelpKind::RemoveElseBlock
-            ),
-        ]
-    }
-
-    zircop_lint_test! {
-        name: bad_control_flow_detects_empty_while,
-        source: indoc!{"
-            fn f() -> i32 {
-                while (true) {}
-                return 0;
-            }
-        "},
-        diagnostics: vec![
-            LintDiagnostic::warning(
-                spanned_test!(
-                    33,
-                    LintDiagnosticKind::EmptyWhileBody,
-                    35
-                )
             ),
         ]
     }
