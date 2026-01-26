@@ -44,7 +44,7 @@ pub enum DiagnosticKind {
     UnableToResolveIdentifier(String),
     #[error("type `{0}` is not a lvalue")]
     NotAnLvalue(String),
-    #[error("cannot assign a value of type `{got}` to a variable of type `{expected}")]
+    #[error("cannot assign a value of type `{got}` to a variable of type `{expected}`")]
     InvalidAssignmentRightHandSideType { expected: String, got: String },
     #[error("cannot dereference non-pointer type `{0}`")]
     CannotDereferenceNonPointer(String), // TODO: Migrate to new diags
