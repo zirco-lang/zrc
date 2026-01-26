@@ -21,6 +21,8 @@ pub enum LintDiagnosticKind {
         "empty `while` loop body - consider adding statements to the body or removing the loop"
     )]
     EmptyWhileBody,
+    #[error("division by constant zero")]
+    DivisionByConstantZero,
 }
 impl ErrorCode for LintDiagnosticKind {
     fn error_code(&self) -> &'static str {
@@ -31,6 +33,7 @@ impl ErrorCode for LintDiagnosticKind {
             Self::UnreachableCode => "unreachable_code",
             Self::SussyControlFlow => "suspicious_control_flow",
             Self::EmptyWhileBody => "empty_while_body",
+            Self::DivisionByConstantZero => "division_by_constant_zero",
         }
     }
 }
@@ -53,10 +56,12 @@ pub enum LintLabelKind {
     UnderscoreVariableUsage,
     #[error("this variable is never used")]
     UnusedVariable,
-    #[error("this statement will never be executed")]
+    #[error("so this statement will never be executed")]
     UnreachableCode,
-    #[error("because of this prior control flow statement")]
+    #[error("this statement ends execution of this block")]
     PriorControlFlow,
+    #[error("division by zero detected here")]
+    DivisionByConstantZero,
 }
 
 /// The list of possible notes on Zircop lints
@@ -65,6 +70,8 @@ pub enum LintLabelKind {
 pub enum LintNoteKind {
     #[error("to suppress this warning, consider renaming the variable to `{}`", .0)]
     UnusedVariableSuppress(String),
+    #[error("division by zero is undefined behavior")]
+    DivisionByConstantZero,
 }
 
 /// The list of possible helps on Zircop lints

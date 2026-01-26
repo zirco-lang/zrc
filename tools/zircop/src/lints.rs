@@ -1,6 +1,7 @@
 //! List of lints provided by zircop
 
 mod bad_control_flow;
+mod division_by_constant_zero;
 mod empty_struct_used;
 mod underscore_variable_used;
 mod unreachable_code;
@@ -17,5 +18,6 @@ pub fn get_default_lints() -> PassList {
         unreachable_code::UnreachableCodeLint::init(),
         unused_variables::UnusedVariablesLint::init(),
         bad_control_flow::BadControlFlowLint::init(),
+        division_by_constant_zero::DivisionByConstantZero::init(),
     ])
 }

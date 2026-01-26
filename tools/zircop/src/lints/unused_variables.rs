@@ -66,12 +66,12 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit<'input> {
         // `Rc<RefCell<...>>` so borrow the entry when inspecting it.
         for (var_name, var_entry_rc) in block.scope.values.iter() {
             let var_entry = var_entry_rc.borrow();
+            // Functions are also stored as variables in the scope, but
+            // we don't want to report them as unused variables as they
+            // may be extern
             if var_entry.referenced_spans.is_empty()
                 && !var_name.starts_with('_')
                 && !self.reported_vars.contains(&var_name)
-                // Functions are also stored as variables in the scope, but
-                // we don't want to report them as unused variables as they
-                // may be extern
                 && !matches!(var_entry.ty, Type::Fn(_))
             {
                 let span = var_entry.declaration_span;

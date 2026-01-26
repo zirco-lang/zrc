@@ -61,11 +61,11 @@ impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit {
                 let span = stmt.kind.span();
                 self.diagnostics.push(
                     LintDiagnostic::warning(LintDiagnosticKind::UnreachableCode.in_span(span))
-                        .with_label(GenericLabel::warning(
-                            LintLabelKind::UnreachableCode.in_span(span),
-                        ))
                         .with_label(GenericLabel::note(
                             LintLabelKind::PriorControlFlow.in_span(return_span),
+                        ))
+                        .with_label(GenericLabel::warning(
+                            LintLabelKind::UnreachableCode.in_span(span),
                         )),
                 );
                 // Continue checking to report all unreachable statements

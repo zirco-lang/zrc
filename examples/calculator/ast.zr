@@ -1,0 +1,66 @@
+#include "ast.zh"
+
+#include <libc/stdlib.zh>
+#include <libc/stdio.zh>
+
+// --- Constructors --- //
+
+fn Atom(value: i32) -> Expr {
+    return Expr {
+        Atom: AtomExpr {
+            value: value
+        }
+    };
+}
+
+fn Binary(op: u8, lhs: Expr, rhs: Expr) -> Expr {
+    return Expr {
+        Binary: BinaryExpr {
+            op: op,
+            lhs: box(lhs),
+            rhs: box(rhs)
+        }
+    };
+}
+
+fn Unary(op: u8, expr: Expr) -> Expr {
+    return Expr {
+        Unary: UnaryExpr {
+            op: op,
+            expr: box(expr)
+        }
+    };
+}
+
+// --- Memory Management --- //
+
+fn box(expr: Expr) -> BoxExpr {
+    let ptr = malloc(sizeof Expr);
+    if (ptr == 0 as *void) {
+        printf("malloc() should not return NULL!\n");
+        exit(-1);
+    }
+    *(ptr as *Expr) = expr;
+    return ptr as BoxExpr;
+}
+
+fn unbox(expr: BoxExpr) -> Expr {
+    return *(expr as *Expr);
+}
+
+fn free_expr(expr: *Expr) {
+    match (*expr) {
+        Atom: _ => ;
+        Binary: b => {
+            free_expr(b.lhs as *Expr);
+            free(b.lhs);
+            free_expr(b.rhs as *Expr);
+            free(b.rhs);
+        }
+        Unary: u => {
+            free_expr(u.expr as *Expr);
+            free(u.expr);
+        }
+    }
+    *expr = Atom(0);
+}

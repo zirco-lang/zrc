@@ -1,0 +1,15 @@
+#pragma once
+
+/// Emulates POSIX getline, but doesn't refer to stdin/stdout
+/// 
+/// prompt:  null-terminated ASCII string to be printed to the user
+/// buf:     output buffer
+/// max_len: length of the output buffer
+fn getline(prompt: *u8, buf: *u8, max_len: usize) -> usize;
+
+/// Performs one iteration of the main loop
+/// 
+/// This is a separate function because you cannot `break` from within a `match` statement.
+///
+/// Returns the length of the last line of input, or 0 for "exit"
+fn read_evaluate_print() -> usize;
