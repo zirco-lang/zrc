@@ -1,6 +1,6 @@
 //! helper tools used in the type-checking of expressions
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpanExt};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, SpanExt, diagnostic::GenericLabel};
 use zrc_parser::ast::expr::{Assignment, Expr, ExprKind};
 use zrc_utils::span::{Span, Spannable};
 
@@ -77,7 +77,14 @@ pub fn expr_to_place<'input>(
             inferred_type: expr.inferred_type,
             kind: PlaceKind::Dot(x, y).in_span(kind_span),
         },
-        _ => return Err(span.error(DiagnosticKind::NotAnLvalue(stringified))),
+        _ => {
+            return Err(span
+                .error(DiagnosticKind::NotAnLvalue(stringified.clone()))
+                .with_label(GenericLabel::error(LabelKind::NotAnLvalue.in_span(span)))
+                .with_label(GenericLabel::note(
+                    LabelKind::InferredType(stringified).in_span(span),
+                )));
+        }
     })
 }
 

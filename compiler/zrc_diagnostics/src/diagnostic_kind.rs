@@ -42,10 +42,9 @@ pub enum DiagnosticKind {
     UnableToResolveType(String),
     #[error("unable to resolve identifier `{0}`")]
     UnableToResolveIdentifier(String),
-    #[error("`{0}` is not a valid lvalue for assignment or address-of")]
-    NotAnLvalue(String), // TODO: Migrate to new diags
-    #[error("expected `{expected}` on right hand side of assignment, got `{got}`")]
-    // TODO: Migrate to new diags
+    #[error("type `{0}` is not a lvalue")]
+    NotAnLvalue(String),
+    #[error("cannot assign a value of type `{got}` to a variable of type `{expected}")]
     InvalidAssignmentRightHandSideType { expected: String, got: String },
     #[error("cannot dereference non-pointer type `{0}`")]
     CannotDereferenceNonPointer(String), // TODO: Migrate to new diags
@@ -271,6 +270,16 @@ pub enum LabelKind {
     UnableToResolveType(String),
     #[error("there is no variable named `{0}` in this scope")]
     UnableToResolveIdentifier(String),
+    #[error("this is inferred to be of type `{0}`")]
+    InferredType(String),
+    #[error("only variables and pointers can exist in this position")]
+    NotAnLvalue,
+    #[error("this variable is declared to be of type `{0}`")]
+    VariableDeclaredType(String),
+    #[error("this value is of type `{0}`")]
+    PlaceType(String),
+    #[error("cannot assign a value of type `{got}` to a value of type `{expected}`")]
+    InvalidAssignmentRightHandSideType { expected: String, got: String },
 }
 
 /// The list of possible notes attached to a [`Diagnostic`]

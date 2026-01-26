@@ -382,9 +382,8 @@ fn resolve_key_type_mapping_with_opaque<'input>(
 mod tests {
     use zrc_utils::{span::Span, spanned_test};
 
-    use crate::typeck::GlobalScope;
-
     use super::*;
+    use crate::typeck::GlobalScope;
 
     #[test]
     fn pointers_and_identifiers_resolve_as_expected() {

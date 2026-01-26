@@ -1,6 +1,6 @@
 //! Process let declarations during type checking
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, diagnostic::GenericLabel};
 use zrc_parser::ast::stmt::LetDeclaration as AstLetDeclaration;
 use zrc_utils::span::{Spannable, Spanned};
 
@@ -33,6 +33,7 @@ pub fn process_let_declaration<'input>(
                     .map(|expr| type_expr(scope, expr))
                     .transpose()?;
 
+                let ty_span = let_declaration.ty.as_ref().map(|x| x.0.span());
                 let resolved_ty = let_declaration
                     .ty
                     .map(|ty| resolve_type(scope, ty))
@@ -142,7 +143,18 @@ pub fn process_let_declaration<'input>(
                                 expected: resolved_ty.to_string(),
                                 got: inferred_type.to_string(),
                             }
-                            .error_in(let_decl_span));
+                            .error_in(let_decl_span)
+                            .with_label(GenericLabel::note(
+                                LabelKind::VariableDeclaredType(resolved_ty.to_string())
+                                    .in_span(ty_span.expect("ty_span should exist here")),
+                            ))
+                            .with_label(GenericLabel::error(
+                                LabelKind::InvalidAssignmentRightHandSideType {
+                                    expected: resolved_ty.to_string(),
+                                    got: inferred_type.to_string(),
+                                }
+                                .in_span(kind.span()),
+                            )));
                         }
                     }
                 };
