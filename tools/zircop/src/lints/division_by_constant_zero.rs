@@ -59,7 +59,7 @@ impl<'input> SemanticVisit<'input, '_> for Visit {
             let span = expr.kind.span();
             self.diagnostics.push(
                 LintDiagnostic::warning(LintDiagnosticKind::DivisionByConstantZero.in_span(span))
-                    .with_label(GenericLabel::note(
+                    .with_label(GenericLabel::warning(
                         LintLabelKind::DivisionByConstantZero.in_span(span),
                     ))
                     .with_note(LintNoteKind::DivisionByConstantZero),

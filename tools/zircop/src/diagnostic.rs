@@ -63,7 +63,7 @@ pub enum LintLabelKind {
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
 #[expect(missing_docs)]
 pub enum LintNoteKind {
-    #[error("to suppress this warning, consider renaming the variable to `{}`", .0)]
+    #[error("to suppress this warning, rename the variable to `{}`", .0)]
     UnusedVariableSuppress(String),
     #[error("division by zero is undefined behavior")]
     DivisionByConstantZero,
@@ -81,7 +81,7 @@ pub enum LintHelpKind {
     UseVoidType,
     #[error("consider renaming the variable to `{}`", .0)]
     RenameVariable(String),
-    #[error("consider removing the variable declaration")]
+    #[error("consider removing the variable declaration if it has no side effects")]
     RemoveVariableDeclaration,
 }
 
