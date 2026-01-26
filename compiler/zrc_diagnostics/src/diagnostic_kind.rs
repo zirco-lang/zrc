@@ -39,9 +39,9 @@ pub enum DiagnosticKind {
 
     // TYPE CHECKER ERRORS
     #[error("unable to resolve `{0}` to a type")]
-    UnableToResolveType(String), // TODO: Migrate to new diags
+    UnableToResolveType(String),
     #[error("unable to resolve identifier `{0}`")]
-    UnableToResolveIdentifier(String), // TODO: Migrate to new diags
+    UnableToResolveIdentifier(String),
     #[error("`{0}` is not a valid lvalue for assignment or address-of")]
     NotAnLvalue(String), // TODO: Migrate to new diags
     #[error("expected `{expected}` on right hand side of assignment, got `{got}`")]
@@ -267,6 +267,10 @@ pub enum LabelKind {
     ExpectedClosing(String),
     #[error("unknown preprocessor directive")]
     PreprocessorUnknownDirective,
+    #[error("there is no type named `{0}`")]
+    UnableToResolveType(String),
+    #[error("there is no variable named `{0}` in this scope")]
+    UnableToResolveIdentifier(String),
 }
 
 /// The list of possible notes attached to a [`Diagnostic`]
@@ -291,6 +295,10 @@ pub enum NoteKind {
     ReadFailed(String),
     #[error("Zirco does not support macros")]
     MacrosNotSupported,
+    #[error("there is a variable named `{0}`, but expected a type here")]
+    VariableExists(String),
+    #[error("there is a type named `{0}`, but expected a variable here")]
+    TypeExists(String),
 }
 
 /// The list of possible help messages attached to a [`Diagnostic`]

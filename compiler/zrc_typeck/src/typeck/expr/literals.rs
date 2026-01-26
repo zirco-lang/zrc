@@ -1,6 +1,6 @@
 //! type checking for literal expressions
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, NoteKind, diagnostic::GenericLabel};
 use zrc_parser::{
     ast::{expr::Expr as AstExpr, ty::Type},
     lexer::{NumberLiteral, StringTok, ZrcString},
@@ -24,7 +24,7 @@ pub fn type_expr_number_literal<'input>(
     ty: Option<Type<'input>>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let ty_resolved = ty
-        .map(|ty| resolve_type(scope.types, ty))
+        .map(|ty| resolve_type(scope, ty))
         .transpose()?
         .unwrap_or(TastType::Int);
 
@@ -122,7 +122,17 @@ pub fn type_expr_identifier<'input>(
     i: &'input str,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let ty_rc = scope.values.resolve_mut(i).ok_or_else(|| {
-        DiagnosticKind::UnableToResolveIdentifier(i.to_string()).error_in(expr_span)
+        let base = DiagnosticKind::UnableToResolveIdentifier(i.to_string())
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::UnableToResolveIdentifier(i.to_string()).in_span(expr_span),
+            ));
+
+        if scope.types.resolve(i).is_some() {
+            return base.with_note(NoteKind::TypeExists(i.to_string()));
+        }
+
+        base
     })?;
 
     // Mark as used by adding the reference span and clone the type to return. Use a

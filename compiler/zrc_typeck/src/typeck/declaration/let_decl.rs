@@ -35,7 +35,7 @@ pub fn process_let_declaration<'input>(
 
                 let resolved_ty = let_declaration
                     .ty
-                    .map(|ty| resolve_type(scope.types, ty))
+                    .map(|ty| resolve_type(scope, ty))
                     .transpose()?;
 
                 let result_decl = match (typed_expr, resolved_ty) {
