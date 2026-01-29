@@ -1,6 +1,6 @@
 //! type checking for misc expressions
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, NoteKind, diagnostic::GenericLabel};
 use zrc_parser::{
     ast::{expr::Expr, ty::Type},
     lexer::NumberLiteral,
@@ -274,6 +274,11 @@ pub fn type_expr_struct_construction<'input>(
                     (*variant_name_str).to_string(),
                 )
                 .error_in(variant_name.span())
+                .with_label(GenericLabel::error(
+                    LabelKind::StructOrUnionDoesNotHaveMember((*variant_name_str).to_string())
+                        .in_span(variant_name.span()),
+                ))
+                .with_note(NoteKind::ConstructionOf(resolved_ty.to_string()))
             })?;
 
         // Get the expected type for this variant
@@ -375,6 +380,11 @@ pub fn type_expr_struct_construction<'input>(
                 (*field_name_str).to_string(),
             )
             .error_in(field_name.span())
+            .with_label(GenericLabel::error(
+                LabelKind::StructOrUnionDoesNotHaveMember((*field_name_str).to_string())
+                    .in_span(field_name.span()),
+            ))
+            .with_note(NoteKind::ConstructionOf(resolved_ty.to_string()))
         })?;
 
         // Type check the field value

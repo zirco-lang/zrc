@@ -1,6 +1,8 @@
 //! type checking for the indexing and access operators
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{
+    Diagnostic, DiagnosticKind, HelpKind, LabelKind, NoteKind, diagnostic::GenericLabel,
+};
 use zrc_parser::ast::expr::{Expr, ExprKind};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
@@ -21,6 +23,7 @@ pub fn type_expr_index<'input>(
     ptr: Expr<'input>,
     offset: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
+    let ptr_span = ptr.0.span();
     let ptr_t = type_expr(scope, ptr)?;
     let offset_t = type_expr(scope, offset)?;
 
@@ -62,7 +65,13 @@ pub fn type_expr_index<'input>(
     } else {
         Err(
             DiagnosticKind::CannotIndexIntoNonPointer(ptr_t.inferred_type.to_string())
-                .error_in(expr_span),
+                .error_in(expr_span)
+                .with_label(GenericLabel::note(
+                    LabelKind::PlaceType(ptr_t.inferred_type.to_string()).in_span(ptr_span),
+                ))
+                .with_label(GenericLabel::error(
+                    LabelKind::CannotIndexIntoNonPointer.in_span(expr_span),
+                )),
         )
     }
 }
@@ -76,6 +85,7 @@ pub fn type_expr_dot<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let obj_span = obj.0.span();
     let obj_t = type_expr(scope, obj)?;
+    let key_span = key.span();
 
     if let TastType::Struct(fields) | TastType::Union(fields) = obj_t.inferred_type.clone() {
         if let Some(ty) = fields.get(key.value()) {
@@ -87,14 +97,27 @@ pub fn type_expr_dot<'input>(
         } else {
             Err(DiagnosticKind::StructOrUnionDoesNotHaveMember(
                 obj_t.inferred_type.to_string(),
-                key.into_value().to_string(),
+                key.value().to_string(),
             )
-            .error_in(expr_span))
+            .error_in(expr_span)
+            .with_label(GenericLabel::note(
+                LabelKind::PlaceType(obj_t.inferred_type.to_string()).in_span(obj_span),
+            ))
+            .with_label(GenericLabel::error(
+                LabelKind::StructOrUnionDoesNotHaveMember(key.value().to_string())
+                    .in_span(key_span),
+            )))
         }
     } else {
         Err(
             DiagnosticKind::StructMemberAccessOnNonStruct(obj_t.inferred_type.to_string())
-                .error_in(expr_span),
+                .error_in(expr_span)
+                .with_label(GenericLabel::note(
+                    LabelKind::PlaceType(obj_t.inferred_type.to_string()).in_span(obj_span),
+                ))
+                .with_label(GenericLabel::error(
+                    LabelKind::StructMemberAccessOnNonStruct.in_span(expr_span),
+                )),
         )
     }
 }
@@ -106,6 +129,7 @@ pub fn type_expr_arrow<'input>(
     obj: Box<Expr<'input>>,
     key: Spanned<&'input str>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
+    let obj_span = obj.0.span();
     let obj_t = type_expr(scope, *obj.clone())?;
 
     if let TastType::Ptr(_) = obj_t.inferred_type {
@@ -124,7 +148,15 @@ pub fn type_expr_arrow<'input>(
     } else {
         Err(
             DiagnosticKind::CannotDereferenceNonPointer(obj_t.inferred_type.to_string())
-                .error_in(expr_span),
+                .error_in(expr_span)
+                .with_label(GenericLabel::note(
+                    LabelKind::PlaceType(obj_t.inferred_type.to_string()).in_span(obj_span),
+                ))
+                .with_label(GenericLabel::error(
+                    LabelKind::CannotDereferenceNonPointer.in_span(expr_span),
+                ))
+                .with_note(NoteKind::ArrowDeref)
+                .with_help(HelpKind::UseNormalDotAccess),
         )
     }
 }

@@ -47,15 +47,15 @@ pub enum DiagnosticKind {
     #[error("cannot assign a value of type `{got}` to a variable of type `{expected}`")]
     InvalidAssignmentRightHandSideType { expected: String, got: String },
     #[error("cannot dereference non-pointer type `{0}`")]
-    CannotDereferenceNonPointer(String), // TODO: Migrate to new diags
+    CannotDereferenceNonPointer(String),
     #[error("cannot index into non-pointer type `{0}`")]
-    CannotIndexIntoNonPointer(String), // TODO: Migrate to new diags
+    CannotIndexIntoNonPointer(String),
     #[error("`{0}` does not have member `{1}`")]
-    StructOrUnionDoesNotHaveMember(String, String), // TODO: Migrate to new diags
+    StructOrUnionDoesNotHaveMember(String, String),
     #[error("cannot access member of non-struct type `{0}`")]
-    StructMemberAccessOnNonStruct(String), // TODO: Migrate to new diags
-    #[error("expected `{expected}` arguments, got `{got}`")]
-    FunctionArgumentCountMismatch { expected: String, got: String }, // TODO: Migrate to new diags
+    StructMemberAccessOnNonStruct(String),
+    #[error("expected {expected} arguments, got {got}")]
+    FunctionArgumentCountMismatch { expected: String, got: String },
     #[error("expected `{expected}` for argument `{n}`, got `{got}`")]
     // TODO: Migrate to new diags
     FunctionArgumentTypeMismatch {
@@ -278,8 +278,20 @@ pub enum LabelKind {
     VariableDeclaredType(String),
     #[error("this value is of type `{0}`")]
     PlaceType(String),
+    #[error("this function is of type `{0}`, so it expects {1} arguments")]
+    FunctionType(String, String),
     #[error("cannot assign a value of type `{got}` to a value of type `{expected}`")]
     InvalidAssignmentRightHandSideType { expected: String, got: String },
+    #[error("cannot dereference a non-pointer type")]
+    CannotDereferenceNonPointer,
+    #[error("cannot index into a non-pointer type")]
+    CannotIndexIntoNonPointer,
+    #[error("no such member `{0}`")]
+    StructOrUnionDoesNotHaveMember(String),
+    #[error("cannot access member of non-struct type")]
+    StructMemberAccessOnNonStruct,
+    #[error("expected {expected} arguments, got {got}")]
+    FunctionArgumentCountMismatch { expected: String, got: String },
 }
 
 /// The list of possible notes attached to a [`Diagnostic`]
@@ -308,6 +320,10 @@ pub enum NoteKind {
     VariableExists(String),
     #[error("there is a type named `{0}`, but expected a variable here")]
     TypeExists(String),
+    #[error("the `->` operator includes a dereference operation")]
+    ArrowDeref,
+    #[error("the structure of the type being constructed is `{0}`")]
+    ConstructionOf(String),
 }
 
 /// The list of possible help messages attached to a [`Diagnostic`]
@@ -316,4 +332,6 @@ pub enum NoteKind {
 pub enum HelpKind {
     #[error("did you mean `{0}`?")]
     JavascriptUserDetected(&'static str),
+    #[error("did you mean to use the `.` access operator?")]
+    UseNormalDotAccess,
 }
