@@ -57,7 +57,6 @@ pub enum DiagnosticKind {
     #[error("expected {expected} arguments, got {got}")]
     FunctionArgumentCountMismatch { expected: String, got: String },
     #[error("expected `{expected}` for argument `{n}`, got `{got}`")]
-    // TODO: Migrate to new diags
     FunctionArgumentTypeMismatch {
         n: usize, // counts from 0
         expected: String,
