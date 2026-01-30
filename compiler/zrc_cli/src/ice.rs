@@ -30,7 +30,7 @@ fn ice_hook(
         " https://github.com/zirco-lang/zrc/issues/new?template=ice.yml"
     ));
     eprintln!();
-    eprintln!("note: version: {}", super::build_info::VERSION_STRING);
+    eprintln!("note: version: {}", crate::version_string());
     eprintln!();
     eprintln!(
         "note: command line arguments: {}",

@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "common/zrc_buildinfo",
     "compiler/zrc",
     "compiler/zrc_cli",
     "compiler/zrc_utils",
@@ -10,6 +11,7 @@ members = [
     "compiler/zrc_codegen",
     "compiler/zrc_preprocessor",
     "tools/zircop",
+    "tools/zrx",
 ]
 
 [profile.release]

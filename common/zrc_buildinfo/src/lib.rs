@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+#![doc=include_str!("../README.md")]
 #![allow(unknown_lints)] // in case you use non-nightly clippy
 #![warn(
     clippy::cargo,
@@ -41,44 +41,25 @@
     unused_crate_dependencies,
     variant_size_differences,
     unused_qualifications,
-    clippy::unwrap_used,
-
-    // These should be enabled in any non-user-facing code, like the parser, but not in the
-    // frontend.
-    clippy::print_stderr,
-    clippy::print_stdout
+    clippy::unwrap_used
 )]
 #![allow(
     clippy::multiple_crate_versions,
     clippy::cargo_common_metadata,
+    unused_crate_dependencies,
     clippy::module_name_repetitions,
     clippy::doc_comment_double_space_linebreaks,
-    clippy::boxed_local
+    clippy::missing_errors_doc
 )]
 
-// Ordering matters! Declared here so other modules have access to `unpack!`
-mod bb;
+/// The version string is generated at compile time and includes information
+/// such as the git commit and branch, build type, operating system, and
+/// architecture.
+const VERSION_STRING: &str = include_str!(concat!(env!("OUT_DIR"), "/buildinfo"));
 
-use inkwell::targets::TargetMachine;
-
-mod ctx;
-mod expr;
-mod program;
-mod scope;
-mod stmt;
-#[cfg(test)]
-mod test_utils;
-mod ty;
-
-pub use inkwell::{
-    OptimizationLevel,
-    debug_info::DWARFEmissionKind as DebugLevel,
-    targets::{FileType, TargetTriple},
-};
-pub use program::{cg_program, cg_program_to_buffer, cg_program_to_string};
-
-/// Gets the native [`TargetTriple`].
+/// Obtain the version string for a given package.
+#[inline]
 #[must_use]
-pub fn get_native_triple() -> TargetTriple {
-    TargetMachine::get_default_triple()
+pub fn generate_version_string(package_name: &str, package_version: &str) -> String {
+    format!("{package_name} {package_version} ({VERSION_STRING})")
 }

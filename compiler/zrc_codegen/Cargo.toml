@@ -6,7 +6,7 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-inkwell = { git = "https://github.com/TheDan64/inkwell", version = "0.6.0", features = ["llvm20-1", "llvm20-1-prefer-static"] }
+inkwell = { version = "0.8.0", features = ["llvm20-1", "llvm20-1-prefer-static"] }
 zrc_typeck = { path = "../zrc_typeck" }
 zrc_utils = { path = "../zrc_utils" }
 

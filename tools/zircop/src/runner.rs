@@ -11,7 +11,7 @@ use crate::{diagnostic::LintDiagnostic, lints, pass::PassList};
 /// Lint a program with a list of [`crate::lint::Lint`]s.
 #[expect(clippy::result_large_err)]
 pub fn run(
-    include_paths: Vec<&'static Path>,
+    include_paths: &[&'static Path],
     parent_directory: &Path,
     file_name: &str,
     content: &str,
@@ -49,7 +49,7 @@ pub fn run(
 /// [`crate::lints::get_default_lints`].
 #[expect(clippy::result_large_err)]
 pub fn run_with_default_passes(
-    include_paths: Vec<&'static Path>,
+    include_paths: &[&'static Path],
     parent_directory: &Path,
     file_name: &str,
     content: &str,
