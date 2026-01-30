@@ -98,18 +98,18 @@ impl SourceChunk {
 
 /// Context for preprocessing operations
 #[derive(Debug)]
-struct PreprocessorCtx {
+struct PreprocessorCtx<'sp> {
     /// Set of files that have been included with `#pragma once`
     pragma_once_files: HashSet<PathBuf>,
     /// Collected source chunks
     chunks: Vec<SourceChunk>,
     /// The paths to search for bracket includes
-    search_paths: Vec<&'static Path>,
+    search_paths: &'sp [&'static Path],
 }
 
-impl PreprocessorCtx {
+impl<'sp> PreprocessorCtx<'sp> {
     /// Create a new preprocessor context
-    fn new(search_paths: Vec<&'static Path>) -> Self {
+    fn new(search_paths: &'sp [&'static Path]) -> Self {
         Self {
             pragma_once_files: HashSet::new(),
             chunks: Vec::new(),
@@ -120,7 +120,7 @@ impl PreprocessorCtx {
 
 /// Search for an include file in the provided search paths
 fn find_include_file(ctx: &PreprocessorCtx, include_file: &str) -> Option<PathBuf> {
-    for search_path in &ctx.search_paths {
+    for search_path in ctx.search_paths {
         let candidate = search_path.join(include_file);
         if candidate.exists() {
             return Some(candidate);
@@ -141,14 +141,29 @@ fn find_include_file(ctx: &PreprocessorCtx, include_file: &str) -> Option<PathBu
 /// - An included file cannot be found
 /// - An included file cannot be read
 /// - A preprocessing directive is malformed
+///
+/// # Panics
+///
+/// Panics if the file name cannot be converted to a static string.
 #[expect(clippy::result_large_err)]
 pub fn preprocess(
     base_path: &Path,
-    search_paths: Vec<&'static Path>,
+    search_paths: &'_ [&'static Path],
     file_name: &str,
     content: &str,
 ) -> Result<Vec<SourceChunk>, Diagnostic> {
     let mut ctx = PreprocessorCtx::new(search_paths);
+
+    // Trim off a leading shebang line if present
+    let content = if content.starts_with("#!") {
+        let mut lines = content.lines();
+        let shebang_line = lines.next().expect("the first line exists");
+        let shebang_len = shebang_line.len() + 1; // +1 for newline
+        &content[shebang_len..]
+    } else {
+        content
+    };
+
     preprocess_internal(base_path, file_name, content, &mut ctx)?;
     Ok(ctx.chunks)
 }
@@ -365,7 +380,7 @@ mod tests {
     fn preprocess_simple_file_without_directives() {
         let content = "fn main() {\n    printf(\"Hello\");\n}";
         let chunks =
-            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
+            preprocess(Path::new("."), &[], "test.zr", content).expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].file_name, "./test.zr");
@@ -378,7 +393,7 @@ mod tests {
     fn preprocess_with_pragma_once() {
         let content = "#pragma once\nfn test() {}";
         let chunks =
-            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
+            preprocess(Path::new("."), &[], "test.zr", content).expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].start_line, 2);
@@ -390,7 +405,7 @@ mod tests {
     fn preprocess_pragma_once_with_multiple_lines() {
         let content = "#pragma once\n\nfn first() {}\nfn second() {}";
         let chunks =
-            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
+            preprocess(Path::new("."), &[], "test.zr", content).expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].start_line, 2);
@@ -403,7 +418,7 @@ mod tests {
         // Test that byte offsets are correctly calculated
         let content = "line1\n#pragma once\nline3";
         let chunks =
-            preprocess(Path::new("."), vec![], "test.zr", content).expect("preprocessing failed");
+            preprocess(Path::new("."), &[], "test.zr", content).expect("preprocessing failed");
 
         // First chunk: "line1" (before pragma)
         assert_eq!(chunks.len(), 2);
@@ -422,7 +437,7 @@ mod tests {
         // Test that preprocessor errors reference the correct file name, not
         // "<preprocessor>"
         let content = "#include \"nonexistent.zr\"";
-        let result = preprocess(Path::new("/test/dir"), vec![], "main.zr", content);
+        let result = preprocess(Path::new("/test/dir"), &[], "main.zr", content);
 
         assert!(result.is_err());
         let err = result.expect_err("expected a preprocessing error");
@@ -434,7 +449,7 @@ mod tests {
     fn preprocessor_errors_include_correct_byte_offset() {
         // Test that preprocessor errors on later lines have correct byte offsets
         let content = "// line 1\n// line 2\n#unknown_directive";
-        let result = preprocess(Path::new("."), vec![], "test.zr", content);
+        let result = preprocess(Path::new("."), &[], "test.zr", content);
 
         assert!(result.is_err());
         let err = result.expect_err("expected a preprocessing error");
@@ -446,7 +461,7 @@ mod tests {
     #[test]
     fn preprocessor_unterminated_include_string_error() {
         let content = "#include \"unterminated";
-        let result = preprocess(Path::new("."), vec![], "test.zr", content);
+        let result = preprocess(Path::new("."), &[], "test.zr", content);
 
         assert!(result.is_err());
         let err = result.expect_err("expected a preprocessing error");
@@ -458,7 +473,7 @@ mod tests {
     #[test]
     fn preprocessor_unterminated_include_angle_brackets_error() {
         let content = "#include <unterminated";
-        let result = preprocess(Path::new("."), vec![], "test.zr", content);
+        let result = preprocess(Path::new("."), &[], "test.zr", content);
 
         assert!(result.is_err());
         let err = result.expect_err("expected a preprocessing error");
@@ -470,7 +485,7 @@ mod tests {
     #[test]
     fn preprocessor_invalid_include_syntax_error() {
         let content = "#include invalid";
-        let result = preprocess(Path::new("."), vec![], "test.zr", content);
+        let result = preprocess(Path::new("."), &[], "test.zr", content);
 
         assert!(result.is_err());
         let err = result.expect_err("expected a preprocessing error");

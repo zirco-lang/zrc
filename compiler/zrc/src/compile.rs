@@ -70,7 +70,7 @@ pub enum OutputFormat {
 )]
 pub fn compile(
     frontend_version_string: &str,
-    include_paths: Vec<&'static Path>,
+    include_paths: &[&'static Path],
     emit: &OutputFormat,
     parent_directory: &str,
     file_name: &str,

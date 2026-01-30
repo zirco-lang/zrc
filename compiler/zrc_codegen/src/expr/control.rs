@@ -45,8 +45,9 @@ pub fn cg_call<'ctx, 'input>(
         .build_indirect_call(llvm_f_type, f_ptr, &args, "call")
         .expect("call should have compiled successfully");
 
-    bb.and(if ret.try_as_basic_value().is_left() {
-        ret.try_as_basic_value().unwrap_left()
+    bb.and(if ret.try_as_basic_value().is_basic() {
+        ret.try_as_basic_value()
+            .expect_basic("we just checked this")
     } else {
         cg.ctx.i8_type().get_undef().as_basic_value_enum()
     })

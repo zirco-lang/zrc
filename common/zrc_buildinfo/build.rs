@@ -11,12 +11,10 @@ const BUILD_TYPE: &str = "release";
 
 fn main() {
     let out_dir = std::env::var("OUT_DIR").unwrap();
-    let version_path = std::path::Path::new(&out_dir).join("version");
+    let version_path = std::path::Path::new(&out_dir).join("buildinfo");
 
     let version_string = format!(
-        "{} {} ({}{}, {} build, {} [{}])",
-        env!("CARGO_PKG_NAME"),
-        env!("CARGO_PKG_VERSION"),
+        "{}{}, {} build, {} [{}]",
         get_git_string(),
         if is_working_tree_clean() {
             ""

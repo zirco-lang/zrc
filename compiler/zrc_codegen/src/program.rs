@@ -534,7 +534,7 @@ fn cg_program_without_optimization<'ctx>(
 /// passed, so make sure to type check it so invariants are upheld.
 #[must_use]
 #[expect(clippy::too_many_arguments)]
-fn cg_program<'ctx>(
+pub fn cg_program<'ctx>(
     frontend_version_string: &str,
     cli_args: &str,
     ctx: &'ctx Context,

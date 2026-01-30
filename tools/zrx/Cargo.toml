@@ -1,5 +1,5 @@
 [package]
-name = "zircop"
+name = "zrx"
 version = "0.1.0"
 edition = "2024"
 
@@ -11,10 +11,7 @@ zrc_parser = { path = "../../compiler/zrc_parser" }
 zrc_typeck = { path = "../../compiler/zrc_typeck" }
 zrc_diagnostics = { path = "../../compiler/zrc_diagnostics" }
 zrc_utils = { path = "../../compiler/zrc_utils" }
-thiserror = "2.0.17"
-derive_more = { version = "2.0.1", features = ["display"] }
+zrc_codegen = { path = "../../compiler/zrc_codegen" }
+inkwell = { version = "0.8.0", features = ["llvm20-1", "llvm20-1-prefer-static"] }
 clap = { version = "4.5.52", features = ["derive"] }
 zrc_buildinfo = { path = "../../common/zrc_buildinfo" }
-
-[dev-dependencies]
-indoc = "2.0.7"

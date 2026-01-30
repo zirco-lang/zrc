@@ -22,7 +22,7 @@ macro_rules! zircop_lint_test {
             let file_name = "<test>";
 
             let lint_result = $crate::runner::run_with_default_passes(
-                include_paths,
+                &include_paths,
                 parent_directory,
                 file_name,
                 $source,
