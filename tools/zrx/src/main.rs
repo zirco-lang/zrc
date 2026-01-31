@@ -64,6 +64,7 @@ use std::{
 use clap::Parser;
 use inkwell::{
     context::Context,
+    execution_engine::ExecutionEngine,
     support::{load_library_permanently, load_visible_symbols},
     targets::{CodeModel, InitializationConfig, RelocMode, Target},
 };
@@ -208,6 +209,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         jit_module.link_in_module(file_module)?;
     }
+
+    // IMPORTANT: Must call this to ensure the MCJIT components are linked in,
+    // especially in release builds where link-time optimization may remove them.
+    ExecutionEngine::link_in_mc_jit();
 
     let ee = jit_module.create_jit_execution_engine(cli.opt_level.into())?;
 
