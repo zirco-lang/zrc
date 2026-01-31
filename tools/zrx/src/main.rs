@@ -253,7 +253,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // SAFETY: We are calling a JIT-compiled function with the correct signature as
     // asserted by typeck
     let exit_code = unsafe { main.call(c_ptrs.len(), c_ptrs.as_ptr()) };
-    std::mem::forget(ee);
 
     process::exit(exit_code);
 }
