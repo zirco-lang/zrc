@@ -64,6 +64,7 @@ use std::{
 use clap::Parser;
 use inkwell::{
     context::Context,
+    execution_engine::ExecutionEngine,
     support::{load_library_permanently, load_visible_symbols},
     targets::{CodeModel, InitializationConfig, RelocMode, Target},
 };
@@ -149,6 +150,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     Target::initialize_native(&InitializationConfig::default())?;
     let triple = get_native_triple();
     let target = Target::from_triple(&triple)?;
+    // Force the MCJIT components to be linked in, preventing runtime errors later
+    ExecutionEngine::link_in_mc_jit();
 
     let target_machine = target
         .create_target_machine(
@@ -209,8 +212,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         jit_module.link_in_module(file_module)?;
     }
 
-    let ee = jit_module.create_jit_execution_engine(cli.opt_level.into())?;
-
     // Load any libraries specified on the command line into this process
     let mut library_paths = split_paths("LD_LIBRARY_PATH");
     library_paths.extend(split_paths("DYLD_LIBRARY_PATH"));
@@ -229,6 +230,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Load all other symbols visible to the current process into the JIT
     load_visible_symbols();
+
+    let ee = jit_module.create_jit_execution_engine(cli.opt_level.into())?;
 
     // Main expects (usize, **u8) -> i32 so we must prep the extra args for it
     // Obtain the **u8 from the cli.program_args
