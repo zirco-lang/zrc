@@ -128,10 +128,7 @@ fn lex_string_contents<'input>(
     let mut string_lexer = StringTok::lexer(contents);
     let mut tokens = Vec::new();
 
-    loop {
-        let Some(token) = string_lexer.next() else {
-            break;
-        };
+    while let Some(token) = string_lexer.next() {
         let span = string_lexer.span();
 
         match token {

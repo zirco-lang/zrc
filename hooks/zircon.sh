@@ -19,6 +19,7 @@ cargo build --release
 
 cp target/release/zrc "$ZIRCON_BIN_DIR/"
 cp target/release/zircop "$ZIRCON_BIN_DIR/"
+cp target/release/zrx "$ZIRCON_BIN_DIR/"
 cp -r include/* "$ZIRCON_INCLUDE_DIR/"
 
 # build std using the fresh compiler
