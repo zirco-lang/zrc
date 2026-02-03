@@ -245,6 +245,14 @@ pub fn type_expr_struct_construction<'input>(
                 got: resolved_ty.to_string(),
             }
             .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedGot {
+                    expected: "enum with __value__ field".to_string(),
+                    got: resolved_ty.to_string(),
+                }
+                .in_span(expr_span),
+            ))
+            .with_note(NoteKind::ConstructionOf(resolved_ty.to_string()))
         })?;
 
         let TastType::Union(variant_types) = union_ty else {
@@ -257,7 +265,15 @@ pub fn type_expr_struct_construction<'input>(
                 expected: "exactly one variant initialization".to_string(),
                 got: format!("{} field initializations", fields.value().len()),
             }
-            .error_in(fields.span()));
+            .error_in(fields.span())
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedGot {
+                    expected: "exactly one variant initialization".to_string(),
+                    got: format!("{} field initializations", fields.value().len()),
+                }
+                .in_span(fields.span()),
+            ))
+            .with_note(NoteKind::ConstructionOf(resolved_ty.to_string())));
         }
 
         let field_init = &fields.value()[0];
@@ -303,7 +319,15 @@ pub fn type_expr_struct_construction<'input>(
                 expected: expected_variant_type.to_string(),
                 got: typed_variant_expr.inferred_type.to_string(),
             }
-            .error_in(typed_variant_expr.kind.span()));
+            .error_in(typed_variant_expr.kind.span())
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedGot {
+                    expected: expected_variant_type.to_string(),
+                    got: typed_variant_expr.inferred_type.to_string(),
+                }
+                .in_span(typed_variant_expr.kind.span()),
+            ))
+            .with_note(NoteKind::ConstructionOf(resolved_ty.to_string())));
         };
 
         // Create the discriminant literal
@@ -362,7 +386,15 @@ pub fn type_expr_struct_construction<'input>(
                 expected: "struct or union type".to_string(),
                 got: resolved_ty.to_string(),
             }
-            .error_in(expr_span));
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedGot {
+                    expected: "struct or union type".to_string(),
+                    got: resolved_ty.to_string(),
+                }
+                .in_span(expr_span),
+            ))
+            .with_note(NoteKind::ConstructionOf(resolved_ty.to_string())));
         }
     };
 
@@ -403,7 +435,15 @@ pub fn type_expr_struct_construction<'input>(
                 expected: expected_type.to_string(),
                 got: typed_field_expr.inferred_type.to_string(),
             }
-            .error_in(typed_field_expr.kind.span()));
+            .error_in(typed_field_expr.kind.span())
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedGot {
+                    expected: expected_type.to_string(),
+                    got: typed_field_expr.inferred_type.to_string(),
+                }
+                .in_span(typed_field_expr.kind.span()),
+            ))
+            .with_note(NoteKind::ConstructionOf(resolved_ty.to_string())));
         };
 
         // Check for duplicate field initialization
@@ -423,7 +463,15 @@ pub fn type_expr_struct_construction<'input>(
             expected: "exactly one field initialization".to_string(),
             got: format!("{} field initializations", initialized_fields.len()),
         }
-        .error_in(fields.span()));
+        .error_in(fields.span())
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedGot {
+                expected: "exactly one field initialization".to_string(),
+                got: format!("{} field initializations", initialized_fields.len()),
+            }
+            .in_span(fields.span()),
+        ))
+        .with_note(NoteKind::ConstructionOf(resolved_ty.to_string())));
     }
 
     // For structs (not unions), verify all fields are initialized
@@ -434,7 +482,15 @@ pub fn type_expr_struct_construction<'input>(
                     expected: format!("initialization of field '{field_name}'"),
                     got: "missing field".to_string(),
                 }
-                .error_in(fields.span()));
+                .error_in(fields.span())
+                .with_label(GenericLabel::error(
+                    LabelKind::ExpectedGot {
+                        expected: format!("initialization of field '{field_name}'"),
+                        got: "missing field".to_string(),
+                    }
+                    .in_span(fields.span()),
+                ))
+                .with_note(NoteKind::ConstructionOf(resolved_ty.to_string())));
             }
         }
     }

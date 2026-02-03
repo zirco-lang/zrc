@@ -114,10 +114,17 @@ pub fn expect(
         Ok(())
     } else {
         Err(DiagnosticKind::ExpectedGot {
-            expected: expected_str,
-            got: got_str,
+            expected: expected_str.clone(),
+            got: got_str.clone(),
         }
-        .error_in(span))
+        .error_in(span)
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedGot {
+                expected: expected_str,
+                got: got_str,
+            }
+            .in_span(span),
+        )))
     }
 }
 
@@ -147,7 +154,14 @@ pub fn expect_is_signed_integer(
             expected: "signed integer".to_string(),
             got: expr.inferred_type.to_string(),
         }
-        .error_in(span))
+        .error_in(span)
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedGot {
+                expected: "signed integer".to_string(),
+                got: expr.inferred_type.to_string(),
+            }
+            .in_span(span),
+        )))
     }
 }
 

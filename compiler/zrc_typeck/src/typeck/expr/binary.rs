@@ -1,6 +1,8 @@
 //! type checking for binary operators
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{
+    Diagnostic, DiagnosticKind, HelpKind, LabelKind, NoteKind, diagnostic::GenericLabel,
+};
 use zrc_parser::ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Expr, Logical};
 use zrc_utils::span::{Span, Spannable};
 
@@ -199,7 +201,16 @@ pub fn type_expr_arithmetic<'input>(
                 expected: "usize".to_string(),
                 got: rhs_t.inferred_type.to_string(),
             }
-            .error_in(rhs_t.kind.span()));
+            .error_in(rhs_t.kind.span())
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedGot {
+                    expected: "usize".to_string(),
+                    got: rhs_t.inferred_type.to_string(),
+                }
+                .in_span(rhs_t.kind.span()),
+            ))
+            .with_note(NoteKind::PointerArithmeticRequiresUsize)
+            .with_help(HelpKind::ConsiderCasting("usize".to_string())));
         };
 
         Ok(TypedExpr {

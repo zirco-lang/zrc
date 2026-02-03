@@ -10,7 +10,7 @@ use std::fmt::Display;
 
 pub use block_utils::{coerce_stmt_into_block, has_duplicates};
 pub use cfa::{BlockReturnAbility, BlockReturnActuality};
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, diagnostic::GenericLabel};
 use zrc_parser::ast::stmt::{Stmt, StmtKind};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
@@ -262,11 +262,17 @@ pub fn type_block<'input, 'gs>(
                                             // Try to coerce the return value to the expected type
                                             return_value.map(|val| try_coerce_to(val, return_ty))
                                         } else {
-                                            return Err(Diagnostic::error(stmt_span.containing(
-                                                DiagnosticKind::ExpectedGot {
+                                            return Err(DiagnosticKind::ReturnTypeMismatch {
+                                                expected: return_ty.to_string(),
+                                                got: inferred_return_type.to_string(),
+                                            }
+                                            .error_in(stmt_span)
+                                            .with_label(GenericLabel::error(
+                                                LabelKind::ExpectedGot {
                                                     expected: return_ty.to_string(),
                                                     got: inferred_return_type.to_string(),
-                                                },
+                                                }
+                                                .in_span(stmt_span),
                                             )));
                                         };
 

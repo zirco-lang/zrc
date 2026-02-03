@@ -63,11 +63,11 @@ pub enum DiagnosticKind {
         got: String,
     },
     #[error("cannot call non-function type `{0}`")]
-    CannotCallNonFunction(String), // TODO: Migrate to new diags
-    #[error("ternary arms must have same type, got `{0}` and `{1}`")]
-    TernaryArmsMustHaveSameType(String, String), // TODO: Migrate to new diags
+    CannotCallNonFunction(String),
+    #[error("this function returns `{expected}`, but this statement yields `{got}`")]
+    ReturnTypeMismatch { expected: String, got: String },
     #[error("expected `{expected}`, got `{got}`")]
-    ExpectedGot { expected: String, got: String }, // TODO: Migrate to new diags
+    ExpectedGot { expected: String, got: String },
     #[error("expected both sides to have the same type, got `{0}` and `{1}`")]
     ExpectedSameType(String, String), // TODO: Migrate to new diags
     #[error(
@@ -195,7 +195,7 @@ impl ErrorCode for DiagnosticKind {
             Self::FunctionArgumentCountMismatch { .. } => "E3009",
             Self::FunctionArgumentTypeMismatch { .. } => "E3010",
             Self::CannotCallNonFunction(_) => "E3011",
-            Self::TernaryArmsMustHaveSameType(_, _) => "E3012",
+            Self::ReturnTypeMismatch { .. } => "E3012",
             Self::ExpectedGot { .. } => "E3013",
             Self::ExpectedSameType(_, _) => "E3014",
             Self::EqualityOperators(_, _) => "E3015",
@@ -291,6 +291,10 @@ pub enum LabelKind {
     StructMemberAccessOnNonStruct,
     #[error("expected {expected} arguments, got {got}")]
     FunctionArgumentCountMismatch { expected: String, got: String },
+    #[error("cannot call a non-function type")]
+    CannotCallNonFunction,
+    #[error("expected `{expected}`, got `{got}`")]
+    ExpectedGot { expected: String, got: String },
 }
 
 /// The list of possible notes attached to a [`Diagnostic`]
@@ -323,6 +327,10 @@ pub enum NoteKind {
     ArrowDeref,
     #[error("the structure of the type being constructed is `{0}`")]
     ConstructionOf(String),
+    #[error("array indexes must be usize")]
+    ArrayIndexesMustBeUsize,
+    #[error("pointer arithmetic requires the right-hand side to be usize")]
+    PointerArithmeticRequiresUsize,
 }
 
 /// The list of possible help messages attached to a [`Diagnostic`]
@@ -333,4 +341,6 @@ pub enum HelpKind {
     JavascriptUserDetected(&'static str),
     #[error("did you mean to use the `.` access operator?")]
     UseNormalDotAccess,
+    #[error("consider casting: `value as {0}`")]
+    ConsiderCasting(String),
 }

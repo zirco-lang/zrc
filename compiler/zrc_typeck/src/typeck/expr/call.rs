@@ -170,7 +170,14 @@ pub fn type_expr_call<'input>(
             })
         }
         _ => Err(
-            DiagnosticKind::CannotCallNonFunction(ft.inferred_type.to_string()).error_in(expr_span),
+            DiagnosticKind::CannotCallNonFunction(ft.inferred_type.to_string())
+                .error_in(expr_span)
+                .with_label(GenericLabel::note(
+                    LabelKind::PlaceType(ft.inferred_type.to_string()).in_span(f_span),
+                ))
+                .with_label(GenericLabel::error(
+                    LabelKind::CannotCallNonFunction.in_span(args_span),
+                )),
         ),
     }
 }

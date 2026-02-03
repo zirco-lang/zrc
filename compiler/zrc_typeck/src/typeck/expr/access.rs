@@ -40,7 +40,16 @@ pub fn type_expr_index<'input>(
             expected: "usize".to_string(),
             got: offset_t.inferred_type.to_string(),
         }
-        .error_in(offset_t.kind.span()));
+        .error_in(offset_t.kind.span())
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedGot {
+                expected: "usize".to_string(),
+                got: offset_t.inferred_type.to_string(),
+            }
+            .in_span(offset_t.kind.span()),
+        ))
+        .with_note(NoteKind::ArrayIndexesMustBeUsize)
+        .with_help(HelpKind::ConsiderCasting("usize".to_string())));
     };
 
     if let TastType::Ptr(points_to_ty) = ptr_t.inferred_type.clone() {
