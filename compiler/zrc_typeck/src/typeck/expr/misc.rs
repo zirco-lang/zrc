@@ -264,10 +264,15 @@ pub fn type_expr_struct_construction<'input>(
         let (variant_name, variant_expr) = field_init.value();
         let variant_name_str = variant_name.value();
 
-        // Find the discriminant value (index of the variant)
-        let discriminant = variant_types
+        // Find the discriminant value using ALPHABETICAL ORDER
+        // Sort the variant names to match the discriminant assignment used in match
+        // statements
+        let mut sorted_variants: Vec<(&str, &TastType<'_>)> = variant_types.iter().collect();
+        sorted_variants.sort_unstable_by_key(|(name, _)| *name);
+
+        let discriminant = sorted_variants
             .iter()
-            .position(|(name, _)| name == *variant_name_str)
+            .position(|(name, _)| *name == *variant_name_str)
             .ok_or_else(|| {
                 DiagnosticKind::StructOrUnionDoesNotHaveMember(
                     resolved_ty.to_string(),
