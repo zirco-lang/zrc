@@ -241,6 +241,9 @@ pub fn type_match<'input, 'gs>(
         return Err(DiagnosticKind::NonExhaustiveMatchCases.error_in(stmt_span));
     }
 
+    // Create discriminant mapping using ALPHABETICAL ORDER
+    // Both enum construction and match must use the same alphabetically sorted
+    // order
     let variant_to_discriminant: HashMap<&str, usize> = sorted_enum_variants
         .iter()
         .enumerate()
