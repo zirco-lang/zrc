@@ -1,4 +1,0 @@
-Got Forward { A }
-Got Forward { A }
-Got Reverse { A }
-Got Reverse { A }
