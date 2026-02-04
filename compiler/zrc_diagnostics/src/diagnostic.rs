@@ -113,6 +113,7 @@ impl<K: Debug + PartialEq + Eq + Display> Error for GenericDiagnostic<K> {}
 #[derive(Debug, PartialEq, Eq, Display)]
 #[display("{_0}: {_1}")]
 pub struct Diagnostic(pub Severity, pub Spanned<DiagnosticKind>);
+impl Error for Diagnostic {}
 impl Diagnostic {
     /// Get a generic version of this diagnostic
     #[must_use]

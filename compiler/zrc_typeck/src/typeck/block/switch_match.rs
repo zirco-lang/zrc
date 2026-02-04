@@ -230,7 +230,7 @@ pub fn type_match<'input, 'gs>(
         .map(|case| case.value().variant)
         .collect::<Vec<_>>();
 
-    sorted_enum_variants.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+    sorted_enum_variants.sort_unstable_by_key(|(a, _)| *a);
     sorted_case_variants.sort_unstable();
 
     if sorted_enum_variants

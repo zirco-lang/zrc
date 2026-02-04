@@ -1,0 +1,44 @@
+#pragma once
+
+// --- Types --- //
+
+// Recursive types are typechecked as *void internally; here we make it explicit.
+type BoxExpr = *void;
+
+struct AtomExpr { value: i32 }
+struct BinaryExpr { lhs: BoxExpr, rhs: BoxExpr, op: u8 }
+struct UnaryExpr { expr: BoxExpr, op: u8 }
+enum Expr {
+    Atom: AtomExpr,
+    Binary: BinaryExpr,
+    Unary: UnaryExpr,
+}
+
+
+// --- Constructors --- //
+
+/// Constructs an `Expr { Atom }`
+fn Atom(value: i32) -> Expr;
+
+/// Constructs an `Expr { Binary }`, using `box` to move lhs and rhs to heap
+fn Binary(op: u8, lhs: Expr, rhs: Expr) -> Expr;
+
+/// Constructs an `Expr { Unary }`, using `box` to move `expr` to the heap
+fn Unary(op: u8, expr: Expr) -> Expr;
+
+
+// --- Memory Management --- //
+
+/// Takes "ownership" of the value in `Expr`, and recursively frees its children, leaving it
+/// in an "empty" state (Expr { Atom: 0 }).
+/// 
+/// Assumes that all sub-expressions were allocated with `box`
+///
+/// Does not free `expr` itself, as that may be a pointer to a value on the stack.
+fn free_expr(expr: *Expr);
+
+/// Boxes an Expr, placing it onto the heap
+fn box(expr: Expr) -> BoxExpr;
+
+/// Unboxes an Expr, retrieving it from the heap
+fn unbox(expr: BoxExpr) -> Expr;

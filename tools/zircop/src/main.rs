@@ -52,7 +52,6 @@
     clippy::missing_errors_doc
 )]
 
-mod build_info;
 mod cli;
 
 use std::{error::Error, fmt, path::Path, process};
@@ -61,6 +60,11 @@ use clap::Parser;
 use cli::Cli;
 use zircop::runner;
 use zrc_utils::io;
+
+/// Get the current Zircop version.
+fn version_string() -> String {
+    zrc_buildinfo::generate_version_string(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+}
 
 /// An error produced by the zircop CLI
 #[derive(Debug)]
@@ -76,7 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
     if cli.version {
-        println!("{}", build_info::VERSION_STRING);
+        println!("{}", version_string());
         return Ok(());
     }
 
@@ -90,7 +94,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     input.read_to_string(&mut source_content)?;
 
     let diagnostics = runner::run_with_default_passes(
-        cli::get_include_paths(&cli),
+        &cli::get_include_paths(&cli),
         Path::new(&directory_name),
         &file_name,
         &source_content,

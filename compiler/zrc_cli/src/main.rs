@@ -60,7 +60,6 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-mod build_info;
 mod cli;
 mod ice;
 
@@ -80,13 +79,18 @@ impl fmt::Display for CliError {
 }
 impl Error for CliError {}
 
+/// Get the current CLI version.
+pub(crate) fn version_string() -> String {
+    zrc_buildinfo::generate_version_string(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     ice::setup_panic_hook();
 
     let cli = Cli::parse();
 
     if cli.version {
-        println!("{}", build_info::VERSION_STRING);
+        println!("{}", version_string());
         return Ok(());
     }
 
@@ -110,8 +114,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let result = compile(
-        build_info::VERSION_STRING,
-        cli::get_include_paths(&cli),
+        &version_string(),
+        &cli::get_include_paths(&cli),
         &cli.emit.into(),
         &directory_name,
         &file_name,

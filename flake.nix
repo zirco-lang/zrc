@@ -26,15 +26,9 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            (rust-bin.stable.latest.default.override {
+            (rust-bin.nightly.latest.default.override {
               extensions = [ "rust-src" ];
             })
-            (rust-bin.selectLatestNightlyWith (
-              toolchain:
-              toolchain.default.override {
-                extensions = [ "rust-src" ];
-              }
-            ))
             llvm.llvm
             llvm.libllvm
             llvm.clang
