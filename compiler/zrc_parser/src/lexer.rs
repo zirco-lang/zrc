@@ -242,9 +242,9 @@ impl<'input> NumberLiteral<'input> {
 #[logos(
     error = InternalLexicalError,
     skip r"[ \t\r\n\f]+",         // whitespace
-    skip r"//[^\r\n]*(\r\n|\n)?", // single-line comments
     // multi-line comments are handled by a callback: see handle_block_comment_start.
 )]
+#[logos(skip(r"//[^\r\n]*(\r\n|\n)?", allow_greedy = true))] // single-line comments
 pub enum Tok<'input> {
     // Handle nested block comments -- this does not need its own token type and can be attached
     // to whatever token is directly below this. The handle_block_comment_start will either Skip
