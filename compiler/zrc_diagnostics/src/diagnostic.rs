@@ -171,6 +171,34 @@ where
     NK: Debug + PartialEq + Eq + Display,
     HK: Debug + PartialEq + Eq + Display,
 {
+    /// Print this diagnostic as JSON, with an optional source for context in
+    /// the case of `<stdin>` or `<unknown>` spans.
+    ///
+    /// # Panics
+    /// This function may panic if the diagnostic contains non-serializable data
+    /// or if the provided piped source is required but not provided.
+    #[must_use]
+    pub fn print_json(&self) -> String {
+        serde_json::to_string(&serde_json::json!({
+            "severity": self.severity.to_string(),
+            "code": self.kind.value().error_code(),
+            "message": self.kind.to_string(),
+            "labels": self.labels.iter().map(|label| {
+                serde_json::json!({
+                    "message": label.kind.to_string(),
+                    "span": {
+                        "file_name": label.kind.span().file_name(),
+                        "start": label.kind.span().start(),
+                        "end": label.kind.span().end(),
+                    }
+                })
+            }).collect::<Vec<_>>(),
+            "notes": self.notes.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            "helps": self.helps.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        }))
+        .expect("diagnostic should be serializable to JSON")
+    }
+
     /// Convert this [`Diagnostic`] to a printable string using ariadne. The
     /// source code is provided directly as a string if it is not read from a
     /// file.

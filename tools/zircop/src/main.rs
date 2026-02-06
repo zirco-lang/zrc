@@ -102,8 +102,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match diagnostics {
         Err(diagnostic) => {
-            eprintln!("{}", diagnostic.print(Some(&source_content)));
-            eprintln!("The above error originated from zrc - this is not a Zircop lint.");
+            if cli.diagnostic_format == cli::DiagFormat::Json {
+                eprintln!("{}", diagnostic.print_json());
+            } else {
+                eprintln!("{}", diagnostic.print(Some(&source_content)));
+            }
             process::exit(1);
         }
         Ok(diagnostics) => {
