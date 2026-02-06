@@ -156,13 +156,13 @@ pub fn register_function_declaration<'input>(
 /// `GlobalScope`. This constructs the `TypedDeclaration` and typechecks the
 /// body (if any) using a subscope derived from `global_scope`.
 #[expect(clippy::needless_pass_by_value)]
-pub fn finalize_function_declaration<'input, 'gs>(
-    global_scope: &'gs GlobalScope<'input>,
+pub fn finalize_function_declaration<'input>(
+    global_scope: &GlobalScope<'input>,
     name: Spanned<&'input str>,
     parameters: Spanned<ArgumentDeclarationList<'input>>,
     return_type: Option<Type<'input>>,
     body: Option<Spanned<Vec<Stmt<'input>>>>,
-) -> Result<Option<TypedDeclaration<'input, 'gs>>, Diagnostic> {
+) -> Result<Option<TypedDeclaration<'input>>, Diagnostic> {
     let resolved_return_type = return_type
         .clone()
         .map(|ty| resolve_type(&global_scope.create_subscope(), ty))

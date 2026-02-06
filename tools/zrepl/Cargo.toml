@@ -1,0 +1,17 @@
+[package]
+name = "zrepl"
+version = "0.1.0"
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+zrc_preprocessor = { path = "../../compiler/zrc_preprocessor" }
+zrc_parser = { path = "../../compiler/zrc_parser" }
+zrc_typeck = { path = "../../compiler/zrc_typeck" }
+zrc_diagnostics = { path = "../../compiler/zrc_diagnostics" }
+zrc_utils = { path = "../../compiler/zrc_utils" }
+clap = { version = "4.5.52", features = ["derive"] }
+zrc_buildinfo = { path = "../../common/zrc_buildinfo" }
+repline = "0.0.13"
+ansi_color_constants = "2.0.2"

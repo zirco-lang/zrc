@@ -22,7 +22,7 @@ use crate::{
 
 /// Typeck a comma expr
 pub fn type_expr_comma<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     lhs: Expr<'input>,
     rhs: Expr<'input>,
@@ -37,7 +37,7 @@ pub fn type_expr_comma<'input>(
 
 /// Typeck a ternary expr
 pub fn type_expr_ternary<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     cond: Expr<'input>,
     if_true: Expr<'input>,
@@ -107,14 +107,18 @@ pub fn type_expr_ternary<'input>(
 
 /// Typeck a cast expr
 pub fn type_expr_cast<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
     ty: Type<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_t = type_expr(scope, x)?;
     let ty_span = ty.0.span();
+<<<<<<< HEAD
     let resolved_ty = resolve_type(scope, ty)?;
+=======
+    let resolved_ty = resolve_type(&scope.types, ty)?;
+>>>>>>> main
 
     // Handle {int} type resolution
     if matches!(x_t.inferred_type, TastType::Int) {
@@ -173,11 +177,15 @@ pub fn type_expr_cast<'input>(
 
 /// Typeck a sizeof T expr
 pub fn type_expr_size_of_type<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &Scope<'input>,
     expr_span: Span,
     ty: Type<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
+<<<<<<< HEAD
     let resolved_ty = resolve_type(scope, ty)?;
+=======
+    let resolved_ty = resolve_type(&scope.types, ty)?;
+>>>>>>> main
     Ok(TypedExpr {
         inferred_type: TastType::Usize,
         kind: TypedExprKind::SizeOf(resolved_ty).in_span(expr_span),
@@ -186,7 +194,7 @@ pub fn type_expr_size_of_type<'input>(
 
 /// Typeck a sizeof(T) expr
 pub fn type_expr_size_of_expr<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -202,7 +210,7 @@ pub fn type_expr_size_of_expr<'input>(
 /// Typeck a struct construction expr
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
 pub fn type_expr_struct_construction<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     ty: Type<'input>,
     fields: &zrc_utils::span::Spanned<
@@ -280,10 +288,15 @@ pub fn type_expr_struct_construction<'input>(
         let (variant_name, variant_expr) = field_init.value();
         let variant_name_str = variant_name.value();
 
-        // Find the discriminant value (index of the variant)
-        let discriminant = variant_types
+        // Find the discriminant value using ALPHABETICAL ORDER
+        // Sort the variant names to match the discriminant assignment used in match
+        // statements
+        let mut sorted_variants: Vec<(&str, &TastType<'_>)> = variant_types.iter().collect();
+        sorted_variants.sort_unstable_by_key(|(name, _)| *name);
+
+        let discriminant = sorted_variants
             .iter()
-            .position(|(name, _)| name == *variant_name_str)
+            .position(|(name, _)| *name == *variant_name_str)
             .ok_or_else(|| {
                 DiagnosticKind::StructOrUnionDoesNotHaveMember(
                     resolved_ty.to_string(),

@@ -16,7 +16,7 @@ use crate::tast::{
 
 /// Typeck a unary not
 pub fn type_expr_unary_not<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -37,7 +37,7 @@ pub fn type_expr_unary_not<'input>(
 
 /// Typeck a bit not
 pub fn type_expr_unary_bitwise_not<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -54,7 +54,7 @@ pub fn type_expr_unary_bitwise_not<'input>(
 
 /// Typeck a unary minus
 pub fn type_expr_unary_minus<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -71,7 +71,7 @@ pub fn type_expr_unary_minus<'input>(
 
 /// Typeck a unary ref
 pub fn type_expr_unary_address_of<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -86,7 +86,7 @@ pub fn type_expr_unary_address_of<'input>(
 
 /// Typeck a unary deref
 pub fn type_expr_unary_dereference<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -114,7 +114,7 @@ pub fn type_expr_unary_dereference<'input>(
 
 /// Typeck a prefix increment (++x)
 pub fn type_expr_prefix_increment<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -132,7 +132,7 @@ pub fn type_expr_prefix_increment<'input>(
 
 /// Typeck a prefix decrement (--x)
 pub fn type_expr_prefix_decrement<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -150,7 +150,7 @@ pub fn type_expr_prefix_decrement<'input>(
 
 /// Typeck a postfix increment (x++)
 pub fn type_expr_postfix_increment<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -168,7 +168,7 @@ pub fn type_expr_postfix_increment<'input>(
 
 /// Typeck a postfix decrement (x--)
 pub fn type_expr_postfix_decrement<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {

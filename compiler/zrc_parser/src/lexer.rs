@@ -250,9 +250,9 @@ impl<'input> NumberLiteral<'input> {
 #[logos(
     error = InternalLexicalError,
     skip r"[ \t\r\n\f]+",         // whitespace
-    skip r"//[^\r\n]*(\r\n|\n)?", // single-line comments
     // multi-line comments are handled by a callback: see handle_block_comment_start.
 )]
+#[logos(skip(r"//[^\r\n]*(\r\n|\n)?", allow_greedy = true))] // single-line comments
 pub enum Tok<'input> {
     // Handle nested block comments -- this does not need its own token type and can be attached
     // to whatever token is directly below this. The handle_block_comment_start will either Skip
@@ -745,6 +745,45 @@ impl<'input> Iterator for ZircoLexer<'input> {
                 .in_span(span),
         )
     }
+}
+
+/// Determine if all delimiters in a string are balanced.
+/// Useful for quick checks before passing to the parser in things like zrepl.
+#[must_use]
+pub fn are_delimiters_balanced(input: &str) -> bool {
+    let lex = ZircoLexer::new(input, "<input>");
+    let mut stack = Vec::new();
+
+    for token in lex {
+        let Ok(tok) = token.into_value() else {
+            continue; // Ignore lexical errors for this check
+        };
+
+        #[expect(clippy::wildcard_enum_match_arm)]
+        match tok {
+            Tok::LeftParen | Tok::LeftBracket | Tok::LeftBrace => {
+                stack.push(tok);
+            }
+            Tok::RightParen => {
+                if stack.pop() != Some(Tok::LeftParen) {
+                    return false;
+                }
+            }
+            Tok::RightBracket => {
+                if stack.pop() != Some(Tok::LeftBracket) {
+                    return false;
+                }
+            }
+            Tok::RightBrace => {
+                if stack.pop() != Some(Tok::LeftBrace) {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    stack.is_empty()
 }
 
 #[cfg(test)]

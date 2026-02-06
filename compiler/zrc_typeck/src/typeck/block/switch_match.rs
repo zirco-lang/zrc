@@ -1,5 +1,7 @@
 //! Type checking for switch case and match statements.
 
+use std::collections::HashMap;
+
 use zrc_diagnostics::{Diagnostic, DiagnosticKind};
 use zrc_parser::ast::{
     expr::{Expr, ExprKind},
@@ -24,13 +26,13 @@ use crate::{
 
 /// Type check a switch case statement.
 #[expect(clippy::ptr_arg)]
-pub fn type_switch_case<'input, 'gs>(
-    scope: &mut Scope<'input, 'gs>,
+pub fn type_switch_case<'input>(
+    scope: &mut Scope<'input>,
     scrutinee: Expr<'input>,
     cases: &Vec<Spanned<SwitchCase<'input>>>,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
     let mut cases = cases.clone();
     let scrutinee = type_expr(scope, scrutinee)?;
     let scrutinee_ty = scrutinee.inferred_type.clone();
@@ -102,13 +104,10 @@ pub fn type_switch_case<'input, 'gs>(
             )?;
             let return_status = exec_block.return_actuality;
 
-            Ok::<
-                (
-                    (TypedExpr<'input>, BlockMetadata<'_, '_>),
-                    BlockReturnActuality,
-                ),
-                Diagnostic,
-            >(((trigger, exec_block), return_status))
+            Ok::<((TypedExpr<'input>, BlockMetadata<'_>), BlockReturnActuality), Diagnostic>((
+                (trigger, exec_block),
+                return_status,
+            ))
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -133,14 +132,14 @@ pub fn type_switch_case<'input, 'gs>(
 
 /// Desugar and type check a match statement.
 #[expect(clippy::too_many_lines, clippy::needless_pass_by_value)]
-pub fn type_match<'input, 'gs>(
-    scope: &mut Scope<'input, 'gs>,
+pub fn type_match<'input>(
+    scope: &mut Scope<'input>,
     scrutinee: Expr<'input>,
     cases: Vec<Spanned<MatchCase<'input>>>,
     can_use_break_continue: bool,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
     // The following code:
     // fn takes_i32(x: i32);
     // fn takes_i64(x: i64);
@@ -239,6 +238,15 @@ pub fn type_match<'input, 'gs>(
         return Err(DiagnosticKind::NonExhaustiveMatchCases.error_in(stmt_span));
     }
 
+    // Create discriminant mapping using ALPHABETICAL ORDER
+    // Both enum construction and match must use the same alphabetically sorted
+    // order
+    let variant_to_discriminant: HashMap<&str, usize> = sorted_enum_variants
+        .iter()
+        .enumerate()
+        .map(|(idx, (name, _))| (*name, idx))
+        .collect();
+
     // The index into sorted_enum_variants is the discriminant value
     // We sorted both, so the indices line up
 
@@ -259,11 +267,15 @@ pub fn type_match<'input, 'gs>(
     // Build switch cases for each variant
     let mut switch_cases = Vec::new();
 
-    for (idx, case) in cases.iter().enumerate() {
+    for case in &cases {
         let variant_name = case.value().variant;
         let var_binding = case.value().var;
         let body = case.value().body.clone();
         let case_span = case.span();
+
+        let discriminant_idx = *variant_to_discriminant
+            .get(&variant_name)
+            .expect("variant should be present in discriminant map");
 
         // Build let binding: let <var_binding> =
         // <scrutinee>.__value__.<variant_name>;
@@ -308,7 +320,9 @@ pub fn type_match<'input, 'gs>(
                 // SAFETY: We leak this string because the AST
                 // requires a &str for number literals and we need
                 // it to live long enough
-                zrc_parser::lexer::NumberLiteral::Decimal(Box::leak(Box::new(idx.to_string()))),
+                zrc_parser::lexer::NumberLiteral::Decimal(Box::leak(Box::new(
+                    discriminant_idx.to_string(),
+                ))),
                 None,
             ),
         ));

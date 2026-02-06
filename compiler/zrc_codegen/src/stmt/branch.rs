@@ -19,15 +19,15 @@ use crate::{
 
 /// Code generates a switch statement
 #[expect(clippy::too_many_arguments, clippy::ref_option)]
-pub fn cg_if_stmt<'ctx, 'input, 'gs, 'a>(
+pub fn cg_if_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'input, 'ctx>,
     lexical_block: Option<DILexicalBlock<'ctx>>,
     breakaway: &Option<LoopBreakaway<'ctx>>,
     cond: TypedExpr<'input>,
-    then: Spanned<BlockMetadata<'input, 'gs>>,
-    then_else: Option<Spanned<BlockMetadata<'input, 'gs>>>,
+    then: Spanned<BlockMetadata<'input>>,
+    then_else: Option<Spanned<BlockMetadata<'input>>>,
 ) -> Option<BasicBlock<'ctx>> {
     let expr_cg = BlockCtx::new(cg, scope, lexical_block);
 

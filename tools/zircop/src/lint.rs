@@ -14,7 +14,7 @@ pub trait Lint {
     }
 
     /// Run a semantic lint on a program.
-    fn lint_tast(&self, _program: Vec<Spanned<TypedDeclaration<'_, '_>>>) -> Vec<LintDiagnostic> {
+    fn lint_tast(&self, _program: Vec<Spanned<TypedDeclaration<'_>>>) -> Vec<LintDiagnostic> {
         vec![]
     }
 }

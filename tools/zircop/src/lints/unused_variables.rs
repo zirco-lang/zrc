@@ -34,7 +34,7 @@ impl UnusedVariablesLint {
     }
 }
 impl Lint for UnusedVariablesLint {
-    fn lint_tast(&self, program: Vec<Spanned<TypedDeclaration<'_, '_>>>) -> Vec<LintDiagnostic> {
+    fn lint_tast(&self, program: Vec<Spanned<TypedDeclaration<'_>>>) -> Vec<LintDiagnostic> {
         let mut vis = Visit {
             diagnostics: vec![],
             reported_vars: vec![],
@@ -56,8 +56,8 @@ struct Visit<'a> {
     // notified about each unused variable once.
     reported_vars: Vec<&'a str>,
 }
-impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit<'input> {
-    fn visit_tc_block(&mut self, block: &BlockMetadata<'input, 'gs>) {
+impl<'input> SemanticVisit<'input, '_> for Visit<'input> {
+    fn visit_tc_block(&mut self, block: &BlockMetadata<'input>) {
         // Call the default traversal first so other visits run as expected.
         SemanticVisit::walk_tc_block(self, block);
 

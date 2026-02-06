@@ -32,7 +32,7 @@ impl DivisionByConstantZero {
 }
 
 impl Lint for DivisionByConstantZero {
-    fn lint_tast(&self, program: Vec<Spanned<TypedDeclaration<'_, '_>>>) -> Vec<LintDiagnostic> {
+    fn lint_tast(&self, program: Vec<Spanned<TypedDeclaration<'_>>>) -> Vec<LintDiagnostic> {
         let mut vis = Visit {
             diagnostics: Vec::new(),
         };

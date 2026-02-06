@@ -18,7 +18,7 @@ use crate::{
 /// Errors with type checker errors.
 #[expect(clippy::too_many_lines)]
 pub fn process_let_declaration<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     declarations: Vec<Spanned<AstLetDeclaration<'input>>>,
 ) -> Result<Vec<Spanned<TastLetDeclaration<'input>>>, Diagnostic> {
     declarations

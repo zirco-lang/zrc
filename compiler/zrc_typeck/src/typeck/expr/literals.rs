@@ -18,7 +18,7 @@ use crate::{
 
 /// Typeck a number literal
 pub fn type_expr_number_literal<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &Scope<'input>,
     expr_span: Span,
     n: NumberLiteral<'input>,
     ty: Option<Type<'input>>,
@@ -93,7 +93,7 @@ pub fn type_expr_number_literal<'input>(
 
 /// Typeck a str literal
 pub fn type_expr_string_literal<'input>(
-    _scope: &Scope<'input, '_>,
+    _scope: &Scope<'input>,
     expr_span: Span,
     str: ZrcString<'input>,
 ) -> TypedExpr<'input> {
@@ -105,7 +105,7 @@ pub fn type_expr_string_literal<'input>(
 
 /// Typeck a char literal
 pub fn type_expr_char_literal<'input>(
-    _scope: &Scope<'input, '_>,
+    _scope: &Scope<'input>,
     expr_span: Span,
     ch: StringTok<'input>,
 ) -> TypedExpr<'input> {
@@ -117,7 +117,7 @@ pub fn type_expr_char_literal<'input>(
 
 /// Resolve an identifier
 pub fn type_expr_identifier<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     i: &'input str,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -152,7 +152,7 @@ pub fn type_expr_identifier<'input>(
 
 /// Typeck a boolean literal
 pub fn type_expr_boolean_literal<'input>(
-    _scope: &Scope<'input, '_>,
+    _scope: &Scope<'input>,
     expr_span: Span,
     value: bool,
 ) -> TypedExpr<'input> {
@@ -164,7 +164,7 @@ pub fn type_expr_boolean_literal<'input>(
 
 /// Typeck an array literal
 pub fn type_expr_array_literal<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     elements: zrc_utils::span::Spanned<Vec<AstExpr<'input>>>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
