@@ -12,6 +12,7 @@ members = [
     "compiler/zrc_preprocessor",
     "tools/zircop",
     "tools/zrx",
+    "tools/zrepl",
 ]
 
 [profile.release]

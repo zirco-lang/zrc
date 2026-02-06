@@ -15,7 +15,7 @@ use crate::{
 
 /// Code generates a switch statement
 #[expect(clippy::too_many_arguments, clippy::ref_option)]
-pub fn cg_switch_stmt<'ctx, 'input, 'gs, 'a>(
+pub fn cg_switch_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     mut bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'input, 'ctx>,
@@ -23,8 +23,8 @@ pub fn cg_switch_stmt<'ctx, 'input, 'gs, 'a>(
     breakaway: &Option<LoopBreakaway<'ctx>>,
     stmt_span: Span,
     scrutinee: TypedExpr<'input>,
-    default: BlockMetadata<'input, 'gs>,
-    cases: Vec<(TypedExpr<'input>, BlockMetadata<'input, 'gs>)>,
+    default: BlockMetadata<'input>,
+    cases: Vec<(TypedExpr<'input>, BlockMetadata<'input>)>,
 ) -> BasicBlock<'ctx> {
     let expr_cg = BlockCtx::new(cg, scope, lexical_block);
 

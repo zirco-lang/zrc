@@ -41,10 +41,10 @@ pub fn is_constant_expr(expr: &TypedExpr) -> bool {
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
-pub fn process_declaration<'input, 'gs>(
-    global_scope: &'gs mut GlobalScope<'input>,
+pub fn process_declaration<'input>(
+    global_scope: &mut GlobalScope<'input>,
     declaration: AstDeclaration<'input>,
-) -> Result<Option<TypedDeclaration<'input, 'gs>>, Diagnostic> {
+) -> Result<Option<TypedDeclaration<'input>>, Diagnostic> {
     // Backwards-compatible wrapper: perform registration then finalize
     // for this single declaration. We operate on the AST declaration by
     // value (not a `Spanned` wrapper) because some callers pass the
@@ -115,10 +115,10 @@ pub fn register_declaration_value<'input>(
 
 /// Finalize a declaration using only immutable access to `GlobalScope`.
 /// This produces the final `TypedDeclaration` where applicable.
-pub fn finalize_declaration_value<'input, 'gs>(
-    global_scope: &'gs GlobalScope<'input>,
+pub fn finalize_declaration_value<'input>(
+    global_scope: &GlobalScope<'input>,
     declaration: AstDeclaration<'input>,
-) -> Result<Option<TypedDeclaration<'input, 'gs>>, Diagnostic> {
+) -> Result<Option<TypedDeclaration<'input>>, Diagnostic> {
     match declaration {
         AstDeclaration::FunctionDeclaration {
             name,

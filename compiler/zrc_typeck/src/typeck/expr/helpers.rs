@@ -43,7 +43,7 @@ pub fn desugar_assignment<'input>(
 
 /// Validate an expr into a place
 pub fn expr_to_place<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &Scope<'input>,
     span: Span,
     expr: TypedExpr<'input>,
 ) -> Result<Place<'input>, Diagnostic> {

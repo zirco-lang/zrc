@@ -19,15 +19,15 @@ use crate::tast::{
 };
 
 /// Type check a for statement.
-pub fn type_for<'input, 'gs>(
-    scope: &Scope<'input, 'gs>,
+pub fn type_for<'input>(
+    scope: &Scope<'input>,
     init: Option<Box<Spanned<Vec<Spanned<LetDeclaration<'input>>>>>>,
     cond: Option<Expr<'input>>,
     post: Option<Expr<'input>>,
     body: Box<Stmt<'input>>,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
     // TODO: same logic as the TODO comment on the while loop applies
     // here.
 
@@ -92,12 +92,12 @@ pub fn type_for<'input, 'gs>(
 }
 
 /// Type check a four statement.
-pub fn type_four<'input, 'gs>(
-    scope: &Scope<'input, 'gs>,
+pub fn type_four<'input>(
+    scope: &Scope<'input>,
     body: Box<Stmt<'input>>,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
     let loop_scope = scope.clone();
 
     let body_as_block = coerce_stmt_into_block(*body);
@@ -122,13 +122,13 @@ pub fn type_four<'input, 'gs>(
 }
 
 /// Type check a while statement.
-pub fn type_while<'input, 'gs>(
-    scope: &mut Scope<'input, 'gs>,
+pub fn type_while<'input>(
+    scope: &mut Scope<'input>,
     cond: Expr<'input>,
     body: Box<Stmt<'input>>,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
     // TODO: we might be able to prove that the body runs at least once
     // or an infinite loop making this
     // won't/will return statically
@@ -164,13 +164,13 @@ pub fn type_while<'input, 'gs>(
 }
 
 /// Type check a do..while statement.
-pub fn type_do_while<'input, 'gs>(
-    scope: &mut Scope<'input, 'gs>,
+pub fn type_do_while<'input>(
+    scope: &mut Scope<'input>,
     body: Box<Stmt<'input>>,
     cond: Expr<'input>,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
     let cond_span = cond.0.span();
     let body_span = body.0.span();
     let typed_cond = type_expr(scope, cond)?;

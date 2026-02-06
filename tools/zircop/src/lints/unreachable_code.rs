@@ -31,7 +31,7 @@ impl UnreachableCodeLint {
     }
 }
 impl Lint for UnreachableCodeLint {
-    fn lint_tast(&self, program: Vec<Spanned<TypedDeclaration<'_, '_>>>) -> Vec<LintDiagnostic> {
+    fn lint_tast(&self, program: Vec<Spanned<TypedDeclaration<'_>>>) -> Vec<LintDiagnostic> {
         let mut vis = Visit {
             diagnostics: vec![],
         };
@@ -47,8 +47,8 @@ struct Visit {
     diagnostics: Vec<LintDiagnostic>,
 }
 
-impl<'input, 'gs> SemanticVisit<'input, 'gs> for Visit {
-    fn visit_tc_block(&mut self, block: &BlockMetadata<'input, 'gs>) {
+impl<'input> SemanticVisit<'input, '_> for Visit {
+    fn visit_tc_block(&mut self, block: &BlockMetadata<'input>) {
         let stmts = &block.stmts;
 
         // Track whether we've encountered a statement that always returns

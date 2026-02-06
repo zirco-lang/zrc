@@ -256,7 +256,7 @@ fn cg_program_without_optimization<'ctx>(
     parent_directory: &str,
     file_name: &str,
     line_lookup: &LineLookup,
-    program: Vec<Spanned<TypedDeclaration<'_, '_>>>,
+    program: Vec<Spanned<TypedDeclaration<'_>>>,
 ) -> Module<'ctx> {
     let builder = ctx.create_builder();
     let module = ctx.create_module(file_name);
@@ -544,7 +544,7 @@ pub fn cg_program<'ctx>(
     parent_directory: &str,
     file_name: &str,
     line_lookup: &LineLookup,
-    program: Vec<Spanned<TypedDeclaration<'_, '_>>>,
+    program: Vec<Spanned<TypedDeclaration<'_>>>,
 ) -> Module<'ctx> {
     let module = cg_program_without_optimization(
         frontend_version_string,
@@ -575,7 +575,7 @@ pub fn cg_program_to_string(
     file_name: &str,
     cli_args: &str,
     source: &str,
-    program: Vec<Spanned<TypedDeclaration<'_, '_>>>,
+    program: Vec<Spanned<TypedDeclaration<'_>>>,
     optimization_level: OptimizationLevel,
     debug_level: DWARFEmissionKind,
     triple: &TargetTriple,
@@ -630,7 +630,7 @@ pub fn cg_program_to_string_without_optimization(
     file_name: &str,
     cli_args: &str,
     source: &str,
-    program: Vec<Spanned<TypedDeclaration<'_, '_>>>,
+    program: Vec<Spanned<TypedDeclaration<'_>>>,
     debug_level: DWARFEmissionKind,
     triple: &TargetTriple,
     cpu: &str,
@@ -682,7 +682,7 @@ pub fn cg_program_to_buffer(
     file_name: &str,
     cli_args: &str,
     source: &str,
-    program: Vec<Spanned<TypedDeclaration<'_, '_>>>,
+    program: Vec<Spanned<TypedDeclaration<'_>>>,
     file_type: FileType,
     optimization_level: OptimizationLevel,
     debug_level: DWARFEmissionKind,

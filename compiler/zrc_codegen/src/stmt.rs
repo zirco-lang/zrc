@@ -65,7 +65,7 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
     bb: BasicBlock<'ctx>,
     parent_scope: &'a CgScope<'input, 'ctx>,
     parent_lexical_block: Option<DILexicalBlock<'ctx>>,
-    block: Spanned<BlockMetadata<'input, '_>>,
+    block: Spanned<BlockMetadata<'input>>,
     breakaway: &Option<LoopBreakaway<'ctx>>,
 ) -> Option<BasicBlock<'ctx>> {
     let mut scope = parent_scope.clone();
