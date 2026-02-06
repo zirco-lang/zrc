@@ -120,7 +120,15 @@ mod tests {
                     LintDiagnosticKind::DivisionByConstantZero,
                     56
                 )
-            ),
+            )
+            .with_label(GenericLabel::warning(
+                spanned_test!(
+                    51,
+                    LintLabelKind::DivisionByConstantZero,
+                    56
+                )
+            ))
+            .with_note(LintNoteKind::DivisionByConstantZero),
         ]
     }
 
@@ -139,7 +147,15 @@ mod tests {
                     LintDiagnosticKind::DivisionByConstantZero,
                     58
                 )
-            ),
+            )
+            .with_label(GenericLabel::warning(
+                spanned_test!(
+                    51,
+                    LintLabelKind::DivisionByConstantZero,
+                    58
+                )
+            ))
+            .with_note(LintNoteKind::DivisionByConstantZero),
         ]
     }
 
@@ -158,7 +174,15 @@ mod tests {
                     LintDiagnosticKind::DivisionByConstantZero,
                     57
                 )
-            ),
+            )
+            .with_label(GenericLabel::warning(
+                spanned_test!(
+                    51,
+                    LintLabelKind::DivisionByConstantZero,
+                    57
+                )
+            ))
+            .with_note(LintNoteKind::DivisionByConstantZero),
         ]
     }
 

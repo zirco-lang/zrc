@@ -107,9 +107,11 @@ pub fn type_block<'input>(
                                 },
                                 BlockReturnActuality::NeverReturns,
                             ))),
-                            StmtKind::BreakStmt => {
-                                Err(DiagnosticKind::CannotUseBreakOutsideOfLoop.error_in(stmt_span))
-                            }
+                            StmtKind::BreakStmt => Err(DiagnosticKind::CannotUseBreakOutsideOfLoop
+                                .error_in(stmt_span)
+                                .with_label(GenericLabel::error(
+                                    LabelKind::CannotUseBreakOutsideOfLoop.in_span(stmt_span),
+                                ))),
 
                             StmtKind::ContinueStmt if can_use_break_continue => Ok(Some((
                                 TypedStmt {
@@ -120,7 +122,11 @@ pub fn type_block<'input>(
                             ))),
                             StmtKind::ContinueStmt => {
                                 Err(DiagnosticKind::CannotUseContinueOutsideOfLoop
-                                    .error_in(stmt_span))
+                                    .error_in(stmt_span)
+                                    .with_label(GenericLabel::error(
+                                        LabelKind::CannotUseContinueOutsideOfLoop
+                                            .in_span(stmt_span),
+                                    )))
                             }
 
                             StmtKind::SwitchCase { scrutinee, cases } => {
@@ -245,7 +251,11 @@ pub fn type_block<'input>(
                                 match (resolved_value, &return_ability) {
                                     // expects no return
                                     (_, BlockReturnAbility::MustNotReturn) => {
-                                        Err(DiagnosticKind::CannotReturnHere.error_in(stmt_span))
+                                        Err(DiagnosticKind::CannotReturnHere
+                                            .error_in(stmt_span)
+                                            .with_label(GenericLabel::error(
+                                                LabelKind::CannotReturnHere.in_span(stmt_span),
+                                            )))
                                     }
 
                                     // return x; in fn expecting to return x
@@ -349,7 +359,11 @@ pub fn type_block<'input>(
         (
             BlockReturnAbility::MustReturn(_),
             BlockReturnActuality::SometimesReturns | BlockReturnActuality::NeverReturns,
-        ) => Err(DiagnosticKind::ExpectedABlockToReturn.error_in(input_block_span)),
+        ) => Err(DiagnosticKind::ExpectedABlockToReturn
+            .error_in(input_block_span)
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedABlockToReturn.in_span(input_block_span),
+            ))),
 
         (
             BlockReturnAbility::MustNotReturn,

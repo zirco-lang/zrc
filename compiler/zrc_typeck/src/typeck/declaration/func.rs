@@ -1,6 +1,8 @@
 //! Process function declarations
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpannedExt};
+use zrc_diagnostics::{
+    Diagnostic, DiagnosticKind, LabelKind, SpannedExt, diagnostic::GenericLabel,
+};
 use zrc_parser::ast::{
     stmt::{ArgumentDeclarationList, Stmt},
     ty::Type,
@@ -77,23 +79,39 @@ pub fn register_function_declaration<'input>(
                     .expect("global_scope.declarations was not populated with function properly");
 
                 if !canonical.fn_type.types_equal(&fn_type) {
-                    return Err(name.error(|_| {
-                        DiagnosticKind::ConflictingFunctionDeclarations(
-                            canonical.fn_type.to_string(),
-                            fn_type.to_string(),
-                        )
-                    }));
+                    return Err(name
+                        .error(|_| {
+                            DiagnosticKind::ConflictingFunctionDeclarations(
+                                canonical.fn_type.to_string(),
+                                fn_type.to_string(),
+                            )
+                        })
+                        .with_label(GenericLabel::error(
+                            LabelKind::ConflictingFunctionDeclarations(
+                                canonical.fn_type.to_string(),
+                                fn_type.to_string(),
+                            )
+                            .in_span(name.span()),
+                        )));
                 }
 
                 if body.is_some() && canonical.has_implementation {
-                    return Err(name.error(|name| {
-                        DiagnosticKind::ConflictingImplementations(name.to_string())
-                    }));
+                    return Err(name
+                        .error(|name| DiagnosticKind::ConflictingImplementations(name.to_string()))
+                        .with_label(GenericLabel::error(
+                            LabelKind::ConflictingImplementations(name.to_string())
+                                .in_span(name.span()),
+                        )));
                 }
 
                 canonical.has_implementation
             } else {
-                return Err(name.error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())));
+                return Err(name
+                    .error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string()))
+                    .with_label(GenericLabel::error(
+                        LabelKind::IdentifierAlreadyInUse(name.value().to_string())
+                            .in_span(name.span()),
+                    )));
             }
         } else {
             false
@@ -114,9 +132,14 @@ pub fn register_function_declaration<'input>(
 
     if *name.value() == "main" {
         if resolved_return_type != TastType::I32 {
-            return Err(name.error(|_| {
-                DiagnosticKind::MainFunctionMustReturnI32(resolved_return_type.to_string())
-            }));
+            return Err(name
+                .error(|_| {
+                    DiagnosticKind::MainFunctionMustReturnI32(resolved_return_type.to_string())
+                })
+                .with_label(GenericLabel::error(
+                    LabelKind::MainFunctionMustReturnI32(resolved_return_type.to_string())
+                        .in_span(name.span()),
+                )));
         }
 
         match &parameters.value() {
@@ -137,14 +160,26 @@ pub fn register_function_declaration<'input>(
                         .map(tast::ty::Type::into_pointee)
                         != Some(Some(TastType::U8))
                 {
-                    return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
+                    return Err(name
+                        .error(|_| DiagnosticKind::MainFunctionInvalidParameters)
+                        .with_label(GenericLabel::error(
+                            LabelKind::MainFunctionInvalidParameters.in_span(name.span()),
+                        )));
                 }
             }
             ArgumentDeclarationList::NonVariadic(_) => {
-                return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
+                return Err(name
+                    .error(|_| DiagnosticKind::MainFunctionInvalidParameters)
+                    .with_label(GenericLabel::error(
+                        LabelKind::MainFunctionInvalidParameters.in_span(name.span()),
+                    )));
             }
             ArgumentDeclarationList::Variadic(_) => {
-                return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
+                return Err(name
+                    .error(|_| DiagnosticKind::MainFunctionInvalidParameters)
+                    .with_label(GenericLabel::error(
+                        LabelKind::MainFunctionInvalidParameters.in_span(name.span()),
+                    )));
             }
         }
     }

@@ -4,8 +4,11 @@ mod func;
 mod let_decl;
 
 pub use let_decl::process_let_declaration;
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpannedExt};
+use zrc_diagnostics::{
+    Diagnostic, DiagnosticKind, LabelKind, SpannedExt, diagnostic::GenericLabel,
+};
 use zrc_parser::ast::stmt::Declaration as AstDeclaration;
+use zrc_utils::span::Spannable;
 
 use super::{scope::GlobalScope, ty::resolve_type_with_self_reference, type_block};
 use crate::{
@@ -77,7 +80,12 @@ pub fn register_declaration_value<'input>(
 
         AstDeclaration::TypeAliasDeclaration { name, ty } => {
             if global_scope.types.has(name.value()) {
-                return Err(name.error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())));
+                return Err(name
+                    .error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string()))
+                    .with_label(GenericLabel::error(
+                        LabelKind::IdentifierAlreadyInUse(name.value().to_string())
+                            .in_span(name.span()),
+                    )));
             }
 
             let resolved_ty = resolve_type_with_self_reference(
@@ -98,9 +106,11 @@ pub fn register_declaration_value<'input>(
                 if let Some(ref value) = decl.value().value
                     && !is_constant_expr(value)
                 {
-                    return Err(
-                        DiagnosticKind::GlobalInitializerMustBeConstant.error_in(value.kind.span())
-                    );
+                    return Err(DiagnosticKind::GlobalInitializerMustBeConstant
+                        .error_in(value.kind.span())
+                        .with_label(GenericLabel::error(
+                            LabelKind::GlobalInitializerMustBeConstant.in_span(value.kind.span()),
+                        )));
                 }
             }
 

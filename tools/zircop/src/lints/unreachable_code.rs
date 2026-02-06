@@ -105,19 +105,19 @@ mod tests {
                     45
                 )
             ).with_label(
-                GenericLabel::warning(
-                    spanned_test!(
-                        34,
-                        LintLabelKind::UnreachableCode,
-                        45
-                    )
-                )
-            ).with_label(
                 GenericLabel::note(
                     spanned_test!(
                         20,
                         LintLabelKind::PriorControlFlow,
                         29
+                    )
+                )
+            ).with_label(
+                GenericLabel::warning(
+                    spanned_test!(
+                        34,
+                        LintLabelKind::UnreachableCode,
+                        45
                     )
                 )
             ),

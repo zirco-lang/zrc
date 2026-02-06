@@ -30,7 +30,11 @@ pub fn type_expr_number_literal<'input>(
 
     if !ty_resolved.is_integer() {
         return Err(
-            DiagnosticKind::InvalidNumberLiteralType(ty_resolved.to_string()).error_in(expr_span),
+            DiagnosticKind::InvalidNumberLiteralType(ty_resolved.to_string())
+                .error_in(expr_span)
+                .with_label(GenericLabel::error(
+                    LabelKind::InvalidNumberLiteralType(ty_resolved.to_string()).in_span(expr_span),
+                )),
         );
     }
 
@@ -81,7 +85,16 @@ pub fn type_expr_number_literal<'input>(
                 min.to_string(),
                 max.to_string(),
             )
-            .error_in(expr_span));
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::NumberLiteralOutOfBounds(
+                    n.to_string(),
+                    ty_resolved.to_string(),
+                    min.to_string(),
+                    max.to_string(),
+                )
+                .in_span(expr_span),
+            )));
         }
     }
 
@@ -171,7 +184,11 @@ pub fn type_expr_array_literal<'input>(
     let elements_vec = elements.into_value();
 
     if elements_vec.is_empty() {
-        return Err(DiagnosticKind::EmptyArrayLiteral.error_in(expr_span));
+        return Err(DiagnosticKind::EmptyArrayLiteral
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::EmptyArrayLiteral.in_span(expr_span),
+            )));
     }
 
     let mut typed_elements = Vec::with_capacity(elements_vec.len());
@@ -196,7 +213,15 @@ pub fn type_expr_array_literal<'input>(
                 found: elem.inferred_type.to_string(),
                 index: idx,
             }
-            .error_in(elem.kind.span()));
+            .error_in(elem.kind.span())
+            .with_label(GenericLabel::error(
+                LabelKind::ArrayElementTypeMismatch {
+                    expected: element_type.to_string(),
+                    found: elem.inferred_type.to_string(),
+                    index: idx,
+                }
+                .in_span(elem.kind.span()),
+            )));
         }
         *elem = coerced_elem;
     }

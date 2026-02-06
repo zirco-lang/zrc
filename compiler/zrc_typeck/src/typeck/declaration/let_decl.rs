@@ -41,16 +41,23 @@ pub fn process_let_declaration<'input>(
 
                 let result_decl = match (typed_expr, resolved_ty) {
                     (None, None) => {
-                        return Err(DiagnosticKind::NoTypeNoValue.error_in(let_decl_span));
+                        return Err(DiagnosticKind::NoTypeNoValue
+                            .error_in(let_decl_span)
+                            .with_label(GenericLabel::error(
+                                LabelKind::NoTypeNoValue.in_span(let_decl_span),
+                            )));
                     }
 
                     // Explicitly typed with no value
                     (None, Some(ty)) => {
                         // Check if trying to declare a variable with function type
                         if matches!(ty, TastType::Fn(_)) {
-                            return Err(
-                                DiagnosticKind::FunctionNotFirstClass.error_in(let_decl_span)
-                            );
+                            return Err(DiagnosticKind::FunctionNotFirstClass
+                                .error_in(let_decl_span)
+                                .with_label(GenericLabel::error(
+                                    LabelKind::FunctionNotFirstClass
+                                        .in_span(ty_span.expect("ty_span should exist here")),
+                                )));
                         }
                         TastLetDeclaration {
                             name: let_declaration.name,
@@ -70,9 +77,11 @@ pub fn process_let_declaration<'input>(
                     ) => {
                         // Check if trying to infer a function type
                         if matches!(inferred_type, TastType::Fn(_)) {
-                            return Err(
-                                DiagnosticKind::FunctionNotFirstClass.error_in(let_decl_span)
-                            );
+                            return Err(DiagnosticKind::FunctionNotFirstClass
+                                .error_in(let_decl_span)
+                                .with_label(GenericLabel::error(
+                                    LabelKind::FunctionNotFirstClass.in_span(kind.span()),
+                                )));
                         }
 
                         // If the inferred type is {int}, resolve it to i32
@@ -108,9 +117,12 @@ pub fn process_let_declaration<'input>(
                     ) => {
                         // Check if trying to use a function type
                         if matches!(resolved_ty, TastType::Fn(_)) {
-                            return Err(
-                                DiagnosticKind::FunctionNotFirstClass.error_in(let_decl_span)
-                            );
+                            return Err(DiagnosticKind::FunctionNotFirstClass
+                                .error_in(let_decl_span)
+                                .with_label(GenericLabel::error(
+                                    LabelKind::FunctionNotFirstClass
+                                        .in_span(ty_span.expect("ty_span should exist here")),
+                                )));
                         }
 
                         if inferred_type == resolved_ty {

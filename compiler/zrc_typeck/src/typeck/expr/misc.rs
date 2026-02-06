@@ -91,7 +91,14 @@ pub fn type_expr_ternary<'input>(
                 if_true_t.inferred_type.to_string(),
                 if_false_t.inferred_type.to_string(),
             )
-            .error_in(expr_span));
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedSameType(
+                    if_true_t.inferred_type.to_string(),
+                    if_false_t.inferred_type.to_string(),
+                )
+                .in_span(expr_span),
+            )));
         };
 
     Ok(TypedExpr {
@@ -114,11 +121,7 @@ pub fn type_expr_cast<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_t = type_expr(scope, x)?;
     let ty_span = ty.0.span();
-<<<<<<< HEAD
     let resolved_ty = resolve_type(scope, ty)?;
-=======
-    let resolved_ty = resolve_type(&scope.types, ty)?;
->>>>>>> main
 
     // Handle {int} type resolution
     if matches!(x_t.inferred_type, TastType::Int) {
@@ -157,7 +160,11 @@ pub fn type_expr_cast<'input>(
                 x_t.inferred_type.to_string(),
                 resolved_ty.to_string(),
             )
-            .error_in(expr_span));
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::InvalidCast(x_t.inferred_type.to_string(), resolved_ty.to_string())
+                    .in_span(expr_span),
+            )));
         }
     } else if x_t.inferred_type == TastType::Bool && resolved_ty.is_integer() {
         // bool -> int cast is valid
@@ -166,7 +173,11 @@ pub fn type_expr_cast<'input>(
             x_t.inferred_type.to_string(),
             resolved_ty.to_string(),
         )
-        .error_in(expr_span));
+        .error_in(expr_span)
+        .with_label(GenericLabel::error(
+            LabelKind::InvalidCast(x_t.inferred_type.to_string(), resolved_ty.to_string())
+                .in_span(expr_span),
+        )));
     }
 
     Ok(TypedExpr {
@@ -181,11 +192,7 @@ pub fn type_expr_size_of_type<'input>(
     expr_span: Span,
     ty: Type<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-<<<<<<< HEAD
     let resolved_ty = resolve_type(scope, ty)?;
-=======
-    let resolved_ty = resolve_type(&scope.types, ty)?;
->>>>>>> main
     Ok(TypedExpr {
         inferred_type: TastType::Usize,
         kind: TypedExprKind::SizeOf(resolved_ty).in_span(expr_span),
@@ -463,7 +470,11 @@ pub fn type_expr_struct_construction<'input>(
         if initialized_fields.contains_key(field_name_str) {
             return Err(
                 DiagnosticKind::DuplicateStructMember((*field_name_str).to_string())
-                    .error_in(field_name.span()),
+                    .error_in(field_name.span())
+                    .with_label(GenericLabel::error(
+                        LabelKind::DuplicateStructMember((*field_name_str).to_string())
+                            .in_span(field_name.span()),
+                    )),
             );
         }
 

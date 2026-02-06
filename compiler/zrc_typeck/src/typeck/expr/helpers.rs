@@ -62,7 +62,14 @@ pub fn expr_to_place<'input>(
                 .resolve(x)
                 .is_some_and(|entry| entry.borrow().is_constant) =>
         {
-            return Err(DiagnosticKind::AssignmentToConstant(x.to_string()).error_in(kind_span));
+            return Err(DiagnosticKind::AssignmentToConstant(x.to_string())
+                .error_in(kind_span)
+                .with_label(GenericLabel::error(
+                    LabelKind::AssignmentToConstant(x.to_string()).in_span(kind_span),
+                ))
+                .with_label(GenericLabel::note(
+                    LabelKind::InferredType(stringified).in_span(span),
+                )));
         }
         // not constant
         TypedExprKind::Identifier(x) => Place {
@@ -98,7 +105,13 @@ pub fn expect_identical_types<'a, 'input>(
     if lhs == rhs {
         Ok(())
     } else {
-        Err(DiagnosticKind::ExpectedSameType(lhs.to_string(), rhs.to_string()).error_in(span))
+        Err(
+            DiagnosticKind::ExpectedSameType(lhs.to_string(), rhs.to_string())
+                .error_in(span)
+                .with_label(GenericLabel::error(
+                    LabelKind::ExpectedSameType(lhs.to_string(), rhs.to_string()).in_span(span),
+                )),
+        )
     }
 }
 
@@ -242,7 +255,11 @@ mod tests {
             Err(Diagnostic::error(
                 DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string())
                     .in_span(sample_span)
-            ))
+            )
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedSameType("i32".to_string(), "i8".to_string())
+                    .in_span(sample_span)
+            )))
         );
     }
 
@@ -262,7 +279,14 @@ mod tests {
                     got: "got".to_string()
                 }
                 .in_span(sample_span)
-            ))
+            )
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedGot {
+                    expected: "expected".to_string(),
+                    got: "got".to_string()
+                }
+                .in_span(sample_span)
+            )))
         );
     }
 

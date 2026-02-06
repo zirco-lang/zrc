@@ -69,74 +69,69 @@ pub enum DiagnosticKind {
     #[error("expected `{expected}`, got `{got}`")]
     ExpectedGot { expected: String, got: String },
     #[error("expected both sides to have the same type, got `{0}` and `{1}`")]
-    ExpectedSameType(String, String), // TODO: Migrate to new diags
+    ExpectedSameType(String, String),
     #[error(
         "expected both sides to be the same integer, boolean or pointer type, got `{0}` and `{1}`"
     )]
-    EqualityOperators(String, String), // TODO: Migrate to new diags
+    EqualityOperators(String, String),
     #[error("cannot cast `{0}` to `{1}`")]
-    InvalidCast(String, String), // TODO: Migrate to new diags
+    InvalidCast(String, String),
     #[error("identifier `{0}` already in use")]
-    IdentifierAlreadyInUse(String), // TODO: Migrate to new diags
+    IdentifierAlreadyInUse(String),
     #[error("no explicit variable type present and no value to infer from")]
-    NoTypeNoValue, // TODO: Migrate to new diags
+    NoTypeNoValue,
     #[error("empty array literals are not allowed")]
-    EmptyArrayLiteral, // TODO: Migrate to new diags
+    EmptyArrayLiteral,
     #[error("array element at index {index} has type `{found}`, expected `{expected}`")]
-    // TODO: Migrate to new diags
     ArrayElementTypeMismatch {
         expected: String,
         found: String,
         index: usize,
     },
     #[error("cannot use `break` outside of loop")]
-    CannotUseBreakOutsideOfLoop, // TODO: Migrate to new diags
+    CannotUseBreakOutsideOfLoop,
     #[error("cannot use `continue` outside of loop")]
-    CannotUseContinueOutsideOfLoop, // TODO: Migrate to new diags
+    CannotUseContinueOutsideOfLoop,
     #[error("cannot use `return` here")]
-    CannotReturnHere, // TODO: Migrate to new diags
+    CannotReturnHere,
     #[error("expected a block to be guaranteed to return")]
-    ExpectedABlockToReturn, // TODO: Migrate to new diags
+    ExpectedABlockToReturn,
     #[error("duplicate struct member `{0}`")]
-    DuplicateStructMember(String), // TODO: Migrate to new diags
-    #[error("cannot use variadic arguments (`...`) on a non-external function")]
-    VariadicFunctionMustBeExternal, // TODO: Migrate to new diags
-    #[error("cannot declare a variable of type `void` -- just discard the value")]
-    CannotDeclareVoid, // TODO: Migrate to new diags
+    DuplicateStructMember(String),
     #[error("invalid pointer arithmetic operation `{0}`")]
-    InvalidPointerArithmeticOperation(String), // TODO: Migrate to new diags
+    InvalidPointerArithmeticOperation(String),
     #[error("declaration of type `{1}` conflicts with previous declaration with type `{0}`")]
-    ConflictingFunctionDeclarations(String, String), // TODO: Migrate to new diags
+    ConflictingFunctionDeclarations(String, String),
     #[error("function {0} has multiple implementations in this unit")]
-    ConflictingImplementations(String), // TODO: Migrate to new diags
+    ConflictingImplementations(String),
     #[error("type {0} cannot be used for number literals")]
-    InvalidNumberLiteralType(String), // TODO: Migrate to new diags
+    InvalidNumberLiteralType(String),
     #[error("a switch case statement must always end in a default block")]
-    SwitchCaseMissingTerminalDefault, // TODO: Migrate to new diags
+    SwitchCaseMissingTerminalDefault,
     #[error("multiple case statements are matching for the same value")]
-    MultipleCases, // TODO: Migrate to new diags
+    MultipleCases,
     #[error("self-referential type `{0}` must be behind a pointer (e.g., `*{0}`)")]
-    SelfReferentialTypeNotBehindPointer(String), // TODO: Migrate to new diags
+    SelfReferentialTypeNotBehindPointer(String),
     #[error("number literal `{0}` is out of bounds for type `{1}` (valid range: {2} to {3})")]
-    NumberLiteralOutOfBounds(String, String, String, String), // TODO: Migrate to new diags
+    NumberLiteralOutOfBounds(String, String, String, String),
     #[error("global variable initializer must be a constant expression")]
-    GlobalInitializerMustBeConstant, // TODO: Migrate to new diags
+    GlobalInitializerMustBeConstant,
     #[error("match on non-enum type `{0}`")]
-    MatchOnNonEnum(String), // TODO: Migrate to new diags
+    MatchOnNonEnum(String),
     #[error("there must be exactly one match arm for every enum variant")]
-    MatchCaseCountMismatch, // TODO: Migrate to new diags
+    MatchCaseCountMismatch,
     #[error("there must be a match arm for every enum variant")]
-    NonExhaustiveMatchCases, // TODO: Migrate to new diags
+    NonExhaustiveMatchCases,
     #[error("main() function must have return type `i32`, got `{0}`")]
-    MainFunctionMustReturnI32(String), // TODO: Migrate to new diags
+    MainFunctionMustReturnI32(String),
     #[error(
         "main() function may either have no parameters or two parameters, a `usize` and a `**u8`"
     )]
-    MainFunctionInvalidParameters, // TODO: Migrate to new diags
+    MainFunctionInvalidParameters,
     #[error("cannot use constant `{0}` as an lvalue")]
-    AssignmentToConstant(String), // TODO: Migrate to new diags
+    AssignmentToConstant(String),
     #[error("functions are not first-class values in Zirco; use a function pointer instead")]
-    FunctionNotFirstClass, // TODO: Migrate to new diags
+    FunctionNotFirstClass,
 
     // PREPROCESSOR ERRORS
     #[error("unterminated include directive")]
@@ -209,8 +204,6 @@ impl ErrorCode for DiagnosticKind {
             Self::CannotReturnHere => "E3023",
             Self::ExpectedABlockToReturn => "E3024",
             Self::DuplicateStructMember(_) => "E3025",
-            Self::VariadicFunctionMustBeExternal => "E3026",
-            Self::CannotDeclareVoid => "E3027",
             Self::InvalidPointerArithmeticOperation(_) => "E3028",
             Self::ConflictingFunctionDeclarations(_, _) => "E3029",
             Self::ConflictingImplementations(_) => "E3030",
@@ -295,6 +288,70 @@ pub enum LabelKind {
     CannotCallNonFunction,
     #[error("expected `{expected}`, got `{got}`")]
     ExpectedGot { expected: String, got: String },
+    #[error("expected both sides to have the same type, got `{0}` and `{1}`")]
+    ExpectedSameType(String, String),
+    #[error(
+        "expected both sides to be the same integer, boolean or pointer type, got `{0}` and `{1}`"
+    )]
+    EqualityOperators(String, String),
+    #[error("cannot cast `{0}` to `{1}`")]
+    InvalidCast(String, String),
+    #[error("identifier `{0}` already in use")]
+    IdentifierAlreadyInUse(String),
+    #[error("empty array literals are not allowed")]
+    EmptyArrayLiteral,
+    #[error("array element at index {index} has type `{found}`, expected `{expected}`")]
+    ArrayElementTypeMismatch {
+        expected: String,
+        found: String,
+        index: usize,
+    },
+    #[error("cannot use `break` outside of loop")]
+    CannotUseBreakOutsideOfLoop,
+    #[error("cannot use `continue` outside of loop")]
+    CannotUseContinueOutsideOfLoop,
+    #[error("cannot use `return` here")]
+    CannotReturnHere,
+    #[error("expected a block to be guaranteed to return")]
+    ExpectedABlockToReturn,
+    #[error("no explicit variable type present and no value to infer from")]
+    NoTypeNoValue,
+    #[error("duplicate struct member `{0}`")]
+    DuplicateStructMember(String),
+    #[error("invalid pointer arithmetic operation `{0}`")]
+    InvalidPointerArithmeticOperation(String),
+    #[error("declaration of type `{1}` conflicts with previous declaration with type `{0}`")]
+    ConflictingFunctionDeclarations(String, String),
+    #[error("function {0} has multiple implementations in this unit")]
+    ConflictingImplementations(String),
+    #[error("type {0} cannot be used for number literals")]
+    InvalidNumberLiteralType(String),
+    #[error("a switch case statement must always end in a default block")]
+    SwitchCaseMissingTerminalDefault,
+    #[error("multiple case statements are matching for the same value")]
+    MultipleCases,
+    #[error("self-referential type `{0}` must be behind a pointer (e.g., `*{0}`)")]
+    SelfReferentialTypeNotBehindPointer(String),
+    #[error("number literal `{0}` is out of bounds for type `{1}` (valid range: {2} to {3})")]
+    NumberLiteralOutOfBounds(String, String, String, String),
+    #[error("global variable initializer must be a constant expression")]
+    GlobalInitializerMustBeConstant,
+    #[error("match on non-enum type `{0}`")]
+    MatchOnNonEnum(String),
+    #[error("there must be exactly one match arm for every enum variant")]
+    MatchCaseCountMismatch,
+    #[error("there must be a match arm for every enum variant")]
+    NonExhaustiveMatchCases,
+    #[error("main() function must have return type `i32`, got `{0}`")]
+    MainFunctionMustReturnI32(String),
+    #[error(
+        "main() function may either have no parameters or two parameters, a `usize` and a `**u8`"
+    )]
+    MainFunctionInvalidParameters,
+    #[error("cannot use constant `{0}` as an lvalue")]
+    AssignmentToConstant(String),
+    #[error("functions are not first-class values in Zirco; use a function pointer instead")]
+    FunctionNotFirstClass,
 }
 
 /// The list of possible notes attached to a [`Diagnostic`]

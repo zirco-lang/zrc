@@ -22,7 +22,7 @@ use crate::tast::{
 /// Errors if the identifier is not found in the type scope or a key is
 /// double-defined.
 pub fn resolve_type<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &Scope<'input>,
     ty: ParserType<'input>,
 ) -> Result<TastType<'input>, Diagnostic> {
     let span = ty.0.span();
@@ -132,7 +132,7 @@ pub fn resolve_type<'input>(
 /// // Result: Struct { "value": I32, "next": Ptr(Opaque("Node")) }
 /// ```
 fn resolve_type_with_opaque<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &Scope<'input>,
     ty: ParserType<'input>,
     opaque_name: &'input str,
 ) -> Result<TastType<'input>, Diagnostic> {
@@ -240,7 +240,11 @@ fn check_opaque_behind_pointer<'input>(
     match ty {
         TastType::Opaque(name) if *name == opaque_name => Err(
             DiagnosticKind::SelfReferentialTypeNotBehindPointer((*name).to_string())
-                .error_in(ty_span),
+                .error_in(ty_span)
+                .with_label(GenericLabel::error(
+                    LabelKind::SelfReferentialTypeNotBehindPointer((*name).to_string())
+                        .in_span(ty_span),
+                )),
         ),
         TastType::Ptr(_) => {
             // Anything behind a pointer is OK, even opaque types
@@ -267,7 +271,7 @@ fn check_opaque_behind_pointer<'input>(
 /// Errors if the type contains self-references not behind pointers or other
 /// type resolution errors.
 pub fn resolve_type_with_self_reference<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &Scope<'input>,
     ty: ParserType<'input>,
     self_name: &'input str,
 ) -> Result<TastType<'input>, Diagnostic> {
@@ -330,7 +334,7 @@ fn replace_opaque_with_concrete<'input>(
 /// # Errors
 /// Errors if a key is not unique or is unresolvable.
 pub(super) fn resolve_key_type_mapping<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &Scope<'input>,
     members: KeyTypeMapping<'input>,
 ) -> Result<OrderedTypeFields<'input>, Diagnostic> {
     let mut fields = OrderedFields::new();
@@ -340,7 +344,12 @@ pub(super) fn resolve_key_type_mapping<'input>(
 
         if fields.contains_key(key.value()) {
             return Err(
-                DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
+                DiagnosticKind::DuplicateStructMember(key.into_value().to_string())
+                    .error_in(span)
+                    .with_label(GenericLabel::error(
+                        LabelKind::DuplicateStructMember(key.into_value().to_string())
+                            .in_span(span),
+                    )),
             );
         }
         fields.insert(key.value(), resolve_type(scope, ast_type)?);
@@ -356,7 +365,7 @@ pub(super) fn resolve_key_type_mapping<'input>(
 /// Errors if a key is not unique, is unresolvable, or contains a
 /// self-referential type not behind a pointer.
 fn resolve_key_type_mapping_with_opaque<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &Scope<'input>,
     members: KeyTypeMapping<'input>,
     opaque_name: &'input str,
 ) -> Result<OrderedTypeFields<'input>, Diagnostic> {
@@ -367,7 +376,12 @@ fn resolve_key_type_mapping_with_opaque<'input>(
 
         if fields.contains_key(key.value()) {
             return Err(
-                DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
+                DiagnosticKind::DuplicateStructMember(key.into_value().to_string())
+                    .error_in(span)
+                    .with_label(GenericLabel::error(
+                        LabelKind::DuplicateStructMember(key.into_value().to_string())
+                            .in_span(span),
+                    )),
             );
         }
         let resolved_type = resolve_type_with_opaque(scope, ast_type, opaque_name)?;
@@ -415,7 +429,12 @@ mod tests {
                 0,
                 DiagnosticKind::UnableToResolveType("x".to_string()),
                 1
-            )))
+            ))
+            .with_label(GenericLabel::error(spanned_test!(
+                0,
+                LabelKind::UnableToResolveType("x".to_string()),
+                1
+            ))))
         );
     }
 
@@ -568,7 +587,12 @@ mod tests {
                 17,
                 DiagnosticKind::DuplicateStructMember("x".to_string()),
                 23
-            )))
+            ))
+            .with_label(GenericLabel::error(spanned_test!(
+                17,
+                LabelKind::DuplicateStructMember("x".to_string()),
+                23
+            ))))
         );
     }
 
@@ -688,6 +712,11 @@ mod tests {
                 DiagnosticKind::SelfReferentialTypeNotBehindPointer("Node".to_string()),
                 31
             ))
+            .with_label(GenericLabel::error(spanned_test!(
+                21,
+                LabelKind::SelfReferentialTypeNotBehindPointer("Node".to_string()),
+                31
+            )))
         );
     }
 
