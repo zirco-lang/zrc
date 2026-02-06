@@ -1,6 +1,6 @@
 //! Type checking for if statements.
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, diagnostic::GenericLabel};
 use zrc_parser::ast::{
     expr::Expr,
     stmt::{LetDeclaration, Stmt},
@@ -49,15 +49,22 @@ pub fn type_for<'input>(
     if let Some(inner_t_cond) = typed_cond.clone()
         && inner_t_cond.inferred_type != TastType::Bool
     {
-        return Err(Diagnostic(
-            Severity::Error,
-            cond_span
-                .expect("span should exist if we unwrapped it")
-                .containing(DiagnosticKind::ExpectedGot {
-                    expected: "bool".to_string(),
-                    got: inner_t_cond.inferred_type.to_string(),
-                }),
-        ));
+        let Some(cond_span) = cond_span else {
+            panic!("span should exist if we unwrapped it");
+        };
+
+        return Err(DiagnosticKind::ExpectedGot {
+            expected: "bool".to_string(),
+            got: inner_t_cond.inferred_type.to_string(),
+        }
+        .error_in(cond_span)
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedGot {
+                expected: "bool".to_string(),
+                got: inner_t_cond.inferred_type.to_string(),
+            }
+            .in_span(cond_span),
+        )));
     }
 
     let typed_post = post
@@ -142,7 +149,14 @@ pub fn type_while<'input>(
             expected: "bool".to_string(),
             got: typed_cond.inferred_type.to_string(),
         }
-        .error_in(cond_span));
+        .error_in(cond_span)
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedGot {
+                expected: "bool".to_string(),
+                got: typed_cond.inferred_type.to_string(),
+            }
+            .in_span(cond_span),
+        )));
     }
 
     let body = type_block(
@@ -180,7 +194,14 @@ pub fn type_do_while<'input>(
             expected: "bool".to_string(),
             got: typed_cond.inferred_type.to_string(),
         }
-        .error_in(cond_span));
+        .error_in(cond_span)
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedGot {
+                expected: "bool".to_string(),
+                got: typed_cond.inferred_type.to_string(),
+            }
+            .in_span(cond_span),
+        )));
     }
 
     let body = type_block(

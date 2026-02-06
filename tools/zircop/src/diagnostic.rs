@@ -1,60 +1,90 @@
 //! Diagnostics producible by the Zircop tool
 
-use std::error::Error;
-
-use derive_more::Display;
 use thiserror::Error;
-use zrc_diagnostics::diagnostic::{GenericDiagnostic, Severity};
-use zrc_utils::span::Spanned;
+use zrc_diagnostics::diagnostic::{ErrorCode, GenericDiagnostic};
 
 /// The list of possible lints Zircop can raise
 #[expect(missing_docs)]
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
 pub enum LintDiagnosticKind {
-    #[error("assignment found in condition expression, consider using `==` or `!=` instead")]
-    AssignmentInCondition,
-    #[error("empty struct used, consider using `void` instead")]
+    #[error("empty struct used where `void` would be more appropriate")]
     EmptyStructUsed,
-    #[error("underscore variable `{0}` used, consider renaming it")]
-    UnderscoreVariableUsed(String),
-    #[error("unused variable `{0}`")]
-    UnusedVariable(String),
+    #[error("variable with a '_' name has usages")]
+    UnderscoreVariableUsed,
+    #[error("unused variable")]
+    UnusedVariable,
     #[error("unreachable code")]
     UnreachableCode,
-    #[error("empty `if` block with an `else` block present - consider inverting the condition")]
-    EmptyIfBlock,
-    #[error("empty `else` block - consider removing the `else` block")]
-    EmptyElseBlock,
-    #[error(
-        "empty `while` loop body - consider adding statements to the body or removing the loop"
-    )]
-    EmptyWhileBody,
+    #[error("suspicious control flow")]
+    SussyControlFlow,
     #[error("division by constant zero")]
     DivisionByConstantZero,
 }
-
-/// A Zircop lint
-#[derive(Display, Debug, PartialEq, Eq)]
-#[display("{_0}")]
-pub struct LintDiagnostic(GenericDiagnostic<LintDiagnosticKind>);
-
-impl LintDiagnostic {
-    /// Create a new lint diagnostic with warning severity
-    #[must_use]
-    pub const fn new(kind: Spanned<LintDiagnosticKind>) -> Self {
-        Self(GenericDiagnostic(Severity::Warning, kind))
-    }
-
-    /// Convert this [`LintDiagnostic`] to a printable string using ariadne. The
-    /// source code is provided directly as a string if it is not read from a
-    /// file.
-    ///
-    /// # Panics
-    /// This function may panic if the span is invalid or if writing to the
-    /// buffer fails.
-    #[must_use]
-    pub fn print(&self, piped_source: Option<&str>) -> String {
-        self.0.print(piped_source)
+impl ErrorCode for LintDiagnosticKind {
+    fn error_code(&self) -> &'static str {
+        match self {
+            Self::EmptyStructUsed => "empty_struct_used",
+            Self::UnderscoreVariableUsed => "underscore_variable_used",
+            Self::UnusedVariable => "unused_variable",
+            Self::UnreachableCode => "unreachable_code",
+            Self::SussyControlFlow => "suspicious_control_flow",
+            Self::DivisionByConstantZero => "division_by_constant_zero",
+        }
     }
 }
-impl Error for LintDiagnostic {}
+
+/// The list of possible labels on Zircop lints
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[expect(missing_docs)]
+pub enum LintLabelKind {
+    #[error("this `if` block is empty")]
+    EmptyIf,
+    #[error("but this `else` block has contents")]
+    NonEmptyElse,
+    #[error("this `else` block is empty")]
+    EmptyElseBlock,
+    #[error("this type is equivalent to `void`")]
+    EmptyStructType,
+    #[error("this variable is declared with a '_' prefix indicating it is unused")]
+    UnderscoreVariableDeclaration,
+    #[error("but it is used here")]
+    UnderscoreVariableUsage,
+    #[error("this variable is never used")]
+    UnusedVariable,
+    #[error("so this statement will never be executed")]
+    UnreachableCode,
+    #[error("this statement ends execution of this block")]
+    PriorControlFlow,
+    #[error("division by zero detected here")]
+    DivisionByConstantZero,
+}
+
+/// The list of possible notes on Zircop lints
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[expect(missing_docs)]
+pub enum LintNoteKind {
+    #[error("to suppress this warning, rename the variable to `{}`", .0)]
+    UnusedVariableSuppress(String),
+    #[error("division by zero is undefined behavior")]
+    DivisionByConstantZero,
+}
+
+/// The list of possible helps on Zircop lints
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[expect(missing_docs)]
+pub enum LintHelpKind {
+    #[error("consider inverting the condition: `if (!{}) ...`", .0)]
+    InvertIfCondition(String),
+    #[error("consider removing the `else` block")]
+    RemoveElseBlock,
+    #[error("consider using `void` instead")]
+    UseVoidType,
+    #[error("consider renaming the variable to `{}`", .0)]
+    RenameVariable(String),
+    #[error("consider removing the variable declaration if it has no side effects")]
+    RemoveVariableDeclaration,
+}
+
+/// A Zircop lint
+pub type LintDiagnostic =
+    GenericDiagnostic<LintDiagnosticKind, LintLabelKind, LintNoteKind, LintHelpKind>;

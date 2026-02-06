@@ -1,6 +1,6 @@
 //! helper tools used in the type-checking of expressions
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpanExt};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, SpanExt, diagnostic::GenericLabel};
 use zrc_parser::ast::expr::{Assignment, Expr, ExprKind};
 use zrc_utils::span::{Span, Spannable};
 
@@ -62,7 +62,14 @@ pub fn expr_to_place<'input>(
                 .resolve(x)
                 .is_some_and(|entry| entry.borrow().is_constant) =>
         {
-            return Err(DiagnosticKind::AssignmentToConstant(x.to_string()).error_in(kind_span));
+            return Err(DiagnosticKind::AssignmentToConstant(x.to_string())
+                .error_in(kind_span)
+                .with_label(GenericLabel::error(
+                    LabelKind::AssignmentToConstant(x.to_string()).in_span(kind_span),
+                ))
+                .with_label(GenericLabel::note(
+                    LabelKind::InferredType(stringified).in_span(span),
+                )));
         }
         // not constant
         TypedExprKind::Identifier(x) => Place {
@@ -77,7 +84,14 @@ pub fn expr_to_place<'input>(
             inferred_type: expr.inferred_type,
             kind: PlaceKind::Dot(x, y).in_span(kind_span),
         },
-        _ => return Err(span.error(DiagnosticKind::NotAnLvalue(stringified))),
+        _ => {
+            return Err(span
+                .error(DiagnosticKind::NotAnLvalue(stringified.clone()))
+                .with_label(GenericLabel::error(LabelKind::NotAnLvalue.in_span(span)))
+                .with_label(GenericLabel::note(
+                    LabelKind::InferredType(stringified).in_span(span),
+                )));
+        }
     })
 }
 
@@ -91,7 +105,13 @@ pub fn expect_identical_types<'a, 'input>(
     if lhs == rhs {
         Ok(())
     } else {
-        Err(DiagnosticKind::ExpectedSameType(lhs.to_string(), rhs.to_string()).error_in(span))
+        Err(
+            DiagnosticKind::ExpectedSameType(lhs.to_string(), rhs.to_string())
+                .error_in(span)
+                .with_label(GenericLabel::error(
+                    LabelKind::ExpectedSameType(lhs.to_string(), rhs.to_string()).in_span(span),
+                )),
+        )
     }
 }
 
@@ -107,10 +127,17 @@ pub fn expect(
         Ok(())
     } else {
         Err(DiagnosticKind::ExpectedGot {
-            expected: expected_str,
-            got: got_str,
+            expected: expected_str.clone(),
+            got: got_str.clone(),
         }
-        .error_in(span))
+        .error_in(span)
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedGot {
+                expected: expected_str,
+                got: got_str,
+            }
+            .in_span(span),
+        )))
     }
 }
 
@@ -140,7 +167,14 @@ pub fn expect_is_signed_integer(
             expected: "signed integer".to_string(),
             got: expr.inferred_type.to_string(),
         }
-        .error_in(span))
+        .error_in(span)
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedGot {
+                expected: "signed integer".to_string(),
+                got: expr.inferred_type.to_string(),
+            }
+            .in_span(span),
+        )))
     }
 }
 
@@ -203,8 +237,7 @@ pub fn resolve_binary_int_operands<'input>(
 
 #[cfg(test)]
 mod tests {
-
-    use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+    use zrc_diagnostics::{Diagnostic, DiagnosticKind};
     use zrc_parser::ast::expr::{Arithmetic, Assignment, Expr, ExprKind};
     use zrc_utils::{
         span::{Span, Spannable},
@@ -219,11 +252,14 @@ mod tests {
         let sample_span = Span::from_positions_and_file(0, 5, "<test>");
         assert_eq!(
             expect_identical_types(&TastType::I32, &TastType::I8, sample_span),
-            Err(Diagnostic(
-                Severity::Error,
+            Err(Diagnostic::error(
                 DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string())
                     .in_span(sample_span)
-            ))
+            )
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedSameType("i32".to_string(), "i8".to_string())
+                    .in_span(sample_span)
+            )))
         );
     }
 
@@ -237,14 +273,20 @@ mod tests {
                 "got".to_string(),
                 sample_span
             ),
-            Err(Diagnostic(
-                Severity::Error,
+            Err(Diagnostic::error(
                 DiagnosticKind::ExpectedGot {
                     expected: "expected".to_string(),
                     got: "got".to_string()
                 }
                 .in_span(sample_span)
-            ))
+            )
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedGot {
+                    expected: "expected".to_string(),
+                    got: "got".to_string()
+                }
+                .in_span(sample_span)
+            )))
         );
     }
 

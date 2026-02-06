@@ -1,6 +1,6 @@
 //! type checking for the assignment operators
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, diagnostic::GenericLabel};
 use zrc_parser::ast::expr::{Assignment, Expr};
 use zrc_utils::span::{Span, Spannable};
 
@@ -48,6 +48,16 @@ pub fn type_expr_assignment<'input>(
             expected: place_t.inferred_type.to_string(),
             got: value_t.inferred_type.to_string(),
         }
-        .error_in(expr_span))
+        .error_in(expr_span)
+        .with_label(GenericLabel::note(
+            LabelKind::PlaceType(place_t.inferred_type.to_string()).in_span(place_t.kind.span()),
+        ))
+        .with_label(GenericLabel::error(
+            LabelKind::InvalidAssignmentRightHandSideType {
+                expected: place_t.inferred_type.to_string(),
+                got: value_t.inferred_type.to_string(),
+            }
+            .in_span(value_t.kind.span()),
+        )))
     }
 }

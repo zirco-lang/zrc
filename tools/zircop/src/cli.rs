@@ -21,6 +21,20 @@ pub struct Cli {
     /// Add a directory to the include path
     #[arg(short = 'I', long = "include", action = clap::ArgAction::Append)]
     pub include_paths: Vec<PathBuf>,
+
+    /// Diagnostic output format
+    #[arg(long)]
+    #[clap(default_value = "human")]
+    pub diagnostic_format: DiagFormat,
+}
+
+/// Configuration for diagnostic display formats
+#[derive(Debug, Clone, clap::ValueEnum, PartialEq, Eq)]
+pub enum DiagFormat {
+    /// Human-readable diagnostics with colors and source code snippets
+    Human,
+    /// Machine-readable diagnostics in JSON format
+    Json,
 }
 
 /// Resolve a path to an absolute path based on the current working directory.

@@ -1,6 +1,8 @@
 //! type checking for binary operators
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{
+    Diagnostic, DiagnosticKind, HelpKind, LabelKind, NoteKind, diagnostic::GenericLabel,
+};
 use zrc_parser::ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Expr, Logical};
 use zrc_utils::span::{Span, Spannable};
 
@@ -69,7 +71,14 @@ pub fn type_expr_equality<'input>(
                     resolved_lhs.inferred_type.to_string(),
                     resolved_rhs.inferred_type.to_string(),
                 )
-                .error_in(expr_span));
+                .error_in(expr_span)
+                .with_label(GenericLabel::error(
+                    LabelKind::EqualityOperators(
+                        resolved_lhs.inferred_type.to_string(),
+                        resolved_rhs.inferred_type.to_string(),
+                    )
+                    .in_span(expr_span),
+                )));
             }
         } else if let (TastType::Ptr(_), TastType::Ptr(_)) =
             (&lhs_t.inferred_type, &rhs_t.inferred_type)
@@ -84,7 +93,14 @@ pub fn type_expr_equality<'input>(
                 lhs_t.inferred_type.to_string(),
                 rhs_t.inferred_type.to_string(),
             )
-            .error_in(expr_span));
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::EqualityOperators(
+                    lhs_t.inferred_type.to_string(),
+                    rhs_t.inferred_type.to_string(),
+                )
+                .in_span(expr_span),
+            )));
         };
 
     Ok(TypedExpr {
@@ -119,7 +135,14 @@ pub fn type_expr_binary_bitwise<'input>(
             final_lhs.inferred_type.to_string(),
             final_rhs.inferred_type.to_string(),
         )
-        .error_in(expr_span));
+        .error_in(expr_span)
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedSameType(
+                final_lhs.inferred_type.to_string(),
+                final_rhs.inferred_type.to_string(),
+            )
+            .in_span(expr_span),
+        )));
     }
 
     Ok(TypedExpr {
@@ -154,7 +177,14 @@ pub fn type_expr_comparison<'input>(
             final_lhs.inferred_type.to_string(),
             final_rhs.inferred_type.to_string(),
         )
-        .error_in(expr_span));
+        .error_in(expr_span)
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedSameType(
+                final_lhs.inferred_type.to_string(),
+                final_rhs.inferred_type.to_string(),
+            )
+            .in_span(expr_span),
+        )));
     }
 
     Ok(TypedExpr {
@@ -184,7 +214,11 @@ pub fn type_expr_arithmetic<'input>(
         ) {
             return Err(
                 DiagnosticKind::InvalidPointerArithmeticOperation(op.to_string())
-                    .error_in(lhs_span),
+                    .error_in(lhs_span)
+                    .with_label(GenericLabel::error(
+                        LabelKind::InvalidPointerArithmeticOperation(op.to_string())
+                            .in_span(lhs_span),
+                    )),
             );
         }
 
@@ -199,7 +233,16 @@ pub fn type_expr_arithmetic<'input>(
                 expected: "usize".to_string(),
                 got: rhs_t.inferred_type.to_string(),
             }
-            .error_in(rhs_t.kind.span()));
+            .error_in(rhs_t.kind.span())
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedGot {
+                    expected: "usize".to_string(),
+                    got: rhs_t.inferred_type.to_string(),
+                }
+                .in_span(rhs_t.kind.span()),
+            ))
+            .with_note(NoteKind::PointerArithmeticRequiresUsize)
+            .with_help(HelpKind::ConsiderCasting("usize".to_string())));
         };
 
         Ok(TypedExpr {
@@ -220,7 +263,14 @@ pub fn type_expr_arithmetic<'input>(
                 final_lhs.inferred_type.to_string(),
                 final_rhs.inferred_type.to_string(),
             )
-            .error_in(expr_span));
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedSameType(
+                    final_lhs.inferred_type.to_string(),
+                    final_rhs.inferred_type.to_string(),
+                )
+                .in_span(expr_span),
+            )));
         }
 
         Ok(TypedExpr {

@@ -1,16 +1,16 @@
 //! for types
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, NoteKind, diagnostic::GenericLabel};
 use zrc_parser::ast::{
     stmt::ArgumentDeclarationList as AstADL,
     ty::{KeyTypeMapping, Type as ParserType, TypeKind as ParserTypeKind},
 };
 use zrc_utils::{
     ordered_fields::OrderedFields,
-    span::{Span, Spanned},
+    span::{Span, Spannable, Spanned},
 };
 
-use super::scope::TypeCtx;
+use super::scope::Scope;
 use crate::tast::{
     stmt::{ArgumentDeclaration, ArgumentDeclarationList},
     ty::{Fn, OrderedTypeFields, Type as TastType},
@@ -22,30 +22,40 @@ use crate::tast::{
 /// Errors if the identifier is not found in the type scope or a key is
 /// double-defined.
 pub fn resolve_type<'input>(
-    type_scope: &TypeCtx<'input>,
+    scope: &Scope<'input>,
     ty: ParserType<'input>,
 ) -> Result<TastType<'input>, Diagnostic> {
     let span = ty.0.span();
     Ok(match ty.0.into_value() {
         ParserTypeKind::Identifier(x) => {
-            if let Some(ty) = type_scope.resolve(x) {
+            if let Some(ty) = scope.types.resolve(x) {
                 ty.clone()
             } else {
-                return Err(DiagnosticKind::UnableToResolveType(x.to_string()).error_in(span));
+                let base = DiagnosticKind::UnableToResolveType(x.to_string())
+                    .error_in(span)
+                    .with_label(GenericLabel::error(
+                        LabelKind::UnableToResolveType(x.to_string()).in_span(span),
+                    ));
+
+                if scope.values.resolve(x).is_some() {
+                    return Err(base.with_note(NoteKind::VariableExists(x.to_string())));
+                }
+
+                return Err(base);
             }
         }
         ParserTypeKind::Ptr(pointee_ty) => {
-            TastType::Ptr(Box::new(resolve_type(type_scope, *pointee_ty)?))
+            TastType::Ptr(Box::new(resolve_type(scope, *pointee_ty)?))
         }
         ParserTypeKind::Array { size, element_type } => TastType::Array {
             size,
-            element_type: Box::new(resolve_type(type_scope, *element_type)?),
+            element_type: Box::new(resolve_type(scope, *element_type)?),
         },
         ParserTypeKind::Struct(members) => {
-            TastType::Struct(resolve_key_type_mapping(type_scope, members)?)
+            TastType::Struct(resolve_key_type_mapping(scope, members)?)
         }
         ParserTypeKind::Union(members) => {
-            TastType::Union(resolve_key_type_mapping(type_scope, members)?)
+            TastType::Union(resolve_key_type_mapping(scope, members)?)
         }
         ParserTypeKind::Enum(members) => {
             // Desugar an enum into its represented internal struct
@@ -53,7 +63,7 @@ pub fn resolve_type<'input>(
                 ("__discriminant__", TastType::Usize),
                 (
                     "__value__",
-                    (TastType::Union(resolve_key_type_mapping(type_scope, members)?)),
+                    (TastType::Union(resolve_key_type_mapping(scope, members)?)),
                 ),
             ]))
         }
@@ -70,7 +80,7 @@ pub fn resolve_type<'input>(
                         Ok(ArgumentDeclaration {
                             name: param.value().name,
                             ty: param
-                                .map(|param| resolve_type(type_scope, param.ty))
+                                .map(|param| resolve_type(scope, param.ty))
                                 .transpose()
                                 .map_err(Spanned::into_value)?,
                         })
@@ -83,7 +93,7 @@ pub fn resolve_type<'input>(
                 ArgumentDeclarationList::NonVariadic(*parameters)
             };
 
-            let returns = Box::new(resolve_type(type_scope, *return_type)?);
+            let returns = Box::new(resolve_type(scope, *return_type)?);
 
             TastType::Fn(Fn {
                 arguments: parameters,
@@ -122,7 +132,7 @@ pub fn resolve_type<'input>(
 /// // Result: Struct { "value": I32, "next": Ptr(Opaque("Node")) }
 /// ```
 fn resolve_type_with_opaque<'input>(
-    type_scope: &TypeCtx<'input>,
+    scope: &Scope<'input>,
     ty: ParserType<'input>,
     opaque_name: &'input str,
 ) -> Result<TastType<'input>, Diagnostic> {
@@ -131,32 +141,37 @@ fn resolve_type_with_opaque<'input>(
         ParserTypeKind::Identifier(x) => {
             if x == opaque_name {
                 TastType::Opaque(x)
-            } else if let Some(ty) = type_scope.resolve(x) {
+            } else if let Some(ty) = scope.types.resolve(x) {
                 ty.clone()
             } else {
-                return Err(DiagnosticKind::UnableToResolveType(x.to_string()).error_in(span));
+                let base = DiagnosticKind::UnableToResolveType(x.to_string())
+                    .error_in(span)
+                    .with_label(GenericLabel::error(
+                        LabelKind::UnableToResolveType(x.to_string()).in_span(span),
+                    ));
+                if scope.values.resolve(x).is_some() {
+                    return Err(base.with_note(NoteKind::VariableExists(x.to_string())));
+                }
+
+                return Err(base);
             }
         }
         ParserTypeKind::Ptr(pointee_ty) => TastType::Ptr(Box::new(resolve_type_with_opaque(
-            type_scope,
+            scope,
             *pointee_ty,
             opaque_name,
         )?)),
         ParserTypeKind::Array { size, element_type } => TastType::Array {
             size,
-            element_type: Box::new(resolve_type_with_opaque(
-                type_scope,
-                *element_type,
-                opaque_name,
-            )?),
+            element_type: Box::new(resolve_type_with_opaque(scope, *element_type, opaque_name)?),
         },
         ParserTypeKind::Struct(members) => TastType::Struct(resolve_key_type_mapping_with_opaque(
-            type_scope,
+            scope,
             members,
             opaque_name,
         )?),
         ParserTypeKind::Union(members) => TastType::Union(resolve_key_type_mapping_with_opaque(
-            type_scope,
+            scope,
             members,
             opaque_name,
         )?),
@@ -167,7 +182,7 @@ fn resolve_type_with_opaque<'input>(
                 (
                     "__value__",
                     (TastType::Union(resolve_key_type_mapping_with_opaque(
-                        type_scope,
+                        scope,
                         members,
                         opaque_name,
                     )?)),
@@ -187,9 +202,7 @@ fn resolve_type_with_opaque<'input>(
                         Ok(ArgumentDeclaration {
                             name: param.value().name,
                             ty: param
-                                .map(|param| {
-                                    resolve_type_with_opaque(type_scope, param.ty, opaque_name)
-                                })
+                                .map(|param| resolve_type_with_opaque(scope, param.ty, opaque_name))
                                 .transpose()
                                 .map_err(Spanned::into_value)?,
                         })
@@ -202,11 +215,7 @@ fn resolve_type_with_opaque<'input>(
                 ArgumentDeclarationList::NonVariadic(*parameters)
             };
 
-            let returns = Box::new(resolve_type_with_opaque(
-                type_scope,
-                *return_type,
-                opaque_name,
-            )?);
+            let returns = Box::new(resolve_type_with_opaque(scope, *return_type, opaque_name)?);
 
             TastType::Fn(Fn {
                 arguments: parameters,
@@ -231,7 +240,11 @@ fn check_opaque_behind_pointer<'input>(
     match ty {
         TastType::Opaque(name) if *name == opaque_name => Err(
             DiagnosticKind::SelfReferentialTypeNotBehindPointer((*name).to_string())
-                .error_in(ty_span),
+                .error_in(ty_span)
+                .with_label(GenericLabel::error(
+                    LabelKind::SelfReferentialTypeNotBehindPointer((*name).to_string())
+                        .in_span(ty_span),
+                )),
         ),
         TastType::Ptr(_) => {
             // Anything behind a pointer is OK, even opaque types
@@ -258,11 +271,11 @@ fn check_opaque_behind_pointer<'input>(
 /// Errors if the type contains self-references not behind pointers or other
 /// type resolution errors.
 pub fn resolve_type_with_self_reference<'input>(
-    type_scope: &TypeCtx<'input>,
+    scope: &Scope<'input>,
     ty: ParserType<'input>,
     self_name: &'input str,
 ) -> Result<TastType<'input>, Diagnostic> {
-    let resolved = resolve_type_with_opaque(type_scope, ty, self_name)?;
+    let resolved = resolve_type_with_opaque(scope, ty, self_name)?;
     // Note: validation happens during resolve_key_type_mapping_with_opaque for
     // struct/union members
     Ok(replace_opaque_with_concrete(resolved, self_name))
@@ -321,7 +334,7 @@ fn replace_opaque_with_concrete<'input>(
 /// # Errors
 /// Errors if a key is not unique or is unresolvable.
 pub(super) fn resolve_key_type_mapping<'input>(
-    type_scope: &TypeCtx<'input>,
+    scope: &Scope<'input>,
     members: KeyTypeMapping<'input>,
 ) -> Result<OrderedTypeFields<'input>, Diagnostic> {
     let mut fields = OrderedFields::new();
@@ -331,10 +344,15 @@ pub(super) fn resolve_key_type_mapping<'input>(
 
         if fields.contains_key(key.value()) {
             return Err(
-                DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
+                DiagnosticKind::DuplicateStructMember(key.into_value().to_string())
+                    .error_in(span)
+                    .with_label(GenericLabel::error(
+                        LabelKind::DuplicateStructMember(key.into_value().to_string())
+                            .in_span(span),
+                    )),
             );
         }
-        fields.insert(key.value(), resolve_type(type_scope, ast_type)?);
+        fields.insert(key.value(), resolve_type(scope, ast_type)?);
     }
     Ok(fields)
 }
@@ -347,7 +365,7 @@ pub(super) fn resolve_key_type_mapping<'input>(
 /// Errors if a key is not unique, is unresolvable, or contains a
 /// self-referential type not behind a pointer.
 fn resolve_key_type_mapping_with_opaque<'input>(
-    type_scope: &TypeCtx<'input>,
+    scope: &Scope<'input>,
     members: KeyTypeMapping<'input>,
     opaque_name: &'input str,
 ) -> Result<OrderedTypeFields<'input>, Diagnostic> {
@@ -358,10 +376,15 @@ fn resolve_key_type_mapping_with_opaque<'input>(
 
         if fields.contains_key(key.value()) {
             return Err(
-                DiagnosticKind::DuplicateStructMember(key.into_value().to_string()).error_in(span),
+                DiagnosticKind::DuplicateStructMember(key.into_value().to_string())
+                    .error_in(span)
+                    .with_label(GenericLabel::error(
+                        LabelKind::DuplicateStructMember(key.into_value().to_string())
+                            .in_span(span),
+                    )),
             );
         }
-        let resolved_type = resolve_type_with_opaque(type_scope, ast_type, opaque_name)?;
+        let resolved_type = resolve_type_with_opaque(scope, ast_type, opaque_name)?;
         // Check this specific field for invalid opaque references
         check_opaque_behind_pointer(&resolved_type, opaque_name, span)?;
         fields.insert(key.value(), resolved_type);
@@ -371,16 +394,19 @@ fn resolve_key_type_mapping_with_opaque<'input>(
 
 #[cfg(test)]
 mod tests {
-    use zrc_diagnostics::Severity;
     use zrc_utils::{span::Span, spanned_test};
 
     use super::*;
+    use crate::typeck::GlobalScope;
 
     #[test]
     fn pointers_and_identifiers_resolve_as_expected() {
+        let mut gs = GlobalScope::new();
+        gs.types.insert("i32", TastType::I32);
+
         assert_eq!(
             resolve_type(
-                &TypeCtx::from([("i32", TastType::I32)]),
+                &gs.create_subscope(),
                 ParserType::build_ptr(
                     Span::from_positions_and_file(0, 4, "<test>"),
                     ParserType::build_ident(spanned_test!(1, "i32", 4)),
@@ -392,24 +418,33 @@ mod tests {
 
     #[test]
     fn invalid_types_produce_error() {
+        let gs = GlobalScope::new_empty();
+
         assert_eq!(
             resolve_type(
-                &TypeCtx::new_empty(),
+                &gs.create_subscope(),
                 ParserType::build_ident(spanned_test!(0, "x", 1))
             ),
-            Err(Diagnostic(
-                Severity::Error,
-                spanned_test!(0, DiagnosticKind::UnableToResolveType("x".to_string()), 1)
+            Err(Diagnostic::error(spanned_test!(
+                0,
+                DiagnosticKind::UnableToResolveType("x".to_string()),
+                1
             ))
+            .with_label(GenericLabel::error(spanned_test!(
+                0,
+                LabelKind::UnableToResolveType("x".to_string()),
+                1
+            ))))
         );
     }
 
     #[test]
     fn structs_resolve_as_expected() {
+        let gs = GlobalScope::new();
         // struct { x: i32, y: i32 }
         assert_eq!(
             resolve_type(
-                &TypeCtx::default(),
+                &gs.create_subscope(),
                 ParserType(spanned_test!(
                     0,
                     ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
@@ -454,10 +489,11 @@ mod tests {
 
     #[test]
     fn enums_resolve_as_expected() {
+        let gs = GlobalScope::new();
         // enum { Eight: i8, Sixteen: i16 }
         assert_eq!(
             resolve_type(
-                &TypeCtx::default(),
+                &gs.create_subscope(),
                 ParserType(spanned_test!(
                     0,
                     ParserTypeKind::Enum(KeyTypeMapping(spanned_test!(
@@ -508,10 +544,11 @@ mod tests {
 
     #[test]
     fn duplicate_keys_in_struct_causes_error() {
+        let gs = GlobalScope::new();
         // struct { x: i32, x: i32 }
         assert_eq!(
             resolve_type(
-                &TypeCtx::default(),
+                &gs.create_subscope(),
                 ParserType::build_struct_from_contents(
                     Span::from_positions_and_file(0, 25, "<test>"),
                     KeyTypeMapping(spanned_test!(
@@ -546,23 +583,26 @@ mod tests {
                     )),
                 )
             ),
-            Err(Diagnostic(
-                Severity::Error,
-                spanned_test!(
-                    17,
-                    DiagnosticKind::DuplicateStructMember("x".to_string()),
-                    23
-                )
+            Err(Diagnostic::error(spanned_test!(
+                17,
+                DiagnosticKind::DuplicateStructMember("x".to_string()),
+                23
             ))
+            .with_label(GenericLabel::error(spanned_test!(
+                17,
+                LabelKind::DuplicateStructMember("x".to_string()),
+                23
+            ))))
         );
     }
 
     #[test]
     fn self_referential_type_behind_pointer_resolves_correctly() {
+        let gs = GlobalScope::new();
         // struct { value: i32, next: *Node }
         // where Node is the name being defined
         let result = resolve_type_with_self_reference(
-            &TypeCtx::default(),
+            &gs.create_subscope(),
             ParserType(spanned_test!(
                 0,
                 ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
@@ -621,10 +661,11 @@ mod tests {
 
     #[test]
     fn self_referential_type_not_behind_pointer_produces_error() {
+        let gs = GlobalScope::new();
         // struct { value: i32, next: Node }
         // where Node is the name being defined (ERROR: not behind pointer)
         let result = resolve_type_with_self_reference(
-            &TypeCtx::default(),
+            &gs.create_subscope(),
             ParserType(spanned_test!(
                 0,
                 ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
@@ -666,23 +707,26 @@ mod tests {
         let err = result.expect_err("should produce error");
         assert_eq!(
             err,
-            Diagnostic(
-                Severity::Error,
-                spanned_test!(
-                    21,
-                    DiagnosticKind::SelfReferentialTypeNotBehindPointer("Node".to_string()),
-                    31
-                )
-            )
+            Diagnostic::error(spanned_test!(
+                21,
+                DiagnosticKind::SelfReferentialTypeNotBehindPointer("Node".to_string()),
+                31
+            ))
+            .with_label(GenericLabel::error(spanned_test!(
+                21,
+                LabelKind::SelfReferentialTypeNotBehindPointer("Node".to_string()),
+                31
+            )))
         );
     }
 
     #[test]
     fn nested_self_referential_type_works() {
+        let gs = GlobalScope::new();
         // struct { data: i32, children: *struct { item: *Node, next: *Node } }
         // where Node is the name being defined
         let result = resolve_type_with_self_reference(
-            &TypeCtx::default(),
+            &gs.create_subscope(),
             ParserType(spanned_test!(
                 0,
                 ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(

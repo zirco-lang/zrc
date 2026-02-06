@@ -1,6 +1,8 @@
 //! Process function declarations
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpannedExt};
+use zrc_diagnostics::{
+    Diagnostic, DiagnosticKind, LabelKind, SpannedExt, diagnostic::GenericLabel,
+};
 use zrc_parser::ast::{
     stmt::{ArgumentDeclarationList, Stmt},
     ty::Type,
@@ -24,7 +26,7 @@ use crate::{
 /// This does not typecheck the function body; it only inserts the function
 /// into the global value and declaration tables so other declarations can
 /// resolve it during registration.
-#[expect(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value, clippy::too_many_lines)]
 pub fn register_function_declaration<'input>(
     global_scope: &mut GlobalScope<'input>,
     name: Spanned<&'input str>,
@@ -34,7 +36,7 @@ pub fn register_function_declaration<'input>(
 ) -> Result<(), Diagnostic> {
     let resolved_return_type = return_type
         .clone()
-        .map(|ty| resolve_type(&global_scope.types, ty))
+        .map(|ty| resolve_type(&global_scope.create_subscope(), ty))
         .transpose()?
         .unwrap_or_else(TastType::unit);
 
@@ -46,8 +48,11 @@ pub fn register_function_declaration<'input>(
         .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
             Ok(TastArgumentDeclaration {
                 name: parameter.value().name,
-                ty: resolve_type(&global_scope.types, parameter.value().ty.clone())?
-                    .in_span(parameter.span()),
+                ty: resolve_type(
+                    &global_scope.create_subscope(),
+                    parameter.value().ty.clone(),
+                )?
+                .in_span(parameter.span()),
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;
@@ -74,23 +79,39 @@ pub fn register_function_declaration<'input>(
                     .expect("global_scope.declarations was not populated with function properly");
 
                 if !canonical.fn_type.types_equal(&fn_type) {
-                    return Err(name.error(|_| {
-                        DiagnosticKind::ConflictingFunctionDeclarations(
-                            canonical.fn_type.to_string(),
-                            fn_type.to_string(),
-                        )
-                    }));
+                    return Err(name
+                        .error(|_| {
+                            DiagnosticKind::ConflictingFunctionDeclarations(
+                                canonical.fn_type.to_string(),
+                                fn_type.to_string(),
+                            )
+                        })
+                        .with_label(GenericLabel::error(
+                            LabelKind::ConflictingFunctionDeclarations(
+                                canonical.fn_type.to_string(),
+                                fn_type.to_string(),
+                            )
+                            .in_span(name.span()),
+                        )));
                 }
 
                 if body.is_some() && canonical.has_implementation {
-                    return Err(name.error(|name| {
-                        DiagnosticKind::ConflictingImplementations(name.to_string())
-                    }));
+                    return Err(name
+                        .error(|name| DiagnosticKind::ConflictingImplementations(name.to_string()))
+                        .with_label(GenericLabel::error(
+                            LabelKind::ConflictingImplementations(name.to_string())
+                                .in_span(name.span()),
+                        )));
                 }
 
                 canonical.has_implementation
             } else {
-                return Err(name.error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string())));
+                return Err(name
+                    .error(|x| DiagnosticKind::IdentifierAlreadyInUse(x.to_string()))
+                    .with_label(GenericLabel::error(
+                        LabelKind::IdentifierAlreadyInUse(name.value().to_string())
+                            .in_span(name.span()),
+                    )));
             }
         } else {
             false
@@ -111,18 +132,27 @@ pub fn register_function_declaration<'input>(
 
     if *name.value() == "main" {
         if resolved_return_type != TastType::I32 {
-            return Err(name.error(|_| {
-                DiagnosticKind::MainFunctionMustReturnI32(resolved_return_type.to_string())
-            }));
+            return Err(name
+                .error(|_| {
+                    DiagnosticKind::MainFunctionMustReturnI32(resolved_return_type.to_string())
+                })
+                .with_label(GenericLabel::error(
+                    LabelKind::MainFunctionMustReturnI32(resolved_return_type.to_string())
+                        .in_span(name.span()),
+                )));
         }
 
         match &parameters.value() {
             ArgumentDeclarationList::NonVariadic(params) if params.is_empty() => {}
             ArgumentDeclarationList::NonVariadic(params) if params.len() == 2 => {
-                let first_param_type =
-                    resolve_type(&global_scope.types, params[0].value().ty.clone())?;
-                let second_param_type =
-                    resolve_type(&global_scope.types, params[1].value().ty.clone())?;
+                let first_param_type = resolve_type(
+                    &global_scope.create_subscope(),
+                    params[0].value().ty.clone(),
+                )?;
+                let second_param_type = resolve_type(
+                    &global_scope.create_subscope(),
+                    params[1].value().ty.clone(),
+                )?;
 
                 if first_param_type != TastType::Usize
                     || second_param_type
@@ -130,14 +160,26 @@ pub fn register_function_declaration<'input>(
                         .map(tast::ty::Type::into_pointee)
                         != Some(Some(TastType::U8))
                 {
-                    return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
+                    return Err(name
+                        .error(|_| DiagnosticKind::MainFunctionInvalidParameters)
+                        .with_label(GenericLabel::error(
+                            LabelKind::MainFunctionInvalidParameters.in_span(name.span()),
+                        )));
                 }
             }
             ArgumentDeclarationList::NonVariadic(_) => {
-                return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
+                return Err(name
+                    .error(|_| DiagnosticKind::MainFunctionInvalidParameters)
+                    .with_label(GenericLabel::error(
+                        LabelKind::MainFunctionInvalidParameters.in_span(name.span()),
+                    )));
             }
             ArgumentDeclarationList::Variadic(_) => {
-                return Err(name.error(|_| DiagnosticKind::MainFunctionInvalidParameters));
+                return Err(name
+                    .error(|_| DiagnosticKind::MainFunctionInvalidParameters)
+                    .with_label(GenericLabel::error(
+                        LabelKind::MainFunctionInvalidParameters.in_span(name.span()),
+                    )));
             }
         }
     }
@@ -158,7 +200,7 @@ pub fn finalize_function_declaration<'input>(
 ) -> Result<Option<TypedDeclaration<'input>>, Diagnostic> {
     let resolved_return_type = return_type
         .clone()
-        .map(|ty| resolve_type(&global_scope.types, ty))
+        .map(|ty| resolve_type(&global_scope.create_subscope(), ty))
         .transpose()?
         .unwrap_or_else(TastType::unit);
 
@@ -170,8 +212,11 @@ pub fn finalize_function_declaration<'input>(
         .map(|parameter| -> Result<TastArgumentDeclaration, Diagnostic> {
             Ok(TastArgumentDeclaration {
                 name: parameter.value().name,
-                ty: resolve_type(&global_scope.types, parameter.value().ty.clone())?
-                    .in_span(parameter.span()),
+                ty: resolve_type(
+                    &global_scope.create_subscope(),
+                    parameter.value().ty.clone(),
+                )?
+                .in_span(parameter.span()),
             })
         })
         .collect::<Result<Vec<_>, Diagnostic>>()?;

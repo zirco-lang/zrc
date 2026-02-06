@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, diagnostic::GenericLabel};
 use zrc_parser::ast::{
     expr::{Expr, ExprKind},
     stmt::{LetDeclaration, MatchCase, Stmt, StmtKind, SwitchCase, SwitchTrigger},
@@ -40,11 +40,19 @@ pub fn type_switch_case<'input>(
     // The last entry in over MUST be the default case
     let maybe_default_case = cases.pop();
     let Some(maybe_default_case) = maybe_default_case else {
-        return Err(DiagnosticKind::SwitchCaseMissingTerminalDefault.error_in(stmt_span));
+        return Err(DiagnosticKind::SwitchCaseMissingTerminalDefault
+            .error_in(stmt_span)
+            .with_label(GenericLabel::error(
+                LabelKind::SwitchCaseMissingTerminalDefault.in_span(stmt_span),
+            )));
     };
 
     let SwitchCase(SwitchTrigger::Default, default_stmt) = maybe_default_case.value() else {
-        return Err(DiagnosticKind::SwitchCaseMissingTerminalDefault.error_in(stmt_span));
+        return Err(DiagnosticKind::SwitchCaseMissingTerminalDefault
+            .error_in(stmt_span)
+            .with_label(GenericLabel::error(
+                LabelKind::SwitchCaseMissingTerminalDefault.in_span(maybe_default_case.span()),
+            )));
     };
 
     let default_block = type_block(
@@ -63,7 +71,11 @@ pub fn type_switch_case<'input>(
             .map(move |x| x.into_value().0)
             .collect::<Vec<_>>()),
     ) {
-        return Err(DiagnosticKind::MultipleCases.error_in(stmt_span));
+        return Err(DiagnosticKind::MultipleCases
+            .error_in(stmt_span)
+            .with_label(GenericLabel::error(
+                LabelKind::MultipleCases.in_span(stmt_span),
+            )));
     }
 
     let cases = cases
@@ -93,7 +105,14 @@ pub fn type_switch_case<'input>(
                     scrutinee_ty.to_string(),
                     trigger.inferred_type.to_string(),
                 )
-                .error_in(trigger.kind.span()));
+                .error_in(trigger.kind.span())
+                .with_label(GenericLabel::error(
+                    LabelKind::ExpectedSameType(
+                        scrutinee_ty.to_string(),
+                        trigger.inferred_type.to_string(),
+                    )
+                    .in_span(trigger.kind.span()),
+                )));
             };
 
             let exec_block = type_block(
@@ -202,16 +221,28 @@ pub fn type_match<'input>(
             union_def
         } else {
             return Err(DiagnosticKind::MatchOnNonEnum(scrutinee_ty.to_string())
-                .error_in(t_scrutinee.kind.span()));
+                .error_in(t_scrutinee.kind.span())
+                .with_label(GenericLabel::error(
+                    LabelKind::MatchOnNonEnum(scrutinee_ty.to_string())
+                        .in_span(t_scrutinee.kind.span()),
+                )));
         }
     } else {
         return Err(DiagnosticKind::MatchOnNonEnum(scrutinee_ty.to_string())
-            .error_in(t_scrutinee.kind.span()));
+            .error_in(t_scrutinee.kind.span())
+            .with_label(GenericLabel::error(
+                LabelKind::MatchOnNonEnum(scrutinee_ty.to_string())
+                    .in_span(t_scrutinee.kind.span()),
+            )));
     };
 
     // * There must be exactly one case per variant of the enum
     if enum_as_union_def.len() != cases.len() {
-        return Err(DiagnosticKind::MatchCaseCountMismatch.error_in(stmt_span));
+        return Err(DiagnosticKind::MatchCaseCountMismatch
+            .error_in(stmt_span)
+            .with_label(GenericLabel::error(
+                LabelKind::MatchCaseCountMismatch.in_span(stmt_span),
+            )));
     }
 
     // Ensure each enum variant is covered by exactly one case
@@ -235,7 +266,11 @@ pub fn type_match<'input>(
         .map(|(name, _)| *name)
         .ne(sorted_case_variants.iter().copied())
     {
-        return Err(DiagnosticKind::NonExhaustiveMatchCases.error_in(stmt_span));
+        return Err(DiagnosticKind::NonExhaustiveMatchCases
+            .error_in(stmt_span)
+            .with_label(GenericLabel::error(
+                LabelKind::NonExhaustiveMatchCases.in_span(stmt_span),
+            )));
     }
 
     // Create discriminant mapping using ALPHABETICAL ORDER
@@ -372,7 +407,6 @@ pub fn type_match<'input>(
 
 #[cfg(test)]
 mod tests {
-    use zrc_diagnostics::Severity;
     use zrc_utils::spanned_test;
 
     use super::*;
@@ -400,14 +434,16 @@ mod tests {
 
         assert_eq!(
             diagnostic,
-            Diagnostic(
-                Severity::Error,
-                spanned_test!(
-                    20,
-                    DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string()),
-                    27
-                )
-            )
+            Diagnostic::error(spanned_test!(
+                20,
+                DiagnosticKind::ExpectedSameType("i32".to_string(), "i8".to_string()),
+                27
+            ))
+            .with_label(GenericLabel::error(spanned_test!(
+                20,
+                LabelKind::ExpectedSameType("i32".to_string(), "i8".to_string()),
+                27
+            )))
         );
     }
 }

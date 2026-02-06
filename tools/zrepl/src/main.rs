@@ -549,8 +549,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                         return Ok(Response::Accept);
                     };
 
-                    let resolved_ty =
-                        diag_wrapper(|| typeck::resolve_type(&gs.types, tys), Some(ty));
+                    let resolved_ty = diag_wrapper(
+                        || typeck::resolve_type(&gs.create_subscope(), tys),
+                        Some(ty),
+                    );
                     let Ok(resolved_ty) = resolved_ty else {
                         return Ok(Response::Accept);
                     };

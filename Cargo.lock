@@ -445,6 +445,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "itoa"
+version = "1.0.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
+
+[[package]]
 name = "keccak"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -823,6 +829,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_json"
+version = "1.0.149"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+dependencies = [
+ "itoa",
+ "memchr",
+ "serde",
+ "serde_core",
+ "zmij",
+]
+
+[[package]]
 name = "sha3"
 version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1167,7 +1186,6 @@ name = "zircop"
 version = "0.1.0"
 dependencies = [
  "clap",
- "derive_more",
  "indoc",
  "thiserror",
  "zrc_buildinfo",
@@ -1177,6 +1195,12 @@ dependencies = [
  "zrc_typeck",
  "zrc_utils",
 ]
+
+[[package]]
+name = "zmij"
+version = "1.0.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ff05f8caa9038894637571ae6b9e29466c1f4f829d26c9b28f869a29cbe3445"
 
 [[package]]
 name = "zrc"
@@ -1221,7 +1245,7 @@ name = "zrc_diagnostics"
 version = "0.1.0"
 dependencies = [
  "ariadne",
- "derive_more",
+ "serde_json",
  "thiserror",
  "zrc_utils",
 ]

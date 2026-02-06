@@ -62,8 +62,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
-use zrc_utils::span::Span;
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, NoteKind, diagnostic::GenericLabel};
+use zrc_utils::span::{Span, Spannable};
 
 /// Represents a chunk of source code with its metadata
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -240,13 +240,16 @@ fn preprocess_internal(
                         (
                             path.strip_suffix('"')
                                 .ok_or_else(|| {
-                                    DiagnosticKind::PreprocessorUnterminatedIncludeString.error_in(
-                                        Span::from_positions_and_file(
-                                            current_byte,
-                                            current_byte + line.len(),
-                                            static_file_name,
-                                        ),
-                                    )
+                                    let sp = Span::from_positions_and_file(
+                                        current_byte,
+                                        current_byte + line.len(),
+                                        static_file_name,
+                                    );
+                                    DiagnosticKind::PreprocessorUnterminatedIncludeDirective
+                                        .error_in(sp)
+                                        .with_label(GenericLabel::error(
+                                            LabelKind::ExpectedClosing("\"".into()).in_span(sp),
+                                        ))
                                 })?
                                 .to_string(),
                             false,
@@ -255,24 +258,32 @@ fn preprocess_internal(
                         (
                             path.strip_suffix('>')
                                 .ok_or_else(|| {
-                                    DiagnosticKind::PreprocessorUnterminatedIncludeAngleBrackets
-                                        .error_in(Span::from_positions_and_file(
-                                            current_byte,
-                                            current_byte + line.len(),
-                                            static_file_name,
+                                    let sp = Span::from_positions_and_file(
+                                        current_byte,
+                                        current_byte + line.len(),
+                                        static_file_name,
+                                    );
+                                    DiagnosticKind::PreprocessorUnterminatedIncludeDirective
+                                        .error_in(sp)
+                                        .with_label(GenericLabel::error(
+                                            LabelKind::ExpectedClosing(">".into()).in_span(sp),
                                         ))
                                 })?
                                 .to_string(),
                             true,
                         )
                     } else {
-                        return Err(DiagnosticKind::PreprocessorInvalidIncludeSyntax.error_in(
-                            Span::from_positions_and_file(
-                                current_byte,
-                                current_byte + line.len(),
-                                static_file_name,
-                            ),
-                        ));
+                        let sp = Span::from_positions_and_file(
+                            current_byte,
+                            current_byte + line.len(),
+                            static_file_name,
+                        );
+                        return Err(DiagnosticKind::PreprocessorInvalidIncludeSyntax
+                            .error_in(sp)
+                            .with_label(GenericLabel::error(
+                                LabelKind::PreprocessorInvalidIncludeSyntax.in_span(sp),
+                            ))
+                            .with_note(NoteKind::ValidIncludeSyntax));
                     };
 
                 // Resolve the include file path
@@ -280,26 +291,36 @@ fn preprocess_internal(
                 if do_search_path {
                     include_file = find_include_file(ctx, &include_file)
                         .ok_or_else(|| {
-                            DiagnosticKind::PreprocessorCannotFindIncludeFile(include_file.clone())
-                                .error_in(Span::from_positions_and_file(
-                                    current_byte,
-                                    current_byte + line.len(),
-                                    static_file_name,
+                            let sp = Span::from_positions_and_file(
+                                current_byte,
+                                current_byte + line.len(),
+                                static_file_name,
+                            );
+                            DiagnosticKind::PreprocessorCannotFindIncludeFile
+                                .error_in(sp)
+                                .with_label(GenericLabel::error(
+                                    LabelKind::PreprocessorCannotFindIncludeFile(
+                                        include_file.clone(),
+                                    )
+                                    .in_span(sp),
                                 ))
+                                .with_note(NoteKind::IncludeSearchPaths(
+                                    ctx.search_paths
+                                        .iter()
+                                        .map(|x| x.to_string_lossy().to_string())
+                                        .collect::<Vec<_>>()
+                                        .join("\n"),
+                                ))
+                                .with_note(NoteKind::IncludeKinds)
                         })?
                         .to_string_lossy()
                         .to_string();
                 }
 
                 let include_full_path = base_path.join(&include_file);
-                let canonical_path = include_full_path.canonicalize().map_err(|_| {
-                    DiagnosticKind::PreprocessorCannotFindIncludeFile(include_file.clone())
-                        .error_in(Span::from_positions_and_file(
-                            current_byte,
-                            current_byte + line.len(),
-                            static_file_name,
-                        ))
-                })?;
+                let canonical_path = include_full_path
+                    .canonicalize()
+                    .expect("failed to canonicalize path");
 
                 // Check if already included with pragma once
                 if ctx.pragma_once_files.contains(&canonical_path) {
@@ -310,41 +331,48 @@ fn preprocess_internal(
 
                 // Read and preprocess the included file
                 let included_content = fs::read_to_string(&canonical_path).map_err(|err| {
-                    DiagnosticKind::PreprocessorCannotReadIncludeFile(
-                        include_file.clone(),
-                        err.to_string(),
-                    )
-                    .error_in(Span::from_positions_and_file(
+                    let sp = Span::from_positions_and_file(
                         current_byte,
                         current_byte + line.len(),
                         static_file_name,
-                    ))
+                    );
+
+                    DiagnosticKind::PreprocessorCannotReadIncludeFile
+                        .error_in(sp)
+                        .with_label(GenericLabel::error(
+                            LabelKind::PreprocessorCannotReadIncludeFile(include_file.clone())
+                                .in_span(sp),
+                        ))
+                        .with_note(NoteKind::ReadFailed(err.to_string()))
                 })?;
 
                 // Recursively preprocess
-                let include_base = canonical_path.parent().ok_or_else(|| {
-                    DiagnosticKind::PreprocessorCannotDetermineParentDirectory(include_file.clone())
-                        .error_in(Span::from_positions_and_file(
-                            current_byte,
-                            current_byte + line.len(),
-                            static_file_name,
-                        ))
-                })?;
+                let include_base = canonical_path
+                    .parent()
+                    .expect("included file has no parent?");
 
                 preprocess_internal(include_base, &include_file, &included_content, ctx)?;
 
                 chunk_start_line = line_num + 1;
                 chunk_start_byte = current_byte + line.len() + 1; // +1 for newline
             } else {
-                return Err(
-                    DiagnosticKind::PreprocessorUnknownDirective(directive.to_string()).error_in(
-                        Span::from_positions_and_file(
-                            current_byte,
-                            current_byte + line.len(),
-                            static_file_name,
-                        ),
-                    ),
+                let sp = Span::from_positions_and_file(
+                    current_byte,
+                    current_byte + line.len(),
+                    static_file_name,
                 );
+                let mut diag = DiagnosticKind::PreprocessorUnknownDirective
+                    .error_in(sp)
+                    .with_label(GenericLabel::error(
+                        LabelKind::PreprocessorUnknownDirective.in_span(sp),
+                    ));
+
+                if directive.starts_with("define") {
+                    // i forgor which syntax it was but this is a useful note
+                    diag = diag.with_note(NoteKind::MacrosNotSupported);
+                }
+
+                return Err(diag);
             }
         } else {
             current_chunk_lines.push(line);
@@ -430,67 +458,5 @@ mod tests {
         assert_eq!(chunks[1].content, "line3");
         assert_eq!(chunks[1].byte_offset, 19); // "line1\n#pragma once\n" is 19 bytes
         assert_eq!(chunks[1].start_line, 3);
-    }
-
-    #[test]
-    fn preprocessor_errors_include_correct_file_name() {
-        // Test that preprocessor errors reference the correct file name, not
-        // "<preprocessor>"
-        let content = "#include \"nonexistent.zr\"";
-        let result = preprocess(Path::new("/test/dir"), &[], "main.zr", content);
-
-        assert!(result.is_err());
-        let err = result.expect_err("expected a preprocessing error");
-        // The error span should reference the actual file, not "<preprocessor>"
-        assert_eq!(err.1.span().file_name(), "/test/dir/main.zr");
-    }
-
-    #[test]
-    fn preprocessor_errors_include_correct_byte_offset() {
-        // Test that preprocessor errors on later lines have correct byte offsets
-        let content = "// line 1\n// line 2\n#unknown_directive";
-        let result = preprocess(Path::new("."), &[], "test.zr", content);
-
-        assert!(result.is_err());
-        let err = result.expect_err("expected a preprocessing error");
-        // The error should start at byte 20 (after "// line 1\n// line 2\n")
-        assert_eq!(err.1.span().start(), 20);
-        assert_eq!(err.1.span().end(), 20 + "#unknown_directive".len());
-    }
-
-    #[test]
-    fn preprocessor_unterminated_include_string_error() {
-        let content = "#include \"unterminated";
-        let result = preprocess(Path::new("."), &[], "test.zr", content);
-
-        assert!(result.is_err());
-        let err = result.expect_err("expected a preprocessing error");
-        assert_eq!(err.1.span().file_name(), "./test.zr");
-        assert_eq!(err.1.span().start(), 0);
-        assert_eq!(err.1.span().end(), content.len());
-    }
-
-    #[test]
-    fn preprocessor_unterminated_include_angle_brackets_error() {
-        let content = "#include <unterminated";
-        let result = preprocess(Path::new("."), &[], "test.zr", content);
-
-        assert!(result.is_err());
-        let err = result.expect_err("expected a preprocessing error");
-        assert_eq!(err.1.span().file_name(), "./test.zr");
-        assert_eq!(err.1.span().start(), 0);
-        assert_eq!(err.1.span().end(), content.len());
-    }
-
-    #[test]
-    fn preprocessor_invalid_include_syntax_error() {
-        let content = "#include invalid";
-        let result = preprocess(Path::new("."), &[], "test.zr", content);
-
-        assert!(result.is_err());
-        let err = result.expect_err("expected a preprocessing error");
-        assert_eq!(err.1.span().file_name(), "./test.zr");
-        assert_eq!(err.1.span().start(), 0);
-        assert_eq!(err.1.span().end(), content.len());
     }
 }

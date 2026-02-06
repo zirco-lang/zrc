@@ -1,6 +1,6 @@
 //! type checking for literal expressions
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, NoteKind, diagnostic::GenericLabel};
 use zrc_parser::{
     ast::{expr::Expr as AstExpr, ty::Type},
     lexer::{NumberLiteral, StringTok, ZrcString},
@@ -24,13 +24,17 @@ pub fn type_expr_number_literal<'input>(
     ty: Option<Type<'input>>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let ty_resolved = ty
-        .map(|ty| resolve_type(&scope.types, ty))
+        .map(|ty| resolve_type(scope, ty))
         .transpose()?
         .unwrap_or(TastType::Int);
 
     if !ty_resolved.is_integer() {
         return Err(
-            DiagnosticKind::InvalidNumberLiteralType(ty_resolved.to_string()).error_in(expr_span),
+            DiagnosticKind::InvalidNumberLiteralType(ty_resolved.to_string())
+                .error_in(expr_span)
+                .with_label(GenericLabel::error(
+                    LabelKind::InvalidNumberLiteralType(ty_resolved.to_string()).in_span(expr_span),
+                )),
         );
     }
 
@@ -81,7 +85,16 @@ pub fn type_expr_number_literal<'input>(
                 min.to_string(),
                 max.to_string(),
             )
-            .error_in(expr_span));
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::NumberLiteralOutOfBounds(
+                    n.to_string(),
+                    ty_resolved.to_string(),
+                    min.to_string(),
+                    max.to_string(),
+                )
+                .in_span(expr_span),
+            )));
         }
     }
 
@@ -122,7 +135,17 @@ pub fn type_expr_identifier<'input>(
     i: &'input str,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let ty_rc = scope.values.resolve_mut(i).ok_or_else(|| {
-        DiagnosticKind::UnableToResolveIdentifier(i.to_string()).error_in(expr_span)
+        let base = DiagnosticKind::UnableToResolveIdentifier(i.to_string())
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::UnableToResolveIdentifier(i.to_string()).in_span(expr_span),
+            ));
+
+        if scope.types.resolve(i).is_some() {
+            return base.with_note(NoteKind::TypeExists(i.to_string()));
+        }
+
+        base
     })?;
 
     // Mark as used by adding the reference span and clone the type to return. Use a
@@ -161,7 +184,11 @@ pub fn type_expr_array_literal<'input>(
     let elements_vec = elements.into_value();
 
     if elements_vec.is_empty() {
-        return Err(DiagnosticKind::EmptyArrayLiteral.error_in(expr_span));
+        return Err(DiagnosticKind::EmptyArrayLiteral
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::EmptyArrayLiteral.in_span(expr_span),
+            )));
     }
 
     let mut typed_elements = Vec::with_capacity(elements_vec.len());
@@ -186,7 +213,15 @@ pub fn type_expr_array_literal<'input>(
                 found: elem.inferred_type.to_string(),
                 index: idx,
             }
-            .error_in(elem.kind.span()));
+            .error_in(elem.kind.span())
+            .with_label(GenericLabel::error(
+                LabelKind::ArrayElementTypeMismatch {
+                    expected: element_type.to_string(),
+                    found: elem.inferred_type.to_string(),
+                    index: idx,
+                }
+                .in_span(elem.kind.span()),
+            )));
         }
         *elem = coerced_elem;
     }
@@ -279,7 +314,7 @@ mod tests {
         );
         if let Err(diagnostic) = result {
             assert!(matches!(
-                diagnostic.1.into_value(),
+                diagnostic.kind.into_value(),
                 DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
             ));
         } else {
@@ -295,7 +330,7 @@ mod tests {
         );
         if let Err(diagnostic) = result {
             assert!(matches!(
-                diagnostic.1.into_value(),
+                diagnostic.kind.into_value(),
                 DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
             ));
         } else {
@@ -344,7 +379,7 @@ mod tests {
         );
         if let Err(diagnostic) = result {
             assert!(matches!(
-                diagnostic.1.into_value(),
+                diagnostic.kind.into_value(),
                 DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
             ));
         } else {
@@ -371,7 +406,7 @@ mod tests {
         );
         if let Err(diagnostic) = result {
             assert!(matches!(
-                diagnostic.1.into_value(),
+                diagnostic.kind.into_value(),
                 DiagnosticKind::NumberLiteralOutOfBounds(_, _, _, _)
             ));
         } else {

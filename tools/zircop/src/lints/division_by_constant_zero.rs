@@ -4,6 +4,7 @@
 //! and raises a warning if it detects a division by a constant zero literal.
 //! Dividing by zero is undefined behavior and should be avoided.
 
+use zrc_diagnostics::diagnostic::GenericLabel;
 use zrc_parser::{ast::expr::Arithmetic, lexer::NumberLiteral};
 use zrc_typeck::tast::{
     expr::{TypedExpr, TypedExpr as TcExpr, TypedExprKind, TypedExprKind as TcExprKind},
@@ -12,7 +13,7 @@ use zrc_typeck::tast::{
 use zrc_utils::span::{Spannable, Spanned};
 
 use crate::{
-    diagnostic::{LintDiagnostic, LintDiagnosticKind},
+    diagnostic::{LintDiagnostic, LintDiagnosticKind, LintLabelKind, LintNoteKind},
     lint::Lint,
     visit::SemanticVisit,
 };
@@ -56,9 +57,13 @@ impl<'input> SemanticVisit<'input, '_> for Visit {
             && is_literal_zero(rhs.as_ref())
         {
             let span = expr.kind.span();
-            self.diagnostics.push(LintDiagnostic::new(
-                LintDiagnosticKind::DivisionByConstantZero.in_span(span),
-            ));
+            self.diagnostics.push(
+                LintDiagnostic::warning(LintDiagnosticKind::DivisionByConstantZero.in_span(span))
+                    .with_label(GenericLabel::warning(
+                        LintLabelKind::DivisionByConstantZero.in_span(span),
+                    ))
+                    .with_note(LintNoteKind::DivisionByConstantZero),
+            );
         }
     }
 }
@@ -109,13 +114,21 @@ mod tests {
             }
         "},
         diagnostics: vec![
-            LintDiagnostic::new(
+            LintDiagnostic::warning(
                 spanned_test!(
                     51,
                     LintDiagnosticKind::DivisionByConstantZero,
                     56
                 )
-            ),
+            )
+            .with_label(GenericLabel::warning(
+                spanned_test!(
+                    51,
+                    LintLabelKind::DivisionByConstantZero,
+                    56
+                )
+            ))
+            .with_note(LintNoteKind::DivisionByConstantZero),
         ]
     }
 
@@ -128,13 +141,21 @@ mod tests {
             }
         "},
         diagnostics: vec![
-            LintDiagnostic::new(
+            LintDiagnostic::warning(
                 spanned_test!(
                     51,
                     LintDiagnosticKind::DivisionByConstantZero,
                     58
                 )
-            ),
+            )
+            .with_label(GenericLabel::warning(
+                spanned_test!(
+                    51,
+                    LintLabelKind::DivisionByConstantZero,
+                    58
+                )
+            ))
+            .with_note(LintNoteKind::DivisionByConstantZero),
         ]
     }
 
@@ -147,13 +168,21 @@ mod tests {
             }
         "},
         diagnostics: vec![
-            LintDiagnostic::new(
+            LintDiagnostic::warning(
                 spanned_test!(
                     51,
                     LintDiagnosticKind::DivisionByConstantZero,
                     57
                 )
-            ),
+            )
+            .with_label(GenericLabel::warning(
+                spanned_test!(
+                    51,
+                    LintLabelKind::DivisionByConstantZero,
+                    57
+                )
+            ))
+            .with_note(LintNoteKind::DivisionByConstantZero),
         ]
     }
 

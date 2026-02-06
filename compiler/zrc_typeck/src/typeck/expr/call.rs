@@ -1,6 +1,6 @@
 //! type checking for call expressions
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, SpanExt};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, SpanExt, diagnostic::GenericLabel};
 use zrc_parser::ast::expr::Expr;
 use zrc_utils::span::{Span, Spannable, Spanned};
 
@@ -25,6 +25,7 @@ pub fn type_expr_call<'input>(
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let f_span = f.0.span();
     let ft = type_expr(scope, f)?;
+    let args_span = args.span();
     let args_t = args
         .value()
         .iter()
@@ -42,7 +43,21 @@ pub fn type_expr_call<'input>(
                     expected: arg_types.len().to_string(),
                     got: args_t.len().to_string(),
                 }
-                .error_in(expr_span));
+                .error_in(expr_span)
+                .with_label(GenericLabel::note(
+                    LabelKind::FunctionType(
+                        ft.inferred_type.to_string(),
+                        arg_types.len().to_string(),
+                    )
+                    .in_span(f_span),
+                ))
+                .with_label(GenericLabel::error(
+                    LabelKind::FunctionArgumentCountMismatch {
+                        expected: arg_types.len().to_string(),
+                        got: args_t.len().to_string(),
+                    }
+                    .in_span(args_span),
+                )));
             }
 
             for (i, (arg_type, arg_t)) in arg_types.iter().zip(args_t.iter()).enumerate() {
@@ -95,7 +110,21 @@ pub fn type_expr_call<'input>(
                     expected: format!("at least {}", beginning_arg_types.len()),
                     got: args_t.len().to_string(),
                 }
-                .error_in(expr_span));
+                .error_in(expr_span)
+                .with_label(GenericLabel::note(
+                    LabelKind::FunctionType(
+                        ft.inferred_type.to_string(),
+                        format!("at least {}", beginning_arg_types.len()),
+                    )
+                    .in_span(f_span),
+                ))
+                .with_label(GenericLabel::error(
+                    LabelKind::FunctionArgumentCountMismatch {
+                        expected: format!("at least {}", beginning_arg_types.len()),
+                        got: args_t.len().to_string(),
+                    }
+                    .in_span(args_span),
+                )));
             }
 
             for (i, (arg_type, arg_t)) in beginning_arg_types.iter().zip(args_t.iter()).enumerate()
@@ -141,7 +170,14 @@ pub fn type_expr_call<'input>(
             })
         }
         _ => Err(
-            DiagnosticKind::CannotCallNonFunction(ft.inferred_type.to_string()).error_in(expr_span),
+            DiagnosticKind::CannotCallNonFunction(ft.inferred_type.to_string())
+                .error_in(expr_span)
+                .with_label(GenericLabel::note(
+                    LabelKind::PlaceType(ft.inferred_type.to_string()).in_span(f_span),
+                ))
+                .with_label(GenericLabel::error(
+                    LabelKind::CannotCallNonFunction.in_span(args_span),
+                )),
         ),
     }
 }

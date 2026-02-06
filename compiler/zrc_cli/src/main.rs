@@ -67,7 +67,7 @@ use clap::Parser;
 use cli::Cli;
 use zrc::{codegen::DebugLevel, compile, utils::io};
 
-use crate::cli::FrontendOutputFormat;
+use crate::cli::{DiagFormat, FrontendOutputFormat};
 
 /// An error produced by the zrc CLI
 #[derive(Debug)]
@@ -136,7 +136,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match result {
         Err(diagnostic) => {
-            eprintln!("{}", diagnostic.print(Some(&source_content)));
+            if cli.diagnostic_format == DiagFormat::Json {
+                eprintln!("{}", diagnostic.print_json());
+            } else {
+                eprintln!("{}", diagnostic.print(Some(&source_content)));
+            }
             std::process::exit(1);
         }
         Ok(x) => {

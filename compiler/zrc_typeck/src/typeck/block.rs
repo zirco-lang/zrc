@@ -10,7 +10,7 @@ use std::fmt::Display;
 
 pub use block_utils::{coerce_stmt_into_block, has_duplicates};
 pub use cfa::{BlockReturnAbility, BlockReturnActuality};
-use zrc_diagnostics::{Diagnostic, DiagnosticKind, Severity};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, diagnostic::GenericLabel};
 use zrc_parser::ast::stmt::{Stmt, StmtKind};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
@@ -107,9 +107,11 @@ pub fn type_block<'input>(
                                 },
                                 BlockReturnActuality::NeverReturns,
                             ))),
-                            StmtKind::BreakStmt => {
-                                Err(DiagnosticKind::CannotUseBreakOutsideOfLoop.error_in(stmt_span))
-                            }
+                            StmtKind::BreakStmt => Err(DiagnosticKind::CannotUseBreakOutsideOfLoop
+                                .error_in(stmt_span)
+                                .with_label(GenericLabel::error(
+                                    LabelKind::CannotUseBreakOutsideOfLoop.in_span(stmt_span),
+                                ))),
 
                             StmtKind::ContinueStmt if can_use_break_continue => Ok(Some((
                                 TypedStmt {
@@ -120,7 +122,11 @@ pub fn type_block<'input>(
                             ))),
                             StmtKind::ContinueStmt => {
                                 Err(DiagnosticKind::CannotUseContinueOutsideOfLoop
-                                    .error_in(stmt_span))
+                                    .error_in(stmt_span)
+                                    .with_label(GenericLabel::error(
+                                        LabelKind::CannotUseContinueOutsideOfLoop
+                                            .in_span(stmt_span),
+                                    )))
                             }
 
                             StmtKind::SwitchCase { scrutinee, cases } => {
@@ -245,7 +251,11 @@ pub fn type_block<'input>(
                                 match (resolved_value, &return_ability) {
                                     // expects no return
                                     (_, BlockReturnAbility::MustNotReturn) => {
-                                        Err(DiagnosticKind::CannotReturnHere.error_in(stmt_span))
+                                        Err(DiagnosticKind::CannotReturnHere
+                                            .error_in(stmt_span)
+                                            .with_label(GenericLabel::error(
+                                                LabelKind::CannotReturnHere.in_span(stmt_span),
+                                            )))
                                     }
 
                                     // return x; in fn expecting to return x
@@ -262,13 +272,18 @@ pub fn type_block<'input>(
                                             // Try to coerce the return value to the expected type
                                             return_value.map(|val| try_coerce_to(val, return_ty))
                                         } else {
-                                            return Err(Diagnostic(
-                                                Severity::Error,
-                                                stmt_span.containing(DiagnosticKind::ExpectedGot {
+                                            return Err(DiagnosticKind::ReturnTypeMismatch {
+                                                expected: return_ty.to_string(),
+                                                got: inferred_return_type.to_string(),
+                                            }
+                                            .error_in(stmt_span)
+                                            .with_label(GenericLabel::error(
+                                                LabelKind::ExpectedGot {
                                                     expected: return_ty.to_string(),
                                                     got: inferred_return_type.to_string(),
-                                                }),
-                                            ));
+                                                }
+                                                .in_span(stmt_span),
+                                            )));
                                         };
 
                                         Ok(Some((
@@ -344,7 +359,11 @@ pub fn type_block<'input>(
         (
             BlockReturnAbility::MustReturn(_),
             BlockReturnActuality::SometimesReturns | BlockReturnActuality::NeverReturns,
-        ) => Err(DiagnosticKind::ExpectedABlockToReturn.error_in(input_block_span)),
+        ) => Err(DiagnosticKind::ExpectedABlockToReturn
+            .error_in(input_block_span)
+            .with_label(GenericLabel::error(
+                LabelKind::ExpectedABlockToReturn.in_span(input_block_span),
+            ))),
 
         (
             BlockReturnAbility::MustNotReturn,

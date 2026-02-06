@@ -1,6 +1,6 @@
 //! Type checking for if statements.
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, diagnostic::GenericLabel};
 use zrc_parser::ast::{expr::Expr, stmt::Stmt};
 use zrc_utils::span::{Span, Spannable};
 
@@ -42,7 +42,14 @@ pub fn type_if<'input>(
             expected: "bool".to_string(),
             got: typed_cond.inferred_type.to_string(),
         }
-        .error_in(cond_span));
+        .error_in(cond_span)
+        .with_label(GenericLabel::error(
+            LabelKind::ExpectedGot {
+                expected: "bool".to_string(),
+                got: typed_cond.inferred_type.to_string(),
+            }
+            .in_span(cond_span),
+        )));
     }
 
     let typed_then = type_block(

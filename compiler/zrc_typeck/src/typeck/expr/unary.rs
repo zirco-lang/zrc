@@ -1,6 +1,6 @@
 //! type checking for unary operators
 
-use zrc_diagnostics::{Diagnostic, DiagnosticKind};
+use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, diagnostic::GenericLabel};
 use zrc_parser::ast::expr::Expr;
 use zrc_utils::span::{Span, Spannable};
 
@@ -90,6 +90,7 @@ pub fn type_expr_unary_dereference<'input>(
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
+    let inner_span = x.0.span();
     let x_ty = type_expr(scope, x)?;
 
     if let TastType::Ptr(tt) = x_ty.inferred_type.clone() {
@@ -100,7 +101,13 @@ pub fn type_expr_unary_dereference<'input>(
     } else {
         Err(
             DiagnosticKind::CannotDereferenceNonPointer(x_ty.inferred_type.to_string())
-                .error_in(expr_span),
+                .error_in(expr_span)
+                .with_label(GenericLabel::note(
+                    LabelKind::PlaceType(x_ty.inferred_type.to_string()).in_span(inner_span),
+                ))
+                .with_label(GenericLabel::error(
+                    LabelKind::CannotDereferenceNonPointer.in_span(expr_span),
+                )),
         )
     }
 }

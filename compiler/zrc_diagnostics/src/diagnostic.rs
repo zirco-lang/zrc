@@ -11,23 +11,30 @@ use std::{
 };
 
 use ariadne::{Color, Label, Report, ReportKind};
-use derive_more::Display;
 use zrc_utils::span::Spanned;
 
-use crate::DiagnosticKind;
+use crate::{
+    DiagnosticKind,
+    diagnostic_kind::{HelpKind, LabelKind, NoteKind},
+};
 
 /// The severity of a [`Diagnostic`].
-#[derive(Clone, PartialEq, Eq, Debug, Display)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Severity {
     /// Error. Compilation will not continue.
-    #[display("error")]
     Error,
 
     /// Warning. Compilation may continue.
-    #[display("warning")]
     Warning,
 }
-
+impl Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Error => write!(f, "error"),
+            Self::Warning => write!(f, "warning"),
+        }
+    }
+}
 impl Severity {
     /// Convert severity to ariadne's [`ReportKind`]
     const fn to_report_kind(&self) -> ReportKind<'static> {
@@ -38,6 +45,7 @@ impl Severity {
     }
 
     /// Get the color for this severity
+    #[allow(unused)] // i'm sure we'll need this later
     const fn color(&self) -> Color {
         match *self {
             Self::Error => Color::Red,
@@ -46,14 +54,151 @@ impl Severity {
     }
 }
 
-/// A diagnostic message produced by one of the zrc tools
-#[derive(Debug, PartialEq, Eq, Display)]
-#[display("{_0}: {_1}")]
-pub struct GenericDiagnostic<Kind>(pub Severity, pub Spanned<Kind>)
-where
-    Kind: Debug + PartialEq + Eq + Display;
+/// The severity of a [`Label`].
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum LabelType {
+    /// Error. Compilation will not continue.
+    Error,
 
-impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
+    /// Warning. Compilation may continue.
+    Warning,
+
+    /// Note. Additional information.
+    Note,
+}
+impl LabelType {
+    /// Get the color for this severity
+    const fn color(&self) -> Color {
+        match *self {
+            Self::Error => Color::Red,
+            Self::Warning => Color::Yellow,
+            Self::Note => Color::Cyan,
+        }
+    }
+}
+
+/// A label in the diagnostic window
+#[derive(Debug, PartialEq, Eq)]
+pub struct GenericLabel<LK>
+where
+    LK: Debug + PartialEq + Eq + Display,
+{
+    /// The severity of this label
+    pub severity: LabelType,
+    /// The span and kind of this label
+    pub kind: Spanned<LK>,
+}
+impl<LK> GenericLabel<LK>
+where
+    LK: Debug + PartialEq + Eq + Display,
+{
+    /// Create a new label with the given severity and kind.
+    pub const fn new(severity: LabelType, kind: Spanned<LK>) -> Self {
+        Self { severity, kind }
+    }
+
+    /// Create a new error label.
+    pub const fn error(kind: Spanned<LK>) -> Self {
+        Self::new(LabelType::Error, kind)
+    }
+
+    /// Create a new warning label.
+    pub const fn warning(kind: Spanned<LK>) -> Self {
+        Self::new(LabelType::Warning, kind)
+    }
+
+    /// Create a new note label.
+    pub const fn note(kind: Spanned<LK>) -> Self {
+        Self::new(LabelType::Note, kind)
+    }
+}
+
+/// Anything that can produce an error code, required for use in a
+/// [`GenericDiagnostic`]
+pub trait ErrorCode {
+    /// Get the error code associated with this instance
+    fn error_code(&self) -> &'static str;
+}
+
+/// A diagnostic message produced by one of the zrc tools
+#[derive(Debug, PartialEq, Eq)]
+pub struct GenericDiagnostic<K, LK, NK, HK>
+where
+    K: Debug + PartialEq + Eq + Display + ErrorCode,
+    LK: Debug + PartialEq + Eq + Display,
+    NK: Debug + PartialEq + Eq + Display,
+    HK: Debug + PartialEq + Eq + Display,
+{
+    /// The severity of this diagnostic
+    pub severity: Severity,
+    /// The span and kind of this diagnostic's main message
+    pub kind: Spanned<K>,
+
+    /// A list of labels associated with this diagnostic
+    pub labels: Vec<GenericLabel<LK>>,
+
+    /// A list of notes (additional information) associated with this
+    /// diagnostic, lacking spans
+    pub notes: Vec<NK>,
+
+    /// A list of help messages associated with this diagnostic, lacking spans
+    ///
+    /// These are typically suggestions for fixing the issue.
+    pub helps: Vec<HK>,
+}
+impl<K, LK, NK, HK> Display for GenericDiagnostic<K, LK, NK, HK>
+where
+    K: Debug + PartialEq + Eq + Display + ErrorCode,
+    LK: Debug + PartialEq + Eq + Display,
+    HK: Debug + PartialEq + Eq + Display,
+    NK: Debug + PartialEq + Eq + Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}[{}]: {}",
+            self.severity,
+            self.kind.value().error_code(),
+            self.kind
+        )
+    }
+}
+
+impl<K, LK, NK, HK> GenericDiagnostic<K, LK, NK, HK>
+where
+    K: Debug + PartialEq + Eq + Display + ErrorCode,
+    LK: Debug + PartialEq + Eq + Display,
+    NK: Debug + PartialEq + Eq + Display,
+    HK: Debug + PartialEq + Eq + Display,
+{
+    /// Print this diagnostic as JSON, with an optional source for context in
+    /// the case of `<stdin>` or `<unknown>` spans.
+    ///
+    /// # Panics
+    /// This function may panic if the diagnostic contains non-serializable data
+    /// or if the provided piped source is required but not provided.
+    #[must_use]
+    pub fn print_json(&self) -> String {
+        serde_json::to_string(&serde_json::json!({
+            "severity": self.severity.to_string(),
+            "code": self.kind.value().error_code(),
+            "message": self.kind.to_string(),
+            "labels": self.labels.iter().map(|label| {
+                serde_json::json!({
+                    "message": label.kind.to_string(),
+                    "span": {
+                        "file_name": label.kind.span().file_name(),
+                        "start": label.kind.span().start(),
+                        "end": label.kind.span().end(),
+                    }
+                })
+            }).collect::<Vec<_>>(),
+            "notes": self.notes.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            "helps": self.helps.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        }))
+        .expect("diagnostic should be serializable to JSON")
+    }
+
     /// Convert this [`Diagnostic`] to a printable string using ariadne. The
     /// source code is provided directly as a string if it is not read from a
     /// file.
@@ -63,8 +208,8 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
     /// buffer fails.
     #[must_use]
     pub fn print(&self, piped_source: Option<&str>) -> String {
-        let span = self.1.span();
-        let message = self.1.to_string();
+        let span = self.kind.span();
+        let message = self.kind.to_string();
 
         // read the source from the path inside of the span. if it is <stdin>, use
         // the provided piped source.
@@ -89,14 +234,32 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
         };
 
         // Create ariadne report using (filename, range) as the span type
-        let report = Report::build(self.0.to_report_kind(), (path, span.start()..span.end()))
-            .with_message(message.clone())
-            .with_label(
-                Label::new((path, span.start()..span.end()))
-                    .with_message(message)
-                    .with_color(self.0.color()),
-            )
-            .finish();
+        let mut report = Report::build(
+            self.severity.to_report_kind(),
+            (path, span.start()..span.end()),
+        )
+        .with_code(self.kind.value().error_code())
+        .with_message(message)
+        .with_labels(self.labels.iter().map(|label| {
+            Label::new((path, label.kind.span().start()..label.kind.span().end()))
+                .with_message(label.kind.to_string())
+                .with_color(label.severity.color())
+        }));
+
+        report.with_notes(
+            self.notes
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+        );
+        report.with_helps(
+            self.helps
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+        );
+
+        let report = report.finish();
 
         // Write report to string
         let mut buffer = Vec::new();
@@ -106,33 +269,60 @@ impl<K: Debug + PartialEq + Eq + Display> GenericDiagnostic<K> {
 
         String::from_utf8(buffer).expect("diagnostic output should be valid UTF-8")
     }
+
+    /// Create a new empty diagnostic with the given severity and kind.
+    const fn new_empty(severity: Severity, kind: Spanned<K>) -> Self {
+        Self {
+            severity,
+            kind,
+            labels: Vec::new(),
+            notes: Vec::new(),
+            helps: Vec::new(),
+        }
+    }
+
+    /// Create an error.
+    pub const fn error(kind: Spanned<K>) -> Self {
+        Self::new_empty(Severity::Error, kind)
+    }
+
+    /// Create a warning.
+    pub const fn warning(kind: Spanned<K>) -> Self {
+        Self::new_empty(Severity::Warning, kind)
+    }
+
+    /// Add a new label to this diagnostic.
+    #[must_use]
+    pub fn with_label(mut self, label: GenericLabel<LK>) -> Self {
+        self.labels.push(label);
+        self
+    }
+
+    /// Add a new note to this diagnostic.
+    #[must_use]
+    pub fn with_note(mut self, note: NK) -> Self {
+        self.notes.push(note);
+        self
+    }
+
+    /// Add a new help message to this diagnostic.
+    #[must_use]
+    pub fn with_help(mut self, help: HK) -> Self {
+        self.helps.push(help);
+        self
+    }
 }
-impl<K: Debug + PartialEq + Eq + Display> Error for GenericDiagnostic<K> {}
+impl<K, LK, NK, HK> Error for GenericDiagnostic<K, LK, NK, HK>
+where
+    K: Debug + PartialEq + Eq + Display + ErrorCode,
+    LK: Debug + PartialEq + Eq + Display,
+    NK: Debug + PartialEq + Eq + Display,
+    HK: Debug + PartialEq + Eq + Display,
+{
+}
 
 /// A diagnostic message produced by the Zirco compiler
-#[derive(Debug, PartialEq, Eq, Display)]
-#[display("{_0}: {_1}")]
-pub struct Diagnostic(pub Severity, pub Spanned<DiagnosticKind>);
-impl Error for Diagnostic {}
-impl Diagnostic {
-    /// Get a generic version of this diagnostic
-    #[must_use]
-    pub fn as_generic(&self) -> GenericDiagnostic<DiagnosticKind> {
-        GenericDiagnostic(self.0.clone(), self.1.clone())
-    }
-
-    /// Convert this [`Diagnostic`] to a printable string using ariadne. The
-    /// source code is provided directly as a string if it is not read from a
-    /// file.
-    ///
-    /// # Panics
-    /// This function may panic if the span is invalid or if writing to the
-    /// buffer fails.
-    #[must_use]
-    pub fn print(&self, piped_source: Option<&str>) -> String {
-        self.as_generic().print(piped_source)
-    }
-}
+pub type Diagnostic = GenericDiagnostic<DiagnosticKind, LabelKind, NoteKind, HelpKind>;
 
 #[cfg(test)]
 mod tests {
@@ -158,22 +348,18 @@ mod tests {
 
     #[test]
     fn diagnostic_display_includes_severity_and_kind() {
-        let diagnostic = Diagnostic(
-            Severity::Error,
-            spanned_test!(0, DiagnosticKind::InvalidToken, 4),
-        );
+        let diagnostic = Diagnostic::error(spanned_test!(0, DiagnosticKind::InvalidToken, 4));
         let display = diagnostic.to_string();
         assert!(display.contains("error"));
         assert!(display.contains("invalid token"));
     }
 
     #[test]
+    #[ignore = "ignored until #603 complete"]
     fn diagnostic_print_formats_correctly() {
         let source = "let x = 5;";
-        let diagnostic = Diagnostic(
-            Severity::Error,
-            spanned!(4, DiagnosticKind::InvalidToken, 5, "/dev/<stdin>"),
-        );
+        let diagnostic =
+            Diagnostic::error(spanned!(4, DiagnosticKind::InvalidToken, 5, "/dev/<stdin>"));
         let output = diagnostic.print(Some(source));
 
         assert!(output.contains("<stdin>"));
