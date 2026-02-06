@@ -383,12 +383,12 @@ pub trait SemanticVisit<'input, 'gs> {
     }
 
     /// Visit a typed statement. Override to run logic before walking.
-    fn visit_tc_stmt(&mut self, stmt: &TcStmt<'input, 'gs>) {
+    fn visit_tc_stmt(&mut self, stmt: &TcStmt<'input>) {
         self.walk_tc_stmt(stmt);
     }
 
     /// Walk a typed statement's children (default traversal).
-    fn walk_tc_stmt(&mut self, stmt: &TcStmt<'input, 'gs>) {
+    fn walk_tc_stmt(&mut self, stmt: &TcStmt<'input>) {
         match stmt.kind.value() {
             TcStmtKind::IfStmt(cond, if_true, maybe_false) => {
                 self.visit_tc_expr(cond);
@@ -500,7 +500,7 @@ pub trait SemanticVisit<'input, 'gs> {
         name: &Spanned<&'input str>,
         parameters: &Spanned<TcArgumentDeclarationList<'input>>,
         return_type: &Spanned<TcType<'input>>,
-        body: &Option<Spanned<BlockMetadata<'input, 'gs>>>,
+        body: &Option<Spanned<BlockMetadata<'input>>>,
     ) {
         self.walk_tc_fn_decl(name, parameters, return_type, body);
     }
@@ -511,7 +511,7 @@ pub trait SemanticVisit<'input, 'gs> {
         _name: &Spanned<&'input str>,
         _parameters: &Spanned<TcArgumentDeclarationList<'input>>,
         _return_type: &Spanned<TcType<'input>>,
-        body: &Option<Spanned<BlockMetadata<'input, 'gs>>>,
+        body: &Option<Spanned<BlockMetadata<'input>>>,
     ) {
         if let Some(block) = body {
             self.visit_tc_block(block.value());
@@ -519,12 +519,12 @@ pub trait SemanticVisit<'input, 'gs> {
     }
 
     /// Visit a typed declaration.
-    fn visit_tc_decl(&mut self, decl: &Spanned<TcDecl<'input, 'gs>>) {
+    fn visit_tc_decl(&mut self, decl: &Spanned<TcDecl<'input>>) {
         self.walk_tc_decl(decl);
     }
 
     /// Walk a typed declaration (default traversal).
-    fn walk_tc_decl(&mut self, decl: &Spanned<TcDecl<'input, 'gs>>) {
+    fn walk_tc_decl(&mut self, decl: &Spanned<TcDecl<'input>>) {
         match decl.value() {
             TcDecl::FunctionDeclaration {
                 name,
@@ -539,24 +539,24 @@ pub trait SemanticVisit<'input, 'gs> {
     }
 
     /// Visit a typed block of statements.
-    fn visit_tc_block(&mut self, block: &BlockMetadata<'input, 'gs>) {
+    fn visit_tc_block(&mut self, block: &BlockMetadata<'input>) {
         self.walk_tc_block(block);
     }
 
     /// Walk a typed block (default traversal).
-    fn walk_tc_block(&mut self, block: &BlockMetadata<'input, 'gs>) {
+    fn walk_tc_block(&mut self, block: &BlockMetadata<'input>) {
         for stmt in &block.stmts {
             self.visit_tc_stmt(stmt);
         }
     }
 
     /// Visit a typed program (block of declarations).
-    fn visit_tc_program(&mut self, program: &[Spanned<TcDecl<'input, 'gs>>]) {
+    fn visit_tc_program(&mut self, program: &[Spanned<TcDecl<'input>>]) {
         self.walk_tc_program(program);
     }
 
     /// Walk a typed program (default traversal).
-    fn walk_tc_program(&mut self, program: &[Spanned<TcDecl<'input, 'gs>>]) {
+    fn walk_tc_program(&mut self, program: &[Spanned<TcDecl<'input>>]) {
         for decl in program {
             self.visit_tc_decl(decl);
         }

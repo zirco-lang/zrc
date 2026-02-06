@@ -25,7 +25,7 @@ pub fn cg_for_stmt<'ctx, 'input, 'a>(
     init: Option<Box<Vec<Spanned<LetDeclaration<'input>>>>>,
     cond: Option<TypedExpr<'input>>,
     post: Option<TypedExpr<'input>>,
-    body: Spanned<BlockMetadata<'input, '_>>,
+    body: Spanned<BlockMetadata<'input>>,
 ) -> BasicBlock<'ctx> {
     // For loops generate a somewhat more complicated CFG, with a few parts.
     // The preheader, where `init` runs. Breaks to the header.
@@ -110,12 +110,12 @@ pub fn cg_for_stmt<'ctx, 'input, 'a>(
 
 /// Code generates a four statement
 #[allow(clippy::needless_pass_by_value)]
-pub fn cg_four_stmt<'ctx, 'input, 'gs, 'a>(
+pub fn cg_four_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
     scope: &'a CgScope<'input, 'ctx>,
     lexical_block: Option<DILexicalBlock<'ctx>>,
-    body: Spanned<BlockMetadata<'input, 'gs>>,
+    body: Spanned<BlockMetadata<'input>>,
 ) -> BasicBlock<'ctx> {
     let mut current_bb = bb;
 
@@ -178,7 +178,7 @@ pub fn cg_while_stmt<'ctx, 'input, 'a>(
     scope: &'a CgScope<'input, 'ctx>,
     lexical_block: Option<DILexicalBlock<'ctx>>,
     cond: TypedExpr<'input>,
-    body: Spanned<BlockMetadata<'input, '_>>,
+    body: Spanned<BlockMetadata<'input>>,
 ) -> BasicBlock<'ctx> {
     let expr_cg = BlockCtx::new(cg, scope, lexical_block);
 
@@ -238,7 +238,7 @@ pub fn cg_do_while_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     scope: &'a CgScope<'input, 'ctx>,
     lexical_block: Option<DILexicalBlock<'ctx>>,
-    body: Spanned<BlockMetadata<'input, '_>>,
+    body: Spanned<BlockMetadata<'input>>,
     cond: TypedExpr<'input>,
 ) -> BasicBlock<'ctx> {
     let expr_cg = BlockCtx::new(cg, scope, lexical_block);

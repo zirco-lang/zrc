@@ -735,6 +735,45 @@ impl<'input> Iterator for ZircoLexer<'input> {
     }
 }
 
+/// Determine if all delimiters in a string are balanced.
+/// Useful for quick checks before passing to the parser in things like zrepl.
+#[must_use]
+pub fn are_delimiters_balanced(input: &str) -> bool {
+    let lex = ZircoLexer::new(input, "<input>");
+    let mut stack = Vec::new();
+
+    for token in lex {
+        let Ok(tok) = token.into_value() else {
+            continue; // Ignore lexical errors for this check
+        };
+
+        #[expect(clippy::wildcard_enum_match_arm)]
+        match tok {
+            Tok::LeftParen | Tok::LeftBracket | Tok::LeftBrace => {
+                stack.push(tok);
+            }
+            Tok::RightParen => {
+                if stack.pop() != Some(Tok::LeftParen) {
+                    return false;
+                }
+            }
+            Tok::RightBracket => {
+                if stack.pop() != Some(Tok::LeftBracket) {
+                    return false;
+                }
+            }
+            Tok::RightBrace => {
+                if stack.pop() != Some(Tok::LeftBrace) {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    stack.is_empty()
+}
+
 #[cfg(test)]
 mod tests {
     use zrc_utils::spanned;

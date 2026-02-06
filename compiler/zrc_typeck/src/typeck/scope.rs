@@ -88,6 +88,11 @@ impl<'input> TypeCtx<'input> {
     pub fn insert(&mut self, identifier: &'input str, resolution: TastType<'input>) {
         self.mappings.insert(identifier, resolution);
     }
+
+    /// Iterate over the entries in this value context
+    pub fn iter(&self) -> impl Iterator<Item = (&'input str, &TastType<'input>)> {
+        self.mappings.iter().map(|(k, v)| (*k, v))
+    }
 }
 impl Default for TypeCtx<'static> {
     fn default() -> Self {
@@ -285,8 +290,7 @@ impl<'input> IntoIterator for ValueCtx<'input> {
 /// top-level: information about function declarations, type aliases, etc.
 /// subscopes can then be created off of a global scope to represent a
 /// function or block scope, which can resolve (but not mutate) the global data.
-// Cloning this would be an error, so it does not derive [Clone].
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GlobalScope<'input> {
     /// Maps every type name to its representation
     pub types: TypeCtx<'input>,
@@ -322,7 +326,7 @@ impl<'input> GlobalScope<'input> {
 
     /// Create a subscope from this [`GlobalScope`].
     #[must_use]
-    pub fn create_subscope<'gs>(&'gs self) -> Scope<'input, 'gs> {
+    pub fn create_subscope<'gs>(&'gs self) -> Scope<'input> {
         Scope::from_global_scope(self)
     }
 }
@@ -342,20 +346,20 @@ impl Default for GlobalScope<'static> {
 /// method.
 // Cloning is proper behavior for creating a subscope off of another.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Scope<'input, 'gs> {
+pub struct Scope<'input> {
     /// Maps every variable to its data type
     pub values: ValueCtx<'input>,
 
     /// Maps every type name from the parent [`GlobalScope`] to its
     /// representation
-    pub types: &'gs TypeCtx<'input>,
+    pub types: TypeCtx<'input>,
 }
-impl<'input, 'gs> Scope<'input, 'gs> {
+impl<'input> Scope<'input> {
     /// Creates a new [`Scope`] from a parent [`GlobalScope`]
-    fn from_global_scope(global_scope: &'gs GlobalScope<'input>) -> Self {
+    fn from_global_scope(global_scope: &GlobalScope<'input>) -> Self {
         Scope {
             values: global_scope.global_values.clone(),
-            types: &global_scope.types,
+            types: global_scope.types.clone(),
         }
     }
 }

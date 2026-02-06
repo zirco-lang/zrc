@@ -17,15 +17,15 @@ use crate::tast::{
 
 /// Type check an if statement.
 #[expect(clippy::needless_pass_by_value)]
-pub fn type_if<'input, 'gs>(
-    scope: &mut Scope<'input, 'gs>,
+pub fn type_if<'input>(
+    scope: &mut Scope<'input>,
     cond: Expr<'input>,
     then: Box<Stmt<'input>>,
     then_else: Option<Box<Stmt<'input>>>,
     can_use_break_continue: bool,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
     // TODO: if `cond` is always true at compile-time, we can prove the
     // if branch is always taken (hence
     // if it's WillReturn we can be WillReturn

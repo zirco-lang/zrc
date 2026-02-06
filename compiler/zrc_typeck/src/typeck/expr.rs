@@ -24,7 +24,7 @@ use crate::tast::expr::TypedExpr;
 /// # Errors
 /// Errors if a type checker error is encountered.
 pub fn type_expr<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let expr_span = expr.0.span();

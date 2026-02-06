@@ -32,7 +32,7 @@ impl PassList {
     /// Invoke all lints in this passlist on the given TAST. This clones the
     /// program for each lint to allow multiple lints to consume it.
     #[must_use]
-    pub fn lint_tast(&self, program: &[Spanned<TypedDeclaration<'_, '_>>]) -> Vec<LintDiagnostic> {
+    pub fn lint_tast(&self, program: &[Spanned<TypedDeclaration<'_>>]) -> Vec<LintDiagnostic> {
         let mut diagnostics = vec![];
         for lint in &self.0 {
             // Clone to allow multiple lints to consume the program

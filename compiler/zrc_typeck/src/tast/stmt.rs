@@ -25,9 +25,9 @@ pub struct LetDeclaration<'input> {
 
 /// A zirco statement after typeck
 #[derive(Debug, Clone, PartialEq)]
-pub struct TypedStmt<'input, 'gs> {
+pub struct TypedStmt<'input> {
     /// The actual statement kind with its span.
-    pub kind: Spanned<TypedStmtKind<'input, 'gs>>,
+    pub kind: Spanned<TypedStmtKind<'input>>,
 
     /// The return actuality of this statement. This describes whether this
     /// statement is guaranteed to return, sometimes returns, or never returns.
@@ -38,19 +38,19 @@ pub struct TypedStmt<'input, 'gs> {
 /// The enum representing all of the different kinds of statements in Zirco
 /// after type checking
 #[derive(Debug, Clone, PartialEq)]
-pub enum TypedStmtKind<'input, 'gs> {
+pub enum TypedStmtKind<'input> {
     // all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here
     // (basically if (x) y has become if (x) {y})
     /// `if (x) y` or `if (x) y else z`
     IfStmt(
         TypedExpr<'input>,
-        Spanned<BlockMetadata<'input, 'gs>>,
-        Option<Spanned<BlockMetadata<'input, 'gs>>>,
+        Spanned<BlockMetadata<'input>>,
+        Option<Spanned<BlockMetadata<'input>>>,
     ),
     /// `while (x) y`
-    WhileStmt(TypedExpr<'input>, Spanned<BlockMetadata<'input, 'gs>>),
+    WhileStmt(TypedExpr<'input>, Spanned<BlockMetadata<'input>>),
     /// `do x while (y)`
-    DoWhileStmt(Spanned<BlockMetadata<'input, 'gs>>, TypedExpr<'input>),
+    DoWhileStmt(Spanned<BlockMetadata<'input>>, TypedExpr<'input>),
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
@@ -62,21 +62,21 @@ pub enum TypedStmtKind<'input, 'gs> {
         /// Runs after each iteration of the loop.
         post: Option<TypedExpr<'input>>,
         /// The body of the loop.
-        body: Spanned<BlockMetadata<'input, 'gs>>,
+        body: Spanned<BlockMetadata<'input>>,
     },
     /// `four body`
-    FourStmt(Spanned<BlockMetadata<'input, 'gs>>),
+    FourStmt(Spanned<BlockMetadata<'input>>),
     /// `switch`
     SwitchCase {
         /// The value to be switched over (`x` in `switch (x) {}`)
         scrutinee: TypedExpr<'input>,
         /// The default case
-        default: BlockMetadata<'input, 'gs>,
+        default: BlockMetadata<'input>,
         /// The list of other cases
-        cases: Vec<(TypedExpr<'input>, BlockMetadata<'input, 'gs>)>,
+        cases: Vec<(TypedExpr<'input>, BlockMetadata<'input>)>,
     },
     /// `{ ... }`
-    BlockStmt(BlockMetadata<'input, 'gs>),
+    BlockStmt(BlockMetadata<'input>),
     /// `x;`
     ExprStmt(TypedExpr<'input>),
     /// `continue;`
@@ -94,7 +94,7 @@ pub enum TypedStmtKind<'input, 'gs> {
 
 /// A struct or function declaration at the top level of a file
 #[derive(Debug, Clone, PartialEq)]
-pub enum TypedDeclaration<'input, 'gs> {
+pub enum TypedDeclaration<'input> {
     /// A declaration of a function
     FunctionDeclaration {
         /// The name of the function.
@@ -105,7 +105,7 @@ pub enum TypedDeclaration<'input, 'gs> {
         return_type: Spanned<Type<'input>>,
         /// The body of the function. If set to [`None`], this is an extern
         /// declaration.
-        body: Option<Spanned<BlockMetadata<'input, 'gs>>>,
+        body: Option<Spanned<BlockMetadata<'input>>>,
     },
     /// A global let declaration
     GlobalLetDeclaration(Vec<Spanned<LetDeclaration<'input>>>),
@@ -192,13 +192,13 @@ impl Display for LetDeclaration<'_> {
     }
 }
 
-impl Display for TypedStmt<'_, '_> {
+impl Display for TypedStmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.kind.value())
     }
 }
 
-impl Display for TypedStmtKind<'_, '_> {
+impl Display for TypedStmtKind<'_> {
     #[expect(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -210,7 +210,7 @@ impl Display for TypedStmtKind<'_, '_> {
                         .value()
                         .stmts
                         .iter()
-                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -223,14 +223,14 @@ impl Display for TypedStmtKind<'_, '_> {
                         .value()
                         .stmts
                         .iter()
-                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n"),
                     if_false
                         .value()
                         .stmts
                         .iter()
-                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -242,7 +242,7 @@ impl Display for TypedStmtKind<'_, '_> {
                     body.value()
                         .stmts
                         .iter()
-                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -254,7 +254,7 @@ impl Display for TypedStmtKind<'_, '_> {
                     body.value()
                         .stmts
                         .iter()
-                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -266,7 +266,7 @@ impl Display for TypedStmtKind<'_, '_> {
                     body.value()
                         .stmts
                         .iter()
-                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -295,7 +295,7 @@ impl Display for TypedStmtKind<'_, '_> {
                     body.value()
                         .stmts
                         .iter()
-                        .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
+                        .map(|stmt: &TypedStmt<'_>| indent_lines(&stmt.to_string(), "    "))
                         .collect::<Vec<_>>()
                         .join("\n")
                 )
@@ -314,7 +314,7 @@ impl Display for TypedStmtKind<'_, '_> {
                         case_stmts
                             .stmts
                             .iter()
-                            .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
+                            .map(|stmt: &TypedStmt<'_>| indent_lines(&stmt.to_string(), "    "))
                             .collect::<Vec<_>>()
                             .join("\n")
                     )?;
@@ -326,7 +326,7 @@ impl Display for TypedStmtKind<'_, '_> {
                         default
                             .stmts
                             .iter()
-                            .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
+                            .map(|stmt: &TypedStmt<'_>| indent_lines(&stmt.to_string(), "    "))
                             .collect::<Vec<_>>()
                             .join("\n")
                     )?;
@@ -343,7 +343,7 @@ impl Display for TypedStmtKind<'_, '_> {
                         stmts
                             .stmts
                             .iter()
-                            .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
+                            .map(|stmt: &TypedStmt<'_>| indent_lines(&stmt.to_string(), "    "))
                             .collect::<Vec<_>>()
                             .join("\n")
                     )
@@ -369,7 +369,7 @@ impl Display for TypedStmtKind<'_, '_> {
     }
 }
 
-impl Display for TypedDeclaration<'_, '_> {
+impl Display for TypedDeclaration<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::FunctionDeclaration {
@@ -383,7 +383,7 @@ impl Display for TypedDeclaration<'_, '_> {
                 body.value()
                     .stmts
                     .iter()
-                    .map(|stmt: &TypedStmt<'_, '_>| indent_lines(&stmt.to_string(), "    "))
+                    .map(|stmt: &TypedStmt<'_>| indent_lines(&stmt.to_string(), "    "))
                     .collect::<Vec<String>>()
                     .join("\n")
             ),

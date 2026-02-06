@@ -26,13 +26,13 @@ use crate::{
 
 /// Type check a switch case statement.
 #[expect(clippy::ptr_arg)]
-pub fn type_switch_case<'input, 'gs>(
-    scope: &mut Scope<'input, 'gs>,
+pub fn type_switch_case<'input>(
+    scope: &mut Scope<'input>,
     scrutinee: Expr<'input>,
     cases: &Vec<Spanned<SwitchCase<'input>>>,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
     let mut cases = cases.clone();
     let scrutinee = type_expr(scope, scrutinee)?;
     let scrutinee_ty = scrutinee.inferred_type.clone();
@@ -104,13 +104,10 @@ pub fn type_switch_case<'input, 'gs>(
             )?;
             let return_status = exec_block.return_actuality;
 
-            Ok::<
-                (
-                    (TypedExpr<'input>, BlockMetadata<'_, '_>),
-                    BlockReturnActuality,
-                ),
-                Diagnostic,
-            >(((trigger, exec_block), return_status))
+            Ok::<((TypedExpr<'input>, BlockMetadata<'_>), BlockReturnActuality), Diagnostic>((
+                (trigger, exec_block),
+                return_status,
+            ))
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -135,14 +132,14 @@ pub fn type_switch_case<'input, 'gs>(
 
 /// Desugar and type check a match statement.
 #[expect(clippy::too_many_lines, clippy::needless_pass_by_value)]
-pub fn type_match<'input, 'gs>(
-    scope: &mut Scope<'input, 'gs>,
+pub fn type_match<'input>(
+    scope: &mut Scope<'input>,
     scrutinee: Expr<'input>,
     cases: Vec<Spanned<MatchCase<'input>>>,
     can_use_break_continue: bool,
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
-) -> Result<Option<(TypedStmt<'input, 'gs>, BlockReturnActuality)>, Diagnostic> {
+) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
     // The following code:
     // fn takes_i32(x: i32);
     // fn takes_i64(x: i64);

@@ -22,17 +22,17 @@ use crate::tast::{
 
 /// The result returned by [`type_block`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct BlockMetadata<'input, 'gs> {
+pub struct BlockMetadata<'input> {
     /// The typed statements within the block.
-    pub stmts: Vec<TypedStmt<'input, 'gs>>,
+    pub stmts: Vec<TypedStmt<'input>>,
 
     /// The local scope after type checking the block.
-    pub scope: Scope<'input, 'gs>,
+    pub scope: Scope<'input>,
 
     /// The return actuality of the block.
     pub return_actuality: BlockReturnActuality,
 }
-impl Display for BlockMetadata<'_, '_> {
+impl Display for BlockMetadata<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for stmt in &self.stmts {
             writeln!(f, "{stmt}")?;
@@ -79,13 +79,13 @@ impl Display for BlockMetadata<'_, '_> {
 // TODO: Maybe the TAST should attach the BlockReturnActuality in each BlockStmt itself and preserve
 // it on sub-blocks in the TAST (this may be helpful in control flow analysis)
 #[expect(clippy::too_many_lines)]
-pub fn type_block<'input, 'gs>(
-    parent_scope: &Scope<'input, 'gs>,
+pub fn type_block<'input>(
+    parent_scope: &Scope<'input>,
     input_block: Spanned<Vec<Stmt<'input>>>,
     can_use_break_continue: bool,
     return_ability: BlockReturnAbility<'input>,
-) -> Result<BlockMetadata<'input, 'gs>, Diagnostic> {
-    let mut scope: Scope<'input, 'gs> = parent_scope.clone();
+) -> Result<BlockMetadata<'input>, Diagnostic> {
+    let mut scope: Scope<'input> = parent_scope.clone();
 
     let input_block_span = input_block.span();
 
@@ -94,10 +94,10 @@ pub fn type_block<'input, 'gs>(
         .into_value()
         .into_iter()
         .filter_map(
-            |stmt| -> Option<Result<(TypedStmt<'input, 'gs>, BlockReturnActuality), Diagnostic>> {
+            |stmt| -> Option<Result<(TypedStmt<'input>, BlockReturnActuality), Diagnostic>> {
                 let stmt_span = stmt.0.span();
                 let inner_closure =
-                    || -> Result<Option<(TypedStmt<'_, '_>, BlockReturnActuality)>, Diagnostic> {
+                    || -> Result<Option<(TypedStmt<'_>, BlockReturnActuality)>, Diagnostic> {
                         match stmt.0.into_value() {
                             StmtKind::EmptyStmt => Ok(None),
                             StmtKind::BreakStmt if can_use_break_continue => Ok(Some((

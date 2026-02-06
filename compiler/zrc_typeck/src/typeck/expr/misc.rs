@@ -22,7 +22,7 @@ use crate::{
 
 /// Typeck a comma expr
 pub fn type_expr_comma<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     lhs: Expr<'input>,
     rhs: Expr<'input>,
@@ -37,7 +37,7 @@ pub fn type_expr_comma<'input>(
 
 /// Typeck a ternary expr
 pub fn type_expr_ternary<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     cond: Expr<'input>,
     if_true: Expr<'input>,
@@ -107,14 +107,14 @@ pub fn type_expr_ternary<'input>(
 
 /// Typeck a cast expr
 pub fn type_expr_cast<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
     ty: Type<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
     let x_t = type_expr(scope, x)?;
     let ty_span = ty.0.span();
-    let resolved_ty = resolve_type(scope.types, ty)?;
+    let resolved_ty = resolve_type(&scope.types, ty)?;
 
     // Handle {int} type resolution
     if matches!(x_t.inferred_type, TastType::Int) {
@@ -173,11 +173,11 @@ pub fn type_expr_cast<'input>(
 
 /// Typeck a sizeof T expr
 pub fn type_expr_size_of_type<'input>(
-    scope: &Scope<'input, '_>,
+    scope: &Scope<'input>,
     expr_span: Span,
     ty: Type<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    let resolved_ty = resolve_type(scope.types, ty)?;
+    let resolved_ty = resolve_type(&scope.types, ty)?;
     Ok(TypedExpr {
         inferred_type: TastType::Usize,
         kind: TypedExprKind::SizeOf(resolved_ty).in_span(expr_span),
@@ -186,7 +186,7 @@ pub fn type_expr_size_of_type<'input>(
 
 /// Typeck a sizeof(T) expr
 pub fn type_expr_size_of_expr<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
@@ -202,7 +202,7 @@ pub fn type_expr_size_of_expr<'input>(
 /// Typeck a struct construction expr
 #[expect(clippy::type_complexity, clippy::too_many_lines)]
 pub fn type_expr_struct_construction<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     ty: Type<'input>,
     fields: &zrc_utils::span::Spanned<
@@ -215,7 +215,7 @@ pub fn type_expr_struct_construction<'input>(
     let is_enum_literal = matches!(ty.0.value(), ParserTypeKind::Enum(_));
 
     // Resolve the type being constructed
-    let resolved_ty = resolve_type(scope.types, ty)?;
+    let resolved_ty = resolve_type(&scope.types, ty)?;
 
     // Check if the resolved type is an enum (desugared into a struct with
     // __discriminant__ and __value__)

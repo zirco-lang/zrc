@@ -16,7 +16,7 @@ use crate::tast::{
 
 /// Typeck a logical expr
 pub fn type_expr_logical<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     op: Logical,
     lhs: Expr<'input>,
@@ -48,7 +48,7 @@ pub fn type_expr_logical<'input>(
 
 /// Typeck an eq expr
 pub fn type_expr_equality<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     op: Equality,
     lhs: Expr<'input>,
@@ -96,7 +96,7 @@ pub fn type_expr_equality<'input>(
 
 /// Typeck a bitwise expr
 pub fn type_expr_binary_bitwise<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     op: BinaryBitwise,
     lhs: Expr<'input>,
@@ -131,7 +131,7 @@ pub fn type_expr_binary_bitwise<'input>(
 
 /// Typeck a cmp expr
 pub fn type_expr_comparison<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     op: Comparison,
     lhs: Expr<'input>,
@@ -166,7 +166,7 @@ pub fn type_expr_comparison<'input>(
 
 /// Typeck an arithmetic expr
 pub fn type_expr_arithmetic<'input>(
-    scope: &mut Scope<'input, '_>,
+    scope: &mut Scope<'input>,
     expr_span: Span,
     op: Arithmetic,
     lhs: Expr<'input>,

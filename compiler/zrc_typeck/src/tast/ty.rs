@@ -64,7 +64,7 @@ impl Fn<'_> {
 }
 
 /// Auxillary data attached to a [`Fn`] in the Global Scope
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionDeclarationGlobalMetadata<'input> {
     /// The corresponding [`Fn`] we wrap
     pub fn_type: Fn<'input>,

@@ -24,16 +24,15 @@ use crate::tast::stmt::TypedDeclaration;
 pub fn type_program<'input, 'gs>(
     global_scope: &'gs mut GlobalScope<'input>,
     program: Vec<Spanned<AstDeclaration<'input>>>,
-) -> Result<Vec<Spanned<TypedDeclaration<'input, 'gs>>>, zrc_diagnostics::Diagnostic> {
+) -> Result<Vec<Spanned<TypedDeclaration<'input>>>, zrc_diagnostics::Diagnostic> {
     // Phase 1: register all declarations (mutating the global scope)
     for declaration in &program {
         declaration::register_declaration_value(global_scope, declaration.value())?;
     }
 
     // Phase 2: finalize all declarations (read-only access to the scope)
-    let mut results: Vec<
-        Result<Spanned<TypedDeclaration<'input, 'gs>>, zrc_diagnostics::Diagnostic>,
-    > = Vec::with_capacity(program.len());
+    let mut results: Vec<Result<Spanned<TypedDeclaration<'input>>, zrc_diagnostics::Diagnostic>> =
+        Vec::with_capacity(program.len());
 
     for declaration in program {
         let span = declaration.span();
