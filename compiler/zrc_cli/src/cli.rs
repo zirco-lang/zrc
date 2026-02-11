@@ -8,7 +8,7 @@ use std::{
 use clap::Parser;
 use zrc::{OutputFormat, codegen::OptimizationLevel};
 
-/// The official Zirco compiler
+/// j
 #[derive(Parser)]
 #[command(version=None)]
 pub struct Cli {

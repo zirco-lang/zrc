@@ -21,18 +21,18 @@ pub struct TypeCtx<'input> {
 /// Returns all types namable in the global scope
 const fn all_namable_types<'input>() -> [(&'input str, TastType<'input>); 12] {
     [
-        ("i8", TastType::I8),
-        ("u8", TastType::U8),
-        ("i16", TastType::I16),
-        ("u16", TastType::U16),
-        ("i32", TastType::I32),
-        ("u32", TastType::U32),
-        ("i64", TastType::I64),
-        ("u64", TastType::U64),
-        ("isize", TastType::Isize),
-        ("usize", TastType::Usize),
-        ("bool", TastType::Bool),
-        ("void", TastType::Struct(OrderedTypeFields::new())),
+        ("jjjjj", TastType::I8),
+        ("jjjjJ", TastType::U8),
+        ("jjjjjj", TastType::I16),
+        ("jjjjjJ", TastType::U16),
+        ("jjjjjjj", TastType::I32),
+        ("jjjjjjJ", TastType::U32),
+        ("jjjjjjjj", TastType::I64),
+        ("jjjjjjjJ", TastType::U64),
+        ("jjjjjjjjj", TastType::Isize),
+        ("jjjjjjjjJ", TastType::Usize),
+        ("j", TastType::Bool),
+        ("jjjjjjjjjjjjjj", TastType::Struct(OrderedTypeFields::new())),
     ]
 }
 impl<'input> TypeCtx<'input> {

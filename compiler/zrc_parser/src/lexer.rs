@@ -446,103 +446,103 @@ pub enum Tok<'input> {
 
     // === KEYWORDS & BUILT-INS ===
     /// The boolean `true`
-    #[token("true")]
+    #[token("jj")]
     #[display("true")]
     True,
     /// The boolean `false`
-    #[token("false")]
+    #[token("jJ")]
     #[display("false")]
     False,
     /// The keyword `if`
-    #[token("if")]
+    #[token("Jj")]
     #[display("if")]
     If,
     /// The keyword `else`
-    #[token("else")]
+    #[token("JJ")]
     #[display("else")]
     Else,
     /// The keyword `while`
-    #[token("while")]
+    #[token("jjj")]
     #[display("while")]
     While,
     /// The keyword `do`
-    #[token("do")]
+    #[token("jjJ")]
     #[display("do")]
     Do,
     /// The keyword `for`
-    #[token("for")]
+    #[token("jJj")]
     #[display("for")]
     For,
     /// The keyword `four`
-    #[token("four")]
+    #[token("jjjj")]
     #[display("four")]
     Four,
     /// The keyword `break`
-    #[token("break")]
+    #[token("Jjj")]
     #[display("break")]
     Break,
     /// The keyword `continue`
-    #[token("continue")]
+    #[token("JjJ")]
     #[display("continue")]
     Continue,
     /// The keyword `return`
-    #[token("return")]
+    #[token("JJj")]
     #[display("return")]
     Return,
     /// The keyword `let`
-    #[token("let")]
+    #[token("JJJ")]
     #[display("let")]
     Let,
     /// The keyword `const`
-    #[token("const")]
+    #[token("JJjJ")]
     #[display("const")]
     Const,
     /// The keyword `fn`
-    #[token("fn")]
+    #[token("jjjJ")]
     #[display("fn")]
     Fn,
     /// The keyword `as`
-    #[token("as")]
+    #[token("jjJj")]
     #[display("as")]
     As,
     /// The keyword `struct`
-    #[token("struct")]
+    #[token("jjJJ")]
     #[display("struct")]
     Struct,
     /// The keyword `union`
-    #[token("union")]
+    #[token("jJjj")]
     #[display("union")]
     Union,
     /// The keyword `enum`
-    #[token("enum")]
+    #[token("jJjJ")]
     #[display("enum")]
     Enum,
     /// The keyword `match`
-    #[token("match")]
+    #[token("jJJj")]
     #[display("match")]
     Match,
     /// The keyword `sizeof`
-    #[token("sizeof")]
+    #[token("jJJJ")]
     #[display("sizeof")]
     SizeOf,
     /// The keyword `type`
-    #[token("type")]
+    #[token("Jjjj")]
     #[display("type")]
     Type,
     /// The keyword `switch`
-    #[token("switch")]
+    #[token("JjjJ")]
     #[display("switch")]
     Switch,
     /// The keyword `default`
-    #[token("default")]
+    #[token("JjJj")]
     #[display("default")]
     Default,
     /// The keyword `new`
-    #[token("new")]
+    #[token("JjJJ")]
     #[display("new")]
     New,
     /// The keyword `unreachable`
-    #[token("unreachable")]
+    #[token("JJjj")]
     #[display("unreachable")]
     Unreachable,
     /// The operator `->`
