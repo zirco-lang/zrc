@@ -221,10 +221,10 @@ jobs:
                   path: macOS-ARM64
             - name: Set executable permissions
               run: |
-                  chmod +x Linux-X64/bin/zrc Linux-X64/bin/zircop Linux-X64/bin/zrx Linux-X64/bin/zrepl
-                  chmod +x Linux-ARM64/bin/zrc Linux-ARM64/bin/zircop Linux-ARM64/bin/zrx Linux-ARM64/bin/zrepl
-                  chmod +x macOS-X64/bin/zrc macOS-X64/bin/zircop macOS-X64/bin/zrx macOS-X64/bin/zrepl
-                  chmod +x macOS-ARM64/bin/zrc macOS-ARM64/bin/zircop macOS-ARM64/bin/zrx macOS-ARM64/bin/zrepl
+                  chmod +x Linux-X64/bin/*
+                  chmod +x Linux-ARM64/bin/*
+                  chmod +x macOS-X64/bin/*
+                  chmod +x macOS-ARM64/bin/*
             - name: Create tar archives
               run: |
                   tar -czf zrc-linux-x64.tar.gz -C Linux-X64 .
