@@ -19,6 +19,8 @@ pub enum LintDiagnosticKind {
     SussyControlFlow,
     #[error("division by constant zero")]
     DivisionByConstantZero,
+    #[error("unused statement")]
+    UnusedStatement,
 }
 impl ErrorCode for LintDiagnosticKind {
     fn error_code(&self) -> &'static str {
@@ -29,6 +31,7 @@ impl ErrorCode for LintDiagnosticKind {
             Self::UnreachableCode => "unreachable_code",
             Self::SussyControlFlow => "suspicious_control_flow",
             Self::DivisionByConstantZero => "division_by_constant_zero",
+            Self::UnusedStatement => "unused_statement",
         }
     }
 }
@@ -57,6 +60,8 @@ pub enum LintLabelKind {
     PriorControlFlow,
     #[error("division by zero detected here")]
     DivisionByConstantZero,
+    #[error("this statement has no side effects")]
+    UnusedStatement,
 }
 
 /// The list of possible notes on Zircop lints
@@ -65,8 +70,10 @@ pub enum LintLabelKind {
 pub enum LintNoteKind {
     #[error("to suppress this warning, rename the variable to `{}`", .0)]
     UnusedVariableSuppress(String),
-    #[error("division by zero is undefined behavior")]
+    #[error("this quotient may prove difficult to obtain")]
     DivisionByConstantZero,
+    #[error("this expression appears to exist solely to troll the processor")]
+    UnusedStatement,
 }
 
 /// The list of possible helps on Zircop lints
