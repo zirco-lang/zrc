@@ -14,7 +14,7 @@ zrc_utils = { path = "../zrc_utils" }
 zrc_preprocessor = { path = "../zrc_preprocessor" }
 
 [build-dependencies]
-lalrpop = "0.22.0"
+lalrpop = "0.23.0"
 
 [dev-dependencies]
 indoc = "2.0.5"

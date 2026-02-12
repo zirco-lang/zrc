@@ -171,17 +171,17 @@ KeyTypeMapping: KeyTypeMapping<'input> = {
 }
 
 StructOrUnionDeclaration: Declaration<'input> = {
-    Spanned<("struct" <Spanned<IDENTIFIER>> <KeyTypeMapping>)> => Declaration::TypeAliasDeclaration {
-        name: <>.value().0,
-        ty: Type(<>.map(|(_, values)| TypeKind::Struct(values))),
+    <a:Spanned<("struct" <Spanned<IDENTIFIER>> <KeyTypeMapping>)>> => Declaration::TypeAliasDeclaration {
+        name: a.value().0,
+        ty: Type(a.map(|(_, values)| TypeKind::Struct(values))),
     },
-    Spanned<("union" <Spanned<IDENTIFIER>> <KeyTypeMapping>)> => Declaration::TypeAliasDeclaration {
-        name: <>.value().0,
-        ty: Type(<>.map(|(_, values)| TypeKind::Union(values))),
+    <a:Spanned<("union" <Spanned<IDENTIFIER>> <KeyTypeMapping>)>> => Declaration::TypeAliasDeclaration {
+        name: a.value().0,
+        ty: Type(a.map(|(_, values)| TypeKind::Union(values))),
     },
-    Spanned<("enum" <Spanned<IDENTIFIER>> <KeyTypeMapping>)> => Declaration::TypeAliasDeclaration {
-        name: <>.value().0,
-        ty: Type(<>.map(|(_, values)| TypeKind::Enum(values))),
+    <a:Spanned<("enum" <Spanned<IDENTIFIER>> <KeyTypeMapping>)>> => Declaration::TypeAliasDeclaration {
+        name: a.value().0,
+        ty: Type(a.map(|(_, values)| TypeKind::Enum(values))),
     },
 };
 
