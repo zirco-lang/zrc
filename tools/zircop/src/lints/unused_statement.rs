@@ -6,7 +6,10 @@
 //! as they likely indicate a logical error or leftover debugging code.
 
 use zrc_diagnostics::diagnostic::GenericLabel;
-use zrc_typeck::{tast::stmt::TypedDeclaration, typeck::BlockMetadata};
+use zrc_typeck::{
+    tast::{expr::TypedExprKind, stmt::TypedDeclaration},
+    typeck::BlockMetadata,
+};
 use zrc_utils::span::{Spannable, Spanned};
 
 use crate::{
@@ -55,13 +58,11 @@ impl<'input> SemanticVisit<'input, '_> for Visit {
                 if !has_side_effects(expr.kind.value()) {
                     let span = stmt.kind.span();
                     self.diagnostics.push(
-                        LintDiagnostic::warning(
-                            LintDiagnosticKind::UnusedStatement.in_span(span),
-                        )
-                        .with_label(GenericLabel::warning(
-                            LintLabelKind::UnusedStatement.in_span(span),
-                        ))
-                        .with_note(LintNoteKind::UnusedStatement),
+                        LintDiagnostic::warning(LintDiagnosticKind::UnusedStatement.in_span(span))
+                            .with_label(GenericLabel::warning(
+                                LintLabelKind::UnusedStatement.in_span(span),
+                            ))
+                            .with_note(LintNoteKind::UnusedStatement),
                     );
                 }
             }
@@ -73,20 +74,25 @@ impl<'input> SemanticVisit<'input, '_> for Visit {
 }
 
 /// Check if an expression has side effects (recursively)
-fn has_side_effects(expr: &zrc_typeck::tast::expr::TypedExprKind<'_>) -> bool {
+fn has_side_effects(expr: &TypedExprKind<'_>) -> bool {
     use zrc_typeck::tast::expr::TypedExprKind;
 
     match expr {
         // Expressions with direct side effects
-        TypedExprKind::Assignment(_, _) => true,
-        TypedExprKind::Call(_, _) => true,
-        TypedExprKind::PrefixIncrement(_) => true,
-        TypedExprKind::PrefixDecrement(_) => true,
-        TypedExprKind::PostfixIncrement(_) => true,
-        TypedExprKind::PostfixDecrement(_) => true,
+        TypedExprKind::Assignment(_, _)
+        | TypedExprKind::Call(_, _)
+        | TypedExprKind::PrefixIncrement(_)
+        | TypedExprKind::PrefixDecrement(_)
+        | TypedExprKind::PostfixIncrement(_)
+        | TypedExprKind::PostfixDecrement(_) => true,
 
-        // Comma operator: check both sides
-        TypedExprKind::Comma(left, right) => {
+        // check both sides
+        TypedExprKind::Comma(left, right)
+        | TypedExprKind::BinaryBitwise(_, left, right)
+        | TypedExprKind::Logical(_, left, right)
+        | TypedExprKind::Equality(_, left, right)
+        | TypedExprKind::Comparison(_, left, right)
+        | TypedExprKind::Arithmetic(_, left, right) => {
             has_side_effects(left.kind.value()) || has_side_effects(right.kind.value())
         }
 
@@ -98,22 +104,22 @@ fn has_side_effects(expr: &zrc_typeck::tast::expr::TypedExprKind<'_>) -> bool {
         }
 
         // Binary operations: check both operands
-        TypedExprKind::BinaryBitwise(_, left, right)
-        | TypedExprKind::Logical(_, left, right)
-        | TypedExprKind::Equality(_, left, right)
-        | TypedExprKind::Comparison(_, left, right)
-        | TypedExprKind::Arithmetic(_, left, right) => {
-            has_side_effects(left.kind.value()) || has_side_effects(right.kind.value())
-        }
-
         // Unary operations: check the operand
         TypedExprKind::UnaryNot(expr)
         | TypedExprKind::UnaryBitwiseNot(expr)
         | TypedExprKind::UnaryMinus(expr)
-        | TypedExprKind::UnaryDereference(expr) => has_side_effects(expr.kind.value()),
+        | TypedExprKind::UnaryDereference(expr)
+        | TypedExprKind::Cast(expr, _) => has_side_effects(expr.kind.value()),
 
-        // Address-of and dot operations don't have side effects on their own
-        TypedExprKind::UnaryAddressOf(_) | TypedExprKind::Dot(_, _) => false,
+        // these operations don't have side effects on their own
+        TypedExprKind::UnaryAddressOf(_)
+        | TypedExprKind::Dot(_, _)
+        | TypedExprKind::SizeOf(_)
+        | TypedExprKind::NumberLiteral(_, _)
+        | TypedExprKind::StringLiteral(_)
+        | TypedExprKind::CharLiteral(_)
+        | TypedExprKind::BooleanLiteral(_)
+        | TypedExprKind::Identifier(_) => false,
 
         // Index: check both array and index expressions
         TypedExprKind::Index(array, index) => {
@@ -121,14 +127,10 @@ fn has_side_effects(expr: &zrc_typeck::tast::expr::TypedExprKind<'_>) -> bool {
         }
 
         // Cast: check the expression being cast
-        TypedExprKind::Cast(expr, _) => has_side_effects(expr.kind.value()),
-
         // SizeOf takes a Type, not an expression, so no side effects
-        TypedExprKind::SizeOf(_) => false,
-
         // Array literals: check all elements
         TypedExprKind::ArrayLiteral(elements) => {
-            elements.iter().any(|e| has_side_effects(e.kind.value()))
+            elements.iter().any(|ex| has_side_effects(ex.kind.value()))
         }
 
         // Struct construction: check all field values
@@ -136,13 +138,7 @@ fn has_side_effects(expr: &zrc_typeck::tast::expr::TypedExprKind<'_>) -> bool {
             .fields
             .iter()
             .any(|(_, value)| has_side_effects(value.kind.value())),
-
         // Leaf expressions (no side effects)
-        TypedExprKind::NumberLiteral(_, _)
-        | TypedExprKind::StringLiteral(_)
-        | TypedExprKind::CharLiteral(_)
-        | TypedExprKind::BooleanLiteral(_)
-        | TypedExprKind::Identifier(_) => false,
     }
 }
 
