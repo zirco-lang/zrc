@@ -5,6 +5,7 @@ mod division_by_constant_zero;
 mod empty_struct_used;
 mod underscore_variable_used;
 mod unreachable_code;
+mod unused_statement;
 mod unused_variables;
 
 use crate::pass::PassList;
@@ -19,5 +20,6 @@ pub fn get_default_lints() -> PassList {
         unused_variables::UnusedVariablesLint::init(),
         bad_control_flow::BadControlFlowLint::init(),
         division_by_constant_zero::DivisionByConstantZero::init(),
+        unused_statement::UnusedStatementLint::init(),
     ])
 }
