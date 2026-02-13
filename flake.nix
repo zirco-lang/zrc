@@ -27,7 +27,7 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             (rust-bin.nightly.latest.default.override {
-              extensions = [ "rust-src" ];
+              extensions = [ "rust-src" "rust-analyzer" ];
             })
             llvm.llvm
             llvm.libllvm

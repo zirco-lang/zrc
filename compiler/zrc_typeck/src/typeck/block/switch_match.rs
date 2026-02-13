@@ -25,7 +25,7 @@ use crate::{
 };
 
 /// Type check a switch case statement.
-#[expect(clippy::ptr_arg)]
+#[expect(clippy::ptr_arg, clippy::too_many_lines)]
 pub fn type_switch_case<'input>(
     scope: &mut Scope<'input>,
     scrutinee: Expr<'input>,
@@ -54,6 +54,18 @@ pub fn type_switch_case<'input>(
                 LabelKind::SwitchCaseMissingTerminalDefault.in_span(maybe_default_case.span()),
             )));
     };
+
+    // Ensure no other default triggers exist (resolves ICE #654)
+    if cases
+        .iter()
+        .any(|case| matches!(case.value().0, SwitchTrigger::Default))
+    {
+        return Err(DiagnosticKind::MultipleDefaultCases
+            .error_in(stmt_span)
+            .with_label(GenericLabel::error(
+                LabelKind::MultipleDefaultCases.in_span(stmt_span),
+            )));
+    }
 
     let default_block = type_block(
         scope,

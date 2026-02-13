@@ -44,8 +44,14 @@ pub fn type_expr_number_literal<'input>(
     // Check the bounds of the number literal
     // Note: We skip usize/isize since their size is platform-dependent
     let text_without_underscores = n.text_content().replace('_', "");
-    let parsed_value = u128::from_str_radix(&text_without_underscores, n.radix())
-        .expect("Number literal should have been valid");
+    let parsed_value = u128::from_str_radix(&text_without_underscores, n.radix());
+    let Ok(parsed_value) = parsed_value else {
+        return Err(DiagnosticKind::InvalidNumberLiteral(n.to_string())
+            .error_in(expr_span)
+            .with_label(GenericLabel::error(
+                LabelKind::InvalidNumberLiteral(n.to_string()).in_span(expr_span),
+            )));
+    };
 
     // Check bounds based on type
     #[expect(clippy::wildcard_enum_match_arm)]
@@ -411,6 +417,29 @@ mod tests {
             ));
         } else {
             panic!("Expected error for binary u8 overflow");
+        }
+    }
+
+    #[test]
+    fn regression_656_invalid_number_literals_dont_panic() {
+        let global_scope = GlobalScope::new();
+        let scope = global_scope.create_subscope();
+        let span = spanned_test!(0, (), 5).span();
+
+        // Test invalid number literal that would cause parse error
+        let result = type_expr_number_literal(
+            &scope,
+            span,
+            NumberLiteral::Decimal("not_a_number"),
+            Some(make_ast_type("i32")),
+        );
+        if let Err(diagnostic) = result {
+            assert!(matches!(
+                diagnostic.kind.into_value(),
+                DiagnosticKind::InvalidNumberLiteral(_)
+            ));
+        } else {
+            panic!("Expected error for invalid number literal");
         }
     }
 }
