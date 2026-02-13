@@ -38,5 +38,7 @@
         "queue": "cpp",
         "stack": "cpp",
         "unordered_map": "cpp"
-    }
+    },
+    // Use Nix's rust-analyzer
+    "rust-analyzer.server.path": "rust-analyzer"
 }

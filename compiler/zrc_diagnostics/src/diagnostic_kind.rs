@@ -132,6 +132,10 @@ pub enum DiagnosticKind {
     AssignmentToConstant(String),
     #[error("functions are not first-class values in Zirco; use a function pointer instead")]
     FunctionNotFirstClass,
+    #[error("invalid number literal")]
+    InvalidNumberLiteral(String),
+    #[error("multiple default cases found")]
+    MultipleDefaultCases,
 
     // PREPROCESSOR ERRORS
     #[error("unterminated include directive")]
@@ -220,6 +224,8 @@ impl ErrorCode for DiagnosticKind {
             Self::MainFunctionInvalidParameters => "E3041",
             Self::AssignmentToConstant(_) => "E3042",
             Self::FunctionNotFirstClass => "E3043",
+            Self::InvalidNumberLiteral(_) => "E3044",
+            Self::MultipleDefaultCases => "E3045",
         }
     }
 }
@@ -352,6 +358,10 @@ pub enum LabelKind {
     AssignmentToConstant(String),
     #[error("functions are not first-class values in Zirco; use a function pointer instead")]
     FunctionNotFirstClass,
+    #[error("invalid number literal")]
+    InvalidNumberLiteral(String),
+    #[error("multiple default cases found")]
+    MultipleDefaultCases,
 }
 
 /// The list of possible notes attached to a [`Diagnostic`]
