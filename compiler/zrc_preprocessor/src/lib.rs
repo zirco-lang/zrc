@@ -159,6 +159,28 @@ pub fn preprocess(
         let mut lines = content.lines();
         let shebang_line = lines.next().expect("the first line exists");
         let shebang_len = shebang_line.len() + 1; // +1 for newline
+
+        // Resolve ICE 648 where a missing LF can panic:
+        if !content[shebang_len - 1..].starts_with('\n') {
+            let sp = Span::from_positions_and_file(
+                0,
+                shebang_len,
+                Box::leak(
+                    base_path
+                        .join(file_name)
+                        .to_string_lossy()
+                        .into_owned()
+                        .into_boxed_str(),
+                ),
+            );
+            return Err(DiagnosticKind::PreprocessorInvalidShebang
+                .error_in(sp)
+                .with_label(GenericLabel::error(
+                    LabelKind::PreprocessorInvalidShebang.in_span(sp),
+                ))
+                .with_note(NoteKind::ShebangMustEndWithNewline));
+        }
+
         &content[shebang_len..]
     } else {
         content
