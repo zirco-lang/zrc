@@ -222,8 +222,8 @@ pub Type: Type<'input> = {
     <s:@L> "[" <size:NUMBER> "]" <element_type:TypeOrParenthesizedType> <e:@R> => {
         let size_val = match size {
             lexer::NumberLiteral::Decimal(s) => s.parse::<u64>().expect("array size should be a valid u64"),
-            lexer::NumberLiteral::Hexadecimal(s) => u64::from_str_radix(&s[2..], 16).expect("array size should be a valid hex u64"),
-            lexer::NumberLiteral::Binary(s) => u64::from_str_radix(&s[2..], 2).expect("array size should be a valid binary u64"),
+            lexer::NumberLiteral::Hexadecimal(s) => u64::from_str_radix(&s, 16).expect("array size should be a valid hex u64"),
+            lexer::NumberLiteral::Binary(s) => u64::from_str_radix(&s, 2).expect("array size should be a valid binary u64"),
         };
         Type::build_array(spanned!(s, (), e, file_name).span(), size_val, element_type)
     },
