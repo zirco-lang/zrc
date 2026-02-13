@@ -186,6 +186,7 @@ StructOrUnionDeclaration: Declaration<'input> = {
 };
 
 ArgumentDeclarationList: ArgumentDeclarationList<'input> = {
+    "..." => ArgumentDeclarationList::Variadic(Vec::new()),
     <CommaSeparated<Spanned<ArgumentDeclaration>>> => ArgumentDeclarationList::NonVariadic(<>),
     <CommaSeparatedWithoutTrailing<Spanned<ArgumentDeclaration>>> "," "..." => ArgumentDeclarationList::Variadic(<>),
 };
