@@ -1,8 +1,9 @@
-#!/bin/sh
-# Zircon installation hook for the zrc compiler
-# This script is invoked by Zircon to compile the zrc source files.
+#!/usr/bin/env bash
+# Build hook for the zrc compiler
+# This script is invoked by a github action to compile the zrc source files.
 # CWD is the repo root, and ZIRCON_TOOLCHAIN_DIR is the destination.
-# We install the binary, include files, and env.sh which is hooked by zircon env.
+# We install the binary, include files, and env.sh which is hooked by zircon env into the toolchain
+# directory in the proper format for Zircon.
 
 set -e
 
@@ -30,6 +31,6 @@ cp libzr/dist/libzr.a "$ZIRCON_LIBZR_DIR/lib/"
 cp libzr/dist/libzr.so "$ZIRCON_LIBZR_DIR/lib/"
 cp -r libzr/include/* "$ZIRCON_LIBZR_DIR/include/"
 
-cp hooks/env.sh "$ZIRCON_TOOLCHAIN_DIR/env.sh"
+cp scripts/env.sh "$ZIRCON_TOOLCHAIN_DIR/env.sh"
 
 chmod +x "$ZIRCON_TOOLCHAIN_DIR/env.sh"

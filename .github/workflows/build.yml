@@ -49,7 +49,7 @@ jobs:
               run: |
                   mkdir outputs
                   ZIRCON_TOOLCHAIN_DIR=$(pwd)/outputs \
-                    bash hooks/zircon.sh
+                    bash scripts/build.sh
             - name: Upload build artifacts
               uses: actions/upload-artifact@v6
               with:
@@ -121,8 +121,37 @@ jobs:
               run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
             - name: Lint all examples
               run: make -j2 -C examples lint ZIRCOP=zircop
-    comment-artifacts:
+    build-debs:
         needs: build
+        runs-on: ${{ matrix.os }}
+        strategy:
+            matrix:
+                os:
+                    - ubuntu-24.04
+                    - ubuntu-24.04-arm
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  # Make sure the actual branch is checked out when running on pull requests
+                  ref: ${{ github.head_ref }}
+                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+            - name: Download build artifact
+              uses: actions/download-artifact@v7
+              with:
+                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
+                  path: /tmp/artifacts
+            - name: Build sysroots
+              run: ZIRCON_TOOLCHAIN_DIR=/tmp/artifacts SYSROOT=/tmp/sysroot bash scripts/mk-sysroot.sh
+            - name: Build Debian package
+              run: SYSROOT=/tmp/sysroot DEB_OUTPUT=./debs bash scripts/mk-deb.sh
+            - name: Upload Debian package artifact
+              uses: actions/upload-artifact@v6
+              with:
+                  path: ./debs/*.deb
+                  name: zrc-Debian-${{ runner.arch }}
+    comment-artifacts:
+        needs: [build, build-debs]
         runs-on: ubuntu-latest
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
 
@@ -183,7 +212,7 @@ jobs:
                       }
     release:
         # only on commits to main
-        needs: build
+        needs: [build, build-debs]
         if: github.ref == 'refs/heads/main'
         runs-on: ubuntu-latest
         permissions:
@@ -219,6 +248,16 @@ jobs:
               with:
                   name: zrc-macOS-ARM64-release
                   path: macOS-ARM64
+            - name: Download X86 Debian package artifact
+              uses: actions/download-artifact@v7
+              with:
+                  name: zrc-Debian-X64
+                  path: Debian-X64
+            - name: Download ARM64 Debian package artifact
+              uses: actions/download-artifact@v7
+              with:
+                  name: zrc-Debian-ARM64
+                  path: Debian-ARM64
             - name: Set executable permissions
               run: |
                   chmod +x Linux-X64/bin/*
@@ -231,6 +270,8 @@ jobs:
                   tar -czf zrc-linux-arm64.tar.gz -C Linux-ARM64 .
                   tar -czf zrc-macos-x64.tar.gz -C macOS-X64 .
                   tar -czf zrc-macos-arm64.tar.gz -C macOS-ARM64 .
+                  mv Debian-X64/* .
+                  mv Debian-ARM64/* .
             - name: Update `nightly` release
               uses: softprops/action-gh-release@v2
               with:
@@ -238,6 +279,10 @@ jobs:
                   name: Latest Build
                   body: |
                       This is an automated build of the Zirco project from the `main` branch.
+
+                      Although we build Zirco for Debian and provide tarballs here,
+                      the recommended installation method is always to use the
+                      [Zircon toolchain manager](https://github.com/zirco-lang/zircon) to update and manage multiple versions of the toolchain.
 
                       **Commit:** ${{ github.sha }}
                       **Date:** ${{ github.event.head_commit.timestamp }}
@@ -248,5 +293,7 @@ jobs:
                       zrc-linux-arm64.tar.gz
                       zrc-macos-x64.tar.gz
                       zrc-macos-arm64.tar.gz
+                      *.deb
+
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
