@@ -11,6 +11,7 @@ use zrc::{OutputFormat, codegen::OptimizationLevel};
 /// The official Zirco compiler
 #[derive(Parser)]
 #[command(version=None)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct Cli {
     /// See what version of zrc you are using
     #[arg(short, long)]
@@ -56,6 +57,11 @@ pub struct Cli {
     /// Add a directory to the include path
     #[arg(short = 'I', long = "include", action = clap::ArgAction::Append)]
     pub include_paths: Vec<PathBuf>,
+
+    /// Restrict all final resolved include paths to lie within listed -I paths
+    /// or `ZIRCO_INCLUDE_PATH`
+    #[arg(long)]
+    pub forbid_unlisted_includes: bool,
 
     /// Diagnostic output format
     #[arg(long)]

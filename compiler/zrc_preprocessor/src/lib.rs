@@ -105,15 +105,18 @@ struct PreprocessorCtx<'sp> {
     chunks: Vec<SourceChunk>,
     /// The paths to search for bracket includes
     search_paths: &'sp [&'static Path],
+    /// Whether to forbid includes outside of listed search paths
+    forbid_unlisted_includes: bool,
 }
 
 impl<'sp> PreprocessorCtx<'sp> {
     /// Create a new preprocessor context
-    fn new(search_paths: &'sp [&'static Path]) -> Self {
+    fn new(search_paths: &'sp [&'static Path], forbid_unlisted_includes: bool) -> Self {
         Self {
             pragma_once_files: HashSet::new(),
             chunks: Vec::new(),
             search_paths,
+            forbid_unlisted_includes,
         }
     }
 }
@@ -129,18 +132,44 @@ fn find_include_file(ctx: &PreprocessorCtx, include_file: &str) -> Option<PathBu
     None
 }
 
+/// Check if a resolved path is within any of the allowed search paths
+fn is_path_within_allowed_dirs(resolved_path: &Path, search_paths: &[&Path]) -> bool {
+    // Try to canonicalize the resolved path
+    let Ok(canonical_resolved) = resolved_path.canonicalize() else {
+        return false;
+    };
+
+    // Check if the resolved path is within any of the search paths
+    for search_path in search_paths {
+        let Ok(canonical_search) = search_path.canonicalize() else {
+            continue;
+        };
+
+        if canonical_resolved.starts_with(&canonical_search) {
+            return true;
+        }
+    }
+
+    false
+}
+
 /// Process a Zirco source file with preprocessing directives
 ///
 /// # Arguments
 /// * `base_path` - The directory to resolve relative includes from
+/// * `search_paths` - The list of directories to search for includes
 /// * `file_name` - The name of the file being processed
 /// * `content` - The content of the file to preprocess
+/// * `forbid_unlisted_includes` - Whether to restrict includes to search paths
+///   only
 ///
 /// # Errors
 /// Returns an error if:
 /// - An included file cannot be found
 /// - An included file cannot be read
 /// - A preprocessing directive is malformed
+/// - An include path is outside allowed directories (when
+///   `forbid_unlisted_includes` is true)
 ///
 /// # Panics
 ///
@@ -151,8 +180,9 @@ pub fn preprocess(
     search_paths: &'_ [&'static Path],
     file_name: &str,
     content: &str,
+    forbid_unlisted_includes: bool,
 ) -> Result<Vec<SourceChunk>, Diagnostic> {
-    let mut ctx = PreprocessorCtx::new(search_paths);
+    let mut ctx = PreprocessorCtx::new(search_paths, forbid_unlisted_includes);
 
     // Trim off a leading shebang line if present
     let content = if content.starts_with("#!") {
@@ -344,6 +374,32 @@ fn preprocess_internal(
                     .canonicalize()
                     .expect("failed to canonicalize path");
 
+                // Check if the resolved path is within allowed directories
+                if ctx.forbid_unlisted_includes
+                    && !is_path_within_allowed_dirs(&canonical_path, ctx.search_paths)
+                {
+                    let sp = Span::from_positions_and_file(
+                        current_byte,
+                        current_byte + line.len(),
+                        static_file_name,
+                    );
+                    return Err(DiagnosticKind::PreprocessorForbiddenIncludePath
+                        .error_in(sp)
+                        .with_label(GenericLabel::error(
+                            LabelKind::PreprocessorForbiddenIncludePath(
+                                canonical_path.to_string_lossy().to_string(),
+                            )
+                            .in_span(sp),
+                        ))
+                        .with_note(NoteKind::AllowedIncludeDirectories(
+                            ctx.search_paths
+                                .iter()
+                                .map(|x| x.to_string_lossy().to_string())
+                                .collect::<Vec<_>>()
+                                .join("\n"),
+                        )));
+                }
+
                 // Check if already included with pragma once
                 if ctx.pragma_once_files.contains(&canonical_path) {
                     chunk_start_line = line_num + 1;
@@ -429,8 +485,8 @@ mod tests {
     #[test]
     fn preprocess_simple_file_without_directives() {
         let content = "fn main() {\n    printf(\"Hello\");\n}";
-        let chunks =
-            preprocess(Path::new("."), &[], "test.zr", content).expect("preprocessing failed");
+        let chunks = preprocess(Path::new("."), &[], "test.zr", content, false)
+            .expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].file_name, "./test.zr");
@@ -442,8 +498,8 @@ mod tests {
     #[test]
     fn preprocess_with_pragma_once() {
         let content = "#pragma once\nfn test() {}";
-        let chunks =
-            preprocess(Path::new("."), &[], "test.zr", content).expect("preprocessing failed");
+        let chunks = preprocess(Path::new("."), &[], "test.zr", content, false)
+            .expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].start_line, 2);
@@ -454,8 +510,8 @@ mod tests {
     #[test]
     fn preprocess_pragma_once_with_multiple_lines() {
         let content = "#pragma once\n\nfn first() {}\nfn second() {}";
-        let chunks =
-            preprocess(Path::new("."), &[], "test.zr", content).expect("preprocessing failed");
+        let chunks = preprocess(Path::new("."), &[], "test.zr", content, false)
+            .expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].start_line, 2);
@@ -467,8 +523,8 @@ mod tests {
     fn preprocess_tracks_byte_offsets_correctly() {
         // Test that byte offsets are correctly calculated
         let content = "line1\n#pragma once\nline3";
-        let chunks =
-            preprocess(Path::new("."), &[], "test.zr", content).expect("preprocessing failed");
+        let chunks = preprocess(Path::new("."), &[], "test.zr", content, false)
+            .expect("preprocessing failed");
 
         // First chunk: "line1" (before pragma)
         assert_eq!(chunks.len(), 2);

@@ -148,6 +148,8 @@ pub enum DiagnosticKind {
     PreprocessorCannotReadIncludeFile,
     #[error("unknown preprocessor directive")]
     PreprocessorUnknownDirective,
+    #[error("include path not in allowed directories")]
+    PreprocessorForbiddenIncludePath,
     #[error("invalid shebang")]
     PreprocessorInvalidShebang,
 }
@@ -174,6 +176,7 @@ impl ErrorCode for DiagnosticKind {
             Self::PreprocessorInvalidIncludeSyntax => "E1003",
             Self::PreprocessorUnterminatedIncludeDirective => "E1004",
             Self::PreprocessorUnknownDirective => "E1005",
+            Self::PreprocessorForbiddenIncludePath => "E1007",
             Self::PreprocessorInvalidShebang => "E1006",
 
             Self::UnknownToken(_) => "E2001",
@@ -267,6 +270,8 @@ pub enum LabelKind {
     ExpectedClosing(String),
     #[error("unknown preprocessor directive")]
     PreprocessorUnknownDirective,
+    #[error("include path `{0}` is not within any allowed directory")]
+    PreprocessorForbiddenIncludePath(String),
     #[error("there is no type named `{0}`")]
     UnableToResolveType(String),
     #[error("there is no variable named `{0}` in this scope")]
@@ -391,6 +396,8 @@ pub enum NoteKind {
     ReadFailed(String),
     #[error("Zirco does not support macros")]
     MacrosNotSupported,
+    #[error("allowed include directories:\n{0}")]
+    AllowedIncludeDirectories(String),
     #[error("there is a variable named `{0}`, but expected a type here")]
     VariableExists(String),
     #[error("there is a type named `{0}`, but expected a variable here")]
