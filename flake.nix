@@ -69,7 +69,7 @@
               cp -r $src/include $out/include
             '';
 
-            setupHook = ./hooks/nix-zrc.sh;
+            setupHook = ./scripts/nix-zrc.sh;
 
             LLVM_SYS_201_PREFIX = llvm.llvm.dev;
           };
@@ -99,7 +99,7 @@
               cp -r include/* $out/include/
             '';
 
-            setupHook = ./hooks/nix-libzr.sh;
+            setupHook = ./scripts/nix-libzr.sh;
           };
 
         packages.default = self.packages.${system}.zrc;
