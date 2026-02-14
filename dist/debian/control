@@ -1,0 +1,9 @@
+Package: zrc
+Version: 0.1.0+{COMMIT}
+Section: devel
+Priority: optional
+Architecture: {ARCH}
+Maintainer: Logan Devine <logan@zirco.dev>
+Description: Compiler for the Zirco programming language
+ Zirco is a systems programming language for writing high-performance and explicit software.
+Homepage: https://zirco.dev/

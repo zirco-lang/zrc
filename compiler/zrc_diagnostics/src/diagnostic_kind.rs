@@ -150,6 +150,8 @@ pub enum DiagnosticKind {
     PreprocessorUnknownDirective,
     #[error("include path not in allowed directories")]
     PreprocessorForbiddenIncludePath,
+    #[error("invalid shebang")]
+    PreprocessorInvalidShebang,
 }
 impl DiagnosticKind {
     /// Create a [error] diagnostic in a given [`Span`].
@@ -174,7 +176,8 @@ impl ErrorCode for DiagnosticKind {
             Self::PreprocessorInvalidIncludeSyntax => "E1003",
             Self::PreprocessorUnterminatedIncludeDirective => "E1004",
             Self::PreprocessorUnknownDirective => "E1005",
-            Self::PreprocessorForbiddenIncludePath => "E1006",
+            Self::PreprocessorForbiddenIncludePath => "E1007",
+            Self::PreprocessorInvalidShebang => "E1006",
 
             Self::UnknownToken(_) => "E2001",
             Self::UnterminatedStringLiteral => "E2002",
@@ -367,6 +370,8 @@ pub enum LabelKind {
     InvalidNumberLiteral(String),
     #[error("multiple default cases found")]
     MultipleDefaultCases,
+    #[error("invalid shebang")]
+    PreprocessorInvalidShebang,
 }
 
 /// The list of possible notes attached to a [`Diagnostic`]
@@ -405,6 +410,8 @@ pub enum NoteKind {
     ArrayIndexesMustBeUsize,
     #[error("pointer arithmetic requires the right-hand side to be usize")]
     PointerArithmeticRequiresUsize,
+    #[error("a shebang must end in a linefeed")]
+    ShebangMustEndWithNewline,
 }
 
 /// The list of possible help messages attached to a [`Diagnostic`]
