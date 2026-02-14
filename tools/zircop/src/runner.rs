@@ -15,6 +15,7 @@ pub fn run(
     parent_directory: &Path,
     file_name: &str,
     content: &str,
+    forbid_unlisted_includes: bool,
     passes: &PassList,
 ) -> Result<Vec<LintDiagnostic>, Diagnostic> {
     // This function very closely mirrors the beginning of the `compile` function
@@ -23,8 +24,13 @@ pub fn run(
     let mut diagnostics = Vec::new();
 
     // === PREPROCESSOR ===
-    let chunks =
-        zrc_preprocessor::preprocess(parent_directory, include_paths, file_name, content, false)?;
+    let chunks = zrc_preprocessor::preprocess(
+        parent_directory,
+        include_paths,
+        file_name,
+        content,
+        forbid_unlisted_includes,
+    )?;
 
     // === PARSER ===
     let mut ast = Vec::new();
@@ -54,7 +60,15 @@ pub fn run_with_default_passes(
     parent_directory: &Path,
     file_name: &str,
     content: &str,
+    forbid_unlisted_includes: bool,
 ) -> Result<Vec<LintDiagnostic>, Diagnostic> {
     let passes = lints::get_default_lints();
-    run(include_paths, parent_directory, file_name, content, &passes)
+    run(
+        include_paths,
+        parent_directory,
+        file_name,
+        content,
+        forbid_unlisted_includes,
+        &passes,
+    )
 }

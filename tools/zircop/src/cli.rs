@@ -22,6 +22,11 @@ pub struct Cli {
     #[arg(short = 'I', long = "include", action = clap::ArgAction::Append)]
     pub include_paths: Vec<PathBuf>,
 
+    /// Restrict all final resolved include paths to lie within listed -I paths
+    /// or `ZIRCO_INCLUDE_PATH`
+    #[arg(long)]
+    pub forbid_unlisted_includes: bool,
+
     /// Diagnostic output format
     #[arg(long)]
     #[clap(default_value = "human")]

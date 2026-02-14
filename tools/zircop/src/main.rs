@@ -98,6 +98,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Path::new(&directory_name),
         &file_name,
         &source_content,
+        cli.forbid_unlisted_includes,
     );
 
     match diagnostics {
