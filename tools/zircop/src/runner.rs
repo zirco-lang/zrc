@@ -23,7 +23,8 @@ pub fn run(
     let mut diagnostics = Vec::new();
 
     // === PREPROCESSOR ===
-    let chunks = zrc_preprocessor::preprocess(parent_directory, include_paths, file_name, content)?;
+    let chunks =
+        zrc_preprocessor::preprocess(parent_directory, include_paths, file_name, content, false)?;
 
     // === PARSER ===
     let mut ast = Vec::new();

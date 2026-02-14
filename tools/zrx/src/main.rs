@@ -185,6 +185,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             &include_paths,
             &file_name,
             &source_content,
+            false,
         )?;
 
         let mut ast = Vec::new();

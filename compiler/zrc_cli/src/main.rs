@@ -132,6 +132,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 zrc::codegen::TargetTriple::create(&triple)
             }),
         &cli.cpu,
+        cli.forbid_unlisted_includes,
     );
 
     match result {

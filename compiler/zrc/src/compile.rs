@@ -49,6 +49,7 @@ pub enum OutputFormat {
 ///
 /// * `frontend_version_string` - A string representing the version of the
 ///   frontend.
+/// * `include_paths` - The list of directories to search for includes.
 /// * `emit` - The desired output format.
 /// * `parent_directory` - The parent directory of the source file.
 /// * `file_name` - The name of the source file.
@@ -58,6 +59,8 @@ pub enum OutputFormat {
 /// * `debug_mode` - The debug level for code generation.
 /// * `triple` - The target triple for code generation.
 /// * `cpu` - The target CPU for code generation.
+/// * `forbid_unlisted_includes` - Whether to restrict includes to search paths
+///   only.
 ///
 /// # Errors
 ///
@@ -80,6 +83,7 @@ pub fn compile(
     debug_mode: DebugLevel,
     triple: &zrc_codegen::TargetTriple,
     cpu: &str,
+    forbid_unlisted_includes: bool,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
     // === PREPROCESSOR ===
     let chunks = zrc_preprocessor::preprocess(
@@ -87,6 +91,7 @@ pub fn compile(
         include_paths,
         file_name,
         content,
+        forbid_unlisted_includes,
     )?;
 
     // === PARSER ===

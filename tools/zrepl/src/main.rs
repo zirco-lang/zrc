@@ -294,7 +294,7 @@ fn handle_help() -> Response {
 fn handle_include(line: &str, include_paths: &'static [&Path], gs: &mut GlobalScope) -> Response {
     // feed it to the preprocessor
     let chunks = diag_wrapper(
-        || zrc_preprocessor::preprocess(Path::new("/dev"), include_paths, "<stdin>", line),
+        || zrc_preprocessor::preprocess(Path::new("/dev"), include_paths, "<stdin>", line, false),
         Some(line),
     );
     let Ok(chunks) = chunks else {
