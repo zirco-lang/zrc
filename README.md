@@ -6,6 +6,8 @@
 
 <b>Bare metal power, modern clarity.</b>
 
+<a href="https://zirco.dev/">Homepage</a> | <a href="https://play.zirco.dev">Playground</a>
+
 ![Alt](https://repobeats.axiom.co/api/embed/ba11a893172e06e66607b7949d986810ab7b42df.svg "Repobeats analytics image")
 
 </div>
