@@ -26,6 +26,7 @@ macro_rules! zircop_lint_test {
                 parent_directory,
                 file_name,
                 $source,
+                false,
             )
             .expect("Compilation should succeed");
 
