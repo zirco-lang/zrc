@@ -51,7 +51,7 @@ jobs:
                   ZIRCON_TOOLCHAIN_DIR=$(pwd)/outputs \
                     bash scripts/build.sh
             - name: Upload build artifacts
-              uses: actions/upload-artifact@v6
+              uses: actions/upload-artifact@v7
               with:
                   path: outputs
                   name: zrc-${{ runner.os }}-${{ runner.arch }}-release
@@ -67,7 +67,7 @@ jobs:
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
             - name: Download build artifact
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
@@ -89,7 +89,7 @@ jobs:
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
             - name: Download build artifact
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
@@ -111,7 +111,7 @@ jobs:
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
             - name: Download build artifact
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: ./artifacts
@@ -137,7 +137,7 @@ jobs:
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
             - name: Download build artifact
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: zrc-${{ runner.os }}-${{ runner.arch }}-release
                   path: /tmp/artifacts
@@ -146,7 +146,7 @@ jobs:
             - name: Build Debian package
               run: SYSROOT=/tmp/sysroot DEB_OUTPUT=./debs bash scripts/mk-deb.sh
             - name: Upload Debian package artifact
-              uses: actions/upload-artifact@v6
+              uses: actions/upload-artifact@v7
               with:
                   path: ./debs/*.deb
                   name: zrc-Debian-${{ runner.arch }}
@@ -229,32 +229,32 @@ jobs:
                   git tag nightly
                   git push origin nightly
             - name: Download X86 Linux build artifact
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: zrc-Linux-X64-release
                   path: Linux-X64
             - name: Download ARM64 Linux build artifact
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: zrc-Linux-ARM64-release
                   path: Linux-ARM64
             - name: Download X86 macOS build artifact
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: zrc-macOS-X64-release
                   path: macOS-X64
             - name: Download ARM64 macOS build artifact
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: zrc-macOS-ARM64-release
                   path: macOS-ARM64
             - name: Download X86 Debian package artifact
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: zrc-Debian-X64
                   path: Debian-X64
             - name: Download ARM64 Debian package artifact
-              uses: actions/download-artifact@v7
+              uses: actions/download-artifact@v8
               with:
                   name: zrc-Debian-ARM64
                   path: Debian-ARM64
