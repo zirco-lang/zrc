@@ -764,20 +764,14 @@ pub fn are_delimiters_balanced(input: &str) -> bool {
             Tok::LeftParen | Tok::LeftBracket | Tok::LeftBrace => {
                 stack.push(tok);
             }
-            Tok::RightParen => {
-                if stack.pop() != Some(Tok::LeftParen) {
-                    return false;
-                }
+            Tok::RightParen if stack.pop() != Some(Tok::LeftParen) => {
+                return false;
             }
-            Tok::RightBracket => {
-                if stack.pop() != Some(Tok::LeftBracket) {
-                    return false;
-                }
+            Tok::RightBracket if stack.pop() != Some(Tok::LeftBracket) => {
+                return false;
             }
-            Tok::RightBrace => {
-                if stack.pop() != Some(Tok::LeftBrace) {
-                    return false;
-                }
+            Tok::RightBrace if stack.pop() != Some(Tok::LeftBrace) => {
+                return false;
             }
             _ => {}
         }

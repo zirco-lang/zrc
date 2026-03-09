@@ -172,7 +172,7 @@ impl Display for StmtKind<'_> {
             Self::EmptyStmt => write!(f, ";"),
             Self::ContinueStmt => write!(f, "continue;"),
             Self::BreakStmt => write!(f, "break;"),
-            Self::ReturnStmt(Some(expr)) => write!(f, "return {expr};",),
+            Self::ReturnStmt(Some(expr)) => write!(f, "return {expr};"),
             Self::ReturnStmt(None) => write!(f, "return;"),
             Self::UnreachableStmt => write!(f, "unreachable;"),
             Self::DeclarationList(list) => {
@@ -229,7 +229,7 @@ pub enum Declaration<'input> {
     /// A named type alias (`type U = T;`)
     /// This is also used for structs and unions.
     TypeAliasDeclaration {
-        /// The name of the newtype.
+        /// The name of the new type alias.
         name: Spanned<&'input str>,
         /// The type to associate.
         ty: Type<'input>,
