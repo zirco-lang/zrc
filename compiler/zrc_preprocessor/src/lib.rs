@@ -446,7 +446,6 @@ fn preprocess_internal(
                     ));
 
                 if directive.starts_with("define") {
-                    // i forgor which syntax it was but this is a useful note
                     diag = diag.with_note(NoteKind::MacrosNotSupported);
                 }
 
