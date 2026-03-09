@@ -272,6 +272,41 @@ jobs:
                   tar -czf zrc-macos-arm64.tar.gz -C macOS-ARM64 .
                   mv Debian-X64/* .
                   mv Debian-ARM64/* .
+            - name: Delete old .deb assets from nightly release
+              uses: actions/github-script@v8
+              with:
+                  script: |
+                      let release;
+                      try {
+                          release = await github.rest.repos.getReleaseByTag({
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              tag: 'nightly',
+                          });
+                      } catch (e) {
+                          if (e.status === 404) { return; }
+                          throw e;
+                      }
+                      const assets = await github.paginate(
+                          github.rest.repos.listReleaseAssets,
+                          {
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              release_id: release.data.id,
+                              per_page: 100,
+                          }
+                      );
+                      for (const asset of assets) {
+                          if (asset.name.endsWith('.deb')) {
+                              await github.rest.repos.deleteReleaseAsset({
+                                  owner: context.repo.owner,
+                                  repo: context.repo.repo,
+                                  asset_id: asset.id,
+                              });
+                          }
+                      }
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             - name: Update `nightly` release
               uses: softprops/action-gh-release@v2
               with:
