@@ -298,12 +298,13 @@ jobs:
                       );
                       for (const asset of assets) {
                           if (asset.name.endsWith('.deb')) {
+                              console.log(`Nuking asset ${asset.name} ${asset.id}`);
                               await github.rest.repos.deleteReleaseAsset({
                                   owner: context.repo.owner,
                                   repo: context.repo.repo,
                                   asset_id: asset.id,
                               });
-                          }
+                          } else console.log(`Not deleting ${asset.name} ${asset.id}`);
                       }
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
