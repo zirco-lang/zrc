@@ -7,29 +7,30 @@
 
 set -e
 
-ZIRCON_BIN_DIR="$ZIRCON_TOOLCHAIN_DIR/bin"
-ZIRCON_INCLUDE_DIR="$ZIRCON_TOOLCHAIN_DIR/include"
-ZIRCON_LIBZR_DIR="$ZIRCON_TOOLCHAIN_DIR/libzr"
-
-mkdir -p "$ZIRCON_BIN_DIR"
-mkdir -p "$ZIRCON_INCLUDE_DIR"
-mkdir -p "$ZIRCON_LIBZR_DIR/lib"
-mkdir -p "$ZIRCON_LIBZR_DIR/include"
+mkdir -p "$ZIRCON_TOOLCHAIN_DIR/bin"
+mkdir -p "$ZIRCON_TOOLCHAIN_DIR/include"
+mkdir -p "$ZIRCON_TOOLCHAIN_DIR/include/zirco"
+mkdir -p "$ZIRCON_TOOLCHAIN_DIR/lib"
+mkdir -p "$ZIRCON_TOOLCHAIN_DIR/libzr/lib"
+mkdir -p "$ZIRCON_TOOLCHAIN_DIR/libzr/include"
 
 cargo build --release
 
-cp target/release/zrc "$ZIRCON_BIN_DIR/"
-cp target/release/zircop "$ZIRCON_BIN_DIR/"
-cp target/release/zrx "$ZIRCON_BIN_DIR/"
-cp target/release/zrepl "$ZIRCON_BIN_DIR/"
-cp -r include/* "$ZIRCON_INCLUDE_DIR/"
+cp target/release/zrc "$ZIRCON_TOOLCHAIN_DIR/bin"
+cp target/release/zircop "$ZIRCON_TOOLCHAIN_DIR/bin"
+cp target/release/zrx "$ZIRCON_TOOLCHAIN_DIR/bin"
+cp target/release/zrepl "$ZIRCON_TOOLCHAIN_DIR/bin"
+cp -r include/* "$ZIRCON_TOOLCHAIN_DIR/include/zirco/"
+cp target/release/libzrc.a "$ZIRCON_TOOLCHAIN_DIR/lib/"
+find target/release -maxdepth 1 -type f \( -name "libzrc.so" -o -name "libzrc.dylib" \) -exec cp {} "$ZIRCON_TOOLCHAIN_DIR/lib/" \;
+cp compiler/zrc_c/zrc.h "$ZIRCON_TOOLCHAIN_DIR/include/"
 
 # build std using the fresh compiler
-make -C libzr all-opt ZRC=$ZIRCON_BIN_DIR/zrc
+make -C libzr all-opt ZRC=$ZIRCON_TOOLCHAIN_DIR/bin/zrc
 
-cp libzr/dist/libzr.a "$ZIRCON_LIBZR_DIR/lib/"
-cp libzr/dist/libzr.so "$ZIRCON_LIBZR_DIR/lib/"
-cp -r libzr/include/* "$ZIRCON_LIBZR_DIR/include/"
+cp libzr/dist/libzr.a "$ZIRCON_TOOLCHAIN_DIR/libzr/lib/"
+find libzr/dist -maxdepth 1 -type f \( -name "libzr.so" -o -name "libzr.dylib" \) -exec cp {} "$ZIRCON_TOOLCHAIN_DIR/libzr/lib/" \;
+cp -r libzr/include/* "$ZIRCON_TOOLCHAIN_DIR/libzr/include/"
 
 cp scripts/env.sh "$ZIRCON_TOOLCHAIN_DIR/env.sh"
 

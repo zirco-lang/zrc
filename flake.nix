@@ -54,6 +54,7 @@
           naerskLib.buildPackage {
             pname = "zrc";
             src = ./.;
+            copyLibs = true;
             buildInputs = with pkgs; [
               rust-bin.stable.latest.default
               llvm.llvm
@@ -66,7 +67,9 @@
             ];
 
             postInstall = ''
-              cp -r $src/include $out/include
+              mkdir -p $out/include/zirco
+              cp -r $src/include/* $out/include/zirco/
+              cp $src/compiler/zrc_c/zrc.h $out/include
             '';
 
             setupHook = ./scripts/nix-zrc.sh;

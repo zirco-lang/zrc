@@ -5,4 +5,7 @@
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 # We assume that the include folder is next to the nix support folder
-export ZIRCO_INCLUDE_PATH="${ZIRCO_INCLUDE_PATH:-}:$HOOK_DIR/../include"
+export ZIRCO_INCLUDE_PATH="${ZIRCO_INCLUDE_PATH:-}:$HOOK_DIR/../include/zirco"
+export C_INCLUDE_PATH="${C_INCLUDE_PATH:-}:$HOOK_DIR/../include"
+export CPLUS_INCLUDE_PATH="${CPLUS_INCLUDE_PATH:-}:$HOOK_DIR/../include"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:$HOOK_DIR/../lib"
