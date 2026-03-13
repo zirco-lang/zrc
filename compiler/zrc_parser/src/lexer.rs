@@ -622,7 +622,7 @@ pub enum StringTok<'input> {
     EscapedHexByte(&'input str),
 
     /// '\u{X...} with `X...` being a hex literal from `0`..`10FFFF`
-    #[regex(r"\\u\{[0-9a-fA-F]{1,6}\}", escaped_unicode)]
+    #[regex(r"\\u\{([0-9a-fA-F]{1,5}|10[0-9a-fA-F]{4})\}", escaped_unicode)]
     #[display("\\u{{{_0}}}")]
     EscapedUnicode(&'input str),
 
