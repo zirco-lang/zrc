@@ -4,3 +4,4 @@ lcov.info
 /examples/**/out
 /result
 /libzr/dist
+.claude

@@ -30,8 +30,14 @@ C_OUTPUTS ?= $(C_SOURCES:$(SRCDIR)/%.c=$(OUTDIR)/%.o)
 
 # make .so and .a files
 all: out $(ZR_OUTPUTS) $(C_OUTPUTS)
+# if we're on macOS, make a .dylib instead of a .so:
+ifeq ($(shell uname),Darwin)
+	$(ECHO) "  CCLD   libzr.dylib"
+	$(Q)$(CC) $(CFLAGS) -dynamiclib -o $(OUTDIR)/libzr.dylib $(ZR_OUTPUTS) $(C_OUTPUTS)
+else
 	$(ECHO) "  CCLD   libzr.so"
 	$(Q)$(CC) $(CFLAGS) -shared -o $(OUTDIR)/libzr.so $(ZR_OUTPUTS) $(C_OUTPUTS)
+endif
 	$(ECHO) "  AR     libzr.a"
 	$(Q)ar rcs $(OUTDIR)/libzr.a $(ZR_OUTPUTS) $(C_OUTPUTS)
 

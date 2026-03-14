@@ -10,6 +10,7 @@ members = [
     "compiler/zrc_typeck",
     "compiler/zrc_codegen",
     "compiler/zrc_preprocessor",
+    "compiler/zrc_c",
     "tools/zircop",
     "tools/zrx",
     "tools/zrepl",
