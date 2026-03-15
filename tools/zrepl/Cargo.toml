@@ -13,5 +13,5 @@ zrc_diagnostics = { path = "../../compiler/zrc_diagnostics" }
 zrc_utils = { path = "../../compiler/zrc_utils" }
 clap = { version = "4.5.52", features = ["derive"] }
 zrc_buildinfo = { path = "../../common/zrc_buildinfo" }
-repline = "0.0.13"
+repline = "0.0.14"
 ansi_color_constants = "2.0.2"
