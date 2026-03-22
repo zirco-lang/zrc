@@ -352,7 +352,7 @@ Zirco uses the following operators and punctuation:
 **Other Operators**:
 
 ```
-.   ->  ::  ?   :   as
+.   ->  <-  ::  ?   :   as
 ```
 
 **Delimiters**:
@@ -819,7 +819,7 @@ Additionally, the `<-` operator can be used to provide the member to access firs
 
 ```zirco
 let ptr: *Point;
-let x_val: x<-ptr;
+let x_val = x<-ptr;
 ```
 
 ### 4.11 Index Expressions
@@ -1651,6 +1651,7 @@ expr ::= primary
        | expr "[" expr "]"
        | expr "." identifier
        | expr "->" identifier
+       | identifier "<-" expr
 
 primary ::= literal
           | identifier
