@@ -381,6 +381,7 @@ _Unary: ExprKind<'input> = {
     "*" <Unary> => ExprKind::UnaryDereference(Box::new(<>)),
     "++" <Unary> => ExprKind::PrefixIncrement(Box::new(<>)),
     "--" <Unary> => ExprKind::PrefixDecrement(Box::new(<>)),
+    <r:Spanned<IDENTIFIER>> "<-" <l:Unary> => ExprKind::Arrow(Box::new(l), r),
 };
 Unary: Expr<'input> = ExprPrecedenceTier<_Unary, Postfix>;
 
@@ -512,6 +513,7 @@ extern {
         "new" => lexer::Tok::New,
         "unreachable" => lexer::Tok::Unreachable,
         "->" => lexer::Tok::SmallArrow,
+        "<-" => lexer::Tok::SmallArrowBack,
         "=>" => lexer::Tok::FatArrow,
         "..." => lexer::Tok::Ellipsis,
     }

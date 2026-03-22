@@ -352,7 +352,7 @@ Zirco uses the following operators and punctuation:
 **Other Operators**:
 
 ```
-.   ->  ::  ?   :   as
+.   ->  <-  ::  ?   :   as
 ```
 
 **Delimiters**:
@@ -608,7 +608,7 @@ Operators are listed from highest to lowest precedence:
 | Precedence | Operators                                    | Description                                                            | Associativity |
 | ---------- | -------------------------------------------- | ---------------------------------------------------------------------- | ------------- |
 | 1          | `x()` `x[]` `x.y` `x->y` `x++` `x--`         | Function call, array index, member access, postfix increment/decrement | Left-to-right |
-| 2          | `!x` `-x` `~x` `&x` `*x` `++x` `--x`         | Unary operators, prefix increment/decrement                            | Right-to-left |
+| 2          | `!x` `-x` `~x` `&x` `*x` `++x` `--x` `y<-x`  | Unary operators, prefix increment/decrement, prefix member access      | Right-to-left |
 | 3          | `as`                                         | Type cast                                                              | Left-to-right |
 | 4          | `*` `/` `%`                                  | Multiplication, division, modulo                                       | Left-to-right |
 | 5          | `+` `-`                                      | Addition, subtraction                                                  | Left-to-right |
@@ -813,6 +813,13 @@ The `->` operator is shorthand for dereferencing a pointer and accessing a membe
 ```zirco
 let ptr: *Point;
 let x_val = ptr->x;  // equivalent to (*ptr).x
+```
+
+Additionally, the `<-` operator can be used to provide the member to access first:
+
+```zirco
+let ptr: *Point;
+let x_val = x<-ptr;
 ```
 
 ### 4.11 Index Expressions
@@ -1644,6 +1651,7 @@ expr ::= primary
        | expr "[" expr "]"
        | expr "." identifier
        | expr "->" identifier
+       | identifier "<-" expr
 
 primary ::= literal
           | identifier

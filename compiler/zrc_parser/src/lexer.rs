@@ -549,6 +549,10 @@ pub enum Tok<'input> {
     #[token("->")]
     #[display("->")]
     SmallArrow,
+    /// The operator `<-`
+    #[token("<-")]
+    #[display("<-")]
+    SmallArrowBack,
     /// The operator `=>`
     #[token("=>")]
     #[display("=>")]
