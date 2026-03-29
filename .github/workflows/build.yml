@@ -311,7 +311,7 @@ jobs:
                       **Date:** ${{ github.event.head_commit.timestamp }}
                   draft: false
                   prerelease: false
-                  make_latest: true
+                  make_latest: false
                   fail_on_unmatched_files: true
                   files: |
                       zrc-linux-x64.tar.gz
