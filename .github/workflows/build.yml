@@ -220,42 +220,28 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@v6
-            - name: Delete old .deb assets from nightly release
+            - name: Delete existing nightly release
               uses: actions/github-script@v8
               with:
                   script: |
-                      let release;
                       try {
-                          release = await github.rest.repos.getReleaseByTag({
+                          const release = await github.rest.repos.getReleaseByTag({
                               owner: context.repo.owner,
                               repo: context.repo.repo,
                               tag: 'nightly',
                           });
-                      } catch (e) {
-                          if (e.status === 404) {
-                              console.log('No nightly release found, skipping deb cleanup.');
-                              return;
-                          }
-                          throw e;
-                      }
-                      const assets = await github.paginate(
-                          github.rest.repos.listReleaseAssets,
-                          {
+                          await github.rest.repos.deleteRelease({
                               owner: context.repo.owner,
                               repo: context.repo.repo,
                               release_id: release.data.id,
-                              per_page: 100,
+                          });
+                          console.log('Deleted existing nightly release.');
+                      } catch (e) {
+                          if (e.status === 404) {
+                              console.log('No nightly release found, nothing to delete.');
+                          } else {
+                              throw e;
                           }
-                      );
-                      for (const asset of assets) {
-                          if (asset.name.endsWith('.deb')) {
-                              console.log(`Nuking asset ${asset.name} ${asset.id}`);
-                              await github.rest.repos.deleteReleaseAsset({
-                                  owner: context.repo.owner,
-                                  repo: context.repo.repo,
-                                  asset_id: asset.id,
-                              });
-                          } else console.log(`Not deleting ${asset.name} ${asset.id}`);
                       }
             - name: Update nightly tag
               run: |
@@ -325,6 +311,8 @@ jobs:
                       **Date:** ${{ github.event.head_commit.timestamp }}
                   draft: false
                   prerelease: true
+                  make_latest: true
+                  fail_on_unmatched_files: true
                   files: |
                       zrc-linux-x64.tar.gz
                       zrc-linux-arm64.tar.gz
