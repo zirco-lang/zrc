@@ -252,71 +252,35 @@ jobs:
                   git tag nightly
                   git push origin nightly
             - name: Download X86 Linux build artifact
-              run: |
-                  for attempt in 1 2 3 4 5; do
-                      rm -rf Linux-X64
-                      if gh run download ${{ github.run_id }} -n zrc-Linux-X64-release -D Linux-X64; then exit 0; fi
-                      echo "Download failed, retrying in 5s..."
-                      sleep 5
-                  done
-                  exit 1
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              uses: actions/download-artifact@v8
+              with:
+                  name: zrc-Linux-X64-release
+                  path: Linux-X64
             - name: Download ARM64 Linux build artifact
-              run: |
-                  for attempt in 1 2 3 4 5; do
-                      rm -rf Linux-ARM64
-                      if gh run download ${{ github.run_id }} -n zrc-Linux-ARM64-release -D Linux-ARM64; then exit 0; fi
-                      echo "Download failed, retrying in 5s..."
-                      sleep 5
-                  done
-                  exit 1
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              uses: actions/download-artifact@v8
+              with:
+                  name: zrc-Linux-ARM64-release
+                  path: Linux-ARM64
             - name: Download X86 macOS build artifact
-              run: |
-                  for attempt in 1 2 3 4 5; do
-                      rm -rf macOS-X64
-                      if gh run download ${{ github.run_id }} -n zrc-macOS-X64-release -D macOS-X64; then exit 0; fi
-                      echo "Download failed, retrying in 5s..."
-                      sleep 5
-                  done
-                  exit 1
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              uses: actions/download-artifact@v8
+              with:
+                  name: zrc-macOS-X64-release
+                  path: macOS-X64
             - name: Download ARM64 macOS build artifact
-              run: |
-                  for attempt in 1 2 3 4 5; do
-                      rm -rf macOS-ARM64
-                      if gh run download ${{ github.run_id }} -n zrc-macOS-ARM64-release -D macOS-ARM64; then exit 0; fi
-                      echo "Download failed, retrying in 5s..."
-                      sleep 5
-                  done
-                  exit 1
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              uses: actions/download-artifact@v8
+              with:
+                  name: zrc-macOS-ARM64-release
+                  path: macOS-ARM64
             - name: Download X86 Debian package artifact
-              run: |
-                  for attempt in 1 2 3 4 5; do
-                      rm -rf Debian-X64
-                      if gh run download ${{ github.run_id }} -n zrc-Debian-X64 -D Debian-X64; then exit 0; fi
-                      echo "Download failed, retrying in 5s..."
-                      sleep 5
-                  done
-                  exit 1
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              uses: actions/download-artifact@v8
+              with:
+                  name: zrc-Debian-X64
+                  path: Debian-X64
             - name: Download ARM64 Debian package artifact
-              run: |
-                  for attempt in 1 2 3 4 5; do
-                      rm -rf Debian-ARM64
-                      if gh run download ${{ github.run_id }} -n zrc-Debian-ARM64 -D Debian-ARM64; then exit 0; fi
-                      echo "Download failed, retrying in 5s..."
-                      sleep 5
-                  done
-                  exit 1
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              uses: actions/download-artifact@v8
+              with:
+                  name: zrc-Debian-ARM64
+                  path: Debian-ARM64
             - name: Set executable permissions
               run: |
                   chmod +x Linux-X64/bin/*
@@ -347,7 +311,7 @@ jobs:
                       **Date:** ${{ github.event.head_commit.timestamp }}
                   draft: false
                   prerelease: true
-                  make_latest: false
+                  make_latest: true
                   fail_on_unmatched_files: true
                   files: |
                       zrc-linux-x64.tar.gz
