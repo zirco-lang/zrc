@@ -296,7 +296,7 @@ jobs:
                   mv Debian-X64/* .
                   mv Debian-ARM64/* .
             - name: Update `nightly` release
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3
               with:
                   tag_name: nightly
                   name: Latest Build
