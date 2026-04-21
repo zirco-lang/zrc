@@ -2,8 +2,8 @@ name: Report a Bug
 description: If your compiler has encountered a bug that is not an ICE, report it here.
 title: "bug: add your bug title here..."
 labels:
-    - status/untriaged
-    - type/bug
+    - S-untriaged
+    - T-bug
 body:
     - type: markdown
       attributes:
