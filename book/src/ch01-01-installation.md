@@ -13,7 +13,8 @@ The toolchain has host support for the following targets:
 Other platforms may be supported via cross-compilation or by building Zirco with a custom LLVM
 build, but this is not currently documented.
 
-Zirco does not support Windows, but the compiler runs normally on Windows via WSL.
+Zirco does not support Windows, but the compiler runs normally on Windows via WSL. This guide also
+assumes your system has a C toolchain installed (for linking).
 
 > [!NOTE]
 > **Command Line Notation**
@@ -148,3 +149,22 @@ Ensure that `LD_LIBRARY_PATH` and `ZIRCO_INCLUDE_PATH` are set to the appropriat
 
 Instructions for building from source are available in the compiler's [README](https://github.com/zirco-lang/zrc)
 file.
+
+## Troubleshooting
+
+If you encounter issues with the installation, we recommend checking the following before
+[reaching out for support](./getting-help.md).
+
+To check that the Zirco compiler is installed and working, run:
+
+```
+$ zrc --version
+zrc_cli 0.1.0 (commit ..., release build, ...)
+```
+
+If you don't see this information, check that the `zrc` binary is in your PATH. If you installed
+with Zircon, you will see an entry for `.zircon/toolchains/current/bin`. Ensure this symlink
+points to the correct toolchain directory.
+
+If you encounter issues with missing libraries or include paths, ensure that `LD_LIBRARY_PATH`
+and `ZIRCO_INCLUDE_PATH` are set to the appropriate directories for your toolchain installation.
