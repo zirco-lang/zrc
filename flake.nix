@@ -36,9 +36,8 @@
             pkg-config
             libffi
             libxml2
-
-            # for formatting .nix files
-            nixfmt-tree
+            mdbook
+            nixfmt
           ];
 
           LLVM_SYS_201_PREFIX = llvm.llvm.dev;
