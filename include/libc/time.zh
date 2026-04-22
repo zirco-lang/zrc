@@ -1,0 +1,24 @@
+// opaque
+struct TimeHandle { unused: i32 }
+// opaque
+struct ClockHandle { unused: i32 }
+struct Time {
+    tm_sec: i32,   // seconds after the minute - [0, 60]
+    tm_min: i32,   // minutes after the hour - [0, 59]
+    tm_hour: i32,  // hours since midnight - [0, 23]
+    tm_mday: i32,  // day of the month - [1, 31]
+    tm_mon: i32,   // months since January - [0, 11]
+    tm_year: i32,  // years since 1900
+    tm_wday: i32,  // days since Sunday - [0, 6]
+    tm_yday: i32,  // days since January 1 - [0, 365]
+    tm_isdst: i32, // daylight savings time flag, positive if DST is in effect, zero if not, and negative if the information is not available
+}
+
+fn time(ptr: *TimeHandle) -> *TimeHandle;
+fn clock() -> ClockHandle;
+fn gmtime(ptr: *TimeHandle) -> *Time;
+fn gmtime_r(ptr: *TimeHandle, buf: *Time) -> *Time;
+fn strftime(str: *u8, count: usize, format: *u8, tp: *Time) -> usize;
+fn mktime(tp: *Time) -> TimeHandle;
+fn localtime(ptr: *TimeHandle) -> *Time;
+fn localtime_r(ptr: *TimeHandle, buf: *Time) -> *Time;
