@@ -4,8 +4,8 @@ description: >-
     suggest it here.
 title: "feat: describe your request..."
 labels:
-    - status/untriaged
-    - type/feat
+    - S-untriaged
+    - T-feat
 body:
     - type: markdown
       attributes:

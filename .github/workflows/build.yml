@@ -157,7 +157,7 @@ jobs:
 
         steps:
             - name: Comment on PR with artifact links
-              uses: actions/github-script@v8
+              uses: actions/github-script@v9
               with:
                   script: |
                       const runId = context.runId;
@@ -221,7 +221,7 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v6
             - name: Delete existing nightly release
-              uses: actions/github-script@v8
+              uses: actions/github-script@v9
               with:
                   script: |
                       try {
@@ -296,7 +296,7 @@ jobs:
                   mv Debian-X64/* .
                   mv Debian-ARM64/* .
             - name: Update `nightly` release
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3
               with:
                   tag_name: nightly
                   name: Latest Build
