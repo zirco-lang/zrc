@@ -37,3 +37,5 @@ fn setenv(name: *u8, value: *u8, overwrite: i32) -> i32;    // POSIX
 fn unsetenv(name: *u8) -> i32;                              // POSIX
 fn srand(seed: u32) -> void;
 fn rand() -> i32;
+fn random() -> i64;
+fn srandom(seed: u32) -> void;
