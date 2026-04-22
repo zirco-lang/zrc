@@ -14,7 +14,7 @@ struct Time {
     tm_isdst: i32, // daylight savings time flag, positive if DST is in effect, zero if not, and negative if the information is not available
 }
 
-fn time(ptr: *TimeHandle) -> *TimeHandle;
+fn time(ptr: *TimeHandle) -> u64;
 fn clock() -> ClockHandle;
 fn gmtime(ptr: *TimeHandle) -> *Time;
 fn gmtime_r(ptr: *TimeHandle, buf: *Time) -> *Time;
