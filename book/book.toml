@@ -1,0 +1,8 @@
+[book]
+title = "The Zirco Programming Language"
+authors = ["Logan Devine", "Contributions from the Zirco Community"]
+language = "en"
+
+[output.html]
+git-repository-url = "https://github.com/zirco-lang/zrc/tree/main/book"
+git-repository-icon = "fab-github"
