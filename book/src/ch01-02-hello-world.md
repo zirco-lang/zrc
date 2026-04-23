@@ -40,6 +40,50 @@ If you see "Hello, World!" printed to the terminal, congratulations! You've succ
 run your first Zirco program! If you don't see the expected output, take a look at the
 [installation troubleshooting](./ch01-01-installation.md#troubleshooting) section.
 
+## Anatomy of the Program
+
+Let's break down the `main.zr` program to understand what each part does:
+
+```
+#include <libc/stdio.zh>
+```
+
+This line includes the Zirco header file for the C standard library (libc)'s Standard I/O functions.
+This directive is used to "copy-paste" the contents of a file into another, similar to C's `#include`
+directive. If you check your toolchain's `include/libc/stdio.zh` file, you'll see that it contains
+"extern" declarations for a bunch of functions, including `printf` and `scanf` which we later use.
+
+```
+fn printf(a: *u8, ...) -> i32;
+fn scanf(a: *u8, ...) -> i32;
+```
+
+These functions are not defined in Zirco, but they exist here so the compiler is aware of their
+signatures and can generate the correct code to call them.
+
+```
+fn main() -> i32 {
+```
+
+This line defines a function named `main` that takes no parameters and returns an `i32` (32-bit
+integer). The `main` function is the entry point of the program, where all Zirco programs start
+execution. The function's return value represents its exit code, where `0` typically indicates
+success.
+
+```
+    printf("Hello, World!\n");
+```
+
+This line calls the `printf` function to print the string "Hello, World!" followed by a newline
+character (`\n`) to the terminal.
+
+```
+    return 0;
+}
+```
+
+This line returns `0` from the `main` function, indicating that the program executed successfully.
+
 ## Using the `zrx` Tool
 
 Oftentimes, for one-off programs (such as many of the examples in this book), it's more convenient
