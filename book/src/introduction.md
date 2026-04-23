@@ -18,11 +18,11 @@ an introduction. It covers the syntax and semantics of the language, as well as 
 for writing Zirco code. It also includes a reference section that provides detailed information
 about the language's features and standard library.
 
-This book assumes the reader has prior experience with low-level programming, manual memory
-management, and systems programming concepts. It is not intended for complete beginners to
+This book assumes the reader has at least some prior experience with low-level programming, manual
+memory management, and systems programming concepts. It is not intended for complete beginners to
 programming, and will not cover some of those concepts in depth. However, we do not assume any
-prior experience with Zirco itself, and will cover all of the language's features from the ground
-up.
+prior experience with Zirco or C itself, and will cover all of the language's features from the
+ground up.
 
 ## How to Use This Book
 
