@@ -688,7 +688,7 @@ pub fn cg_program_to_buffer(
     debug_level: DWARFEmissionKind,
     triple: &TargetTriple,
     cpu: &str,
-) -> MemoryBuffer {
+) -> MemoryBuffer<'static> {
     let ctx = Context::create();
 
     Target::initialize_all(&InitializationConfig::default());
