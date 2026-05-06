@@ -570,7 +570,6 @@ mod tests {
 
         // Should be equal despite different parameter names
         assert_eq!(fn1, fn2);
-        assert!(fn1 == fn2);
         assert!(fn1.types_equal(&fn2));
     }
 
