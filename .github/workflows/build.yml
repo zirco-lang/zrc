@@ -55,6 +55,35 @@ jobs:
               with:
                   path: outputs
                   name: zrc-${{ runner.os }}-${{ runner.arch }}-release
+    build-nix:
+        runs-on: ubuntu-24.04
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+              with:
+                  # Make sure the actual branch is checked out when running on pull requests
+                  ref: ${{ github.head_ref }}
+                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+            - uses: nixbuild/nix-quick-install-action@v30
+              with:
+                  nix_conf: |
+                      keep-env-derivations = true
+                      keep-outputs = true
+            - name: Restore cached Nix store
+              uses: nix-community/cache-nix-action@v7
+              with:
+                  primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+                  restore-prefixes-first-match: nix-${{ runner.os }}-
+                  purge: true
+                  purge-prefixes: nix-${{ runner.os }}-
+                  purge-created: 0
+                  purge-last-accessed: P1DT12H
+                  purge-primary-key: never
+            - name: Test Nix devshell
+              run: nix develop --command cargo --version
+            - name: Build with Nix
+              run: nix build .#zrc .#libzr
     lint-std:
         needs: build
         runs-on: ubuntu-24.04
