@@ -5,15 +5,16 @@ call this the "Zirco toolchain".
 
 The toolchain has host support for the following targets:
 
-**Tier 1 targets** (tested, with prebuilt binaries available):
+**Tier 1 targets** (tested):
 
-- `x86_64-unknown-linux-gnu` (Linux on x86_64)
+- `x86_64-unknown-linux-gnu` (Linux on x86_64, prebuilt binaries available)
 
-**Tier 2 targets** (built, not tested in CI, but prebuilt binaries still available):
+**Tier 2 targets** (built, but not tested in CI):
 
-- `aarch64-unknown-linux-gnu` (Linux on ARM64)
-- `x86_64-apple-darwin` (macOS on x86_64, deprecated)
-- `aarch64-apple-darwin` (macOS on Apple Silicon)
+- `aarch64-unknown-linux-gnu` (Linux on ARM64, prebuilt binaries available)
+- `x86_64-apple-darwin` (macOS on x86_64, prebuilt binaries available, **deprecated**)
+- `aarch64-apple-darwin` (macOS on Apple Silicon, prebuilt binaries available)
+- Nix support for all targets (including Tier 1 targets) is considered Tier 2
 
 Other platforms may be supported via cross-compilation or by building Zirco with a custom LLVM
 build, but this is not currently documented.
