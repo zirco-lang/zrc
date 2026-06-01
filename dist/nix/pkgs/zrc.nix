@@ -16,6 +16,8 @@ in
 naerskLib.buildPackage {
   pname = "zrc";
   src = ../../..;
+  doCheck = true;
+
   buildInputs = with pkgs; [
     rust-bin.stable.latest.default
     llvm.llvm
