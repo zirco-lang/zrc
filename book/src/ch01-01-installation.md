@@ -14,7 +14,9 @@ The toolchain has host support for the following targets:
 - `aarch64-unknown-linux-gnu` (Linux on ARM64, prebuilt binaries available)
 - `x86_64-apple-darwin` (macOS on x86_64, prebuilt binaries available, **deprecated**)
 - `aarch64-apple-darwin` (macOS on Apple Silicon, prebuilt binaries available)
-- Nix support for all targets (including Tier 1 targets) is considered Tier 2
+
+> [!NOTE]
+> Nix support for all targets (including Tier 1 targets) is considered Tier 2.
 
 Other platforms may be supported via cross-compilation or by building Zirco with a custom LLVM
 build, but this is not currently documented.
