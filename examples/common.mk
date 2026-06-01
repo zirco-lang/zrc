@@ -39,7 +39,7 @@ $(OUTDIR)/run: libzr $(ZR_OUTPUTS)
 $(OUTDIR)/%.o: %.zr
 	$(Q)mkdir -p $(OUTDIR)
 	$(ECHO) "  ZRC    $<"
-	$(Q)$(ZRC) --emit object $(ZRFLAGS) -o $@ $<
+	$(Q)$(ZRC) $(ZRFLAGS) -o $@ $<
 
 .PHONY: clean
 clean:

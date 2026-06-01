@@ -24,17 +24,17 @@ fn main() -> i32 {
 Save the file and run the following commands to compile, link, and run the program:
 
 ```
-$ zrc main.zr --emit object -o main.o
+$ zrc main.zr -o main.o
 $ ld -lc -lzr main.o -o main
 $ ./main
 Hello, World!
 ```
 
-| Command                               | Explanation                                                                                          |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `zrc main.zr --emit object -o main.o` | Compiles `main.zr` to an object file `main.o`.                                                       |
-| `ld -lc -lzr main.o -o main`          | Links `main.o` with the C and Zirco standard libraries (`-lc -lzr`) to produce an executable `main`. |
-| `./main`                              | Runs the `main` executable, which prints "Hello, World!" to the terminal.                            |
+| Command                      | Explanation                                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `zrc main.zr -o main.o`      | Compiles `main.zr` to an object file `main.o`.                                                       |
+| `ld -lc -lzr main.o -o main` | Links `main.o` with the C and Zirco standard libraries (`-lc -lzr`) to produce an executable `main`. |
+| `./main`                     | Runs the `main` executable, which prints "Hello, World!" to the terminal.                            |
 
 If you see "Hello, World!" printed to the terminal, congratulations! You've successfully written and
 run your first Zirco program! If you don't see the expected output, take a look at the

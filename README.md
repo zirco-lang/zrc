@@ -29,11 +29,11 @@ If you aim to contribute to the Zirco compiler itself, please follow the instruc
 
 **New to Zirco?** Check out our comprehensive [Getting Started Guide](./docs/GETTING_STARTED.md) for step-by-step instructions on:
 
--   Installing prerequisites
--   Building the compiler
--   Writing and compiling your first program
--   Using compiler options and output formats
--   Troubleshooting common issues
+- Installing prerequisites
+- Building the compiler
+- Writing and compiling your first program
+- Using compiler options and output formats
+- Troubleshooting common issues
 
 ### Quick Start
 
@@ -67,7 +67,7 @@ For experienced developers who want to get running quickly:
 4. **Compile your first program:**
     ```bash
     # Create hello.zr with your favorite editor, then:
-    zrc --emit object -o hello.o hello.zr
+    zrc -o hello.o hello.zr
     clang -o hello hello.o -lc
     ./hello
     ```
@@ -82,7 +82,7 @@ For a comprehensive guide to the Zirco language syntax, semantics, and behavior,
 
 If you are directly invoking the compiler with `cargo`, replace `zrc` with `cargo run --` in the below commands.
 
-You can compile a single Zirco file to a `.o` object with `zrc --emit object -o main.o main.zr`. Otherwise, `zrc main.zr` will emit LLVM IR. This is soon to change.
+You can compile a single Zirco file to a `.o` object with `zrc -o main.o main.zr`. Otherwise, `zrc main.zr` will emit LLVM IR. This is soon to change.
 
 For more usage help, refer to `zrc --help`.
 

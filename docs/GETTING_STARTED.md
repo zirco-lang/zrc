@@ -4,11 +4,11 @@ Welcome to Zirco! This guide will help you get up and running with the Zirco pro
 
 ## What You'll Learn
 
--   How to install all necessary prerequisites
--   How to build the Zirco compiler from source
--   How to write and compile your first Zirco program
--   How to use the compiler's various output formats
--   How to troubleshoot common issues
+- How to install all necessary prerequisites
+- How to build the Zirco compiler from source
+- How to write and compile your first Zirco program
+- How to use the compiler's various output formats
+- How to troubleshoot common issues
 
 ## Prerequisites
 
@@ -172,8 +172,8 @@ fn main() {
 
 This program:
 
--   Declares the C `printf` function (external function declaration)
--   Defines a `main` function that calls `printf` to print "Hello, World!"
+- Declares the C `printf` function (external function declaration)
+- Defines a `main` function that calls `printf` to print "Hello, World!"
 
 ### Step 2: Compile to Object File
 
@@ -181,10 +181,10 @@ Compile your program to an object file:
 
 ```bash
 # If you installed zrc system-wide:
-zrc --emit object -o hello.o hello.zr
+zrc -o hello.o hello.zr
 
 # Or using cargo:
-cargo run -- --emit object -o hello.o hello.zr
+cargo run -- -o hello.o hello.zr
 ```
 
 ### Step 3: Link and Create Executable
@@ -234,7 +234,7 @@ zrc --emit llvm -o hello.ll hello.zr
 Compiled object code that can be linked with a C compiler:
 
 ```bash
-zrc --emit object -o hello.o hello.zr
+zrc -o hello.o hello.zr
 ```
 
 ### Assembly
@@ -292,22 +292,21 @@ zrc --target aarch64-unknown-linux-gnu hello.zr
 Include debugging information in the output:
 
 ```bash
-zrc -g --emit object -o hello.o hello.zr
+zrc -g -o hello.o hello.zr
 ```
 
 ### Complete Example with Options
 
 ```bash
-zrc --emit object -o hello.o -O 3 -g --target x86_64-unknown-linux-gnu hello.zr
+zrc -o hello.o -O 3 -g --target x86_64-unknown-linux-gnu hello.zr
 ```
 
 This command:
 
--   Emits an object file (`--emit object`)
--   Outputs to `hello.o` (`-o hello.o`)
--   Uses aggressive optimization (`-O 3`)
--   Includes debug information (`-g`)
--   Targets x86_64 Linux (`--target x86_64-unknown-linux-gnu`)
+- Outputs to the object file `hello.o` (`-o hello.o`)
+- Uses aggressive optimization (`-O 3`)
+- Includes debug information (`-g`)
+- Targets x86_64 Linux (`--target x86_64-unknown-linux-gnu`)
 
 ## More Examples
 
@@ -419,7 +418,6 @@ Now that you have Zirco up and running, here's what you can explore next:
 1. **Language Specification**: Read the comprehensive [Language Specification](./SPEC.md) to learn about Zirco's syntax, type system, and semantics.
 
 2. **Examples**: Explore the `examples/` directory to see more complex Zirco programs:
-
     - `hello_world/` - Basic program structure
     - `fibonacci/` - Recursion and conditionals
     - `struct_construction/` - Working with structs
@@ -428,14 +426,12 @@ Now that you have Zirco up and running, here's what you can explore next:
     - `global_variables/` - Global variable usage
 
 3. **Contributing**: If you'd like to contribute to Zirco, check out [CONTRIBUTING.md](../.github/CONTRIBUTING.md) for guidelines on:
-
     - Setting up a development environment
     - Running tests and linters
     - Code style requirements
     - Submitting pull requests
 
 4. **Compiler Internals**: Learn about the compiler pipeline:
-
     - **Lexer** (`zrc_parser`) - Tokenization
     - **Parser** (`zrc_parser`) - AST generation using LALRPOP
     - **Type Checker** (`zrc_typeck`) - Semantic analysis
@@ -452,10 +448,10 @@ Now that you have Zirco up and running, here's what you can explore next:
 
 ⚠️ **Zirco is experimental and unstable.** There are **NO STABILITY GUARANTEES** on the current version. This means:
 
--   Internal compiler APIs may change without notice
--   Zirco code may fail to build on different `zrc` versions
--   Language semantics may change
--   This is not recommended for production use
+- Internal compiler APIs may change without notice
+- Zirco code may fail to build on different `zrc` versions
+- Language semantics may change
+- This is not recommended for production use
 
 Zirco is a learning project and reference implementation for compiler design. Use it for education, experimentation, and fun!
 
@@ -463,10 +459,10 @@ Zirco is a learning project and reference implementation for compiler design. Us
 
 While Zirco is primarily developed and tested on Linux and WSL, it should work on:
 
--   ✅ Linux (Ubuntu, Debian, Fedora, Arch, etc.)
--   ✅ WSL (Windows Subsystem for Linux)
--   ✅ macOS (with some environment variable configuration)
--   ⚠️ Windows (recommended to use WSL for best experience)
+- ✅ Linux (Ubuntu, Debian, Fedora, Arch, etc.)
+- ✅ WSL (Windows Subsystem for Linux)
+- ✅ macOS (with some environment variable configuration)
+- ⚠️ Windows (recommended to use WSL for best experience)
 
 The compiler can target any platform supported by LLVM through the `--target` flag.
 
