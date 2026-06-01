@@ -5,7 +5,12 @@ call this the "Zirco toolchain".
 
 The toolchain has host support for the following targets:
 
+**Tier 1 targets** (tested, with prebuilt binaries available):
+
 - `x86_64-unknown-linux-gnu` (Linux on x86_64)
+
+**Tier 2 targets** (built, not tested in CI, but prebuilt binaries still available):
+
 - `aarch64-unknown-linux-gnu` (Linux on ARM64)
 - `x86_64-apple-darwin` (macOS on x86_64, deprecated)
 - `aarch64-apple-darwin` (macOS on Apple Silicon)
