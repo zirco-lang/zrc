@@ -103,20 +103,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut source_content = String::new();
     input.read_to_string(&mut source_content)?;
 
-    if cli.emit == FrontendOutputFormat::Object
-        && !cli.force
-        && cli.out_file.as_os_str().to_str().unwrap_or("-") == "-"
-    {
-        return Err(Box::new(CliError(
-            "emitting raw object code to stdout is not allowed. use --force to override this"
-                .into(),
-        )));
-    }
+    let emit = cli.emit.unwrap_or_else(|| {
+        #[allow(clippy::case_sensitive_file_extension_comparisons)]
+        match cli
+            .out_file
+            .as_os_str()
+            .to_str()
+            .expect("output file should be a valid str")
+            .to_lowercase()
+        {
+            // ends with .o or .obj, emit object code
+            out if out.ends_with(".o") || out.ends_with(".obj") => FrontendOutputFormat::Object,
+            // ends with .s or .asm, emit assembly
+            out if out.ends_with(".s") || out.ends_with(".asm") => FrontendOutputFormat::Asm,
+            // otherwise, emit LLVM IR
+            _ => FrontendOutputFormat::Llvm,
+        }
+    });
 
     let result = compile(
         &version_string(),
         &cli::get_include_paths(&cli),
-        &cli.emit.into(),
+        &emit.into(),
         &directory_name,
         &file_name,
         &std::env::args().collect::<Vec<_>>().join(" "),
