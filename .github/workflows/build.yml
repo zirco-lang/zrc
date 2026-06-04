@@ -18,7 +18,7 @@ jobs:
                     - macos-latest
                     - macos-15-intel
         env:
-            LLVM_SYS_201_PREFIX: /usr/lib/llvm-20
+            LLVM_SYS_221_PREFIX: /usr/lib/llvm-22
 
         steps:
             - name: Checkout
@@ -27,17 +27,18 @@ jobs:
                   # Make sure the actual branch is checked out when running on pull requests
                   ref: ${{ github.head_ref }}
                   repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Install LLVM dependencies from the cache (Linux)
+            - name: Install LLVM dependencies from APT (Linux)
               if: runner.os == 'Linux'
-              uses: awalsh128/cache-apt-pkgs-action@latest
-              with:
-                  packages: llvm-20 llvm-20-dev libpolly-20-dev clang-20
-                  version: 1.0
+              run: |
+                  wget https://apt.llvm.org/llvm.sh
+                  chmod +x llvm.sh
+                  sudo ./llvm.sh 22
+                  sudo apt install libpolly-22-dev
             - name: Install LLVM dependencies from Homebrew (macOS)
               if: runner.os == 'macOS'
               run: |
-                  brew install llvm@20
-                  echo "LLVM_SYS_201_PREFIX=$(brew --prefix llvm@20)" >> $GITHUB_ENV
+                  brew install llvm@22
+                  echo "LLVM_SYS_221_PREFIX=$(brew --prefix llvm@22)" >> $GITHUB_ENV
             - name: Set up Rust
               uses: actions-rs/toolchain@v1
               with:
@@ -130,7 +131,7 @@ jobs:
               run: make -j2 -C examples test ZRC=zrc LIBZR_DIR=$(pwd)/artifacts/libzr/lib/
     lint-examples:
         needs: build
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
 
         steps:
             - name: Checkout
@@ -181,7 +182,7 @@ jobs:
                   name: zrc-Debian-${{ runner.arch }}
     comment-artifacts:
         needs: [build, build-debs]
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
 
         steps:
@@ -243,7 +244,7 @@ jobs:
         # only on commits to main
         needs: [build, build-debs]
         if: github.ref == 'refs/heads/main'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         permissions:
             contents: write
         steps:

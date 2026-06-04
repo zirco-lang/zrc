@@ -57,25 +57,25 @@ You should see version information for both commands.
 
 ### 3. LLVM dependencies
 
-Zirco's code generator relies on LLVM 20 for compilation. You need the LLVM static or dynamic library with Polly support.
+Zirco's code generator relies on LLVM 22 for compilation. You need the LLVM static or dynamic library with Polly support.
 
 **Linux (Ubuntu/Debian):**
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20 build-essential libssl-dev pkg-config libzstd-dev
+sudo apt-get install -y llvm-22 llvm-22-dev libpolly-22-dev clang-22 build-essential libssl-dev pkg-config libzstd-dev
 ```
 
 **macOS:**
 
 ```bash
-brew install llvm@20
+brew install llvm@22
 ```
 
 After installation on macOS, you may need to set the LLVM prefix:
 
 ```bash
-export LLVM_SYS_201_PREFIX=$(brew --prefix llvm@20)
+export LLVM_SYS_221_PREFIX=$(brew --prefix llvm@22)
 ```
 
 **Windows:**
@@ -350,28 +350,28 @@ make -C examples test
 
 **Problem:** LLVM Polly library is not installed.
 
-**Solution:** Install the LLVM 16 development libraries:
+**Solution:** Install the LLVM 22 development libraries:
 
 ```bash
 # Ubuntu/Debian:
-sudo apt-get install -y llvm-16 llvm-16-dev libpolly-16-dev
+sudo apt-get install -y llvm-22 llvm-22-dev libpolly-22-dev
 
 # macOS:
-brew install llvm@16
+brew install llvm@22
 ```
 
 ### Build Error: LLVM Not Found
 
-**Problem:** LLVM 16 is installed but the build system can't find it.
+**Problem:** LLVM 22 is installed but the build system can't find it.
 
-**Solution:** Set the `LLVM_SYS_160_PREFIX` environment variable:
+**Solution:** Set the `LLVM_SYS_221_PREFIX` environment variable:
 
 ```bash
 # Linux (typical location):
-export LLVM_SYS_160_PREFIX=/usr/lib/llvm-16
+export LLVM_SYS_221_PREFIX=/usr/lib/llvm-22
 
 # macOS with Homebrew:
-export LLVM_SYS_160_PREFIX=$(brew --prefix llvm@16)
+export LLVM_SYS_221_PREFIX=$(brew --prefix llvm@22)
 
 # Then build:
 cargo build
