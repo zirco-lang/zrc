@@ -35,5 +35,5 @@ naerskLib.buildPackage {
 
   setupHook = ../hooks/zrc.sh;
 
-  LLVM_SYS_201_PREFIX = llvm.llvm.dev;
+  LLVM_SYS_221_PREFIX = llvm.llvm.dev;
 }

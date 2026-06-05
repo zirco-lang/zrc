@@ -15,7 +15,7 @@
       let
         overlays = [ rust-overlay.overlays.default ];
         pkgs = import nixpkgs { inherit system overlays; };
-        llvm = pkgs.llvmPackages_20;
+        llvm = pkgs.llvmPackages_22;
         rust = pkgs.rust-bin.nightly.latest.default.override {
           extensions = [
             "rust-src"

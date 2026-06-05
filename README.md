@@ -45,9 +45,9 @@ For experienced developers who want to get running quickly:
     # Rust toolchain (if not already installed)
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-    # LLVM 20 with Polly + other dependencies (Ubuntu/Debian)
+    # LLVM 22 with Polly + other dependencies (Ubuntu/Debian)
     sudo apt-get update
-    sudo apt-get install -y llvm-20 llvm-20-dev libpolly-20-dev clang-20 build-essential libssl-dev pkg-config libzstd-dev
+    sudo apt-get install -y llvm-22 llvm-22-dev libpolly-22-dev clang-22 build-essential libssl-dev pkg-config libzstd-dev
     ```
 
 2. **Clone and build:**
