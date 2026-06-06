@@ -583,7 +583,6 @@ pub enum Tok<'input> {
     #[display("\"{_0}\"")]
     StringLiteral(ZrcString<'input>),
     /// Any number literal
-    // FIXME: Do not accept multiple decimal points like "123.456.789"
     #[regex(r"[0-9][0-9\._]*", |lex| NumberLiteral::Decimal(lex.slice()))]
     #[regex(r"0x[0-9a-fA-F_]+", |lex| NumberLiteral::Hexadecimal(&lex.slice()[2..]))]
     #[regex(r"0b[01_]+", |lex| NumberLiteral::Binary(&lex.slice()[2..]))]
