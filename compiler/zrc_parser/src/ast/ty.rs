@@ -73,7 +73,7 @@ pub enum TypeKind<'input> {
 
 // AST builder. We are able to infer the spans of many based on the start of
 // their leftmost and the end of their rightmost operands.
-#[allow(missing_docs, clippy::missing_docs_in_private_items)]
+#[expect(missing_docs)]
 impl<'input> Type<'input> {
     #[must_use]
     pub fn build_ident(ident: Spanned<&'input str>) -> Self {

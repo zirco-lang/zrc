@@ -109,7 +109,7 @@ pub fn cg_for_stmt<'ctx, 'input, 'a>(
 }
 
 /// Code generates a four statement
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 pub fn cg_four_stmt<'ctx, 'input, 'a>(
     cg: FunctionCtx<'ctx, 'a>,
     bb: BasicBlock<'ctx>,
