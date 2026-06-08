@@ -74,7 +74,6 @@ pub enum StmtKind<'input> {
     /// `for (init; cond; post) body`
     ForStmt {
         /// Runs once before the loop starts.
-        // TODO: May also be able to be expressions?
         init: Option<Box<Spanned<Vec<Spanned<LetDeclaration<'input>>>>>>,
         /// Runs before each iteration of the loop. If this evaluates to
         /// `false`, the loop will end. If this is [`None`], the loop

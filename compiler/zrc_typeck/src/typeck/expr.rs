@@ -16,8 +16,6 @@ use zrc_parser::ast::expr::{Expr, ExprKind};
 use super::scope::Scope;
 use crate::tast::expr::TypedExpr;
 
-// FIXME: this NEEDS to be rewritten to use references almost everywhere and be
-// no-clone. We stack overflow for deep expressions which is VERY VERY BAD.
 /// Type check and infer an [AST expression](Expr) to a [TAST
 /// expression](TypedExpr).
 ///

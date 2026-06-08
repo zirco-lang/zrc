@@ -8,7 +8,6 @@ pub struct LineAndCol {
     /// The 1-indexed line number
     pub line: u32,
     /// The 1-indexed column number
-    // REVIEW: Is it truly 1-indexed? If it's 0, LLVM in cg will treat it as "no column known"
     pub col: u32,
 }
 

@@ -59,7 +59,6 @@ pub enum FrontendOptLevel {
     #[value(name = "2", alias("default"))]
     O2,
     /// Optimize for fast execution as much as possible.
-    // TODO: does this enable LTO?
     #[value(name = "3", alias("aggressive"))]
     O3,
 }
