@@ -51,7 +51,13 @@
     nonstandard_style
 )]
 
-use std::ffi::{c_char, CString};
+use std::ffi::{CString, c_char};
+
+pub mod diagnostics;
+pub use diagnostics::*;
+
+pub mod driver;
+pub use driver::*;
 
 /// Free a string returned by the zrc C API.
 ///
