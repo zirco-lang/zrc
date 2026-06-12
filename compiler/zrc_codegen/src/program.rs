@@ -199,8 +199,6 @@ pub fn cg_init_fn<'ctx>(
                 .get_file(),
             line_no,
             fn_dbg_subroutine.expect("we have DI"),
-            // REVIEW: Are these values correct? They're the only values that seem to prevent
-            // invalid codegen
             // This is not local to our unit -- it is exported.
             false,
             // This is, in fact, a definition.
@@ -591,8 +589,6 @@ pub fn cg_program_to_string(
             triple,
             cpu,
             "",
-            // FIXME: Does this potentially run the optimizer twice (as we run it ourselves later)?
-            // That may be inefficient.
             optimization_level,
             RelocMode::PIC,
             CodeModel::Default,
@@ -645,9 +641,6 @@ pub fn cg_program_to_string_without_optimization(
             triple,
             cpu,
             "",
-            // FIXME: Technically this function doesn't run optimizations, but we
-            // do run them later in the cg_program function. Does this mean we're making
-            // an invalid target?
             OptimizationLevel::None,
             RelocMode::PIC,
             CodeModel::Default,
@@ -688,7 +681,7 @@ pub fn cg_program_to_buffer(
     debug_level: DWARFEmissionKind,
     triple: &TargetTriple,
     cpu: &str,
-) -> MemoryBuffer {
+) -> MemoryBuffer<'static> {
     let ctx = Context::create();
 
     Target::initialize_all(&InitializationConfig::default());
@@ -699,8 +692,6 @@ pub fn cg_program_to_buffer(
             triple,
             cpu,
             "",
-            // FIXME: Does this potentially run the optimizer twice (as we run it ourselves later)?
-            // That may be inefficient.
             optimization_level,
             RelocMode::PIC,
             CodeModel::Default,

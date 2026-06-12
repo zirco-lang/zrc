@@ -3,109 +3,22 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
     naersk.url = "github:nix-community/naersk";
   };
 
   outputs =
-    {
+    inputs@{
       self,
       nixpkgs,
-      flake-utils,
       rust-overlay,
       naersk,
     }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        overlays = [ rust-overlay.overlays.default ];
-        pkgs = import nixpkgs { inherit system overlays; };
-        llvm = pkgs.llvmPackages_20;
-      in
-      {
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            (rust-bin.nightly.latest.default.override {
-              extensions = [ "rust-src" "rust-analyzer" ];
-            })
-            llvm.llvm
-            llvm.libllvm
-            llvm.clang
-            llvm.lld
-            pkg-config
-            libffi
-            libxml2
-
-            # for formatting .nix files
-            nixfmt-tree
-          ];
-
-          LLVM_SYS_201_PREFIX = llvm.llvm.dev;
-        };
-
-        packages.zrc =
-          let
-            naerskLib = naersk.lib.${system}.override {
-              cargo = pkgs.rust-bin.stable.latest.default;
-              rustc = pkgs.rust-bin.stable.latest.default;
-            };
-          in
-          naerskLib.buildPackage {
-            pname = "zrc";
-            src = ./.;
-            copyLibs = true;
-            buildInputs = with pkgs; [
-              rust-bin.stable.latest.default
-              llvm.llvm
-              llvm.libllvm
-              llvm.clang
-              llvm.lld
-              pkg-config
-              libffi
-              libxml2
-            ];
-
-            postInstall = ''
-              mkdir -p $out/include/zirco
-              cp -r $src/include/* $out/include/zirco/
-              cp $src/compiler/zrc_c/zrc.h $out/include
-            '';
-
-            setupHook = ./scripts/nix-zrc.sh;
-
-            LLVM_SYS_201_PREFIX = llvm.llvm.dev;
-          };
-
-        packages.libzr =
-          let
-            zpkgs = self.packages.${system};
-          in
-          pkgs.stdenv.mkDerivation {
-            pname = "libzr";
-            version = "0.1.0";
-            src = ./libzr;
-            buildInputs = with pkgs; [
-              zpkgs.zrc
-              llvm.clang
-            ];
-
-            buildPhase = ''
-              make -C $src all-opt OUTDIR=$PWD/dist ZRC=${zpkgs.zrc}/bin/zrc
-            '';
-
-            installPhase = ''
-              mkdir -p $out/lib
-              cp dist/libzr.a $out/lib/
-              cp dist/libzr.so $out/lib/
-              mkdir -p $out/include
-              cp -r include/* $out/include/
-            '';
-
-            setupHook = ./scripts/nix-libzr.sh;
-          };
-
-        packages.default = self.packages.${system}.zrc;
-      }
-    );
+    let
+      inherit (import ./dist/nix/lib.nix { inherit nixpkgs rust-overlay; }) forAllSystems;
+    in
+    {
+      devShells = forAllSystems (args: import ./dist/nix/devshell.nix (inputs // args));
+      packages = forAllSystems (args: import ./dist/nix/pkgs/default.nix (inputs // args));
+    };
 }

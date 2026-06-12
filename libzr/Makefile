@@ -46,7 +46,7 @@ all-opt: all
 
 $(OUTDIR)/%.o: $(SRCDIR)/%.zr
 	$(ECHO) "  ZRC    $<"
-	$(Q)$(ZRC) --emit object $(ZRFLAGS) -o $@ $<
+	$(Q)$(ZRC) $(ZRFLAGS) -o $@ $<
 
 $(OUTDIR)/%.o: $(SRCDIR)/%.c
 	$(ECHO) "  CC     $<"

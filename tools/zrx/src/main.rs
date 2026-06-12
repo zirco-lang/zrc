@@ -64,7 +64,6 @@ use std::{
 use clap::Parser;
 use inkwell::{
     context::Context,
-    execution_engine::ExecutionEngine,
     support::{load_library_permanently, load_visible_symbols},
     targets::{CodeModel, InitializationConfig, RelocMode, Target},
 };
@@ -150,8 +149,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     Target::initialize_native(&InitializationConfig::default())?;
     let triple = get_native_triple();
     let target = Target::from_triple(&triple)?;
-    // Force the MCJIT components to be linked in, preventing runtime errors later
-    ExecutionEngine::link_in_mc_jit();
 
     let target_machine = target
         .create_target_machine(

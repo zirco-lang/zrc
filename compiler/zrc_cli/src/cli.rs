@@ -11,7 +11,6 @@ use zrc::{OutputFormat, codegen::OptimizationLevel};
 /// The official Zirco compiler
 #[derive(Parser)]
 #[command(version=None)]
-#[expect(clippy::struct_excessive_bools)]
 pub struct Cli {
     /// See what version of zrc you are using
     #[arg(short, long)]
@@ -28,13 +27,7 @@ pub struct Cli {
 
     /// What output format to emit
     #[arg(long)]
-    #[clap(default_value_t = FrontendOutputFormat::Llvm)]
-    pub emit: FrontendOutputFormat,
-
-    /// Allow emitting raw object code to stdout. This may mess up your
-    /// terminal!
-    #[arg(long)]
-    pub force: bool,
+    pub emit: Option<FrontendOutputFormat>,
 
     /// Set the target triple to generate output for. Defaults to native.
     #[arg(short, long)]
@@ -92,7 +85,6 @@ pub enum FrontendOptLevel {
     #[value(name = "2", alias("default"))]
     O2,
     /// Optimize for fast execution as much as possible.
-    // TODO: does this enable LTO?
     #[value(name = "3", alias("aggressive"))]
     O3,
 }
@@ -110,7 +102,7 @@ impl From<FrontendOptLevel> for OptimizationLevel {
 /// The list of possible outputs `zrc` can emit in
 ///
 /// Usually you will want to use `llvm`.
-#[derive(Debug, Clone, clap::ValueEnum, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, clap::ValueEnum, PartialEq, Eq)]
 pub enum FrontendOutputFormat {
     /// LLVM IR
     Llvm,
