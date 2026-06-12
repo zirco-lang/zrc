@@ -6,6 +6,7 @@ edition = "2024"
 [lib]
 crate-type = ["cdylib", "staticlib"]
 name = "zrc"
+doc = false
 
 [dependencies]
 zrc = { path = "../zrc" }
