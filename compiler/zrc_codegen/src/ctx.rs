@@ -14,7 +14,7 @@ use zrc_utils::line_finder::LineLookup;
 use crate::scope::CgScope;
 
 /// Trait for any context with at least the fields of [`CompilationUnitCtx`]
-#[allow(dead_code)]
+#[expect(dead_code)]
 pub trait AsCompilationUnitCtx<'ctx: 'a, 'a> {
     /// Convert some specific context to a [`CompilationUnitCtx`]
     ///
