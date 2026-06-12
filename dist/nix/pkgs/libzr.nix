@@ -20,13 +20,14 @@ pkgs.stdenv.mkDerivation {
   ];
 
   buildPhase = ''
-    make -C $src all-opt OUTDIR=$PWD/dist ZRC=${zpkgs.zrc}/bin/zrc
+    make -C $src all-opt OUTDIR=$PWD/dist ZRC="${zpkgs.zrc}/bin/zrc"
   '';
 
   installPhase = ''
     mkdir -p $out/lib
     cp dist/libzr.a $out/lib/
-    cp dist/libzr.so $out/lib/
+    [ -f dist/libzr.so ] && cp dist/libzr.so $out/lib/
+    [ -f dist/libzr.dylib ] && cp dist/libzr.dylib $out/lib/
     mkdir -p $out/include
     cp -r include/* $out/include/
   '';

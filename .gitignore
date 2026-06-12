@@ -3,5 +3,6 @@ lcov.info
 .direnv
 /examples/**/out
 /result
+/result-1
 /libzr/dist
 /book/book
