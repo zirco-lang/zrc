@@ -100,7 +100,7 @@ Contributions to Zirco are welcome! Please read [CONTRIBUTING.md](./.github/CONT
 
 ## Licence & Contact
 
-Zirco is released under the [GNU GPL v3.0](./LICENSE). To contact the maintainer, please use issues or a GitHub discussion. For sensitive matters, please email [logan@zirco.dev](mailto:logan@zirco.dev).
+Zirco is released under the [GNU AGPL v3.0](./LICENSE). To contact the maintainer, please use issues or a GitHub discussion. For sensitive matters, please email [logan@zirco.dev](mailto:logan@zirco.dev).
 
 ## Code Coverage
 
