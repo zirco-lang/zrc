@@ -1,0 +1,3 @@
+language = "C"
+include_guard = "ZRC_H"
+usize_is_size_t = true

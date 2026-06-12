@@ -1,9 +1,18 @@
 #!/bin/sh
 # Added to the resulting tarballs and sourced by `zircon env`
 
-export PATH="$HOME/.zircon/toolchains/current/bin:$PATH"
-export ZIRCO_INCLUDE_PATH="$HOME/.zircon/toolchains/current/include:$ZIRCO_INCLUDE_PATH"
+ZIRCON_TOOLCHAIN_DIR="$HOME/.zircon/toolchains/current"
+
+export PATH="$ZIRCON_TOOLCHAIN_DIR/bin:$PATH"
+export ZIRCO_INCLUDE_PATH="$ZIRCON_TOOLCHAIN_DIR/include:$ZIRCO_INCLUDE_PATH"
+
+# libzrc (compiler APIs)
+export LD_LIBRARY_PATH="$ZIRCON_TOOLCHAIN_DIR/lib:$LD_LIBRARY_PATH"
+export DYLD_LIBRARY_PATH="$ZIRCON_TOOLCHAIN_DIR/lib:$DYLD_LIBRARY_PATH"
+export C_INCLUDE_PATH="$ZIRCON_TOOLCHAIN_DIR/include:$C_INCLUDE_PATH"
+export CPLUS_INCLUDE_PATH="$ZIRCON_TOOLCHAIN_DIR/include:$CPLUS_INCLUDE_PATH"
 
 # libzr
-export LD_LIBRARY_PATH="$HOME/.zircon/toolchains/current/libzr/lib:$LD_LIBRARY_PATH"
-export ZIRCO_INCLUDE_PATH="$HOME/.zircon/toolchains/current/libzr/include:$ZIRCO_INCLUDE_PATH"
+export LD_LIBRARY_PATH="$ZIRCON_TOOLCHAIN_DIR/libzr/lib:$LD_LIBRARY_PATH"
+export DYLD_LIBRARY_PATH="$ZIRCON_TOOLCHAIN_DIR/libzr/lib:$DYLD_LIBRARY_PATH"
+export ZIRCO_INCLUDE_PATH="$ZIRCON_TOOLCHAIN_DIR/libzr/include:$ZIRCO_INCLUDE_PATH"

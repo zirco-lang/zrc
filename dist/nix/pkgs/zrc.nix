@@ -17,6 +17,7 @@ naerskLib.buildPackage {
   pname = "zrc";
   src = ../../..;
   doCheck = true;
+  copyLibs = true;
 
   buildInputs = with pkgs; [
     rust-bin.stable.latest.default
@@ -30,7 +31,9 @@ naerskLib.buildPackage {
   ];
 
   postInstall = ''
-    cp -r $src/include $out/include
+    mkdir -p $out/include
+    cp -r $src/include/* $out/include/
+    cp $src/compiler/libzrc/zrc.h $out/include/
   '';
 
   setupHook = ../hooks/zrc.sh;
