@@ -51,8 +51,27 @@
     nonstandard_style
 )]
 
+use std::ffi::{CString, c_char};
+
 pub mod diagnostics;
 pub use diagnostics::*;
 
 pub mod driver;
 pub use driver::*;
+
+/// Free a string returned by the zrc C API.
+///
+/// # Safety
+/// The caller must guarantee that `s` is a valid pointer to a null-terminated C
+/// string that was returned by a function in the zrc C API, and that it has not
+/// already been freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn zrc_free_string(str: *mut c_char) {
+    if !str.is_null() {
+        // SAFETY: the caller guarantees that `str` is a valid pointer to a string we've
+        // allocated
+        unsafe {
+            drop(CString::from_raw(str));
+        }
+    }
+}

@@ -18,13 +18,12 @@ if [ -z "$SYSROOT" ]; then
 fi
 
 mkdir -p "$SYSROOT/usr/bin"
-mkdir -p "$SYSROOT/usr/include/zirco"
+mkdir -p "$SYSROOT/usr/include"
 mkdir -p "$SYSROOT/usr/lib"
 mkdir -p "$SYSROOT/etc/profile.d"
 
 cp "$ZIRCON_TOOLCHAIN_DIR/bin/"* "$SYSROOT/usr/bin/"
 cp -r "$ZIRCON_TOOLCHAIN_DIR/include/"* "$SYSROOT/usr/include/"
-cp -r "$ZIRCON_TOOLCHAIN_DIR/include/zirco/"* "$SYSROOT/usr/include/zirco/"
 cp -r "$ZIRCON_TOOLCHAIN_DIR/lib/"* "$SYSROOT/usr/lib/"
 cp -r "$ZIRCON_TOOLCHAIN_DIR/libzr/lib/"* "$SYSROOT/usr/lib/"
 cp -r "$ZIRCON_TOOLCHAIN_DIR/libzr/include/"* "$SYSROOT/usr/include/zirco/"

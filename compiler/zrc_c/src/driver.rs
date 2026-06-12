@@ -17,7 +17,7 @@ use crate::diagnostics::ZrcDiagnostic;
 /// The level of optimization to apply during code generation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum OptimizationLevel {
+pub enum ZrcOptimizationLevel {
     /// No optimizations. This is the default.
     ZRC_OPTIMIZE_NONE = 0,
     /// Some optimizations that do not significantly increase compile time or
@@ -29,13 +29,13 @@ pub enum OptimizationLevel {
     /// code size.
     ZRC_OPTIMIZE_AGGRESSIVE = 3,
 }
-impl From<OptimizationLevel> for codegen::OptimizationLevel {
-    fn from(val: OptimizationLevel) -> Self {
+impl From<ZrcOptimizationLevel> for codegen::OptimizationLevel {
+    fn from(val: ZrcOptimizationLevel) -> Self {
         match val {
-            OptimizationLevel::ZRC_OPTIMIZE_NONE => Self::None,
-            OptimizationLevel::ZRC_OPTIMIZE_LESS => Self::Less,
-            OptimizationLevel::ZRC_OPTIMIZE_DEFAULT => Self::Default,
-            OptimizationLevel::ZRC_OPTIMIZE_AGGRESSIVE => Self::Aggressive,
+            ZrcOptimizationLevel::ZRC_OPTIMIZE_NONE => Self::None,
+            ZrcOptimizationLevel::ZRC_OPTIMIZE_LESS => Self::Less,
+            ZrcOptimizationLevel::ZRC_OPTIMIZE_DEFAULT => Self::Default,
+            ZrcOptimizationLevel::ZRC_OPTIMIZE_AGGRESSIVE => Self::Aggressive,
         }
     }
 }
@@ -43,7 +43,7 @@ impl From<OptimizationLevel> for codegen::OptimizationLevel {
 /// The level of debug information to include during code generation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub enum DebugLevel {
+pub enum ZrcDebugLevel {
     /// No debug information. This is the default.
     ZRC_DI_NONE = 0,
     /// Include basic debug information.
@@ -51,12 +51,12 @@ pub enum DebugLevel {
     /// Include full debug information.
     ZRC_DI_FULL = 2,
 }
-impl From<DebugLevel> for codegen::DebugLevel {
-    fn from(val: DebugLevel) -> Self {
+impl From<ZrcDebugLevel> for codegen::DebugLevel {
+    fn from(val: ZrcDebugLevel) -> Self {
         match val {
-            DebugLevel::ZRC_DI_NONE => Self::None,
-            DebugLevel::ZRC_DI_BASIC => Self::LineTablesOnly,
-            DebugLevel::ZRC_DI_FULL => Self::Full,
+            ZrcDebugLevel::ZRC_DI_NONE => Self::None,
+            ZrcDebugLevel::ZRC_DI_BASIC => Self::LineTablesOnly,
+            ZrcDebugLevel::ZRC_DI_FULL => Self::Full,
         }
     }
 }
@@ -151,8 +151,8 @@ pub unsafe extern "C" fn zrc_compile(
     file_name: *const c_char,
     cli_args: *const c_char,
     content: *const c_char,
-    optimization_level: OptimizationLevel,
-    debug_mode: DebugLevel,
+    optimization_level: ZrcOptimizationLevel,
+    debug_mode: ZrcDebugLevel,
     triple: *const c_char,
     cpu: *const c_char,
     forbid_unlisted_includes: bool,

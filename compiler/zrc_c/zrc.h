@@ -46,7 +46,7 @@ typedef uint8_t ZrcOutputFormat;
 /**
  * The level of optimization to apply during code generation.
  */
-enum OptimizationLevel {
+enum ZrcOptimizationLevel {
   /**
    * No optimizations. This is the default.
    */
@@ -66,12 +66,12 @@ enum OptimizationLevel {
    */
   ZRC_OPTIMIZE_AGGRESSIVE = 3,
 };
-typedef uint8_t OptimizationLevel;
+typedef uint8_t ZrcOptimizationLevel;
 
 /**
  * The level of debug information to include during code generation.
  */
-enum DebugLevel {
+enum ZrcDebugLevel {
   /**
    * No debug information. This is the default.
    */
@@ -85,7 +85,7 @@ enum DebugLevel {
    */
   ZRC_DI_FULL = 2,
 };
-typedef uint8_t DebugLevel;
+typedef uint8_t ZrcDebugLevel;
 
 /**
  * Opaque struct representing a diagnostic in the C API. The actual contents of
@@ -121,6 +121,16 @@ typedef struct ZrcCompileResult {
    */
   struct ZrcDiagnostic *diagnostics;
 } ZrcCompileResult;
+
+/**
+ * Free a string returned by the zrc C API.
+ *
+ * # Safety
+ * The caller must guarantee that `s` is a valid pointer to a null-terminated C
+ * string that was returned by a function in the zrc C API, and that it has not
+ * already been freed.
+ */
+void zrc_free_string(char *str);
 
 /**
  * Get the severity of a diagnostic as a [`ZrcDiagnosticSeverity`].
@@ -218,8 +228,8 @@ struct ZrcCompileResult zrc_compile(const char *frontend_version_string,
                                     const char *file_name,
                                     const char *cli_args,
                                     const char *content,
-                                    OptimizationLevel optimization_level,
-                                    DebugLevel debug_mode,
+                                    ZrcOptimizationLevel optimization_level,
+                                    ZrcDebugLevel debug_mode,
                                     const char *triple,
                                     const char *cpu,
                                     bool forbid_unlisted_includes);

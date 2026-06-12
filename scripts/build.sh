@@ -26,7 +26,7 @@ find target/release -maxdepth 1 -type f \( -name "libzrc.so" -o -name "libzrc.dy
 cp compiler/zrc_c/zrc.h "$ZIRCON_TOOLCHAIN_DIR/include/"
 
 # build std using the fresh compiler
-make -C libzr all-opt ZRC=$ZIRCON_TOOLCHAIN_DIR/bin/zrc
+make -C libzr all-opt ZRC="$ZIRCON_TOOLCHAIN_DIR/bin/zrc"
 
 cp libzr/dist/libzr.a "$ZIRCON_TOOLCHAIN_DIR/libzr/lib/"
 find libzr/dist -maxdepth 1 -type f \( -name "libzr.so" -o -name "libzr.dylib" \) -exec cp {} "$ZIRCON_TOOLCHAIN_DIR/libzr/lib/" \;
