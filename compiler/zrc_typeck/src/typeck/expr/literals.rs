@@ -74,7 +74,7 @@ pub fn type_expr_number_literal<'input>(
         // We need to handle unsigned values that might be larger than i128::MAX
         #[expect(clippy::cast_possible_wrap)]
         #[expect(clippy::as_conversions)]
-        let value_in_range = u128::try_from(i128::MAX).ok().is_some_and(|max_as_u128| {
+        let value_in_range = u128::try_from(i128::MAX).is_ok_and(|max_as_u128| {
             if parsed_value <= max_as_u128 {
                 let value_as_signed = parsed_value as i128;
                 value_as_signed >= min && value_as_signed <= max
