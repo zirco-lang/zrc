@@ -74,6 +74,7 @@ impl<'input> SemanticVisit<'input, '_> for Visit<'input> {
             // are commonly used as private/internal helpers where usage is intentional
             if let Some(first_use) = var_entry.referenced_spans.first()
                 && var_name.starts_with('_')
+                && !var_name.starts_with("__")
                 && !self.reported_vars.contains(&var_name)
                 && !matches!(var_entry.ty, Type::Fn(_))
             {

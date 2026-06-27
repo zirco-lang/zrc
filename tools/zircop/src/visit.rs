@@ -424,9 +424,6 @@ pub trait SemanticVisit<'input, 'gs> {
                 }
                 self.visit_tc_block(body.value());
             }
-            TcStmtKind::FourStmt(body) => {
-                self.visit_tc_block(body.value());
-            }
             TcStmtKind::SwitchCase {
                 scrutinee,
                 default,
