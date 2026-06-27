@@ -222,13 +222,6 @@ pub(crate) fn cg_block<'ctx, 'input, 'a>(
                 post.clone(),
                 body.clone(),
             )),
-            TypedStmtKind::FourStmt(body) => Some(loops::cg_four_stmt(
-                cg,
-                bb,
-                &scope,
-                lexical_block,
-                body.clone(),
-            )),
 
             TypedStmtKind::WhileStmt(cond, body) => Some(loops::cg_while_stmt(
                 cg,

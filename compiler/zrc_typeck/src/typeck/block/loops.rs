@@ -2,8 +2,9 @@
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, diagnostic::GenericLabel};
 use zrc_parser::ast::{
-    expr::Expr,
+    expr::{Comparison, Expr, ExprKind},
     stmt::{LetDeclaration, Stmt},
+    ty::{Type, TypeKind},
 };
 use zrc_utils::span::{Span, Spannable, Spanned};
 
@@ -105,27 +106,55 @@ pub fn type_four<'input>(
     return_ability: &BlockReturnAbility<'input>,
     stmt_span: Span,
 ) -> Result<Option<(TypedStmt<'input>, BlockReturnActuality)>, Diagnostic> {
-    let loop_scope = scope.clone();
+    // build the following AST:
+    // ```
+    // {
+    //     for (let __four_i = 0u8; __four_i < 4; ++__four_i) {
+    //         body
+    //     }
+    // }
+    // ```
 
-    let body_as_block = coerce_stmt_into_block(*body);
+    let init = Some(Box::new(
+        vec![
+            LetDeclaration {
+                name: "__four_i".in_span(stmt_span),
+                ty: None,
+                value: Some(Expr(
+                    ExprKind::NumberLiteral(
+                        zrc_parser::lexer::NumberLiteral::Decimal("0"),
+                        Some(Type(TypeKind::Identifier("u8").in_span(stmt_span))),
+                    )
+                    .in_span(stmt_span),
+                )),
+                is_constant: false,
+            }
+            .in_span(stmt_span),
+        ]
+        .in_span(stmt_span),
+    ));
+    let cond = Some(Expr(
+        ExprKind::Comparison(
+            Comparison::Lt,
+            Box::new(Expr(ExprKind::Identifier("__four_i").in_span(stmt_span))),
+            Box::new(Expr(
+                ExprKind::NumberLiteral(
+                    zrc_parser::lexer::NumberLiteral::Decimal("4"),
+                    Some(Type(TypeKind::Identifier("u8").in_span(stmt_span))),
+                )
+                .in_span(stmt_span),
+            )),
+        )
+        .in_span(stmt_span),
+    ));
+    let post = Some(Expr(
+        ExprKind::PrefixIncrement(Box::new(Expr(
+            ExprKind::Identifier("__four_i").in_span(stmt_span),
+        )))
+        .in_span(stmt_span),
+    ));
 
-    let body_as_block_span = body_as_block.span();
-
-    let body = type_block(
-        &loop_scope,
-        body_as_block,
-        true,
-        return_ability.clone().demote(),
-    )?;
-    let return_actuality = body.return_actuality;
-
-    Ok(Some((
-        TypedStmt {
-            kind: TypedStmtKind::FourStmt(body.in_span(body_as_block_span)).in_span(stmt_span),
-            return_actuality,
-        },
-        return_actuality,
-    )))
+    type_for(scope, init, cond, post, body, return_ability, stmt_span)
 }
 
 /// Type check a while statement.
