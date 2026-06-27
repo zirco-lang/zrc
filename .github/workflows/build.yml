@@ -85,6 +85,8 @@ jobs:
               run: nix develop --command cargo --version
             - name: Build with Nix
               run: nix build .#zrc .#libzr
+            - name: Clean up Nix store
+              run: nix-collect-garbage -d
     lint-std:
         needs: build
         runs-on: ubuntu-24.04
