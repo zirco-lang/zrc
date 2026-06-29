@@ -179,7 +179,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         let chunks = zrc_preprocessor::preprocess(
             Path::new(&directory_name),
-            &include_paths,
+            include_paths.clone(),
             &file_name,
             &source_content,
             false,
