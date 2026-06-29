@@ -123,7 +123,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let result = compile(
         &version_string(),
-        &cli::get_include_paths(&cli),
+        cli::get_include_paths(&cli),
         &emit.into(),
         &directory_name,
         &file_name,

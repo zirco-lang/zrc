@@ -3,7 +3,7 @@
 //! This module contains the main driver function for the Zirco compiler,
 //! which orchestrates the parsing, type checking, and code generation phases.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use zrc_codegen::{DebugLevel, OptimizationLevel};
 use zrc_parser::parser;
@@ -73,7 +73,7 @@ pub enum OutputFormat {
 )]
 pub fn compile(
     frontend_version_string: &str,
-    include_paths: &[&'static Path],
+    include_paths: Vec<PathBuf>,
     emit: &OutputFormat,
     parent_directory: &str,
     file_name: &str,

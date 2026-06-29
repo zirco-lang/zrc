@@ -98,20 +98,20 @@ impl SourceChunk {
 
 /// Context for preprocessing operations
 #[derive(Debug)]
-struct PreprocessorCtx<'sp> {
+struct PreprocessorCtx {
     /// Set of files that have been included with `#pragma once`
     pragma_once_files: HashSet<PathBuf>,
     /// Collected source chunks
     chunks: Vec<SourceChunk>,
     /// The paths to search for bracket includes
-    search_paths: &'sp [&'static Path],
+    search_paths: Vec<PathBuf>,
     /// Whether to forbid includes outside of listed search paths
     forbid_unlisted_includes: bool,
 }
 
-impl<'sp> PreprocessorCtx<'sp> {
+impl PreprocessorCtx {
     /// Create a new preprocessor context
-    fn new(search_paths: &'sp [&'static Path], forbid_unlisted_includes: bool) -> Self {
+    fn new(search_paths: Vec<PathBuf>, forbid_unlisted_includes: bool) -> Self {
         Self {
             pragma_once_files: HashSet::new(),
             chunks: Vec::new(),
@@ -123,7 +123,7 @@ impl<'sp> PreprocessorCtx<'sp> {
 
 /// Search for an include file in the provided search paths
 fn find_include_file(ctx: &PreprocessorCtx, include_file: &str) -> Option<PathBuf> {
-    for search_path in ctx.search_paths {
+    for search_path in &ctx.search_paths {
         let candidate = search_path.join(include_file);
         if candidate.exists() {
             return Some(candidate);
@@ -133,7 +133,7 @@ fn find_include_file(ctx: &PreprocessorCtx, include_file: &str) -> Option<PathBu
 }
 
 /// Check if a resolved path is within any of the allowed search paths
-fn is_path_within_allowed_dirs(resolved_path: &Path, search_paths: &[&Path]) -> bool {
+fn is_path_within_allowed_dirs(resolved_path: &Path, search_paths: &[PathBuf]) -> bool {
     // Try to canonicalize the resolved path
     let Ok(canonical_resolved) = resolved_path.canonicalize() else {
         return false;
@@ -175,11 +175,11 @@ fn is_path_within_allowed_dirs(resolved_path: &Path, search_paths: &[&Path]) -> 
 ///
 /// Panics if the file name cannot be converted to a static string.
 #[expect(clippy::result_large_err)]
-pub fn preprocess(
-    base_path: &Path,
-    search_paths: &'_ [&'static Path],
-    file_name: &str,
-    content: &str,
+pub fn preprocess<'input>(
+    base_path: &'input Path,
+    search_paths: Vec<PathBuf>,
+    file_name: &'input str,
+    content: &'input str,
     forbid_unlisted_includes: bool,
 ) -> Result<Vec<SourceChunk>, Diagnostic> {
     let mut ctx = PreprocessorCtx::new(search_paths, forbid_unlisted_includes);
@@ -376,7 +376,7 @@ fn preprocess_internal(
 
                 // Check if the resolved path is within allowed directories
                 if ctx.forbid_unlisted_includes
-                    && !is_path_within_allowed_dirs(&canonical_path, ctx.search_paths)
+                    && !is_path_within_allowed_dirs(&canonical_path, ctx.search_paths.as_ref())
                 {
                     let sp = Span::from_positions_and_file(
                         current_byte,
@@ -484,7 +484,7 @@ mod tests {
     #[test]
     fn preprocess_simple_file_without_directives() {
         let content = "fn main() {\n    printf(\"Hello\");\n}";
-        let chunks = preprocess(Path::new("."), &[], "test.zr", content, false)
+        let chunks = preprocess(Path::new("."), vec![], "test.zr", content, false)
             .expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
@@ -497,7 +497,7 @@ mod tests {
     #[test]
     fn preprocess_with_pragma_once() {
         let content = "#pragma once\nfn test() {}";
-        let chunks = preprocess(Path::new("."), &[], "test.zr", content, false)
+        let chunks = preprocess(Path::new("."), vec![], "test.zr", content, false)
             .expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
@@ -509,7 +509,7 @@ mod tests {
     #[test]
     fn preprocess_pragma_once_with_multiple_lines() {
         let content = "#pragma once\n\nfn first() {}\nfn second() {}";
-        let chunks = preprocess(Path::new("."), &[], "test.zr", content, false)
+        let chunks = preprocess(Path::new("."), vec![], "test.zr", content, false)
             .expect("preprocessing failed");
 
         assert_eq!(chunks.len(), 1);
@@ -522,7 +522,7 @@ mod tests {
     fn preprocess_tracks_byte_offsets_correctly() {
         // Test that byte offsets are correctly calculated
         let content = "line1\n#pragma once\nline3";
-        let chunks = preprocess(Path::new("."), &[], "test.zr", content, false)
+        let chunks = preprocess(Path::new("."), vec![], "test.zr", content, false)
             .expect("preprocessing failed");
 
         // First chunk: "line1" (before pragma)
