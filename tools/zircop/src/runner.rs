@@ -1,6 +1,6 @@
 //! Execute a list of lints on a program.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use zrc_diagnostics::Diagnostic;
 use zrc_parser::parser;
@@ -11,7 +11,7 @@ use crate::{diagnostic::LintDiagnostic, lints, pass::PassList};
 /// Lint a program with a list of [`crate::lint::Lint`]s.
 #[expect(clippy::result_large_err)]
 pub fn run(
-    include_paths: &[&'static Path],
+    include_paths: Vec<PathBuf>,
     parent_directory: &Path,
     file_name: &str,
     content: &str,
@@ -56,7 +56,7 @@ pub fn run(
 /// [`crate::lints::get_default_lints`].
 #[expect(clippy::result_large_err)]
 pub fn run_with_default_passes(
-    include_paths: &[&'static Path],
+    include_paths: Vec<PathBuf>,
     parent_directory: &Path,
     file_name: &str,
     content: &str,

@@ -55,7 +55,10 @@
 
 mod cli;
 
-use std::{error::Error, path::Path};
+use std::{
+    error::Error,
+    path::{Path, PathBuf},
+};
 
 use clap::Parser;
 use repline::{Response, prebaked::read_and_mut};
@@ -291,7 +294,7 @@ fn handle_help() -> Response {
 }
 
 /// Call the #include cmd (zpp)
-fn handle_include(line: &str, include_paths: &'static [&Path], gs: &mut GlobalScope) -> Response {
+fn handle_include(line: &str, include_paths: Vec<PathBuf>, gs: &mut GlobalScope) -> Response {
     // feed it to the preprocessor
     let chunks = diag_wrapper(
         || zrc_preprocessor::preprocess(Path::new("/dev"), include_paths, "<stdin>", line, false),
@@ -345,7 +348,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!();
 
     // Spin up Zirco stuff. Prepare things the preprocessor needs:
-    let include_paths = Box::leak(Box::new(cli::get_include_paths(&cli)));
+    let include_paths = cli::get_include_paths(&cli);
     let mut gs = GlobalScope::new();
     let mut local_scope: Option<typeck::Scope> = None;
 
@@ -422,7 +425,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Ok(Response::Accept)
                 }
                 (Mode::Decl, line) if line == "#include" || line.starts_with("#include ") => {
-                    Ok(handle_include(line, include_paths, &mut gs))
+                    Ok(handle_include(line, include_paths.clone(), &mut gs))
                 }
                 (_, line) if line == "#include" || line.starts_with("#include ") => {
                     println!("The #include command is only available in declaration mode.");

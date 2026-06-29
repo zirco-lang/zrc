@@ -61,25 +61,19 @@ fn resolve_include_path(path: &Path) -> PathBuf {
 /// Get the include paths from the CLI environment and -I arguments
 ///
 /// Relative paths are resolved relative to the current working directory.
-pub fn get_include_paths(cli: &Cli) -> Vec<&'static Path> {
+pub fn get_include_paths(cli: &Cli) -> Vec<PathBuf> {
     // append paths in the following order:
     // 1. CLI
     // 2. ZIRCO_INCLUDE_PATH env var
-    let mut include_paths: Vec<&'static Path> = Vec::new();
+    let mut include_paths: Vec<PathBuf> = Vec::new();
 
     for path in &cli.include_paths {
-        let resolved_path = resolve_include_path(path);
-        // SAFETY: we leak the PathBuf to get a 'static lifetime
-        let static_path: &'static Path = Box::leak(resolved_path.clone().into_boxed_path());
-        include_paths.push(static_path);
+        include_paths.push(resolve_include_path(path));
     }
 
     if let Ok(env_paths) = env::var("ZIRCO_INCLUDE_PATH") {
         for path_str in env::split_paths(&env_paths) {
-            let resolved_path = resolve_include_path(&path_str);
-            // SAFETY: we leak the PathBuf to get a 'static lifetime
-            let static_path: &'static Path = Box::leak(resolved_path.into_boxed_path());
-            include_paths.push(static_path);
+            include_paths.push(resolve_include_path(&path_str));
         }
     }
 

@@ -94,7 +94,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     input.read_to_string(&mut source_content)?;
 
     let diagnostics = runner::run_with_default_passes(
-        &cli::get_include_paths(&cli),
+        cli::get_include_paths(&cli),
         Path::new(&directory_name),
         &file_name,
         &source_content,
