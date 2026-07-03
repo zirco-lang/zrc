@@ -370,9 +370,23 @@ fn preprocess_internal(
                 }
 
                 let include_full_path = base_path.join(&include_file);
-                let canonical_path = include_full_path
-                    .canonicalize()
-                    .expect("failed to canonicalize path");
+                let canonical_path = match include_full_path.canonicalize() {
+                    Ok(path) => path,
+                    Err(err) => {
+                        let sp = Span::from_positions_and_file(
+                            current_byte,
+                            current_byte + line.len(),
+                            static_file_name,
+                        );
+                        return Err(DiagnosticKind::PreprocessorCannotReadIncludeFile
+                            .error_in(sp)
+                            .with_label(GenericLabel::error(
+                                LabelKind::PreprocessorCannotReadIncludeFile(include_file.clone())
+                                    .in_span(sp),
+                            ))
+                            .with_note(NoteKind::ReadFailed(err.to_string())));
+                    }
+                };
 
                 // Check if the resolved path is within allowed directories
                 if ctx.forbid_unlisted_includes
