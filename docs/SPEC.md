@@ -1,6 +1,6 @@
 # Zirco Language Specification
 
-Version 0.1.0 (Draft)
+Version 0.2.0 (Draft)
 
 ## Table of Contents
 
@@ -101,14 +101,14 @@ Zirco is a compiled programming language with a strong type system and modern sy
 
 ### 1.2 Design Philosophy
 
--   **Strong Type System**: Zirco aims for an extremely strong runtime type system
--   **Modern Syntax**: Combines the familiarity of C with modern language design
--   **Compiled**: Compiles to native code via LLVM
--   **Systems Programming**: Suitable for low-level systems programming tasks
+- **Strong Type System**: Zirco aims for an extremely strong runtime type system
+- **Modern Syntax**: Combines the familiarity of C with modern language design
+- **Compiled**: Compiles to native code via LLVM
+- **Systems Programming**: Suitable for low-level systems programming tasks
 
 ### 1.3 Stability Notice
 
-Zirco is currently in active development (version 0.1.0). There are **NO STABILITY GUARANTEES**. The language syntax, semantics, and APIs may change between versions.
+Zirco is currently in active development. There are **NO STABILITY GUARANTEES**. The language syntax, semantics, and APIs may change between versions.
 
 ---
 
@@ -122,10 +122,10 @@ Zirco source files are UTF-8 encoded text files. The language uses ASCII for key
 
 Whitespace characters include:
 
--   Space (U+0020)
--   Tab (U+0009)
--   Newline (U+000A)
--   Carriage return (U+000D)
+- Space (U+0020)
+- Tab (U+0009)
+- Newline (U+000A)
+- Carriage return (U+000D)
 
 Whitespace is used to separate tokens but is otherwise ignored.
 
@@ -154,8 +154,8 @@ The `#include` directive inserts the contents of another file:
 #include <system/header.zr>
 ```
 
--   Files enclosed in double quotes (`"file.zr"`) are searched relative to the current file's directory
--   Files enclosed in angle brackets (`<file.zr>`) follow the same search path as double quotes
+- Files enclosed in double quotes (`"file.zr"`) are searched relative to the current file's directory
+- Files enclosed in angle brackets (`<file.zr>`) follow the same search path as double quotes
 
 #### 2.4.2 Pragma Once
 
@@ -216,9 +216,9 @@ identifier ::= [a-zA-Z_][a-zA-Z0-9_]*
 
 **Rules**:
 
--   Must start with a letter (uppercase or lowercase) or underscore
--   May contain letters, digits, and underscores
--   Case-sensitive
+- Must start with a letter (uppercase or lowercase) or underscore
+- May contain letters, digits, and underscores
+- Case-sensitive
 
 **Examples**:
 
@@ -292,11 +292,11 @@ String literals are enclosed in double quotes and may contain escape sequences:
 
 **Supported Escape Sequences**:
 
--   `\n` - Newline
--   `\r` - Carriage return
--   `\t` - Tab
--   `\\` - Backslash
--   `\"` - Double quote
+- `\n` - Newline
+- `\r` - Carriage return
+- `\t` - Tab
+- `\\` - Backslash
+- `\"` - Double quote
 
 String literals must be closed on the same line (multi-line strings are not supported).
 
@@ -388,28 +388,28 @@ Zirco has the following built-in primitive types that are explicitly defined by 
 
 **Signed Integers**:
 
--   `i8` - 8-bit signed integer
--   `i16` - 16-bit signed integer
--   `i32` - 32-bit signed integer
--   `i64` - 64-bit signed integer
--   `isize` - Pointer-sized signed integer
+- `i8` - 8-bit signed integer
+- `i16` - 16-bit signed integer
+- `i32` - 32-bit signed integer
+- `i64` - 64-bit signed integer
+- `isize` - Pointer-sized signed integer
 
 **Unsigned Integers**:
 
--   `u8` - 8-bit unsigned integer
--   `u16` - 16-bit unsigned integer
--   `u32` - 32-bit unsigned integer
--   `u64` - 64-bit unsigned integer
--   `usize` - Pointer-sized unsigned integer
+- `u8` - 8-bit unsigned integer
+- `u16` - 16-bit unsigned integer
+- `u32` - 32-bit unsigned integer
+- `u64` - 64-bit unsigned integer
+- `usize` - Pointer-sized unsigned integer
 
 **Boolean**:
 
--   `bool` - Boolean type (true or false)
+- `bool` - Boolean type (true or false)
 
 **Unit/Void Type**:
 
--   `struct {}` - Empty struct, used as the unit/void type
--   `*struct {}` - Pointer to empty struct, used as a void pointer (analogous to `void*` in C)
+- `struct {}` - Empty struct, used as the unit/void type
+- `*struct {}` - Pointer to empty struct, used as a void pointer (analogous to `void*` in C)
 
 ### 3.4 Pointer Types
 
@@ -493,9 +493,9 @@ type Point = struct { x: i32, y: i32 };
 
 **Rules**:
 
--   Field names must be unique within a struct
--   Fields are accessed using the `.` operator
--   Structs can be nested
+- Field names must be unique within a struct
+- Fields are accessed using the `.` operator
+- Structs can be nested
 
 **Example**:
 
@@ -535,9 +535,9 @@ type Value = union { i: i32, f: f32 };
 
 **Rules**:
 
--   Only one field is active at a time
--   Fields are accessed using the `.` operator
--   Reading an inactive field is undefined behavior
+- Only one field is active at a time
+- Fields are accessed using the `.` operator
+- Reading an inactive field is undefined behavior
 
 ### 3.10 Enum Types
 
@@ -650,11 +650,11 @@ Expressions can be wrapped in parentheses to control evaluation order:
 
 **Binary Arithmetic Operators**:
 
--   `+` Addition
--   `-` Subtraction
--   `*` Multiplication
--   `/` Division
--   `%` Modulo
+- `+` Addition
+- `-` Subtraction
+- `*` Multiplication
+- `/` Division
+- `%` Modulo
 
 **Example**:
 
@@ -667,7 +667,7 @@ let remainder = 17 % 5;
 
 **Unary Arithmetic Operator**:
 
--   `-` Negation
+- `-` Negation
 
 ```zirco
 let x = -5;
@@ -678,15 +678,15 @@ let y = -(10 + 3);
 
 **Comparison Operators**:
 
--   `>` Greater than
--   `>=` Greater than or equal
--   `<` Less than
--   `<=` Less than or equal
+- `>` Greater than
+- `>=` Greater than or equal
+- `<` Less than
+- `<=` Less than or equal
 
 **Equality Operators**:
 
--   `==` Equal to
--   `!=` Not equal to
+- `==` Equal to
+- `!=` Not equal to
 
 **Example**:
 
@@ -699,16 +699,16 @@ let d = 5 != 3;     // true
 
 **Rules**:
 
--   Operands must be of the same type
--   Result is a boolean value
+- Operands must be of the same type
+- Result is a boolean value
 
 ### 4.6 Logical Expressions
 
 **Logical Operators**:
 
--   `&&` Logical AND
--   `||` Logical OR
--   `!` Logical NOT (unary)
+- `&&` Logical AND
+- `||` Logical OR
+- `!` Logical NOT (unary)
 
 **Example**:
 
@@ -720,20 +720,20 @@ let c = !true;           // false
 
 **Rules**:
 
--   Operands must be boolean values
--   `&&` and `||` use short-circuit evaluation
+- Operands must be boolean values
+- `&&` and `||` use short-circuit evaluation
 
 ### 4.7 Bitwise Expressions
 
 **Binary Bitwise Operators**:
 
--   `&` Bitwise AND
--   `|` Bitwise OR
--   `^` Bitwise XOR
+- `&` Bitwise AND
+- `|` Bitwise OR
+- `^` Bitwise XOR
 
 **Unary Bitwise Operator**:
 
--   `~` Bitwise NOT
+- `~` Bitwise NOT
 
 **Example**:
 
@@ -767,9 +767,9 @@ x ^= 0xAA; // x = x ^ 0xAA
 
 **Rules**:
 
--   Left side must be an lvalue (assignable location)
--   Assignment is an expression and returns the assigned value
--   Assignment is right-associative
+- Left side must be an lvalue (assignable location)
+- Assignment is an expression and returns the assigned value
+- Assignment is right-associative
 
 ### 4.9 Pointer Expressions
 
@@ -834,8 +834,8 @@ arr[5] = 42;
 
 **Rules**:
 
--   The index must be of type `usize`
--   Indexing is equivalent to pointer arithmetic and dereferencing
+- The index must be of type `usize`
+- Indexing is equivalent to pointer arithmetic and dereferencing
 
 ### 4.12 Function Call Expressions
 
@@ -848,8 +848,8 @@ let result = add(5, 3);
 
 **Rules**:
 
--   Arguments are evaluated left-to-right (evaluation order is defined)
--   Number and types of arguments must match the function signature
+- Arguments are evaluated left-to-right (evaluation order is defined)
+- Number and types of arguments must match the function signature
 
 ### 4.13 Cast Expressions
 
@@ -875,9 +875,9 @@ let sign = x >= 0 ? 1 : -1;
 
 **Rules**:
 
--   Condition must be a boolean expression
--   Both branches must have compatible types
--   Only the selected branch is evaluated
+- Condition must be a boolean expression
+- Both branches must have compatible types
+- Only the selected branch is evaluated
 
 ### 4.15 Sizeof Expressions
 
@@ -907,9 +907,9 @@ let x = (a = 5, b = 10, a + b);  // x is 15
 
 **Rules**:
 
--   Expressions are evaluated left-to-right
--   Result is the value of the rightmost expression
--   Primarily used for side effects
+- Expressions are evaluated left-to-right
+- Result is the value of the rightmost expression
+- Primarily used for side effects
 
 ### 4.17 Increment and Decrement Expressions
 
@@ -917,13 +917,13 @@ Zirco supports both prefix and postfix increment and decrement operators for int
 
 **Postfix Operators**:
 
--   `x++` - Postfix increment: returns the current value of `x`, then increments `x`
--   `x--` - Postfix decrement: returns the current value of `x`, then decrements `x`
+- `x++` - Postfix increment: returns the current value of `x`, then increments `x`
+- `x--` - Postfix decrement: returns the current value of `x`, then decrements `x`
 
 **Prefix Operators**:
 
--   `++x` - Prefix increment: increments `x`, then returns the new value
--   `--x` - Prefix decrement: decrements `x`, then returns the new value
+- `++x` - Prefix increment: increments `x`, then returns the new value
+- `--x` - Prefix decrement: decrements `x`, then returns the new value
 
 **Example**:
 
@@ -943,16 +943,16 @@ for (let i = 0; i < 10; i++) {
 
 **Rules**:
 
--   Operand must be an integer lvalue (a modifiable variable)
--   Cannot be used on constants or expressions
--   Prefix operators have unary precedence (level 2)
--   Postfix operators have the highest precedence (level 1)
--   The value is incremented or decremented by 1
+- Operand must be an integer lvalue (a modifiable variable)
+- Cannot be used on constants or expressions
+- Prefix operators have unary precedence (level 2)
+- Postfix operators have the highest precedence (level 1)
+- The value is incremented or decremented by 1
 
 **Parsing Disambiguation**:
 
--   `a+++b` is parsed as `(a++) + b` (maximal munch rule)
--   Use spacing to disambiguate: `a+ ++b` parses as `a + (++b)`
+- `a+++b` is parsed as `(a++) + b` (maximal munch rule)
+- Use spacing to disambiguate: `a+ ++b` parses as `a + (++b)`
 
 ---
 
@@ -994,9 +994,9 @@ A sequence of statements enclosed in braces:
 
 **Rules**:
 
--   Variables declared in a block are scoped to that block
--   Blocks can be nested
--   Blocks can appear anywhere a statement is expected
+- Variables declared in a block are scoped to that block
+- Blocks can be nested
+- Blocks can appear anywhere a statement is expected
 
 ### 5.5 Let Declarations (Local Variables)
 
@@ -1020,10 +1020,10 @@ let x: i32, y: i32, z: i32;
 
 **Rules**:
 
--   Variables must be declared before use
--   Multiple variables can be declared in a single statement
--   Type can be inferred from initializer (implementation-defined)
--   Uninitialized variables have indeterminate values
+- Variables must be declared before use
+- Multiple variables can be declared in a single statement
+- Type can be inferred from initializer (implementation-defined)
+- Uninitialized variables have indeterminate values
 
 ### 5.6 If Statements
 
@@ -1061,10 +1061,10 @@ if (x > 0) {
 
 **Rules**:
 
--   Condition must be enclosed in parentheses
--   Condition must be a boolean expression
--   Braces are optional for single statements but recommended
--   Dangling else attaches to the nearest if
+- Condition must be enclosed in parentheses
+- Condition must be a boolean expression
+- Braces are optional for single statements but recommended
+- Dangling else attaches to the nearest if
 
 ### 5.7 While Loops
 
@@ -1079,9 +1079,9 @@ while (i < 10) {
 
 **Rules**:
 
--   Condition is evaluated before each iteration
--   Loop body may execute zero or more times
--   Condition must be enclosed in parentheses
+- Condition is evaluated before each iteration
+- Loop body may execute zero or more times
+- Condition must be enclosed in parentheses
 
 ### 5.8 Do-While Loops
 
@@ -1096,9 +1096,9 @@ do {
 
 **Rules**:
 
--   Loop body executes at least once
--   Condition is evaluated after each iteration
--   Must end with a semicolon after the condition
+- Loop body executes at least once
+- Condition is evaluated after each iteration
+- Must end with a semicolon after the condition
 
 ### 5.9 For Loops
 
@@ -1134,11 +1134,11 @@ for (;;) {  // infinite loop
 
 **Rules**:
 
--   Initialization runs once before the loop starts
--   Condition is checked before each iteration
--   Post-expression runs after each iteration
--   All three parts are optional
--   Variables declared in init are scoped to the loop
+- Initialization runs once before the loop starts
+- Condition is checked before each iteration
+- Post-expression runs after each iteration
+- All three parts are optional
+- Variables declared in init are scoped to the loop
 
 ### 5.9b Four Loops
 
@@ -1153,9 +1153,9 @@ four {
 
 **Rules**:
 
--   The loop body executes exactly four times
--   `break` and `continue` statements may be used within the loop to alter control flow
--   No loop variable is provided; use an external counter if needed
+- The loop body executes exactly four times
+- `break` and `continue` statements may be used within the loop to alter control flow
+- No loop variable is provided; use an external counter if needed
 
 ### 5.10 Break Statement
 
@@ -1201,9 +1201,9 @@ return x + y;
 
 **Rules**:
 
--   Return type must match function signature
--   Void functions use `return;` or omit return at the end
--   Functions with return types must return a value on all paths
+- Return type must match function signature
+- Void functions use `return;` or omit return at the end
+- Functions with return types must return a value on all paths
 
 ### 5.13 Switch Statement
 
@@ -1223,11 +1223,11 @@ switch (x) {
 
 **Rules**:
 
--   Each case uses `=>` syntax (fat arrow)
--   Cases can match expressions, not just constants
--   `default` case handles all unmatched values
--   No fall-through between cases
--   Each case body is a single statement (use blocks for multiple statements)
+- Each case uses `=>` syntax (fat arrow)
+- Cases can match expressions, not just constants
+- `default` case handles all unmatched values
+- No fall-through between cases
+- Each case body is a single statement (use blocks for multiple statements)
 
 ### 5.14 Match Statement
 
@@ -1244,10 +1244,10 @@ match (x) {
 
 **Rules**:
 
--   Each case uses `=>` syntax (fat arrow)
--   No fall-through between cases
--   Each case body is a single statement (use blocks for multiple statements)
--   There must be exactly one case per variant
+- Each case uses `=>` syntax (fat arrow)
+- No fall-through between cases
+- Each case body is a single statement (use blocks for multiple statements)
+- There must be exactly one case per variant
 
 ### 5.15 Optimization Hints
 
@@ -1344,15 +1344,15 @@ let VERSION: i8 = 1i8;
 
 **Rules**:
 
--   Global variables must be declared at file scope (not inside functions)
--   Type annotation is required (no type inference for globals)
--   Initializer must be a constant expression (literals only)
--   Supported constant expressions:
-    -   Number literals: `42`, `0xFF`, `0b1010`, `42i8`
-    -   Boolean literals: `true`, `false`
-    -   Character literals: `'a'`, `'\n'`
-    -   String literals: `"hello"`
--   Variables without initializers are zero-initialized
+- Global variables must be declared at file scope (not inside functions)
+- Type annotation is required (no type inference for globals)
+- Initializer must be a constant expression (literals only)
+- Supported constant expressions:
+    - Number literals: `42`, `0xFF`, `0b1010`, `42i8`
+    - Boolean literals: `true`, `false`
+    - Character literals: `'a'`, `'\n'`
+    - String literals: `"hello"`
+- Variables without initializers are zero-initialized
 
 **Multiple Declarations**:
 
@@ -1383,10 +1383,10 @@ fn should_retry() -> bool {
 
 **Restrictions**:
 
--   Initializers cannot reference other variables
--   Initializers cannot call functions
--   Initializers cannot use arithmetic or other operations
--   Global variables are always mutable
+- Initializers cannot reference other variables
+- Initializers cannot call functions
+- Initializers cannot use arithmetic or other operations
+- Global variables are always mutable
 
 ---
 
@@ -1432,10 +1432,10 @@ fn complex_function(a: i32, b: *u8, c: Point) -> i32 {
 
 **Rules**:
 
--   Each parameter must have a type annotation
--   Parameters are separated by commas
--   Parameters are local to the function
--   Trailing comma is allowed
+- Each parameter must have a type annotation
+- Parameters are separated by commas
+- Parameters are local to the function
+- Trailing comma is allowed
 
 ### 7.3 Variadic Functions
 
@@ -1447,9 +1447,9 @@ fn printf(format: *u8, ...) -> i32;
 
 **Rules**:
 
--   `...` must be the last parameter
--   Must have at least one non-variadic parameter
--   Accessing variadic arguments is implementation-defined
+- `...` must be the last parameter
+- Must have at least one non-variadic parameter
+- Accessing variadic arguments is implementation-defined
 
 ### 7.4 Function Calls
 
@@ -1472,9 +1472,9 @@ These are typically used to interface with C libraries.
 
 **Rules**:
 
--   External declarations end with a semicolon instead of a body
--   Must match the actual external function signature
--   No body is provided
+- External declarations end with a semicolon instead of a body
+- Must match the actual external function signature
+- No body is provided
 
 ### 7.6 Return Types
 
@@ -1535,59 +1535,59 @@ fn make_point(x: i32, y: i32) -> Point {
 
 Zirco follows a C-like memory model:
 
--   Variables are stored in memory locations
--   Pointers hold memory addresses
--   Memory can be accessed through pointers
--   Memory safety is not guaranteed by the language
+- Variables are stored in memory locations
+- Pointers hold memory addresses
+- Memory can be accessed through pointers
+- Memory safety is not guaranteed by the language
 
 ### 8.2 Type Compatibility
 
--   Types must match exactly in most contexts
--   Implicit conversions are not performed
--   Explicit casts using `as` are required to convert between types
+- Types must match exactly in most contexts
+- Implicit conversions are not performed
+- Explicit casts using `as` are required to convert between types
 
 ### 8.3 Evaluation Order
 
 **Expression Evaluation**:
 
--   Function arguments are evaluated left-to-right
--   Most other evaluation orders are implementation-defined
+- Function arguments are evaluated left-to-right
+- Most other evaluation orders are implementation-defined
 
 **Short-Circuit Evaluation**:
 
--   `&&` and `||` use short-circuit evaluation
--   The right operand is not evaluated if the result is determined by the left operand
+- `&&` and `||` use short-circuit evaluation
+- The right operand is not evaluated if the result is determined by the left operand
 
 ### 8.4 Undefined Behavior
 
 The following behaviors are undefined:
 
--   Reading uninitialized variables
--   Dereferencing invalid pointers
--   Accessing arrays out of bounds
--   Reading an inactive union field
--   Division by zero
--   Integer overflow (behavior is implementation-defined)
+- Reading uninitialized variables
+- Dereferencing invalid pointers
+- Accessing arrays out of bounds
+- Reading an inactive union field
+- Division by zero
+- Integer overflow (behavior is implementation-defined)
 
 ### 8.5 Scope and Lifetime
 
 **Scope Rules**:
 
--   Variables are scoped to the block in which they are declared
--   Function parameters are scoped to the function body
--   Global declarations have file scope
+- Variables are scoped to the block in which they are declared
+- Function parameters are scoped to the function body
+- Global declarations have file scope
 
 ### 8.6 Name Resolution
 
--   Names are resolved in the innermost scope first
--   Outer scopes are searched if a name is not found in the current scope
--   Global names can be accessed from any scope unless shadowed
+- Names are resolved in the innermost scope first
+- Outer scopes are searched if a name is not found in the current scope
+- Global names can be accessed from any scope unless shadowed
 
 ### 8.7 Linkage
 
--   Functions can be declared as external to link with C libraries
--   The linker combines compiled object files into executables
--   Linking behavior follows the platform's standard
+- Functions can be declared as external to link with C libraries
+- The linker combines compiled object files into executables
+- Linking behavior follows the platform's standard
 
 ### 8.8 Program Entry Point
 
@@ -1605,13 +1605,13 @@ The signature of `main` follows C conventions and is compatible with what LLVM a
 
 The following features are planned or under consideration:
 
--   Arrays with first-class syntax
--   Generics/parametric polymorphism
--   Pattern matching
--   Modules and namespaces
--   Enhanced type inference
--   Traits/interfaces
--   Enhanced safety features
+- Arrays with first-class syntax
+- Generics/parametric polymorphism
+- Pattern matching
+- Modules and namespaces
+- Enhanced type inference
+- Traits/interfaces
+- Enhanced safety features
 
 ---
 
@@ -1783,18 +1783,18 @@ fn print_numbers(n: i32) {
 
 ## Appendix E: Terminology
 
--   **AST**: Abstract Syntax Tree - the tree representation of source code structure
--   **TAST**: Typed Abstract Syntax Tree - AST with type information
--   **LLVM**: Low Level Virtual Machine - the compiler backend used by Zirco
--   **lvalue**: An expression that refers to a memory location
--   **rvalue**: An expression that produces a value
--   **Short-circuit evaluation**: Evaluation strategy where the second operand is not evaluated if the result is determined by the first
+- **AST**: Abstract Syntax Tree - the tree representation of source code structure
+- **TAST**: Typed Abstract Syntax Tree - AST with type information
+- **LLVM**: Low Level Virtual Machine - the compiler backend used by Zirco
+- **lvalue**: An expression that refers to a memory location
+- **rvalue**: An expression that produces a value
+- **Short-circuit evaluation**: Evaluation strategy where the second operand is not evaluated if the result is determined by the first
 
 ---
 
 ## Appendix F: Document History
 
--   **Version 0.1.0 (Draft)**: Initial language specification
+- **Version 0.2.0 (Draft)**: Initial language specification
 
 ---
 

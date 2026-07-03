@@ -99,7 +99,7 @@ You're all done! You can verify that the Zirco compiler is installed and working
 
 ```
 $ zrc --version
-zrc_cli 0.1.0 (commit ..., release build, ...)
+zrc_cli 0.2.0 (commit ..., release build, ...)
 ```
 
 ## Install via Debian Package
@@ -110,7 +110,7 @@ if you prefer to install the Zirco toolchain via dpkg, you can download the late
 from the [releases page](https://github.com/zirco-lang/zrc/releases/tag/nightly).
 
 ```
-$ dpkg -i zrc-0.1.0+1234567_amd64.deb
+$ dpkg -i zrc-0.2.0+1234567_amd64.deb
 ```
 
 ## Install via Nix
@@ -167,7 +167,7 @@ To check that the Zirco compiler is installed and working, run:
 
 ```
 $ zrc --version
-zrc_cli 0.1.0 (commit ..., release build, ...)
+zrc_cli 0.2.0 (commit ..., release build, ...)
 ```
 
 If you don't see this information, check that the `zrc` binary is in your PATH. If you installed

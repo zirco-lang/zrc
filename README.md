@@ -91,8 +91,7 @@ For more usage help, refer to `zrc --help`.
 So that Zirco can continue to evolve at a rapid pace, there are **NO STABILITY GUARENTEES** on the current version of Zirco and `zrc`.
 
 All internal compiler APIs are VERY unstable and if you integrate them with your own tooling builds may fail
-if you update `zrc`. Zirco code may change semantics or fail to build on a different zrc version. As of now,
-all internal libraries and `zrc` is given version `0.1.0` until we begin maintaining stability.
+if you update `zrc`. Zirco code may change semantics or fail to build on a different zrc version.
 
 ## Contributing
 
