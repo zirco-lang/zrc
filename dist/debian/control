@@ -1,5 +1,5 @@
 Package: zrc
-Version: 0.1.0+{COMMIT}
+Version: 0.2.0+{COMMIT}
 Section: devel
 Priority: optional
 Architecture: {ARCH}

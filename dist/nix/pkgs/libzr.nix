@@ -12,7 +12,7 @@ let
 in
 pkgs.stdenv.mkDerivation {
   pname = "libzr";
-  version = "0.1.0";
+  version = "0.2.0";
   src = ../../../libzr;
   buildInputs = with pkgs; [
     zpkgs.zrc
