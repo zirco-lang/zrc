@@ -13,9 +13,9 @@ dependencies = [
 
 [[package]]
 name = "ansi_color_constants"
-version = "3.0.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c713a39c031fa6deeef0ccee92647fe0caa1d190e74e4f713d6e182d58cd85b"
+checksum = "60ef46ca7c82ae698289b60485ca1d5cf92d6a55d8a64df69edafee933d8ae35"
 
 [[package]]
 name = "anstream"

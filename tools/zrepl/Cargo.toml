@@ -14,4 +14,4 @@ zrc_utils = { path = "../../compiler/zrc_utils" }
 clap = { version = "4.5.52", features = ["derive"] }
 zrc_buildinfo = { path = "../../common/zrc_buildinfo" }
 repline = "0.0.14"
-ansi_color_constants = "3.0.0"
+ansi_color_constants = "4.0.0"
