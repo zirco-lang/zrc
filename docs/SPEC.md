@@ -1,6 +1,6 @@
 # Zirco Language Specification
 
-Version 0.2.0 (Draft)
+Version 0.2.0 (Draft-2)
 
 ## Table of Contents
 
@@ -1622,11 +1622,6 @@ This section provides a high-level grammar summary. For complete details, refer 
 ### A.1 Lexical Grammar
 
 ```
-keyword ::= "as" | "break" | "continue" | "default" | "do" | "else"
-          | "false" | "fn" | "for" | "if" | "let" | "return"
-          | "sizeof" | "struct" | "switch" | "true" | "type"
-          | "union" | "while" | "four"
-
 identifier ::= [a-zA-Z_][a-zA-Z0-9_]*
 
 decimal_literal ::= [0-9][0-9_]*
@@ -1636,38 +1631,46 @@ binary_literal ::= "0b" [01_]+
 string_literal ::= '"' ([^"\\\n] | escape_sequence)* '"'
 char_literal ::= "'" ([^'\\\n] | escape_sequence) "'"
 
+literal ::= decimal_literal | hex_literal | binary_literal | string_literal | char_literal
+
 escape_sequence ::= "\n" | "\r" | "\t" | "\\" | "\"" | "\'"
-```
 
-### A.2 Expression Grammar
+pointer ::= "*"[pointer] | ""
 
-```
-expr ::= primary
-       | unary_op expr
-       | expr binary_op expr
-       | expr "?" expr ":" expr
-       | expr "as" type
-       | expr "(" argument_list? ")"
-       | expr "[" expr "]"
-       | expr "." identifier
-       | expr "->" identifier
-       | identifier "<-" expr
+// identifier for type is only used for structs, unions, or type definitions
+type ::= (pointer ("u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" | "bool" | "char" | "string" | identifier))
+       | "(" type ")"
 
-primary ::= literal
-          | identifier
-          | "(" expr ")"
-          | "sizeof" type
-          | "sizeof" "(" expr ")"
-```
+path ::= [0-9a-zA-Z_./:]*".zr"
+include_type ::= ("\"" path "\"") | "<" path ">"
 
-### A.3 Statement Grammar
+unary_op ::= '&' | '*' | '+' | '-' | '/' | '|' | '~'
 
 ```
-stmt ::= expr ";"
-       | ";"
-       | "{" stmt* "}"
-       | "let" let_declaration ("," let_declaration)* ";"
-       | "if" "(" expr ")" stmt ("else" stmt)?
+### A.2 Statements
+
+```
+field_list ::= identifier ":" type ("," identifier ":" type)*
+
+preprocessor ::= "#" (("pragma once") | ("include " include_type))
+
+expr ::= literal
+       | identifier
+	   | expr unary_op expr
+	   | expr "?" expr ":" expr
+	   | expr "as" type
+	   | "(" expr ")"
+	   | "sizeof" type
+	   | "sizeof" "(" expr ")"
+
+argument ::= (expr) | (argument "," argument)
+
+stmt ::= ";"
+       | expr ";"
+	   | "{" stmt* "}"
+	   | "let" (identifier ":" type ["=" expr] ";"
+	   | identifier "=" expr ";"
+	   | "if" "(" expr ")" stmt ("else" stmt)?
        | "while" "(" expr ")" stmt
        | "do" stmt "while" "(" expr ")" ";"
        | "for" "(" for_init? ";" expr? ";" expr? ")" stmt
@@ -1676,35 +1679,22 @@ stmt ::= expr ";"
        | "break" ";"
        | "continue" ";"
        | "return" expr? ";"
-```
+	   | identifier "(" argument ");"
 
-### A.4 Declaration Grammar
 
-```
-declaration ::= function_declaration
-              | type_alias_declaration
-              | struct_declaration
-              | union_declaration
+field_list ::= identifier ":" type
+             | field_list field_list
+			 | struct
+			 | union
 
-function_declaration ::= "fn" identifier "(" parameter_list? ")" ("->" type)? (block | ";")
+union ::= "union" identifier "{" field_list "}" ";"
+struct ::= "struct" identifier "{" field_list "}" ";"
 
-type_alias_declaration ::= "type" identifier "=" type ";"
-
-struct_declaration ::= "struct" identifier "{" field_list? "}"
-
-union_declaration ::= "union" identifier "{" field_list? "}"
-```
-
-### A.5 Type Grammar
-
-```
-type ::= identifier
-       | "*" type
-       | "struct" "{" field_list? "}"
-       | "union" "{" field_list? "}"
-       | "(" type ")"
-
-field_list ::= identifier ":" type ("," identifier ":" type)*
+root ::= preprocessor
+       | "fn" identifier "(" parameter_list? ")" ("->" type)? (stmt | ";")
+	   | "type" identifier "=" type ";"
+	   | struct
+	   | union
 ```
 
 ---
