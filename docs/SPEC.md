@@ -1690,11 +1690,13 @@ field_list ::= identifier ":" type
 union ::= "union" identifier "{" field_list "}" ";"
 struct ::= "struct" identifier "{" field_list "}" ";"
 
-root ::= preprocessor
+root ::= (
+         preprocessor
        | "fn" identifier "(" parameter_list? ")" ("->" type)? (stmt | ";")
 	   | "type" identifier "=" type ";"
 	   | struct
 	   | union
+	   )*
 ```
 
 ---
