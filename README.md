@@ -27,12 +27,10 @@ If you aim to contribute to the Zirco compiler itself, please follow the instruc
 
 ## Getting Started
 
-**New to Zirco?** Check out our comprehensive [Getting Started Guide](./docs/GETTING_STARTED.md) for step-by-step instructions on:
+**New to Zirco?** Check out [the Zirco Book](https://book.zirco.dev) for step-by-step instructions on:
 
-- Installing prerequisites
-- Building the compiler
+- Installing the compiler
 - Writing and compiling your first program
-- Using compiler options and output formats
 - Troubleshooting common issues
 
 ### Quick Start
@@ -72,11 +70,10 @@ For experienced developers who want to get running quickly:
     ./hello
     ```
 
-For detailed instructions and troubleshooting, see the [Getting Started Guide](./docs/GETTING_STARTED.md).
-
 ## Language Specification
 
-For a comprehensive guide to the Zirco language syntax, semantics, and behavior, see the [Language Specification](./docs/SPEC.md).
+For a comprehensive guide to the Zirco language syntax, semantics, and behavior, see the [Language
+Reference](https://book.zirco.dev/reference.html).
 
 ## Usage
 
