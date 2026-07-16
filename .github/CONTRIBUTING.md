@@ -18,7 +18,7 @@ communications surrounding it, and all other related channels.
 
 ## Inbound License
 
-All contributions are submitted with the assumption of the inbound-outbound rule, that is, that any contribution you
+All contributions are submitted with the assumption of the inbound-outbound rule; that is, any contribution you
 submit is licensed under the GNU LGPL-3.0. By submitting a contribution, you confirm that you have the authority to
 license the provided content under the relevant open source license(s).
 
