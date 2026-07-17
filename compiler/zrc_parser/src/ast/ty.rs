@@ -52,12 +52,11 @@ pub enum TypeKind<'input> {
         element_type: Box<Type<'input>>,
     },
     /// A direct struct type
-    #[display("{packed}struct {{ {fields} }}")]
+    #[display("{}struct {{ {fields} }}", if *packed { "packed " } else { "" })]
     Struct {
         /// This struct's contents
         fields: KeyTypeMapping<'input>,
         /// True if the struct is a packed struct (no padding between fields)
-        #[display("packed ")]
         packed: bool,
     },
     /// A direct union type
@@ -144,7 +143,7 @@ mod tests {
             "union { a: i32, b: i32 }",
             "enum { Eight: i8, Sixteen: i16 }",
             "fn(x: i32, y: i32) -> i32",
-            "packed struct {}",
+            "packed struct { x: i32 }",
         ];
 
         for input in test_cases {
