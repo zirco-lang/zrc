@@ -96,7 +96,7 @@ pub fn type_expr_dot<'input>(
     let obj_t = type_expr(scope, obj)?;
     let key_span = key.span();
 
-    if let TastType::Struct(fields) | TastType::Union(fields) = obj_t.inferred_type.clone() {
+    if let TastType::Struct { fields, .. } | TastType::Union(fields) = obj_t.inferred_type.clone() {
         if let Some(ty) = fields.get(key.value()) {
             Ok(TypedExpr {
                 inferred_type: ty.clone(),

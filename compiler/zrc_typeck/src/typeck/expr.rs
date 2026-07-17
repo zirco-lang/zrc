@@ -110,7 +110,10 @@ mod tests {
                 ("bool", TastType::Bool),
                 (
                     "s",
-                    TastType::Struct(OrderedTypeFields::from(vec![("i8", TastType::I8)])),
+                    TastType::Struct {
+                        fields: OrderedTypeFields::from(vec![("i8", TastType::I8)]),
+                        packed: false,
+                    },
                 ),
                 (
                     "get_bool",
@@ -156,7 +159,10 @@ mod tests {
             ])),
             types: TypeCtx::from_defaults_and_mappings(HashMap::from([(
                 "NonIntegerType",
-                TastType::Struct(OrderedTypeFields::from(vec![])),
+                TastType::Struct {
+                    fields: OrderedTypeFields::from(vec![]),
+                    packed: false,
+                },
             )])),
             ..Default::default()
         };

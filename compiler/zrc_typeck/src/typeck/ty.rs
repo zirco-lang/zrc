@@ -51,21 +51,25 @@ pub fn resolve_type<'input>(
             size,
             element_type: Box::new(resolve_type(scope, *element_type)?),
         },
-        ParserTypeKind::Struct(members) => {
-            TastType::Struct(resolve_key_type_mapping(scope, members)?)
-        }
+        ParserTypeKind::Struct { fields, packed } => TastType::Struct {
+            fields: resolve_key_type_mapping(scope, fields)?,
+            packed,
+        },
         ParserTypeKind::Union(members) => {
             TastType::Union(resolve_key_type_mapping(scope, members)?)
         }
         ParserTypeKind::Enum(members) => {
             // Desugar an enum into its represented internal struct
-            TastType::Struct(OrderedTypeFields::from(vec![
-                ("__discriminant__", TastType::Usize),
-                (
-                    "__value__",
-                    (TastType::Union(resolve_key_type_mapping(scope, members)?)),
-                ),
-            ]))
+            TastType::Struct {
+                fields: OrderedTypeFields::from(vec![
+                    ("__discriminant__", TastType::Usize),
+                    (
+                        "__value__",
+                        (TastType::Union(resolve_key_type_mapping(scope, members)?)),
+                    ),
+                ]),
+                packed: false,
+            }
         }
         ParserTypeKind::Function {
             parameters,
@@ -165,11 +169,10 @@ fn resolve_type_with_opaque<'input>(
             size,
             element_type: Box::new(resolve_type_with_opaque(scope, *element_type, opaque_name)?),
         },
-        ParserTypeKind::Struct(members) => TastType::Struct(resolve_key_type_mapping_with_opaque(
-            scope,
-            members,
-            opaque_name,
-        )?),
+        ParserTypeKind::Struct { fields, packed } => TastType::Struct {
+            fields: resolve_key_type_mapping_with_opaque(scope, fields, opaque_name)?,
+            packed,
+        },
         ParserTypeKind::Union(members) => TastType::Union(resolve_key_type_mapping_with_opaque(
             scope,
             members,
@@ -177,17 +180,20 @@ fn resolve_type_with_opaque<'input>(
         )?),
         ParserTypeKind::Enum(members) => {
             // Desugar an enum into its represented internal struct
-            TastType::Struct(OrderedTypeFields::from(vec![
-                ("__discriminant__", TastType::Usize),
-                (
-                    "__value__",
-                    (TastType::Union(resolve_key_type_mapping_with_opaque(
-                        scope,
-                        members,
-                        opaque_name,
-                    )?)),
-                ),
-            ]))
+            TastType::Struct {
+                fields: OrderedTypeFields::from(vec![
+                    ("__discriminant__", TastType::Usize),
+                    (
+                        "__value__",
+                        (TastType::Union(resolve_key_type_mapping_with_opaque(
+                            scope,
+                            members,
+                            opaque_name,
+                        )?)),
+                    ),
+                ]),
+                packed: false,
+            }
         }
         ParserTypeKind::Function {
             parameters,
@@ -254,8 +260,8 @@ fn check_opaque_behind_pointer<'input>(
             // Check the element type for opaque references
             check_opaque_behind_pointer(element_type, opaque_name, ty_span)
         }
-        TastType::Struct(members) | TastType::Union(members) => {
-            for (_, member_ty) in members.iter() {
+        TastType::Struct { fields, .. } | TastType::Union(fields) => {
+            for (_, member_ty) in fields.iter() {
                 check_opaque_behind_pointer(member_ty, opaque_name, ty_span)?;
             }
             Ok(())
@@ -311,12 +317,13 @@ fn replace_opaque_with_concrete<'input>(
             size,
             element_type: Box::new(replace_opaque_with_concrete(*element_type, opaque_name)),
         },
-        TastType::Struct(members) => TastType::Struct(
-            members
+        TastType::Struct { fields, packed } => TastType::Struct {
+            fields: fields
                 .into_iter()
                 .map(|(key, val)| (key, replace_opaque_with_concrete(val, opaque_name)))
                 .collect(),
-        ),
+            packed,
+        },
         TastType::Union(members) => TastType::Union(
             members
                 .into_iter()
@@ -447,43 +454,46 @@ mod tests {
                 &gs.create_subscope(),
                 ParserType(spanned_test!(
                     0,
-                    ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
-                        7,
-                        vec![
-                            spanned_test!(
-                                9,
-                                (
-                                    spanned_test!(9, "x", 10),
-                                    ParserType(spanned_test!(
-                                        12,
-                                        ParserTypeKind::Identifier("i32"),
-                                        15
-                                    ))
+                    ParserTypeKind::Struct {
+                        fields: KeyTypeMapping(spanned_test!(
+                            7,
+                            vec![
+                                spanned_test!(
+                                    9,
+                                    (
+                                        spanned_test!(9, "x", 10),
+                                        ParserType(spanned_test!(
+                                            12,
+                                            ParserTypeKind::Identifier("i32"),
+                                            15
+                                        ))
+                                    ),
+                                    15
                                 ),
-                                15
-                            ),
-                            spanned_test!(
-                                17,
-                                (
-                                    spanned_test!(17, "y", 18),
-                                    ParserType(spanned_test!(
-                                        20,
-                                        ParserTypeKind::Identifier("i32"),
-                                        23
-                                    ))
-                                ),
-                                23
-                            )
-                        ],
-                        25
-                    ))),
+                                spanned_test!(
+                                    17,
+                                    (
+                                        spanned_test!(17, "y", 18),
+                                        ParserType(spanned_test!(
+                                            20,
+                                            ParserTypeKind::Identifier("i32"),
+                                            23
+                                        ))
+                                    ),
+                                    23
+                                )
+                            ],
+                            25
+                        )),
+                        packed: false
+                    },
                     25
                 ))
             ),
-            Ok(TastType::Struct(OrderedTypeFields::from(vec![
-                ("x", TastType::I32),
-                ("y", TastType::I32)
-            ])))
+            Ok(TastType::Struct {
+                fields: OrderedTypeFields::from(vec![("x", TastType::I32), ("y", TastType::I32)]),
+                packed: false
+            })
         );
     }
 
@@ -529,16 +539,19 @@ mod tests {
                     15
                 ))
             ),
-            Ok(TastType::Struct(OrderedTypeFields::from(vec![
-                ("__discriminant__", TastType::Usize),
-                (
-                    "__value__",
-                    TastType::Union(OrderedTypeFields::from(vec![
-                        ("Eight", TastType::I8),
-                        ("Sixteen", TastType::I16)
-                    ]))
-                )
-            ])))
+            Ok(TastType::Struct {
+                fields: OrderedTypeFields::from(vec![
+                    ("__discriminant__", TastType::Usize),
+                    (
+                        "__value__",
+                        TastType::Union(OrderedTypeFields::from(vec![
+                            ("Eight", TastType::I8),
+                            ("Sixteen", TastType::I16)
+                        ]))
+                    )
+                ]),
+                packed: false
+            })
         );
     }
 
@@ -581,6 +594,7 @@ mod tests {
                         ],
                         25
                     )),
+                    false
                 )
             ),
             Err(Diagnostic::error(spanned_test!(
@@ -605,40 +619,43 @@ mod tests {
             &gs.create_subscope(),
             ParserType(spanned_test!(
                 0,
-                ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
-                    7,
-                    vec![
-                        spanned_test!(
-                            9,
-                            (
-                                spanned_test!(9, "value", 14),
-                                ParserType(spanned_test!(
-                                    16,
-                                    ParserTypeKind::Identifier("i32"),
-                                    19
-                                ))
+                ParserTypeKind::Struct {
+                    fields: KeyTypeMapping(spanned_test!(
+                        7,
+                        vec![
+                            spanned_test!(
+                                9,
+                                (
+                                    spanned_test!(9, "value", 14),
+                                    ParserType(spanned_test!(
+                                        16,
+                                        ParserTypeKind::Identifier("i32"),
+                                        19
+                                    ))
+                                ),
+                                19
                             ),
-                            19
-                        ),
-                        spanned_test!(
-                            21,
-                            (
-                                spanned_test!(21, "next", 25),
-                                ParserType(spanned_test!(
-                                    27,
-                                    ParserTypeKind::Ptr(Box::new(ParserType(spanned_test!(
-                                        28,
-                                        ParserTypeKind::Identifier("Node"),
+                            spanned_test!(
+                                21,
+                                (
+                                    spanned_test!(21, "next", 25),
+                                    ParserType(spanned_test!(
+                                        27,
+                                        ParserTypeKind::Ptr(Box::new(ParserType(spanned_test!(
+                                            28,
+                                            ParserTypeKind::Identifier("Node"),
+                                            32
+                                        )))),
                                         32
-                                    )))),
-                                    32
-                                ))
-                            ),
-                            32
-                        )
-                    ],
-                    34
-                ))),
+                                    ))
+                                ),
+                                32
+                            )
+                        ],
+                        34
+                    )),
+                    packed: false
+                },
                 34
             )),
             "Node",
@@ -646,7 +663,7 @@ mod tests {
 
         assert!(result.is_ok());
         let resolved_ty = result.expect("should resolve successfully");
-        if let TastType::Struct(fields) = resolved_ty {
+        if let TastType::Struct { fields, .. } = resolved_ty {
             assert_eq!(fields.len(), 2);
             assert_eq!(fields.get("value"), Some(&TastType::I32));
             // The pointer to self should be replaced with pointer to empty struct
@@ -668,36 +685,39 @@ mod tests {
             &gs.create_subscope(),
             ParserType(spanned_test!(
                 0,
-                ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
-                    7,
-                    vec![
-                        spanned_test!(
-                            9,
-                            (
-                                spanned_test!(9, "value", 14),
-                                ParserType(spanned_test!(
-                                    16,
-                                    ParserTypeKind::Identifier("i32"),
-                                    19
-                                ))
+                ParserTypeKind::Struct {
+                    fields: KeyTypeMapping(spanned_test!(
+                        7,
+                        vec![
+                            spanned_test!(
+                                9,
+                                (
+                                    spanned_test!(9, "value", 14),
+                                    ParserType(spanned_test!(
+                                        16,
+                                        ParserTypeKind::Identifier("i32"),
+                                        19
+                                    ))
+                                ),
+                                19
                             ),
-                            19
-                        ),
-                        spanned_test!(
-                            21,
-                            (
-                                spanned_test!(21, "next", 25),
-                                ParserType(spanned_test!(
-                                    27,
-                                    ParserTypeKind::Identifier("Node"),
-                                    31
-                                ))
-                            ),
-                            31
-                        )
-                    ],
-                    33
-                ))),
+                            spanned_test!(
+                                21,
+                                (
+                                    spanned_test!(21, "next", 25),
+                                    ParserType(spanned_test!(
+                                        27,
+                                        ParserTypeKind::Identifier("Node"),
+                                        31
+                                    ))
+                                ),
+                                31
+                            )
+                        ],
+                        33
+                    )),
+                    packed: false
+                },
                 33
             )),
             "Node",
@@ -729,85 +749,91 @@ mod tests {
             &gs.create_subscope(),
             ParserType(spanned_test!(
                 0,
-                ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
-                    7,
-                    vec![
-                        spanned_test!(
-                            9,
-                            (
-                                spanned_test!(9, "data", 13),
-                                ParserType(spanned_test!(
-                                    15,
-                                    ParserTypeKind::Identifier("i32"),
-                                    18
-                                ))
+                ParserTypeKind::Struct {
+                    fields: KeyTypeMapping(spanned_test!(
+                        7,
+                        vec![
+                            spanned_test!(
+                                9,
+                                (
+                                    spanned_test!(9, "data", 13),
+                                    ParserType(spanned_test!(
+                                        15,
+                                        ParserTypeKind::Identifier("i32"),
+                                        18
+                                    ))
+                                ),
+                                18
                             ),
-                            18
-                        ),
-                        spanned_test!(
-                            20,
-                            (
-                                spanned_test!(20, "children", 28),
-                                ParserType(spanned_test!(
-                                    30,
-                                    ParserTypeKind::Ptr(Box::new(ParserType(spanned_test!(
-                                        31,
-                                        ParserTypeKind::Struct(KeyTypeMapping(spanned_test!(
-                                            38,
-                                            vec![
-                                                spanned_test!(
-                                                    40,
-                                                    (
-                                                        spanned_test!(40, "item", 44),
-                                                        ParserType(spanned_test!(
-                                                            46,
-                                                            ParserTypeKind::Ptr(Box::new(
+                            spanned_test!(
+                                20,
+                                (
+                                    spanned_test!(20, "children", 28),
+                                    ParserType(spanned_test!(
+                                        30,
+                                        ParserTypeKind::Ptr(Box::new(ParserType(spanned_test!(
+                                            31,
+                                            ParserTypeKind::Struct {
+                                                fields: KeyTypeMapping(spanned_test!(
+                                                    38,
+                                                    vec![
+                                                        spanned_test!(
+                                                            40,
+                                                            (
+                                                                spanned_test!(40, "item", 44),
                                                                 ParserType(spanned_test!(
-                                                                    47,
-                                                                    ParserTypeKind::Identifier(
-                                                                        "Node"
-                                                                    ),
+                                                                    46,
+                                                                    ParserTypeKind::Ptr(Box::new(
+                                                                        ParserType(spanned_test!(
+                                                                        47,
+                                                                        ParserTypeKind::Identifier(
+                                                                            "Node"
+                                                                        ),
+                                                                        51
+                                                                    ))
+                                                                    )),
                                                                     51
                                                                 ))
-                                                            )),
+                                                            ),
                                                             51
-                                                        ))
-                                                    ),
-                                                    51
-                                                ),
-                                                spanned_test!(
-                                                    53,
-                                                    (
-                                                        spanned_test!(53, "next", 57),
-                                                        ParserType(spanned_test!(
-                                                            59,
-                                                            ParserTypeKind::Ptr(Box::new(
+                                                        ),
+                                                        spanned_test!(
+                                                            53,
+                                                            (
+                                                                spanned_test!(53, "next", 57),
                                                                 ParserType(spanned_test!(
-                                                                    60,
-                                                                    ParserTypeKind::Identifier(
-                                                                        "Node"
-                                                                    ),
+                                                                    59,
+                                                                    ParserTypeKind::Ptr(Box::new(
+                                                                        ParserType(spanned_test!(
+                                                                        60,
+                                                                        ParserTypeKind::Identifier(
+                                                                            "Node"
+                                                                        ),
+                                                                        64
+                                                                    ))
+                                                                    )),
                                                                     64
                                                                 ))
-                                                            )),
+                                                            ),
                                                             64
-                                                        ))
-                                                    ),
-                                                    64
-                                                )
-                                            ],
+                                                        )
+                                                    ],
+                                                    66
+                                                )),
+                                                packed: false
+                                            },
                                             66
-                                        ))),
+                                        )))),
                                         66
-                                    )))),
-                                    66
-                                ))
-                            ),
-                            66
-                        )
-                    ],
-                    68
-                ))),
+                                    ))
+                                ),
+                                66
+                            )
+                        ],
+                        68
+                    )),
+                    packed: false
+                },
                 68
             )),
             "Node",
