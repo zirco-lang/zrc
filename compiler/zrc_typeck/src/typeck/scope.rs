@@ -32,7 +32,13 @@ const fn all_namable_types<'input>() -> [(&'input str, TastType<'input>); 12] {
         ("isize", TastType::Isize),
         ("usize", TastType::Usize),
         ("bool", TastType::Bool),
-        ("void", TastType::Struct(OrderedTypeFields::new())),
+        (
+            "void",
+            TastType::Struct {
+                fields: OrderedTypeFields::new(),
+                packed: false,
+            },
+        ),
     ]
 }
 impl<'input> TypeCtx<'input> {

@@ -52,8 +52,13 @@ pub enum TypeKind<'input> {
         element_type: Box<Type<'input>>,
     },
     /// A direct struct type
-    #[display("struct {{ {_0} }}")]
-    Struct(KeyTypeMapping<'input>),
+    #[display("{}struct {{ {fields} }}", if *packed { "packed " } else { "" })]
+    Struct {
+        /// This struct's contents
+        fields: KeyTypeMapping<'input>,
+        /// True if the struct is a packed struct (no padding between fields)
+        packed: bool,
+    },
     /// A direct union type
     #[display("union {{ {_0} }}")]
     Union(KeyTypeMapping<'input>),
@@ -87,8 +92,12 @@ impl<'input> Type<'input> {
     }
 
     #[must_use]
-    pub fn build_struct_from_contents(span: Span, keys: KeyTypeMapping<'input>) -> Self {
-        Self(TypeKind::Struct(keys).in_span(span))
+    pub fn build_struct_from_contents(
+        span: Span,
+        fields: KeyTypeMapping<'input>,
+        packed: bool,
+    ) -> Self {
+        Self(TypeKind::Struct { fields, packed }.in_span(span))
     }
 
     #[must_use]
@@ -134,6 +143,7 @@ mod tests {
             "union { a: i32, b: i32 }",
             "enum { Eight: i8, Sixteen: i16 }",
             "fn(x: i32, y: i32) -> i32",
+            "packed struct { x: i32 }",
         ];
 
         for input in test_cases {

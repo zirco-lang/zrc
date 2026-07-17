@@ -91,7 +91,11 @@ pub fn llvm_int_type<'ctx: 'a, 'a>(
             Type::Int => {
                 panic!("{{int}} type reached code generation, should be resolved in typeck")
             }
-            Type::Ptr(_) | Type::Array { .. } | Type::Fn(_) | Type::Struct(_) | Type::Union(_) => {
+            Type::Ptr(_)
+            | Type::Array { .. }
+            | Type::Fn(_)
+            | Type::Struct { .. }
+            | Type::Union(_) => {
                 panic!("not an integer type")
             }
             Type::Opaque(name) => {
@@ -175,14 +179,14 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
         Type::Opaque(name) => {
             panic!("opaque type '{name}' reached code generation, should be resolved in typeck")
         }
-        Type::Struct(fields) => (
+        Type::Struct { fields, packed } => (
             ctx.ctx()
                 .struct_type(
                     &fields
                         .iter()
                         .map(|(_, key_ty)| llvm_basic_type(ctx, key_ty).0)
                         .collect::<Vec<_>>(),
-                    false,
+                    *packed,
                 )
                 .as_basic_type_enum(),
             ctx.dbg_builder().map(|dbg_builder| {
@@ -291,7 +295,7 @@ pub fn llvm_type<'ctx: 'a, 'a>(
         | Type::Usize
         | Type::Isize
         | Type::Ptr(_)
-        | Type::Struct(_)
+        | Type::Struct { .. }
         | Type::Array { .. }
         | Type::Union(_) => {
             let (ty, dbg_ty) = llvm_basic_type(ctx, ty);
@@ -344,6 +348,20 @@ mod tests {
     use indoc::indoc;
 
     use crate::cg_snapshot_test;
+
+    #[test]
+    fn packed_structs_generate_properly() {
+        cg_snapshot_test!(indoc! {"
+            struct Normal { x: i8, y: i32 }
+            packed struct Packed { x: i8, y: i32 }
+
+            fn main() -> i32 {
+                let normal: Normal;
+                let pack: Packed;
+                return 0;
+            }
+        "});
+    }
 
     #[test]
     fn tagged_unions_are_properly_typed() {

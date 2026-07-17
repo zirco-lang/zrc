@@ -215,6 +215,7 @@ type ::= identifier
        | "*" type
        | "[" NUMBER_LITERAL "]" type
        | "struct" "{" field_list? "}"
+       | "packed" "struct" "{" field_list? "}"
        | "union" "{" field_list? "}"
        | "enum" "{" field_list? "}"
        | "fn" "(" field_list? ")" "->" type
@@ -279,7 +280,8 @@ where `N` is a `NUMBER_LITERAL` and `T` is a type.
 
 ### 4.4. Struct Types
 
-Structs are user-defined product types that group named fields together.
+Structs are user-defined product types that group named fields together. They are defined with
+`struct` or `packed struct`.
 
 Structs may be defined inline:
 
@@ -296,7 +298,8 @@ struct Point {
 }
 ```
 
-See Declarations for more information on struct declarations.
+Field ordering is always in declaration order. For `packed struct`s, there is no padding between
+fields. For `struct`s, padding is implementation and architecture defined.
 
 ### 4.5. Union Types
 
@@ -404,11 +407,6 @@ expression with an `i32`.
 
 Zirco uses "duck typing," if a type has the same structure as another type, it is considered to be
 the same type.
-
-### 4.12. Field Ordering/Padding
-
-Field ordering is in declaration order, and padding is implementation defined. Compilers MUST NOT
-reorder fields.
 
 ## 5. Expressions
 
@@ -805,6 +803,7 @@ code path should never be reached, and can be used to optimize code generation.
 program ::= decl*
 
 decl ::= "struct" IDENTIFIER "{" field_decl_list? "}"
+       | "packed" "struct" IDENTIFIER "{" field_decl_list? "}"
        | "union" IDENTIFIER "{" field_decl_list? "}"
        | "enum" IDENTIFIER "{" field_decl_list? "}"
        | "type" IDENTIFIER "=" type ";"

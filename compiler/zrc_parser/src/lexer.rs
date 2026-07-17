@@ -545,6 +545,10 @@ pub enum Tok<'input> {
     #[token("unreachable")]
     #[display("unreachable")]
     Unreachable,
+    /// The keyword `packed`
+    #[token("packed")]
+    #[display("packed")]
+    Packed,
     /// The operator `->`
     #[token("->")]
     #[display("->")]
@@ -831,7 +835,7 @@ mod tests {
             " = += -= *= /= %= &= |= ^= ; ,",
             " . : :: ? ( ) [ ] { } true false if else while do for break continue return let fn as",
             r#" struct union enum match sizeof type switch default four -> => "str" 7_000 0xF_A"#,
-            " 0b1_0 abc const"
+            " 0b1_0 abc const packed"
         );
         let tokens: Vec<Tok> = vec![
             Tok::PlusPlus,
@@ -909,6 +913,7 @@ mod tests {
             Tok::NumberLiteral(NumberLiteral::Binary("1_0")),
             Tok::Identifier("abc"),
             Tok::Const,
+            Tok::Packed,
         ];
 
         assert_eq!(

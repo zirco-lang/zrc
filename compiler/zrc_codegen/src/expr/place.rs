@@ -84,9 +84,9 @@ pub fn cg_place<'ctx>(
 
         #[expect(clippy::wildcard_enum_match_arm)]
         PlaceKind::Dot(x, prop) => match &x.inferred_type {
-            Type::Struct(contents) => {
+            Type::Struct { fields, .. } => {
                 let x_ty = llvm_basic_type(&cg, &x.inferred_type).0;
-                let prop_idx = contents
+                let prop_idx = fields
                     .iter()
                     .position(|(got_key, _)| *got_key == *prop.into_value())
                     .expect("invalid struct field");

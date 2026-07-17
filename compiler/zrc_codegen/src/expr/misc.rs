@@ -144,7 +144,10 @@ pub fn cg_struct_construction<'ctx, 'input>(
     fields: &OrderedValueFields<'input>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
     match &inferred_type {
-        Type::Struct(field_types) => {
+        Type::Struct {
+            fields: field_types,
+            ..
+        } => {
             // Get the LLVM struct type
             let struct_type = llvm_basic_type(&cg, &inferred_type).0.into_struct_type();
 

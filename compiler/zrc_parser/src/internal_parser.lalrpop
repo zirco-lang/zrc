@@ -171,9 +171,13 @@ KeyTypeMapping: KeyTypeMapping<'input> = {
 }
 
 StructOrUnionDeclaration: Declaration<'input> = {
+    <a:Spanned<("packed" "struct" <Spanned<IDENTIFIER>> <KeyTypeMapping>)>> => Declaration::TypeAliasDeclaration {
+        name: a.value().0,
+        ty: Type(a.map(|(_, fields)| TypeKind::Struct{ fields, packed: true })),
+    },
     <a:Spanned<("struct" <Spanned<IDENTIFIER>> <KeyTypeMapping>)>> => Declaration::TypeAliasDeclaration {
         name: a.value().0,
-        ty: Type(a.map(|(_, values)| TypeKind::Struct(values))),
+        ty: Type(a.map(|(_, fields)| TypeKind::Struct{ fields, packed: false })),
     },
     <a:Spanned<("union" <Spanned<IDENTIFIER>> <KeyTypeMapping>)>> => Declaration::TypeAliasDeclaration {
         name: a.value().0,
@@ -228,8 +232,10 @@ pub Type: Type<'input> = {
         };
         Type::build_array(spanned!(s, (), e, file_name).span(), size_val, element_type)
     },
+    Spanned<("packed" "struct" <KeyTypeMapping>)> => 
+        Type(<>.map(|fields| TypeKind::Struct { fields, packed: true })),
     Spanned<("struct" <KeyTypeMapping>)> => 
-        Type(<>.map(TypeKind::Struct)),
+        Type(<>.map(|fields| TypeKind::Struct { fields, packed: false })),
     Spanned<("union" <KeyTypeMapping>)> =>
         Type(<>.map(TypeKind::Union)),
     Spanned<("enum" <KeyTypeMapping>)> =>
@@ -254,8 +260,10 @@ TypeOrParenthesizedType: Type<'input> = {
 // This prevents a grammar ambiguity as seen in #553
 ConstructibleType: Type<'input> = {
     Spanned<IDENTIFIER> => Type(<>.map(|x| TypeKind::Identifier(x))),
+    Spanned<("packed" "struct" <KeyTypeMapping>)> => 
+        Type(<>.map(|fields| TypeKind::Struct { fields, packed: true })),
     Spanned<("struct" <KeyTypeMapping>)> => 
-        Type(<>.map(TypeKind::Struct)),
+        Type(<>.map(|fields| TypeKind::Struct { fields, packed: false })),
     Spanned<("union" <KeyTypeMapping>)> =>
         Type(<>.map(TypeKind::Union)),
     Spanned<("enum" <KeyTypeMapping>)> =>
@@ -512,6 +520,7 @@ extern {
         "default" => lexer::Tok::Default,
         "new" => lexer::Tok::New,
         "unreachable" => lexer::Tok::Unreachable,
+        "packed" => lexer::Tok::Packed,
         "->" => lexer::Tok::SmallArrow,
         "<-" => lexer::Tok::SmallArrowBack,
         "=>" => lexer::Tok::FatArrow,

@@ -237,7 +237,7 @@ pub fn type_expr_struct_construction<'input>(
     let is_enum = is_enum_literal
         || matches!(
             &resolved_ty,
-            TastType::Struct(fields) if fields.len() == 2
+            TastType::Struct { fields, .. } if fields.len() == 2
                 && fields.contains_key("__discriminant__")
                 && fields.contains_key("__value__")
                 && matches!(fields.get("__value__"), Some(TastType::Union(_)))
@@ -249,7 +249,11 @@ pub fn type_expr_struct_construction<'input>(
         // { ... } } We need to transform: { VariantName: value }
         // Into: { __discriminant__: index, __value__: { VariantName: value } }
 
-        let TastType::Struct(enum_fields) = &resolved_ty else {
+        let TastType::Struct {
+            fields: enum_fields,
+            ..
+        } = &resolved_ty
+        else {
             unreachable!("enum should desugar to a struct")
         };
 
@@ -385,7 +389,7 @@ pub fn type_expr_struct_construction<'input>(
 
     // Ensure it's a struct or union type
     let expected_fields = match &resolved_ty {
-        TastType::Struct(fields) | TastType::Union(fields) => fields.clone(),
+        TastType::Struct { fields, .. } | TastType::Union(fields) => fields.clone(),
         TastType::I8
         | TastType::U8
         | TastType::I16
@@ -499,7 +503,7 @@ pub fn type_expr_struct_construction<'input>(
     }
 
     // For structs (not unions), verify all fields are initialized
-    if matches!(resolved_ty, TastType::Struct(_)) {
+    if matches!(resolved_ty, TastType::Struct { .. }) {
         for (field_name, _field_type) in expected_fields.iter() {
             if !initialized_fields.contains_key(field_name) {
                 return Err(DiagnosticKind::ExpectedGot {

@@ -50,8 +50,8 @@ impl<'input> SyntacticVisit<'input> for Visit {
 
         let sp = ty.0.span();
 
-        if let TypeKind::Struct(struct_type) = ty.0.value()
-            && struct_type.0.value().is_empty()
+        if let TypeKind::Struct { fields, .. } = ty.0.value()
+            && fields.0.value().is_empty()
         {
             self.diagnostics.push(
                 LintDiagnostic::warning(LintDiagnosticKind::EmptyStructUsed.in_span(sp))

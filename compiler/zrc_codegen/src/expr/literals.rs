@@ -145,7 +145,7 @@ pub fn cg_array_literal<'ctx, 'input>(
         | Type::Int
         | Type::Ptr(_)
         | Type::Fn(_)
-        | Type::Struct(_)
+        | Type::Struct { .. }
         | Type::Union(_)
         | Type::Opaque(_) => panic!("array literal must have array type"),
     };

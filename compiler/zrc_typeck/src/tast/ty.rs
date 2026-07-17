@@ -122,7 +122,12 @@ pub enum Type<'input> {
     /// `fn(A, B) -> T`
     Fn(Fn<'input>),
     /// Struct type literals. Ordered by declaration order.
-    Struct(OrderedTypeFields<'input>),
+    Struct {
+        /// This struct's contents
+        fields: OrderedTypeFields<'input>,
+        /// True if the struct is a packed struct (no padding between fields)
+        packed: bool,
+    },
     /// Union type literals. Ordered by declaration order.
     Union(OrderedTypeFields<'input>),
     /// Opaque type placeholder used during type resolution for self-referential
@@ -151,10 +156,13 @@ impl Display for Type<'_> {
             Self::Ptr(pointee_ty) => write!(f, "*{pointee_ty}"),
             Self::Array { size, element_type } => write!(f, "[{size}]{element_type}"),
             Self::Fn(fn_data) => write!(f, "{fn_data}"),
-            Self::Struct(fields) if fields.is_empty() => write!(f, "struct {{}}"),
-            Self::Struct(fields) => write!(
+            Self::Struct { packed, fields } if fields.is_empty() => {
+                write!(f, "{}struct {{}}", if *packed { "packed " } else { "" })
+            }
+            Self::Struct { packed, fields } => write!(
                 f,
-                "struct {{ {} }}",
+                "{}struct {{ {} }}",
+                if *packed { "packed " } else { "" },
                 fields
                     .iter()
                     .map(|(key, ty)| format!("{key}: {ty}"))
@@ -216,7 +224,7 @@ impl<'input> Type<'input> {
     #[expect(clippy::wildcard_enum_match_arm)]
     pub fn into_struct_contents(self) -> Option<OrderedTypeFields<'input>> {
         match self {
-            Type::Struct(x) => Some(x),
+            Type::Struct { fields, .. } => Some(fields),
             _ => None,
         }
     }
@@ -234,7 +242,10 @@ impl<'input> Type<'input> {
     /// Get the unit type
     #[must_use]
     pub const fn unit() -> Self {
-        Type::Struct(OrderedTypeFields::new())
+        Type::Struct {
+            fields: OrderedTypeFields::new(),
+            packed: false,
+        }
     }
 
     /// Check if this type can be implicitly cast to the target type.
@@ -265,7 +276,7 @@ impl<'input> Type<'input> {
     pub fn can_implicitly_cast_to(&self, target: &Self) -> bool {
         // Allow any pointer type to implicitly cast to void pointer (*struct{})
         if let (Type::Ptr(_from_pointee), Type::Ptr(to_pointee)) = (self, target)
-            && let Type::Struct(fields) = to_pointee.as_ref()
+            && let Type::Struct { fields, .. } = to_pointee.as_ref()
             && fields.is_empty()
         {
             // Target is *struct{}, allow implicit cast from any *T
@@ -288,15 +299,18 @@ mod tests {
     #[test]
     fn test_void_ptr_implicit_cast() {
         // Create a void pointer type (*struct{})
-        let void_ptr = Type::Ptr(Box::new(Type::Struct(OrderedTypeFields::new())));
+        let void_ptr = Type::Ptr(Box::new(Type::Struct {
+            fields: OrderedTypeFields::new(),
+            packed: false,
+        }));
 
         // Create various pointer types
         let i32_ptr = Type::Ptr(Box::new(Type::I32));
         let bool_ptr = Type::Ptr(Box::new(Type::Bool));
-        let struct_ptr = Type::Ptr(Box::new(Type::Struct(OrderedTypeFields::from(vec![(
-            "x",
-            Type::I8,
-        )]))));
+        let struct_ptr = Type::Ptr(Box::new(Type::Struct {
+            fields: OrderedTypeFields::from(vec![("x", Type::I8)]),
+            packed: false,
+        }));
 
         // All should be able to implicitly cast to void pointer
         assert!(i32_ptr.can_implicitly_cast_to(&void_ptr));
@@ -339,7 +353,10 @@ mod tests {
 
     #[test]
     fn type_display_works_for_empty_struct() {
-        let struct_type = Type::Struct(OrderedTypeFields::new());
+        let struct_type = Type::Struct {
+            fields: OrderedTypeFields::new(),
+            packed: false,
+        };
         assert_eq!(struct_type.to_string(), "struct {}");
     }
 
@@ -363,7 +380,10 @@ mod tests {
     #[test]
     fn into_struct_contents_returns_fields_for_struct() {
         let fields = OrderedTypeFields::from(vec![("x", Type::I32)]);
-        let struct_type = Type::Struct(fields.clone());
+        let struct_type = Type::Struct {
+            fields: fields.clone(),
+            packed: false,
+        };
         assert_eq!(struct_type.into_struct_contents(), Some(fields));
     }
 
@@ -388,7 +408,7 @@ mod tests {
     fn unit_type_is_empty_struct() {
         let unit = Type::unit();
         match unit {
-            Type::Struct(fields) => assert!(fields.is_empty()),
+            Type::Struct { fields, .. } => assert!(fields.is_empty()),
             Type::I8
             | Type::U8
             | Type::I16

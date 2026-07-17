@@ -221,14 +221,12 @@ pub fn type_match<'input>(
     // * The scrutinee must be of an enum type
     // (Bonus points: Extracts the internal `union` declaration for
     // later use)
-    let enum_as_union_def = if let TastType::Struct(ref struct_def) = scrutinee_ty
-        && struct_def.get("__discriminant__").is_some()
-        && struct_def.get("__value__").is_some()
+    let enum_as_union_def = if let TastType::Struct { ref fields, .. } = scrutinee_ty
+        && fields.get("__discriminant__").is_some()
+        && fields.get("__value__").is_some()
     {
-        if let TastType::Union(union_def) = struct_def
-            .get("__value__")
-            .expect("value should exist")
-            .clone()
+        if let TastType::Union(union_def) =
+            fields.get("__value__").expect("value should exist").clone()
         {
             union_def
         } else {
