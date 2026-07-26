@@ -1,282 +1,282 @@
 //! type checking for binary operators
 
 use zrc_diagnostics::{
-    Diagnostic, DiagnosticKind, HelpKind, LabelKind, NoteKind, diagnostic::GenericLabel,
+	Diagnostic, DiagnosticKind, HelpKind, LabelKind, NoteKind, diagnostic::GenericLabel,
 };
 use zrc_parser::ast::expr::{Arithmetic, BinaryBitwise, Comparison, Equality, Expr, Logical};
 use zrc_utils::span::{Span, Spannable};
 
 use super::{
-    super::scope::Scope,
-    helpers::{expect, expect_is_integer, resolve_binary_int_operands, try_coerce_to},
-    type_expr,
+	super::scope::Scope,
+	helpers::{expect, expect_is_integer, resolve_binary_int_operands, try_coerce_to},
+	type_expr,
 };
 use crate::tast::{
-    expr::{TypedExpr, TypedExprKind},
-    ty::Type as TastType,
+	expr::{TypedExpr, TypedExprKind},
+	ty::Type as TastType,
 };
 
 /// Typeck a logical expr
 pub fn type_expr_logical<'input>(
-    scope: &mut Scope<'input>,
-    expr_span: Span,
-    op: Logical,
-    lhs: Expr<'input>,
-    rhs: Expr<'input>,
+	scope: &mut Scope<'input>,
+	expr_span: Span,
+	op: Logical,
+	lhs: Expr<'input>,
+	rhs: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    let lhs_span = lhs.0.span();
-    let lhs_t = type_expr(scope, lhs)?;
-    let rhs_span = rhs.0.span();
-    let rhs_t = type_expr(scope, rhs)?;
+	let lhs_span = lhs.0.span();
+	let lhs_t = type_expr(scope, lhs)?;
+	let rhs_span = rhs.0.span();
+	let rhs_t = type_expr(scope, rhs)?;
 
-    expect(
-        lhs_t.inferred_type == TastType::Bool,
-        "bool".to_string(),
-        lhs_t.inferred_type.to_string(),
-        lhs_span,
-    )?;
-    expect(
-        rhs_t.inferred_type == TastType::Bool,
-        "bool".to_string(),
-        rhs_t.inferred_type.to_string(),
-        rhs_span,
-    )?;
+	expect(
+		lhs_t.inferred_type == TastType::Bool,
+		"bool".to_string(),
+		lhs_t.inferred_type.to_string(),
+		lhs_span,
+	)?;
+	expect(
+		rhs_t.inferred_type == TastType::Bool,
+		"bool".to_string(),
+		rhs_t.inferred_type.to_string(),
+		rhs_span,
+	)?;
 
-    Ok(TypedExpr {
-        inferred_type: TastType::Bool,
-        kind: TypedExprKind::Logical(op, Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
-    })
+	Ok(TypedExpr {
+		inferred_type: TastType::Bool,
+		kind: TypedExprKind::Logical(op, Box::new(lhs_t), Box::new(rhs_t)).in_span(expr_span),
+	})
 }
 
 /// Typeck an eq expr
 pub fn type_expr_equality<'input>(
-    scope: &mut Scope<'input>,
-    expr_span: Span,
-    op: Equality,
-    lhs: Expr<'input>,
-    rhs: Expr<'input>,
+	scope: &mut Scope<'input>,
+	expr_span: Span,
+	op: Equality,
+	lhs: Expr<'input>,
+	rhs: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    let lhs_t = type_expr(scope, lhs)?;
-    let rhs_t = type_expr(scope, rhs)?;
+	let lhs_t = type_expr(scope, lhs)?;
+	let rhs_t = type_expr(scope, rhs)?;
 
-    let (final_lhs, final_rhs) =
-        if lhs_t.inferred_type.is_integer() && rhs_t.inferred_type.is_integer() {
-            let (_, resolved_lhs, resolved_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
+	let (final_lhs, final_rhs) =
+		if lhs_t.inferred_type.is_integer() && rhs_t.inferred_type.is_integer() {
+			let (_, resolved_lhs, resolved_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
 
-            // Check if types match after resolution
-            if resolved_lhs.inferred_type == resolved_rhs.inferred_type {
-                (resolved_lhs, resolved_rhs)
-            } else {
-                return Err(DiagnosticKind::EqualityOperators(
-                    resolved_lhs.inferred_type.to_string(),
-                    resolved_rhs.inferred_type.to_string(),
-                )
-                .error_in(expr_span)
-                .with_label(GenericLabel::error(
-                    LabelKind::EqualityOperators(
-                        resolved_lhs.inferred_type.to_string(),
-                        resolved_rhs.inferred_type.to_string(),
-                    )
-                    .in_span(expr_span),
-                )));
-            }
-        } else if let (TastType::Ptr(_), TastType::Ptr(_)) =
-            (&lhs_t.inferred_type, &rhs_t.inferred_type)
-        {
-            // *T == *U is valid
-            (lhs_t, rhs_t)
-        } else if lhs_t.inferred_type == TastType::Bool && rhs_t.inferred_type == TastType::Bool {
-            // bool == bool is valid
-            (lhs_t, rhs_t)
-        } else {
-            return Err(DiagnosticKind::EqualityOperators(
-                lhs_t.inferred_type.to_string(),
-                rhs_t.inferred_type.to_string(),
-            )
-            .error_in(expr_span)
-            .with_label(GenericLabel::error(
-                LabelKind::EqualityOperators(
-                    lhs_t.inferred_type.to_string(),
-                    rhs_t.inferred_type.to_string(),
-                )
-                .in_span(expr_span),
-            )));
-        };
+			// Check if types match after resolution
+			if resolved_lhs.inferred_type == resolved_rhs.inferred_type {
+				(resolved_lhs, resolved_rhs)
+			} else {
+				return Err(DiagnosticKind::EqualityOperators(
+					resolved_lhs.inferred_type.to_string(),
+					resolved_rhs.inferred_type.to_string(),
+				)
+				.error_in(expr_span)
+				.with_label(GenericLabel::error(
+					LabelKind::EqualityOperators(
+						resolved_lhs.inferred_type.to_string(),
+						resolved_rhs.inferred_type.to_string(),
+					)
+					.in_span(expr_span),
+				)));
+			}
+		} else if let (TastType::Ptr(_), TastType::Ptr(_)) =
+			(&lhs_t.inferred_type, &rhs_t.inferred_type)
+		{
+			// *T == *U is valid
+			(lhs_t, rhs_t)
+		} else if lhs_t.inferred_type == TastType::Bool && rhs_t.inferred_type == TastType::Bool {
+			// bool == bool is valid
+			(lhs_t, rhs_t)
+		} else {
+			return Err(DiagnosticKind::EqualityOperators(
+				lhs_t.inferred_type.to_string(),
+				rhs_t.inferred_type.to_string(),
+			)
+			.error_in(expr_span)
+			.with_label(GenericLabel::error(
+				LabelKind::EqualityOperators(
+					lhs_t.inferred_type.to_string(),
+					rhs_t.inferred_type.to_string(),
+				)
+				.in_span(expr_span),
+			)));
+		};
 
-    Ok(TypedExpr {
-        inferred_type: TastType::Bool,
-        kind: TypedExprKind::Equality(op, Box::new(final_lhs), Box::new(final_rhs))
-            .in_span(expr_span),
-    })
+	Ok(TypedExpr {
+		inferred_type: TastType::Bool,
+		kind: TypedExprKind::Equality(op, Box::new(final_lhs), Box::new(final_rhs))
+			.in_span(expr_span),
+	})
 }
 
 /// Typeck a bitwise expr
 pub fn type_expr_binary_bitwise<'input>(
-    scope: &mut Scope<'input>,
-    expr_span: Span,
-    op: BinaryBitwise,
-    lhs: Expr<'input>,
-    rhs: Expr<'input>,
+	scope: &mut Scope<'input>,
+	expr_span: Span,
+	op: BinaryBitwise,
+	lhs: Expr<'input>,
+	rhs: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    let lhs_span = lhs.0.span();
-    let lhs_t = type_expr(scope, lhs)?;
-    let rhs_span = rhs.0.span();
-    let rhs_t = type_expr(scope, rhs)?;
+	let lhs_span = lhs.0.span();
+	let lhs_t = type_expr(scope, lhs)?;
+	let rhs_span = rhs.0.span();
+	let rhs_t = type_expr(scope, rhs)?;
 
-    expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
-    expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
+	expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
+	expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
-    // otherwise these must be the same type (with {int} support)
-    let (result_type, final_lhs, final_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
+	// otherwise these must be the same type (with {int} support)
+	let (result_type, final_lhs, final_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
 
-    // Check if types match after resolution
-    if final_lhs.inferred_type != final_rhs.inferred_type {
-        return Err(DiagnosticKind::ExpectedSameType(
-            final_lhs.inferred_type.to_string(),
-            final_rhs.inferred_type.to_string(),
-        )
-        .error_in(expr_span)
-        .with_label(GenericLabel::error(
-            LabelKind::ExpectedSameType(
-                final_lhs.inferred_type.to_string(),
-                final_rhs.inferred_type.to_string(),
-            )
-            .in_span(expr_span),
-        )));
-    }
+	// Check if types match after resolution
+	if final_lhs.inferred_type != final_rhs.inferred_type {
+		return Err(DiagnosticKind::ExpectedSameType(
+			final_lhs.inferred_type.to_string(),
+			final_rhs.inferred_type.to_string(),
+		)
+		.error_in(expr_span)
+		.with_label(GenericLabel::error(
+			LabelKind::ExpectedSameType(
+				final_lhs.inferred_type.to_string(),
+				final_rhs.inferred_type.to_string(),
+			)
+			.in_span(expr_span),
+		)));
+	}
 
-    Ok(TypedExpr {
-        inferred_type: result_type,
-        kind: TypedExprKind::BinaryBitwise(op, Box::new(final_lhs), Box::new(final_rhs))
-            .in_span(expr_span),
-    })
+	Ok(TypedExpr {
+		inferred_type: result_type,
+		kind: TypedExprKind::BinaryBitwise(op, Box::new(final_lhs), Box::new(final_rhs))
+			.in_span(expr_span),
+	})
 }
 
 /// Typeck a cmp expr
 pub fn type_expr_comparison<'input>(
-    scope: &mut Scope<'input>,
-    expr_span: Span,
-    op: Comparison,
-    lhs: Expr<'input>,
-    rhs: Expr<'input>,
+	scope: &mut Scope<'input>,
+	expr_span: Span,
+	op: Comparison,
+	lhs: Expr<'input>,
+	rhs: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    let lhs_span = lhs.0.span();
-    let lhs_t = type_expr(scope, lhs)?;
-    let rhs_span = rhs.0.span();
-    let rhs_t = type_expr(scope, rhs)?;
+	let lhs_span = lhs.0.span();
+	let lhs_t = type_expr(scope, lhs)?;
+	let rhs_span = rhs.0.span();
+	let rhs_t = type_expr(scope, rhs)?;
 
-    expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
-    expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
+	expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
+	expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
-    // Handle {int} type resolution
-    let (_, final_lhs, final_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
+	// Handle {int} type resolution
+	let (_, final_lhs, final_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
 
-    // Check if types match after resolution
-    if final_lhs.inferred_type != final_rhs.inferred_type {
-        return Err(DiagnosticKind::ExpectedSameType(
-            final_lhs.inferred_type.to_string(),
-            final_rhs.inferred_type.to_string(),
-        )
-        .error_in(expr_span)
-        .with_label(GenericLabel::error(
-            LabelKind::ExpectedSameType(
-                final_lhs.inferred_type.to_string(),
-                final_rhs.inferred_type.to_string(),
-            )
-            .in_span(expr_span),
-        )));
-    }
+	// Check if types match after resolution
+	if final_lhs.inferred_type != final_rhs.inferred_type {
+		return Err(DiagnosticKind::ExpectedSameType(
+			final_lhs.inferred_type.to_string(),
+			final_rhs.inferred_type.to_string(),
+		)
+		.error_in(expr_span)
+		.with_label(GenericLabel::error(
+			LabelKind::ExpectedSameType(
+				final_lhs.inferred_type.to_string(),
+				final_rhs.inferred_type.to_string(),
+			)
+			.in_span(expr_span),
+		)));
+	}
 
-    Ok(TypedExpr {
-        inferred_type: TastType::Bool,
-        kind: TypedExprKind::Comparison(op, Box::new(final_lhs), Box::new(final_rhs))
-            .in_span(expr_span),
-    })
+	Ok(TypedExpr {
+		inferred_type: TastType::Bool,
+		kind: TypedExprKind::Comparison(op, Box::new(final_lhs), Box::new(final_rhs))
+			.in_span(expr_span),
+	})
 }
 
 /// Typeck an arithmetic expr
 pub fn type_expr_arithmetic<'input>(
-    scope: &mut Scope<'input>,
-    expr_span: Span,
-    op: Arithmetic,
-    lhs: Expr<'input>,
-    rhs: Expr<'input>,
+	scope: &mut Scope<'input>,
+	expr_span: Span,
+	op: Arithmetic,
+	lhs: Expr<'input>,
+	rhs: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-    let lhs_span = lhs.0.span();
-    let lhs_t = type_expr(scope, lhs)?;
-    let rhs_span = rhs.0.span();
-    let rhs_t = type_expr(scope, rhs)?;
+	let lhs_span = lhs.0.span();
+	let lhs_t = type_expr(scope, lhs)?;
+	let rhs_span = rhs.0.span();
+	let rhs_t = type_expr(scope, rhs)?;
 
-    if let TastType::Ptr(_) = lhs_t.inferred_type {
-        if matches!(
-            op,
-            Arithmetic::Division | Arithmetic::Multiplication | Arithmetic::Modulo
-        ) {
-            return Err(
-                DiagnosticKind::InvalidPointerArithmeticOperation(op.to_string())
-                    .error_in(lhs_span)
-                    .with_label(GenericLabel::error(
-                        LabelKind::InvalidPointerArithmeticOperation(op.to_string())
-                            .in_span(lhs_span),
-                    )),
-            );
-        }
+	if let TastType::Ptr(_) = lhs_t.inferred_type {
+		if matches!(
+			op,
+			Arithmetic::Division | Arithmetic::Multiplication | Arithmetic::Modulo
+		) {
+			return Err(
+				DiagnosticKind::InvalidPointerArithmeticOperation(op.to_string())
+					.error_in(lhs_span)
+					.with_label(GenericLabel::error(
+						LabelKind::InvalidPointerArithmeticOperation(op.to_string())
+							.in_span(lhs_span),
+					)),
+			);
+		}
 
-        // For pointer arithmetic, rhs should be usize or {int} (which implicitly
-        // converts to usize)
-        let final_rhs = if rhs_t.inferred_type == TastType::Usize {
-            rhs_t
-        } else if rhs_t.inferred_type.can_implicitly_cast_to(&TastType::Usize) {
-            try_coerce_to(rhs_t, &TastType::Usize)
-        } else {
-            return Err(DiagnosticKind::ExpectedGot {
-                expected: "usize".to_string(),
-                got: rhs_t.inferred_type.to_string(),
-            }
-            .error_in(rhs_t.kind.span())
-            .with_label(GenericLabel::error(
-                LabelKind::ExpectedGot {
-                    expected: "usize".to_string(),
-                    got: rhs_t.inferred_type.to_string(),
-                }
-                .in_span(rhs_t.kind.span()),
-            ))
-            .with_note(NoteKind::PointerArithmeticRequiresUsize)
-            .with_help(HelpKind::ConsiderCasting("usize".to_string())));
-        };
+		// For pointer arithmetic, rhs should be usize or {int} (which implicitly
+		// converts to usize)
+		let final_rhs = if rhs_t.inferred_type == TastType::Usize {
+			rhs_t
+		} else if rhs_t.inferred_type.can_implicitly_cast_to(&TastType::Usize) {
+			try_coerce_to(rhs_t, &TastType::Usize)
+		} else {
+			return Err(DiagnosticKind::ExpectedGot {
+				expected: "usize".to_string(),
+				got: rhs_t.inferred_type.to_string(),
+			}
+			.error_in(rhs_t.kind.span())
+			.with_label(GenericLabel::error(
+				LabelKind::ExpectedGot {
+					expected: "usize".to_string(),
+					got: rhs_t.inferred_type.to_string(),
+				}
+				.in_span(rhs_t.kind.span()),
+			))
+			.with_note(NoteKind::PointerArithmeticRequiresUsize)
+			.with_help(HelpKind::ConsiderCasting("usize".to_string())));
+		};
 
-        Ok(TypedExpr {
-            inferred_type: lhs_t.inferred_type.clone(),
-            kind: TypedExprKind::Arithmetic(op, Box::new(lhs_t), Box::new(final_rhs))
-                .in_span(expr_span),
-        })
-    } else {
-        expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
-        expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
+		Ok(TypedExpr {
+			inferred_type: lhs_t.inferred_type.clone(),
+			kind: TypedExprKind::Arithmetic(op, Box::new(lhs_t), Box::new(final_rhs))
+				.in_span(expr_span),
+		})
+	} else {
+		expect_is_integer(&lhs_t.inferred_type, lhs_span)?;
+		expect_is_integer(&rhs_t.inferred_type, rhs_span)?;
 
-        // Handle {int} type resolution
-        let (result_type, final_lhs, final_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
+		// Handle {int} type resolution
+		let (result_type, final_lhs, final_rhs) = resolve_binary_int_operands(lhs_t, rhs_t);
 
-        // Check if types match after resolution
-        if final_lhs.inferred_type != final_rhs.inferred_type {
-            return Err(DiagnosticKind::ExpectedSameType(
-                final_lhs.inferred_type.to_string(),
-                final_rhs.inferred_type.to_string(),
-            )
-            .error_in(expr_span)
-            .with_label(GenericLabel::error(
-                LabelKind::ExpectedSameType(
-                    final_lhs.inferred_type.to_string(),
-                    final_rhs.inferred_type.to_string(),
-                )
-                .in_span(expr_span),
-            )));
-        }
+		// Check if types match after resolution
+		if final_lhs.inferred_type != final_rhs.inferred_type {
+			return Err(DiagnosticKind::ExpectedSameType(
+				final_lhs.inferred_type.to_string(),
+				final_rhs.inferred_type.to_string(),
+			)
+			.error_in(expr_span)
+			.with_label(GenericLabel::error(
+				LabelKind::ExpectedSameType(
+					final_lhs.inferred_type.to_string(),
+					final_rhs.inferred_type.to_string(),
+				)
+				.in_span(expr_span),
+			)));
+		}
 
-        Ok(TypedExpr {
-            inferred_type: result_type,
-            kind: TypedExprKind::Arithmetic(op, Box::new(final_lhs), Box::new(final_rhs))
-                .in_span(expr_span),
-        })
-    }
+		Ok(TypedExpr {
+			inferred_type: result_type,
+			kind: TypedExprKind::Arithmetic(op, Box::new(final_lhs), Box::new(final_rhs))
+				.in_span(expr_span),
+		})
+	}
 }

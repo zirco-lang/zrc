@@ -49,11 +49,11 @@
     clippy::print_stdout
 )]
 #![allow(
-    clippy::multiple_crate_versions,
-    clippy::cargo_common_metadata,
-    clippy::module_name_repetitions,
-    clippy::doc_comment_double_space_linebreaks,
-    clippy::boxed_local
+	clippy::multiple_crate_versions,
+	clippy::cargo_common_metadata,
+	clippy::module_name_repetitions,
+	clippy::doc_comment_double_space_linebreaks,
+	clippy::boxed_local
 )]
 
 // Ordering matters! Declared here so other modules have access to `unpack!`
@@ -71,14 +71,14 @@ mod test_utils;
 mod ty;
 
 pub use inkwell::{
-    OptimizationLevel,
-    debug_info::DWARFEmissionKind as DebugLevel,
-    targets::{FileType, TargetTriple},
+	OptimizationLevel,
+	debug_info::DWARFEmissionKind as DebugLevel,
+	targets::{FileType, TargetTriple},
 };
 pub use program::{cg_program, cg_program_to_buffer, cg_program_to_string};
 
 /// Gets the native [`TargetTriple`].
 #[must_use]
 pub fn get_native_triple() -> TargetTriple {
-    TargetMachine::get_default_triple()
+	TargetMachine::get_default_triple()
 }
