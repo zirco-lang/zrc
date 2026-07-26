@@ -8,6 +8,7 @@
   default = pkgs.mkShell {
     buildInputs = with pkgs; [
       rust
+      cargo-insta
       llvm.llvm
       llvm.libllvm
       llvm.clang
