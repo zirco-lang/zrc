@@ -6,134 +6,134 @@ use zrc_utils::span::{Spannable, Spanned};
 
 use super::place::cg_place;
 use crate::{
-    bb::{BasicBlockAnd, BasicBlockExt},
-    expr::{CgExprArgs, cg_expr},
-    ty::llvm_basic_type,
-    unpack,
+	bb::{BasicBlockAnd, BasicBlockExt},
+	expr::{CgExprArgs, cg_expr},
+	ty::llvm_basic_type,
+	unpack,
 };
 
 /// Generate LLVM IR for an index expression
 pub fn cg_index<'ctx, 'input>(
-    CgExprArgs {
-        cg,
-        mut bb,
-        expr_span,
-        inferred_type,
-    }: CgExprArgs<'ctx, 'input, '_>,
-    ptr: Box<TypedExpr<'input>>,
-    idx: Box<TypedExpr<'input>>,
+	CgExprArgs {
+		cg,
+		mut bb,
+		expr_span,
+		inferred_type,
+	}: CgExprArgs<'ctx, 'input, '_>,
+	ptr: Box<TypedExpr<'input>>,
+	idx: Box<TypedExpr<'input>>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
-    let ptr = unpack!(
-        bb = cg_place(
-            cg,
-            bb,
-            Place {
-                inferred_type: inferred_type.clone(),
-                kind: PlaceKind::Index(ptr, idx).in_span(expr_span),
-            },
-        )
-    );
+	let ptr = unpack!(
+		bb = cg_place(
+			cg,
+			bb,
+			Place {
+				inferred_type: inferred_type.clone(),
+				kind: PlaceKind::Index(ptr, idx).in_span(expr_span),
+			},
+		)
+	);
 
-    let loaded = cg
-        .builder
-        .build_load(llvm_basic_type(&cg, &inferred_type).0, ptr, "load")
-        .expect("index load should have compiled successfully");
+	let loaded = cg
+		.builder
+		.build_load(llvm_basic_type(&cg, &inferred_type).0, ptr, "load")
+		.expect("index load should have compiled successfully");
 
-    bb.and(loaded.as_basic_value_enum())
+	bb.and(loaded.as_basic_value_enum())
 }
 
 /// Generate LLVM IR for a dot expression
 pub fn cg_dot<'ctx, 'input>(
-    CgExprArgs {
-        cg,
-        mut bb,
-        expr_span,
-        inferred_type,
-    }: CgExprArgs<'ctx, 'input, '_>,
-    place: Box<Place<'input>>,
-    key: Spanned<&'input str>,
+	CgExprArgs {
+		cg,
+		mut bb,
+		expr_span,
+		inferred_type,
+	}: CgExprArgs<'ctx, 'input, '_>,
+	place: Box<Place<'input>>,
+	key: Spanned<&'input str>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
-    let ptr = unpack!(
-        bb = cg_place(
-            cg,
-            bb,
-            Place {
-                inferred_type: inferred_type.clone(),
-                kind: PlaceKind::Dot(place, key).in_span(expr_span),
-            },
-        )
-    );
+	let ptr = unpack!(
+		bb = cg_place(
+			cg,
+			bb,
+			Place {
+				inferred_type: inferred_type.clone(),
+				kind: PlaceKind::Dot(place, key).in_span(expr_span),
+			},
+		)
+	);
 
-    let loaded = cg
-        .builder
-        .build_load(llvm_basic_type(&cg, &inferred_type).0, ptr, "load")
-        .expect("dot load should have compiled successfully");
+	let loaded = cg
+		.builder
+		.build_load(llvm_basic_type(&cg, &inferred_type).0, ptr, "load")
+		.expect("dot load should have compiled successfully");
 
-    bb.and(loaded.as_basic_value_enum())
+	bb.and(loaded.as_basic_value_enum())
 }
 
 /// Generate LLVM IR for a dereference expression
 pub fn cg_deref<'ctx, 'input>(
-    CgExprArgs {
-        cg,
-        mut bb,
-        inferred_type,
-        ..
-    }: CgExprArgs<'ctx, 'input, '_>,
-    ptr: Box<TypedExpr<'input>>,
+	CgExprArgs {
+		cg,
+		mut bb,
+		inferred_type,
+		..
+	}: CgExprArgs<'ctx, 'input, '_>,
+	ptr: Box<TypedExpr<'input>>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
-    let ptr = unpack!(bb = cg_expr(cg, bb, *ptr));
+	let ptr = unpack!(bb = cg_expr(cg, bb, *ptr));
 
-    let reg = cg
-        .builder
-        .build_load(
-            llvm_basic_type(&cg, &inferred_type).0,
-            ptr.into_pointer_value(),
-            "load",
-        )
-        .expect("dereference should have compiled successfully");
+	let reg = cg
+		.builder
+		.build_load(
+			llvm_basic_type(&cg, &inferred_type).0,
+			ptr.into_pointer_value(),
+			"load",
+		)
+		.expect("dereference should have compiled successfully");
 
-    bb.and(reg.as_basic_value_enum())
+	bb.and(reg.as_basic_value_enum())
 }
 
 /// Generate LLVM IR for an assignment expression
 pub fn cg_assignment<'ctx, 'input>(
-    CgExprArgs { cg, mut bb, .. }: CgExprArgs<'ctx, 'input, '_>,
-    place: Place<'input>,
-    value: Box<TypedExpr<'input>>,
+	CgExprArgs { cg, mut bb, .. }: CgExprArgs<'ctx, 'input, '_>,
+	place: Place<'input>,
+	value: Box<TypedExpr<'input>>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
-    let value = unpack!(bb = cg_expr(cg, bb, *value));
-    let place = unpack!(bb = cg_place(cg, bb, place));
+	let value = unpack!(bb = cg_expr(cg, bb, *value));
+	let place = unpack!(bb = cg_place(cg, bb, place));
 
-    cg.builder
-        .build_store(place, value)
-        .expect("store instruction in assignment should have built successfully");
+	cg.builder
+		.build_store(place, value)
+		.expect("store instruction in assignment should have built successfully");
 
-    bb.and(value)
+	bb.and(value)
 }
 
 /// Generate LLVM IR for an address-of expression
 pub fn cg_address_of<'ctx, 'input>(
-    CgExprArgs { cg, mut bb, .. }: CgExprArgs<'ctx, 'input, '_>,
-    x: Place<'input>,
+	CgExprArgs { cg, mut bb, .. }: CgExprArgs<'ctx, 'input, '_>,
+	x: Place<'input>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
-    let value = unpack!(bb = cg_place(cg, bb, x));
+	let value = unpack!(bb = cg_place(cg, bb, x));
 
-    bb.and(value.as_basic_value_enum())
+	bb.and(value.as_basic_value_enum())
 }
 
 #[cfg(test)]
 mod tests {
-    // Please read the "Common patterns in tests" section of crate::test_utils for
-    // more information on how code generator tests are structured.
+	// Please read the "Common patterns in tests" section of crate::test_utils for
+	// more information on how code generator tests are structured.
 
-    use indoc::indoc;
+	use indoc::indoc;
 
-    use crate::cg_snapshot_test;
+	use crate::cg_snapshot_test;
 
-    #[test]
-    fn pointer_indexing_in_expr_position() {
-        cg_snapshot_test!(indoc! {"
+	#[test]
+	fn pointer_indexing_in_expr_position() {
+		cg_snapshot_test!(indoc! {"
                 fn take_int(x: i32);
 
                 fn test() {
@@ -144,11 +144,11 @@ mod tests {
                     take_int(x[4 as usize]);
                 }
             "});
-    }
+	}
 
-    #[test]
-    fn pointer_deref_in_expr_position() {
-        cg_snapshot_test!(indoc! {"
+	#[test]
+	fn pointer_deref_in_expr_position() {
+		cg_snapshot_test!(indoc! {"
                 fn test() -> i32 {
                     let x: *i32;
 
@@ -157,11 +157,11 @@ mod tests {
                     return *x;
                 }
             "});
-    }
+	}
 
-    #[test]
-    fn struct_property_access_in_expr_position() {
-        cg_snapshot_test!(indoc! {"
+	#[test]
+	fn struct_property_access_in_expr_position() {
+		cg_snapshot_test!(indoc! {"
                 struct S { x: i32, y: i32 }
                 fn take_int(x: i32);
 
@@ -173,11 +173,11 @@ mod tests {
                     take_int(x.y);
                 }
             "});
-    }
+	}
 
-    #[test]
-    fn union_property_access_in_expr_position() {
-        cg_snapshot_test!(indoc! {"
+	#[test]
+	fn union_property_access_in_expr_position() {
+		cg_snapshot_test!(indoc! {"
                 union U { x: i32, y: i8 }
                 fn take_i32(x: i32);
                 fn take_i8(x: i8);
@@ -192,5 +192,5 @@ mod tests {
                     take_i8(x.y);
                 }
             "});
-    }
+	}
 }

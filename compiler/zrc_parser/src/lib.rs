@@ -49,33 +49,33 @@
     clippy::print_stdout
 )]
 #![allow(
-    clippy::multiple_crate_versions,
-    clippy::cargo_common_metadata,
-    clippy::module_name_repetitions,
-    clippy::doc_comment_double_space_linebreaks
+	clippy::multiple_crate_versions,
+	clippy::cargo_common_metadata,
+	clippy::module_name_repetitions,
+	clippy::doc_comment_double_space_linebreaks
 )]
 
 use lalrpop_util::lalrpop_mod;
 
 lalrpop_mod!(
-    /// Direct access to the LALRPOP parser. **Do not use this module.** Use the
-    /// [`parser`] module instead.
-    ///
-    /// Again. **Don't use this.** The second you import this into your code,
-    /// you're setting yourself up to shoot yourself in the foot. **Just use
-    /// [`parser`].** There is almost *no* reason you would need this module
-    /// instead, unless you need to handle the underlying errors manually,
-    /// which I doubt.
-    #[allow(
-        clippy::all,
-        clippy::nursery,
-        clippy::pedantic,
-        missing_docs,
-        clippy::missing_docs_in_private_items,
-        clippy::restriction,
-        unused_qualifications
-    )]
-    internal_parser
+	/// Direct access to the LALRPOP parser. **Do not use this module.** Use the
+	/// [`parser`] module instead.
+	///
+	/// Again. **Don't use this.** The second you import this into your code,
+	/// you're setting yourself up to shoot yourself in the foot. **Just use
+	/// [`parser`].** There is almost *no* reason you would need this module
+	/// instead, unless you need to handle the underlying errors manually,
+	/// which I doubt.
+	#[allow(
+		clippy::all,
+		clippy::nursery,
+		clippy::pedantic,
+		missing_docs,
+		clippy::missing_docs_in_private_items,
+		clippy::restriction,
+		unused_qualifications
+	)]
+	internal_parser
 );
 
 pub mod ast;

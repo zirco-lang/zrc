@@ -10,131 +10,131 @@
 //! by the `Place`.
 
 use inkwell::{
-    basic_block::BasicBlock,
-    debug_info::AsDIScope,
-    values::{BasicValue, PointerValue},
+	basic_block::BasicBlock,
+	debug_info::AsDIScope,
+	values::{BasicValue, PointerValue},
 };
 use zrc_typeck::tast::{
-    expr::{Place, PlaceKind},
-    ty::Type,
+	expr::{Place, PlaceKind},
+	ty::Type,
 };
 
 use super::cg_expr;
 use crate::{
-    bb::{BasicBlockAnd, BasicBlockExt},
-    ctx::BlockCtx,
-    ty::llvm_basic_type,
-    unpack,
+	bb::{BasicBlockAnd, BasicBlockExt},
+	ctx::BlockCtx,
+	ty::llvm_basic_type,
+	unpack,
 };
 
 /// Resolve a place to its LLVM [`PointerValue`]
 pub fn cg_place<'ctx>(
-    cg: BlockCtx<'ctx, '_, '_>,
-    mut bb: BasicBlock<'ctx>,
-    place: Place,
+	cg: BlockCtx<'ctx, '_, '_>,
+	mut bb: BasicBlock<'ctx>,
+	place: Place,
 ) -> BasicBlockAnd<'ctx, PointerValue<'ctx>> {
-    let place_span = place.kind.span();
-    let line_and_col = cg.line_lookup.lookup_from_index(place_span.start());
-    let _debug_location = cg.dbg_builder.as_ref().map(|dbg_builder| {
-        let dl = dbg_builder.create_debug_location(
-            cg.ctx,
-            line_and_col.line,
-            line_and_col.col,
-            cg.dbg_scope.expect("we have DI").as_debug_info_scope(),
-            None,
-        );
-        cg.builder.set_current_debug_location(dl);
-        dl
-    });
+	let place_span = place.kind.span();
+	let line_and_col = cg.line_lookup.lookup_from_index(place_span.start());
+	let _debug_location = cg.dbg_builder.as_ref().map(|dbg_builder| {
+		let dl = dbg_builder.create_debug_location(
+			cg.ctx,
+			line_and_col.line,
+			line_and_col.col,
+			cg.dbg_scope.expect("we have DI").as_debug_info_scope(),
+			None,
+		);
+		cg.builder.set_current_debug_location(dl);
+		dl
+	});
 
-    match place.kind.into_value() {
-        PlaceKind::Variable(x) => {
-            let reg = cg
-                .scope
-                .get(x)
-                .expect("identifier that passed typeck should exist in the CgScope");
+	match place.kind.into_value() {
+		PlaceKind::Variable(x) => {
+			let reg = cg
+				.scope
+				.get(x)
+				.expect("identifier that passed typeck should exist in the CgScope");
 
-            bb.and(reg)
-        }
+			bb.and(reg)
+		}
 
-        PlaceKind::Deref(x) => {
-            let value = unpack!(bb = cg_expr(cg, bb, *x));
+		PlaceKind::Deref(x) => {
+			let value = unpack!(bb = cg_expr(cg, bb, *x));
 
-            bb.and(value.into_pointer_value())
-        }
+			bb.and(value.into_pointer_value())
+		}
 
-        PlaceKind::Index(ptr, idx) => {
-            let ptr = unpack!(bb = cg_expr(cg, bb, *ptr));
-            let idx = unpack!(bb = cg_expr(cg, bb, *idx));
+		PlaceKind::Index(ptr, idx) => {
+			let ptr = unpack!(bb = cg_expr(cg, bb, *ptr));
+			let idx = unpack!(bb = cg_expr(cg, bb, *idx));
 
-            // SAFETY: This can segfault if indices are used incorrectly
-            // This is only used for pointer arithmetic, so the indices should be correct
-            let reg = unsafe {
-                cg.builder.build_gep(
-                    llvm_basic_type(&cg, &place.inferred_type).0,
-                    ptr.into_pointer_value(),
-                    &[idx.into_int_value()],
-                    "gep",
-                )
-            }
-            .expect("building GEP instruction should succeed");
+			// SAFETY: This can segfault if indices are used incorrectly
+			// This is only used for pointer arithmetic, so the indices should be correct
+			let reg = unsafe {
+				cg.builder.build_gep(
+					llvm_basic_type(&cg, &place.inferred_type).0,
+					ptr.into_pointer_value(),
+					&[idx.into_int_value()],
+					"gep",
+				)
+			}
+			.expect("building GEP instruction should succeed");
 
-            bb.and(reg.as_basic_value_enum().into_pointer_value())
-        }
+			bb.and(reg.as_basic_value_enum().into_pointer_value())
+		}
 
-        #[expect(clippy::wildcard_enum_match_arm)]
-        PlaceKind::Dot(x, prop) => match &x.inferred_type {
-            Type::Struct { fields, .. } => {
-                let x_ty = llvm_basic_type(&cg, &x.inferred_type).0;
-                let prop_idx = fields
-                    .iter()
-                    .position(|(got_key, _)| *got_key == *prop.into_value())
-                    .expect("invalid struct field");
+		#[expect(clippy::wildcard_enum_match_arm)]
+		PlaceKind::Dot(x, prop) => match &x.inferred_type {
+			Type::Struct { fields, .. } => {
+				let x_ty = llvm_basic_type(&cg, &x.inferred_type).0;
+				let prop_idx = fields
+					.iter()
+					.position(|(got_key, _)| *got_key == *prop.into_value())
+					.expect("invalid struct field");
 
-                let x = unpack!(bb = cg_place(cg, bb, *x));
+				let x = unpack!(bb = cg_place(cg, bb, *x));
 
-                let reg = cg
-                    .builder
-                    .build_struct_gep(
-                        x_ty,
-                        x,
-                        prop_idx
-                            .try_into()
-                            .expect("got more than u32::MAX as key index? HOW?"),
-                        "gep",
-                    )
-                    .expect("building GEP instruction should succeed");
+				let reg = cg
+					.builder
+					.build_struct_gep(
+						x_ty,
+						x,
+						prop_idx
+							.try_into()
+							.expect("got more than u32::MAX as key index? HOW?"),
+						"gep",
+					)
+					.expect("building GEP instruction should succeed");
 
-                bb.and(reg.as_basic_value_enum().into_pointer_value())
-            }
-            Type::Union(_) => {
-                // All we need to do is cast the pointer, but there's no `bitcast` anymore,
-                // so just return it and it'll take on the correct type
+				bb.and(reg.as_basic_value_enum().into_pointer_value())
+			}
+			Type::Union(_) => {
+				// All we need to do is cast the pointer, but there's no `bitcast` anymore,
+				// so just return it and it'll take on the correct type
 
-                let value = unpack!(bb = cg_place(cg, bb, *x));
+				let value = unpack!(bb = cg_place(cg, bb, *x));
 
-                bb.and(value)
-            }
-            _ => panic!("cannot access property of non-struct"),
-        },
-    }
+				bb.and(value)
+			}
+			_ => panic!("cannot access property of non-struct"),
+		},
+	}
 }
 
 #[cfg(test)]
 mod tests {
-    // Please read the "Common patterns in tests" section of crate::test_utils for
-    // more information on how code generator tests are structured.
+	// Please read the "Common patterns in tests" section of crate::test_utils for
+	// more information on how code generator tests are structured.
 
-    use indoc::indoc;
+	use indoc::indoc;
 
-    use crate::cg_snapshot_test;
+	use crate::cg_snapshot_test;
 
-    // Remember: In all of these tests, cg_place returns a *pointer* to the data in
-    // the place.
+	// Remember: In all of these tests, cg_place returns a *pointer* to the data in
+	// the place.
 
-    #[test]
-    fn basic_identifiers_in_place_position() {
-        cg_snapshot_test!(indoc! {"
+	#[test]
+	fn basic_identifiers_in_place_position() {
+		cg_snapshot_test!(indoc! {"
                 fn test() {
                     let x = 6;
 
@@ -142,11 +142,11 @@ mod tests {
                     x = 7;
                 }
             "});
-    }
+	}
 
-    #[test]
-    fn identifier_deref_generates_as_expected() {
-        cg_snapshot_test!(indoc! {"
+	#[test]
+	fn identifier_deref_generates_as_expected() {
+		cg_snapshot_test!(indoc! {"
                 fn test() {
                     let x: *i32;
 
@@ -156,11 +156,11 @@ mod tests {
                     *x = 4;
                 }
             "});
-    }
+	}
 
-    #[test]
-    fn other_deref_generates_as_expected() {
-        cg_snapshot_test!(indoc! {"
+	#[test]
+	fn other_deref_generates_as_expected() {
+		cg_snapshot_test!(indoc! {"
                 fn test() {
                     // TEST: because cg_place returns a *pointer* to the represented value, handling
                     // *5 in a place context should return the address of *5, which is &*5 = 5.
@@ -171,11 +171,11 @@ mod tests {
                     *(5 as *i32) = 0;
                 }
             "});
-    }
+	}
 
-    #[test]
-    fn pointer_indexing_in_place_position() {
-        cg_snapshot_test!(indoc! {"
+	#[test]
+	fn pointer_indexing_in_place_position() {
+		cg_snapshot_test!(indoc! {"
                 fn test() {
                     let x: *i32;
 
@@ -185,11 +185,11 @@ mod tests {
                     x[4 as usize] = 5;
                 }
             "});
-    }
+	}
 
-    #[test]
-    fn struct_property_access_in_place_position() {
-        cg_snapshot_test!(indoc! {"
+	#[test]
+	fn struct_property_access_in_place_position() {
+		cg_snapshot_test!(indoc! {"
                 struct S { x: i32, y: i32 }
 
                 fn test() {
@@ -200,11 +200,11 @@ mod tests {
                     x.y = 4;
                 }
             "});
-    }
+	}
 
-    #[test]
-    fn union_property_access_in_place_position() {
-        cg_snapshot_test!(indoc! {"
+	#[test]
+	fn union_property_access_in_place_position() {
+		cg_snapshot_test!(indoc! {"
                 union U { x: i32, y: i8 }
 
                 fn test() {
@@ -217,5 +217,5 @@ mod tests {
                     x.y = 5 as i8;
                 }
             "});
-    }
+	}
 }
