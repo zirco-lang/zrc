@@ -7,8 +7,13 @@
 
 use inkwell::{
 	OptimizationLevel,
+	basic_block::BasicBlock,
 	context::Context,
-	debug_info::{AsDIScope, DISubprogram, DWARFEmissionKind, DWARFSourceLanguage},
+	debug_info::{
+		AsDIScope, DIExpression, DILocalVariable, DILocation, DISubprogram, DWARFEmissionKind,
+		DWARFSourceLanguage, DebugInfoBuilder,
+	},
+	llvm_sys::debuginfo::LLVMDIBuilderInsertDeclareRecordAtEnd,
 	memory_buffer::MemoryBuffer,
 	module::{FlagBehavior, Module},
 	passes::PassBuilderOptions,
@@ -16,7 +21,7 @@ use inkwell::{
 		CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
 	},
 	types::{AnyType, BasicMetadataTypeEnum, BasicTypeEnum},
-	values::{BasicValue, BasicValueEnum, FunctionValue},
+	values::{AsValueRef, BasicValue, BasicValueEnum, FunctionValue, PointerValue},
 };
 use zrc_typeck::tast::{
 	stmt::{ArgumentDeclaration, TypedDeclaration},
@@ -102,6 +107,33 @@ fn eval_const_expr<'ctx>(
 				expr.kind.value()
 			)
 		}
+	}
+}
+
+/// Hack around Inkwell #613, where we cannot insert a dbg.value without causing
+/// an ICE.
+///
+/// Relevant comment: <https://github.com/TheDan64/inkwell/issues/613#issuecomment-4043095759>
+pub fn insert_dbg_value_record_at_end<'ctx>(
+	dbg_builder: &DebugInfoBuilder<'ctx>,
+	value: PointerValue<'ctx>,
+	var_info: Option<DILocalVariable<'ctx>>,
+	expr: Option<DIExpression<'ctx>>,
+	debug_loc: DILocation<'ctx>,
+	block: BasicBlock<'ctx>,
+) {
+	// SAFETY: We ensure that all arguments are valid and non-null, and that the
+	// lifetime of the `dbg_builder` is valid for the duration of this call.
+	unsafe {
+		LLVMDIBuilderInsertDeclareRecordAtEnd(
+			dbg_builder.as_mut_ptr(),
+			value.as_value_ref(),
+			var_info.map_or(std::ptr::null_mut(), |var| var.as_mut_ptr()),
+			expr.unwrap_or_else(|| dbg_builder.create_expression(vec![]))
+				.as_mut_ptr(),
+			debug_loc.as_mut_ptr(),
+			block.as_mut_ptr(),
+		);
 	}
 }
 
@@ -398,7 +430,7 @@ fn cg_program_without_optimization<'ctx>(
 						builder.position_at_end(entry);
 					}
 
-					let (ty, _dbg_ty) = llvm_basic_type(&unit, ty.value());
+					let (ty, dbg_ty) = llvm_basic_type(&unit, ty.value());
 
 					let alloc = builder
 						.build_alloca(ty, &format!("arg_{name}"))
@@ -418,36 +450,43 @@ fn cg_program_without_optimization<'ctx>(
 						)
 						.expect("store should generate successfully");
 
-					// let ident_line_col = line_lookup.lookup_from_index(name.start());
+					if let Some(dbg_builder) = dbg_builder.as_ref() {
+						let dbg_ty = dbg_ty.expect("we have DI");
+						let lexical_block = lexical_block.expect("we have DI");
+						let fn_subprogram = fn_subprogram.expect("we have DI");
+						let compilation_unit = compilation_unit.expect("we have DI");
 
-					// let id_debug_location = dbg_builder.create_debug_location(
-					//     ctx,
-					//     ident_line_col.line,
-					//     ident_line_col.col,
-					//     lexical_block.as_debug_info_scope(),
-					//     None,
-					// );
+						let ident_line_col = line_lookup.lookup_from_index(name.start());
 
-					// let decl = dbg_builder.create_parameter_variable(
-					//     fn_subprogram.as_debug_info_scope(),
-					//     name.value(),
-					//     u32::try_from(n)
-					//         .expect("should not be more than u32::MAX args in a function"),
-					//     compilation_unit.get_file(),
-					//     ident_line_col.line,
-					//     dbg_ty,
-					//     true,
-					//     0,
-					// );
+						let id_debug_location = dbg_builder.create_debug_location(
+							ctx,
+							ident_line_col.line,
+							ident_line_col.col,
+							lexical_block.as_debug_info_scope(),
+							None,
+						);
 
-					// FIXME: Re-enable this when Inkwell resolves TheDan64/inkwell#613
-					// dbg_builder.insert_declare_at_end(
-					//     alloc,
-					//     Some(decl),
-					//     None,
-					//     id_debug_location,
-					//     entry,
-					// );
+						let decl = dbg_builder.create_parameter_variable(
+							fn_subprogram.as_debug_info_scope(),
+							name.value(),
+							u32::try_from(n)
+								.expect("should not be more than u32::MAX args in a function"),
+							compilation_unit.get_file(),
+							ident_line_col.line,
+							dbg_ty,
+							true,
+							0,
+						);
+
+						insert_dbg_value_record_at_end(
+							dbg_builder,
+							alloc,
+							Some(decl),
+							None,
+							id_debug_location,
+							entry,
+						);
+					}
 
 					fn_scope.insert(name.value(), alloc);
 				}
