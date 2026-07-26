@@ -19,6 +19,13 @@ pkgs.stdenv.mkDerivation {
     llvm.clang
   ];
 
+  env = {
+    LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+      pkgs.stdenv.cc.cc.lib
+      pkgs.zlib
+    ];
+  };
+
   buildPhase = ''
     make -C $src all-opt OUTDIR=$PWD/dist ZRC="${zpkgs.zrc}/bin/zrc"
   '';
