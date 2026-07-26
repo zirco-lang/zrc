@@ -3,19 +3,25 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    naersk.url = "github:nix-community/naersk";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    naersk = {
+      url = "github:nix-community/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
     inputs@{
       self,
       nixpkgs,
-      rust-overlay,
+      fenix,
       naersk,
     }:
     let
-      inherit (import ./dist/nix/lib.nix { inherit nixpkgs rust-overlay; }) forAllSystems;
+      inherit (import ./dist/nix/lib.nix { inherit nixpkgs fenix; }) forAllSystems;
     in
     {
       devShells = forAllSystems (args: import ./dist/nix/devshell.nix (inputs // args));

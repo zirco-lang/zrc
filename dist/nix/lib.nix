@@ -1,4 +1,4 @@
-{ nixpkgs, rust-overlay }:
+{ nixpkgs, fenix }:
 {
   forAllSystems =
     let
@@ -13,15 +13,9 @@
     nixpkgs.lib.genAttrs systems (
       system:
       let
-        overlays = [ rust-overlay.overlays.default ];
-        pkgs = import nixpkgs { inherit system overlays; };
+        pkgs = import nixpkgs { inherit system; };
         llvm = pkgs.llvmPackages_22;
-        rust = pkgs.rust-bin.nightly.latest.default.override {
-          extensions = [
-            "rust-src"
-            "rust-analyzer"
-          ];
-        };
+        rust = import ./rust.nix { inherit fenix system; };
       in
       f {
         inherit

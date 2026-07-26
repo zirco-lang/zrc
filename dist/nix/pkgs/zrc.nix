@@ -20,7 +20,6 @@ naerskLib.buildPackage {
   copyLibs = true;
 
   buildInputs = with pkgs; [
-    rust-bin.stable.latest.default
     llvm.llvm
     llvm.libllvm
     llvm.clang
@@ -28,7 +27,17 @@ naerskLib.buildPackage {
     pkg-config
     libffi
     libxml2
+    zlib
   ];
+
+  env = {
+    LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+      pkgs.stdenv.cc.cc.lib
+      pkgs.libffi
+      pkgs.libxml2
+      pkgs.zlib
+    ];
+  };
 
   postInstall = ''
     mkdir -p $out/include
