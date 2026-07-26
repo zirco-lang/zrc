@@ -19,17 +19,17 @@
 /// ```
 #[macro_export]
 macro_rules! unpack {
-    ($bb:ident = $call:expr) => {
-        match $call {
-            BasicBlockAnd {
-                bb: unpacked_bb,
-                value,
-            } => {
-                $bb = unpacked_bb;
-                value
-            }
-        }
-    };
+	($bb:ident = $call:expr) => {
+		match $call {
+			BasicBlockAnd {
+				bb: unpacked_bb,
+				value,
+			} => {
+				$bb = unpacked_bb;
+				value
+			}
+		}
+	};
 }
 
 use inkwell::basic_block::BasicBlock;
@@ -41,26 +41,26 @@ use inkwell::basic_block::BasicBlock;
 /// control flow is explicit. This struct encapsulates both a basic block and a
 /// value, allowing functions to return them together.
 pub struct BasicBlockAnd<'ctx, T> {
-    /// The basic block returned
-    ///
-    /// This represents the current point in the control flow of the
-    /// LLVM IR being generated.
-    pub bb: BasicBlock<'ctx>,
-    /// Any other data the function wishes to pass
-    ///
-    /// This is typically some LLVM value, such as a
-    /// [`inkwell::values::BasicValue`], but can be any type.
-    pub value: T,
+	/// The basic block returned
+	///
+	/// This represents the current point in the control flow of the
+	/// LLVM IR being generated.
+	pub bb: BasicBlock<'ctx>,
+	/// Any other data the function wishes to pass
+	///
+	/// This is typically some LLVM value, such as a
+	/// [`inkwell::values::BasicValue`], but can be any type.
+	pub value: T,
 }
 impl<T> BasicBlockAnd<'_, T> {
-    /// Discard the basic block and return the value
-    ///
-    /// This is useful when you only care about the value and not the
-    /// control flow.
-    #[must_use]
-    pub fn into_value(self) -> T {
-        self.value
-    }
+	/// Discard the basic block and return the value
+	///
+	/// This is useful when you only care about the value and not the
+	/// control flow.
+	#[must_use]
+	pub fn into_value(self) -> T {
+		self.value
+	}
 }
 /// Extends Inkwell [`BasicBlock`]s with a method to easily produce a
 /// [`BasicBlockAnd`] value
@@ -68,13 +68,13 @@ impl<T> BasicBlockAnd<'_, T> {
 /// This is useful for chaining together functions that return both a
 /// basic block and a value.
 pub trait BasicBlockExt<'ctx> {
-    /// Wrap a [`BasicBlock`] and a value into a [`BasicBlockAnd`] instance, to
-    /// allow easier composition of functions which return basic blocks
-    /// along with some other value
-    fn and<T>(self, value: T) -> BasicBlockAnd<'ctx, T>;
+	/// Wrap a [`BasicBlock`] and a value into a [`BasicBlockAnd`] instance, to
+	/// allow easier composition of functions which return basic blocks
+	/// along with some other value
+	fn and<T>(self, value: T) -> BasicBlockAnd<'ctx, T>;
 }
 impl<'ctx> BasicBlockExt<'ctx> for BasicBlock<'ctx> {
-    fn and<T>(self, value: T) -> BasicBlockAnd<'ctx, T> {
-        BasicBlockAnd { bb: self, value }
-    }
+	fn and<T>(self, value: T) -> BasicBlockAnd<'ctx, T> {
+		BasicBlockAnd { bb: self, value }
+	}
 }

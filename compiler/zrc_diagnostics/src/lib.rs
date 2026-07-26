@@ -49,10 +49,10 @@
     clippy::print_stdout
 )]
 #![allow(
-    clippy::multiple_crate_versions,
-    clippy::cargo_common_metadata,
-    clippy::module_name_repetitions,
-    clippy::doc_comment_double_space_linebreaks
+	clippy::multiple_crate_versions,
+	clippy::cargo_common_metadata,
+	clippy::module_name_repetitions,
+	clippy::doc_comment_double_space_linebreaks
 )]
 
 pub mod diagnostic;
