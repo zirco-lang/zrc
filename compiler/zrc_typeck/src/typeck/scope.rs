@@ -6,6 +6,7 @@ use std::{
 	rc::Rc,
 };
 
+use tracing::debug;
 use zrc_utils::span::Span;
 
 use crate::tast::ty::{FunctionDeclarationGlobalMetadata, OrderedTypeFields, Type as TastType};
@@ -92,6 +93,11 @@ impl<'input> TypeCtx<'input> {
 
 	/// Create a new type with a given name and resolved [`TastType`]
 	pub fn insert(&mut self, identifier: &'input str, resolution: TastType<'input>) {
+		debug!(
+			identifier = identifier,
+			ty = %resolution,
+			"adding type to type context"
+		);
 		self.mappings.insert(identifier, resolution);
 	}
 
@@ -241,6 +247,11 @@ impl<'input> ValueCtx<'input> {
 
 	/// Create a new variable with a given name and data [`TastType`]
 	pub fn insert(&mut self, identifier: &'input str, resolution: ValueEntry<'input>) {
+		debug!(
+			identifier = identifier,
+			ty = %resolution.ty,
+			"adding variable to value context"
+		);
 		self.mappings
 			.insert(identifier, Rc::new(RefCell::new(resolution)));
 	}

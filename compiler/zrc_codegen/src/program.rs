@@ -5,6 +5,8 @@
 //! intermediate representation (IR), which can then be optimized and compiled
 //! to machine code.
 
+use std::time::Instant;
+
 use inkwell::{
 	OptimizationLevel,
 	basic_block::BasicBlock,
@@ -23,6 +25,7 @@ use inkwell::{
 	types::{AnyType, BasicMetadataTypeEnum, BasicTypeEnum},
 	values::{AsValueRef, BasicValue, BasicValueEnum, FunctionValue, PointerValue},
 };
+use tracing::{debug, debug_span, instrument};
 use zrc_typeck::tast::{
 	stmt::{ArgumentDeclaration, TypedDeclaration},
 	ty::Type,
@@ -143,6 +146,7 @@ pub fn insert_dbg_value_record_at_end<'ctx>(
 /// Use [`cg_init_fn`] instead for definitions.
 /// We do not attach debugging info to extern functions, to follow with clang's
 /// (probably correct) behavior.
+#[instrument(skip_all)]
 pub fn cg_init_extern_fn<'ctx>(
 	unit: &CompilationUnitCtx<'ctx, '_>,
 	name: &str,
@@ -178,11 +182,14 @@ pub fn cg_init_extern_fn<'ctx>(
 		is_variadic,
 	);
 
+	debug!("initialized new LLVM extern function");
+
 	unit.module.add_function(name, fn_type, None)
 }
 
 /// Same as [`cg_init_extern_fn`] but properly initializes function
 /// *definitions* with their debugging information.
+#[instrument(skip_all)]
 pub fn cg_init_fn<'ctx>(
 	unit: &CompilationUnitCtx<'ctx, '_>,
 	name: &str,
@@ -249,6 +256,8 @@ pub fn cg_init_fn<'ctx>(
 	if let Some(fn_subprogram) = fn_subprogram {
 		fn_val.set_subprogram(fn_subprogram);
 	}
+
+	debug!("initialized new LLVM function");
 
 	(fn_val, fn_subprogram)
 }
@@ -370,6 +379,8 @@ fn cg_program_without_optimization<'ctx>(
 				return_type,
 				body: Some(body),
 			} => {
+				let _span = debug_span!("fn_decl", name = name.value()).entered();
+
 				let body_span = body.span();
 
 				let (fn_value, fn_subprogram) = cg_init_fn(
@@ -488,9 +499,12 @@ fn cg_program_without_optimization<'ctx>(
 						);
 					}
 
+					debug!(name = name.value(), ty = ?ty, "prepared function parameter");
+
 					fn_scope.insert(name.value(), alloc);
 				}
 
+				debug!("recursing into block codegen for body of function");
 				cg_block(
 					FunctionCtx::from_unit_and_fn(unit, fn_value),
 					entry,
@@ -508,6 +522,7 @@ fn cg_program_without_optimization<'ctx>(
 				return_type,
 				body: None,
 			} => {
+				let _span = debug_span!("fn_decl", name = name.value(), extern = true).entered();
 				let fn_value = cg_init_extern_fn(
 					&unit,
 					name.value(),
@@ -526,6 +541,8 @@ fn cg_program_without_optimization<'ctx>(
 			TypedDeclaration::GlobalLetDeclaration(declarations) => {
 				for let_decl in declarations {
 					let let_declaration = let_decl.value();
+					let _span =
+						debug_span!("let_decl", name = let_declaration.name.value()).entered();
 					let (llvm_ty, _) = llvm_basic_type(&unit, &let_declaration.ty);
 
 					let global = module.add_global(llvm_ty, None, let_declaration.name.value());
@@ -538,6 +555,12 @@ fn cg_program_without_optimization<'ctx>(
 					global.set_initializer(&initializer);
 
 					global_scope.insert(let_declaration.name.value(), global.as_pointer_value());
+
+					debug!(
+						name = let_declaration.name.value(),
+						ty = ?llvm_ty,
+						"prepared global variable"
+					);
 				}
 			}
 		}
@@ -547,6 +570,8 @@ fn cg_program_without_optimization<'ctx>(
 		dbg_builder.finalize();
 	}
 
+	let verify_start = Instant::now();
+	debug!("verifying generated LLVM module");
 	match module.verify() {
 		Ok(()) => {}
 
@@ -558,6 +583,10 @@ fn cg_program_without_optimization<'ctx>(
 			);
 		}
 	}
+	debug!(
+		elapsed = ?verify_start.elapsed(),
+		"LLVM module verified, all looks good"
+	);
 
 	module
 }
@@ -571,6 +600,7 @@ fn cg_program_without_optimization<'ctx>(
 /// passed, so make sure to type check it so invariants are upheld.
 #[must_use]
 #[expect(clippy::too_many_arguments)]
+#[instrument(skip_all)]
 pub fn cg_program<'ctx>(
 	frontend_version_string: &str,
 	cli_args: &str,
@@ -583,6 +613,8 @@ pub fn cg_program<'ctx>(
 	line_lookup: &LineLookup,
 	program: Vec<Spanned<TypedDeclaration<'_>>>,
 ) -> Module<'ctx> {
+	let cg_start = Instant::now();
+	debug!("starting code generator");
 	let module = cg_program_without_optimization(
 		frontend_version_string,
 		cli_args,
@@ -594,8 +626,18 @@ pub fn cg_program<'ctx>(
 		line_lookup,
 		program,
 	);
+	debug!(
+		elapsed = ?cg_start.elapsed(),
+		"code generation finished"
+	);
 
+	let optimize_start = Instant::now();
+	debug!(opt_level = ?optimization_level, "asking LLVM to make your code fast...");
 	optimize_module(&module, target_machine, optimization_level);
+	debug!(
+		elapsed = ?optimize_start.elapsed(),
+		"LLVM optimization finished"
+	);
 
 	module
 }
@@ -619,6 +661,13 @@ pub fn cg_program_to_string(
 	cpu: &str,
 ) -> String {
 	let ctx = Context::create();
+
+	debug!(
+		triple = ?triple,
+		cpu = ?cpu,
+		optimization_level = ?optimization_level,
+		"initializing LLVM target machine"
+	);
 
 	Target::initialize_all(&InitializationConfig::default());
 	let target = Target::from_triple(triple).expect("target should be ready and exist");
@@ -646,6 +695,8 @@ pub fn cg_program_to_string(
 		&LineLookup::new(source),
 		program,
 	);
+
+	debug!("asking LLVM to emit IR...");
 
 	module.print_to_string().to_string()
 }
@@ -708,6 +759,7 @@ pub fn cg_program_to_string_without_optimization(
 /// Panics on internal code generation failure.
 #[must_use]
 #[expect(clippy::too_many_arguments)]
+#[instrument(skip_all)]
 pub fn cg_program_to_buffer(
 	frontend_version_string: &str,
 	parent_directory: &str,
@@ -722,6 +774,13 @@ pub fn cg_program_to_buffer(
 	cpu: &str,
 ) -> MemoryBuffer<'static> {
 	let ctx = Context::create();
+
+	debug!(
+		triple = ?triple,
+		cpu = ?cpu,
+		optimization_level = ?optimization_level,
+		"initializing LLVM target machine"
+	);
 
 	Target::initialize_all(&InitializationConfig::default());
 	let target = Target::from_triple(triple).expect("target should be ready and exist");
@@ -750,9 +809,20 @@ pub fn cg_program_to_buffer(
 		program,
 	);
 
-	target_machine
+	debug!(file_type = ?file_type, "back to LLVM to compile module into buffer");
+
+	let start_out = Instant::now();
+
+	let buf = target_machine
 		.write_to_memory_buffer(&module, file_type)
-		.expect("writing to memory buffer should succeed")
+		.expect("writing to memory buffer should succeed");
+
+	debug!(
+		elapsed = ?start_out.elapsed(),
+		buffer_size = buf.get_size(),
+		"final output generation finished"
+	);
+	buf
 }
 
 #[cfg(test)]

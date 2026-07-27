@@ -3,8 +3,12 @@
 //! This module contains the main driver function for the Zirco compiler,
 //! which orchestrates the parsing, type checking, and code generation phases.
 
-use std::path::{Path, PathBuf};
+use std::{
+	path::{Path, PathBuf},
+	time::Instant,
+};
 
+use tracing::{debug, debug_span, info};
 use zrc_codegen::{DebugLevel, OptimizationLevel};
 use zrc_parser::parser;
 use zrc_typeck::typeck;
@@ -69,7 +73,8 @@ pub enum OutputFormat {
 #[expect(
 	clippy::too_many_arguments,
 	clippy::wildcard_enum_match_arm,
-	clippy::result_large_err
+	clippy::result_large_err,
+	clippy::too_many_lines
 )]
 pub fn compile(
 	frontend_version_string: &str,
@@ -86,6 +91,13 @@ pub fn compile(
 	forbid_unlisted_includes: bool,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
 	// === PREPROCESSOR ===
+	info!(
+		include_paths = ?include_paths,
+		parent_directory = parent_directory,
+		file_name = file_name,
+		"running preprocessor"
+	);
+	let preprocessor_start = Instant::now();
 	let chunks = zrc_preprocessor::preprocess(
 		Path::new(parent_directory),
 		include_paths,
@@ -93,13 +105,29 @@ pub fn compile(
 		content,
 		forbid_unlisted_includes,
 	)?;
+	debug!(
+		elapsed = ?preprocessor_start.elapsed(),
+		chunk_count = chunks.len(),
+		"preprocessor finished"
+	);
 
 	// === PARSER ===
+	let parse_start = Instant::now();
+	info!("parsing source code");
 	let mut ast = Vec::new();
 	for chunk in &chunks {
+		let _span = debug_span!(
+			"parse_chunk",
+			start_line = chunk.start_line,
+			file_name = chunk.file_name
+		)
+		.entered();
+		debug!("parsing chunk");
 		let chunk_decls = parser::parse_source_chunk(chunk)?;
+		debug!("parsed {} declarations from chunk", chunk_decls.len());
 		ast.extend(chunk_decls);
 	}
+	debug!(elapsed = ?parse_start.elapsed(), "parsed {} declarations in total", ast.len());
 
 	// display the AST if the user wants it
 	if matches!(
@@ -124,8 +152,11 @@ pub fn compile(
 
 	// otherwise, move on:
 	// === TYPE CHECKER ===
+	let tck_start = Instant::now();
+	info!("type checking AST");
 	let mut global_scope = typeck::GlobalScope::new();
 	let typed_ast = typeck::type_program(&mut global_scope, ast)?;
+	debug!(elapsed = ?tck_start.elapsed(), "type checking finished successfully");
 
 	// display the TAST if the user wants it
 	if matches!(
@@ -151,8 +182,16 @@ pub fn compile(
 	// otherwise, move on:
 	// === CODE GENERATOR ===
 
-	match *emit {
-		OutputFormat::Asm => Ok(zrc_codegen::cg_program_to_buffer(
+	let cg_start = Instant::now();
+	info!(
+		optimization_level = ?optimization_level,
+		debug_mode = ?debug_mode,
+		triple = ?triple,
+		cpu = cpu,
+		"generating code"
+	);
+	let output: Box<[u8]> = match *emit {
+		OutputFormat::Asm => zrc_codegen::cg_program_to_buffer(
 			frontend_version_string,
 			parent_directory,
 			file_name,
@@ -166,8 +205,8 @@ pub fn compile(
 			cpu,
 		)
 		.as_slice()
-		.into()),
-		OutputFormat::Object => Ok(zrc_codegen::cg_program_to_buffer(
+		.into(),
+		OutputFormat::Object => zrc_codegen::cg_program_to_buffer(
 			frontend_version_string,
 			parent_directory,
 			file_name,
@@ -181,9 +220,9 @@ pub fn compile(
 			cpu,
 		)
 		.as_slice()
-		.into()),
+		.into(),
 
-		OutputFormat::Llvm => Ok(zrc_codegen::cg_program_to_string(
+		OutputFormat::Llvm => zrc_codegen::cg_program_to_string(
 			frontend_version_string,
 			parent_directory,
 			file_name,
@@ -196,9 +235,18 @@ pub fn compile(
 			cpu,
 		)
 		.as_bytes()
-		.into()),
+		.into(),
 
 		// unreachable because we return in the above cases
-		_ => unreachable!(),
-	}
+		_ => {
+			unreachable!();
+		}
+	};
+	debug!(
+		elapsed = ?cg_start.elapsed(),
+		output_size = output.len(),
+		"code generation finished"
+	);
+
+	Ok(output)
 }

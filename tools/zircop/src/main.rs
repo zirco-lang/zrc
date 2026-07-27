@@ -54,10 +54,12 @@
 
 mod cli;
 
-use std::{error::Error, fmt, path::Path, process};
+use std::{error::Error, fmt, path::Path, process, time::Instant};
 
 use clap::Parser;
 use cli::Cli;
+use tracing::debug;
+use tracing_subscriber::EnvFilter;
 use zircop::runner;
 use zrc_utils::io;
 
@@ -77,7 +79,12 @@ impl fmt::Display for CliError {
 impl Error for CliError {}
 
 fn main() -> Result<(), Box<dyn Error>> {
+	let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
+	tracing_subscriber::fmt().with_env_filter(filter).init();
+
 	let cli = Cli::parse();
+
+	debug!(parsed_args = ?cli, "finished parsing command line arguments");
 
 	if cli.version {
 		println!("{}", version_string());
@@ -93,6 +100,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let mut source_content = String::new();
 	input.read_to_string(&mut source_content)?;
 
+	debug!("read {} bytes of source content", source_content.len());
+
+	let start = Instant::now();
+	debug!("running linter");
 	let diagnostics = runner::run_with_default_passes(
 		cli::get_include_paths(&cli),
 		Path::new(&directory_name),
@@ -100,6 +111,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		&source_content,
 		cli.forbid_unlisted_includes,
 	);
+	debug!(elapsed = ?start.elapsed(), "zircop finished");
 
 	match diagnostics {
 		Err(diagnostic) => {

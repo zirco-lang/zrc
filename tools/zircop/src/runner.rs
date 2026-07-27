@@ -1,7 +1,11 @@
 //! Execute a list of lints on a program.
 
-use std::path::{Path, PathBuf};
+use std::{
+	path::{Path, PathBuf},
+	time::Instant,
+};
 
+use tracing::{debug, info};
 use zrc_diagnostics::Diagnostic;
 use zrc_parser::parser;
 use zrc_typeck::typeck;
@@ -24,6 +28,7 @@ pub fn run(
 	let mut diagnostics = Vec::new();
 
 	// === PREPROCESSOR ===
+	info!("running preprocessor");
 	let chunks = zrc_preprocessor::preprocess(
 		parent_directory,
 		include_paths,
@@ -33,6 +38,7 @@ pub fn run(
 	)?;
 
 	// === PARSER ===
+	info!("parsing source code");
 	let mut ast = Vec::new();
 	for chunk in &chunks {
 		let chunk_decls = parser::parse_source_chunk(chunk)?;
@@ -40,14 +46,21 @@ pub fn run(
 	}
 
 	// Execute syntactic lints
+	info!("running lints on AST");
+	let ast_start = Instant::now();
 	diagnostics.extend(passes.lint_ast(&ast));
+	debug!(elapsed = ?ast_start.elapsed(), "lints on AST finished");
 
 	// === TYPE CHECKER ===
+	info!("type checking source code");
 	let mut global_scope = typeck::GlobalScope::new();
 	let typed_ast = typeck::type_program(&mut global_scope, ast)?;
 
 	// Execute semantic lints
+	info!("running lints on TAST");
+	let tast_start = Instant::now();
 	diagnostics.extend(passes.lint_tast(&typed_ast));
+	debug!(elapsed = ?tast_start.elapsed(), "lints on TAST finished");
 
 	Ok(diagnostics)
 }

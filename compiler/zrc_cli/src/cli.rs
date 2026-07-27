@@ -6,10 +6,11 @@ use std::{
 };
 
 use clap::Parser;
+use tracing::{debug, instrument};
 use zrc::{OutputFormat, codegen::OptimizationLevel};
 
 /// The official Zirco compiler
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(version=None)]
 pub struct Cli {
 	/// See what version of zrc you are using
@@ -182,6 +183,7 @@ fn resolve_include_path(path: &Path) -> PathBuf {
 /// Get the include paths from the CLI environment and -I arguments
 ///
 /// Relative paths are resolved relative to the current working directory.
+#[instrument(skip(cli))]
 pub fn get_include_paths(cli: &Cli) -> Vec<PathBuf> {
 	// append paths in the following order:
 	// 1. CLI
@@ -190,11 +192,21 @@ pub fn get_include_paths(cli: &Cli) -> Vec<PathBuf> {
 
 	for path in &cli.include_paths {
 		include_paths.push(resolve_include_path(path));
+		debug!(
+			path = ?path,
+			resolved_path = ?include_paths.last(),
+			"added include path from CLI"
+		);
 	}
 
 	if let Ok(env_paths) = std::env::var("ZIRCO_INCLUDE_PATH") {
 		for path_str in std::env::split_paths(&env_paths) {
 			include_paths.push(resolve_include_path(&path_str));
+			debug!(
+				path_str = ?path_str,
+				resolved_path = ?include_paths.last(),
+				"added include path from ZIRCO_INCLUDE_PATH"
+			);
 		}
 	}
 

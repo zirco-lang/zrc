@@ -1,5 +1,6 @@
 //! Process let declarations during type checking
 
+use tracing::{debug, debug_span, instrument};
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, diagnostic::GenericLabel};
 use zrc_parser::ast::stmt::LetDeclaration as AstLetDeclaration;
 use zrc_utils::span::{Spannable, Spanned};
@@ -17,6 +18,7 @@ use crate::{
 /// # Errors
 /// Errors with type checker errors.
 #[expect(clippy::too_many_lines)]
+#[instrument(skip_all)]
 pub fn process_let_declaration<'input>(
 	scope: &mut Scope<'input>,
 	declarations: Vec<Spanned<AstLetDeclaration<'input>>>,
@@ -27,6 +29,12 @@ pub fn process_let_declaration<'input>(
 			|let_declaration| -> Result<Spanned<TastLetDeclaration>, Diagnostic> {
 				let let_decl_span = let_declaration.span();
 				let let_declaration = let_declaration.into_value();
+
+				let _span = debug_span!(
+					"process_let_declaration",
+					name = let_declaration.name.value()
+				)
+				.entered();
 
 				let typed_expr = let_declaration
 					.value
@@ -59,6 +67,7 @@ pub fn process_let_declaration<'input>(
 										.in_span(ty_span.expect("ty_span should exist here")),
 								)));
 						}
+						debug!("let decl has no value, using explicit type");
 						TastLetDeclaration {
 							name: let_declaration.name,
 							ty,
@@ -86,6 +95,7 @@ pub fn process_let_declaration<'input>(
 
 						// If the inferred type is {int}, resolve it to i32
 						let resolved_type = if matches!(inferred_type, TastType::Int) {
+							debug!("replacing arbitrary integer with i32 for let declaration");
 							TastType::I32
 						} else {
 							inferred_type.clone()
@@ -170,6 +180,11 @@ pub fn process_let_declaration<'input>(
 						}
 					}
 				};
+
+				debug!(
+					"let declaration processed, inserting into scope: {:?}",
+					result_decl
+				);
 
 				scope.values.insert(
 					result_decl.name.value(),

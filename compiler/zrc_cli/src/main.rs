@@ -50,7 +50,7 @@
 	clippy::doc_comment_double_space_linebreaks
 )]
 
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, time::Instant};
 
 use mimalloc::MiMalloc;
 /// Use the mimalloc allocator as the global allocator, as LLVM is heavy on heap
@@ -65,6 +65,8 @@ mod ice;
 
 use clap::Parser;
 use cli::Cli;
+use tracing::{debug, info};
+use tracing_subscriber::EnvFilter;
 use zrc::{codegen::DebugLevel, compile, utils::io};
 
 use crate::cli::{DiagFormat, FrontendOutputFormat};
@@ -84,10 +86,18 @@ pub(crate) fn version_string() -> String {
 	zrc_buildinfo::generate_version_string(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))
 }
 
+#[expect(clippy::too_many_lines)]
 fn main() -> Result<(), Box<dyn Error>> {
 	ice::setup_panic_hook();
 
+	let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
+	tracing_subscriber::fmt().with_env_filter(filter).init();
+
+	info!(version = version_string(), "waking up");
+
 	let cli = Cli::parse();
+
+	debug!(parsed_args = ?cli, "finished parsing command line arguments");
 
 	if cli.version {
 		println!("{}", version_string());
@@ -100,8 +110,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let (directory_name, file_name, mut input) = io::open_input(path)?;
 
+	debug!(directory_name, file_name, "opened input file");
+
 	let mut source_content = String::new();
 	input.read_to_string(&mut source_content)?;
+
+	debug!("read {} bytes of source content", source_content.len());
 
 	let emit = cli.emit.unwrap_or_else(|| {
 		#[allow(clippy::case_sensitive_file_extension_comparisons)]
@@ -113,32 +127,66 @@ fn main() -> Result<(), Box<dyn Error>> {
 			.to_lowercase()
 		{
 			// ends with .o or .obj, emit object code
-			out if out.ends_with(".o") || out.ends_with(".obj") => FrontendOutputFormat::Object,
+			out if out.ends_with(".o") || out.ends_with(".obj") => {
+				info!(
+					out,
+					"assuming desired emit type of Object based on output file extension"
+				);
+				FrontendOutputFormat::Object
+			}
 			// ends with .s or .asm, emit assembly
-			out if out.ends_with(".s") || out.ends_with(".asm") => FrontendOutputFormat::Asm,
+			out if out.ends_with(".s") || out.ends_with(".asm") => {
+				info!(
+					out,
+					"assuming desired emit type of Asm based on output file extension"
+				);
+				FrontendOutputFormat::Asm
+			}
 			// otherwise, emit LLVM IR
-			_ => FrontendOutputFormat::Llvm,
+			out => {
+				info!(
+					out,
+					"emit type not specified and output file extension not matched, assuming LLVM"
+				);
+				FrontendOutputFormat::Llvm
+			}
 		}
 	});
 
+	let include_paths = cli::get_include_paths(&cli);
+	let debug_level = if cli.debug {
+		DebugLevel::Full
+	} else {
+		DebugLevel::None
+	};
+	let target = cli
+		.target
+		.map_or_else(zrc::codegen::get_native_triple, |triple| {
+			zrc::codegen::TargetTriple::create(&triple)
+		});
+
+	info!(
+		include_paths = ?include_paths,
+		emit = ?emit,
+		debug_level = ?debug_level,
+		target = ?target,
+		cpu = ?cli.cpu,
+		"starting compilation"
+	);
+
+	let start = Instant::now();
+
 	let result = compile(
 		&version_string(),
-		cli::get_include_paths(&cli),
+		include_paths,
 		&emit.into(),
 		&directory_name,
 		&file_name,
 		&std::env::args().collect::<Vec<_>>().join(" "),
 		&source_content,
 		cli.opt_level.into(),
-		if cli.debug {
-			DebugLevel::Full
-		} else {
-			DebugLevel::None
-		},
-		&cli.target
-			.map_or_else(zrc::codegen::get_native_triple, |triple| {
-				zrc::codegen::TargetTriple::create(&triple)
-			}),
+		debug_level,
+		&target,
 		&cli.cpu,
 		cli.forbid_unlisted_includes,
 	);
@@ -153,9 +201,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 			std::process::exit(1);
 		}
 		Ok(x) => {
+			info!(output_size = x.len(), elapsed = ?start.elapsed(), "compilation finished successfully");
 			io::open_output(&cli.out_file)?.write_all(&x)?;
 		}
 	}
+
+	info!("somehow, just somehow, it didn't ICE! you deserve an award.");
+	info!("compilation completed successfully");
 
 	Ok(())
 }

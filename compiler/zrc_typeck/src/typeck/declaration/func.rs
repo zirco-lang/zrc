@@ -1,5 +1,8 @@
 //! Process function declarations
 
+use std::time::Instant;
+
+use tracing::{debug, instrument};
 use zrc_diagnostics::{
 	Diagnostic, DiagnosticKind, LabelKind, SpannedExt, diagnostic::GenericLabel,
 };
@@ -27,6 +30,7 @@ use crate::{
 /// into the global value and declaration tables so other declarations can
 /// resolve it during registration.
 #[expect(clippy::needless_pass_by_value, clippy::too_many_lines)]
+#[instrument(skip_all, fields(name = ?name))]
 pub fn register_function_declaration<'input>(
 	global_scope: &mut GlobalScope<'input>,
 	name: Spanned<&'input str>,
@@ -104,6 +108,11 @@ pub fn register_function_declaration<'input>(
 						)));
 				}
 
+				debug!(
+					"found existing declaration for function {}, ignoring because types match",
+					name.value()
+				);
+
 				canonical.has_implementation
 			} else {
 				return Err(name
@@ -122,6 +131,11 @@ pub fn register_function_declaration<'input>(
 		ValueEntry::unused(TastType::Fn(fn_type.clone()), name.span()),
 	);
 
+	debug!(
+		name = name.value(),
+		has_implementation = body.is_some() || has_existing_implementation,
+		"registering function declaration"
+	);
 	global_scope.declarations.insert(
 		name.into_value(),
 		FunctionDeclarationGlobalMetadata {
@@ -182,6 +196,7 @@ pub fn register_function_declaration<'input>(
 					)));
 			}
 		}
+		debug!("main function signature is valid");
 	}
 
 	Ok(())
@@ -198,6 +213,7 @@ pub fn finalize_function_declaration<'input>(
 	return_type: Option<Type<'input>>,
 	body: Option<Spanned<Vec<Stmt<'input>>>>,
 ) -> Result<Option<TypedDeclaration<'input>>, Diagnostic> {
+	let start = Instant::now();
 	let resolved_return_type = return_type
 		.clone()
 		.map(|ty| resolve_type(&global_scope.create_subscope(), ty))
@@ -239,20 +255,36 @@ pub fn finalize_function_declaration<'input>(
 		),
 		body: if let Some(body) = body {
 			let mut function_scope = global_scope.create_subscope();
+			debug!(
+				"finalizing function {} with {} parameters and return type {}",
+				name.value(),
+				resolved_parameters.len(),
+				resolved_return_type
+			);
+
 			for param in resolved_parameters {
+				debug!(
+					"injecting parameter {} of type {} into function scope",
+					param.name.value(),
+					param.ty
+				);
 				function_scope.values.insert(
 					param.name.value(),
 					ValueEntry::unused(param.ty.into_value(), param.name.span()),
 				);
 			}
 
-			Some(body.span().containing(type_block(
+			let result = body.span().containing(type_block(
 				&function_scope,
 				body,
 				false,
 				BlockReturnAbility::MustReturn(resolved_return_type),
-			)?))
+			)?);
+
+			debug!("type checking {} took {:?}", name.value(), start.elapsed());
+			Some(result)
 		} else {
+			debug!("function {} has no body, nothing to do", name.value());
 			None
 		},
 	}))

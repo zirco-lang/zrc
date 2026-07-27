@@ -10,6 +10,7 @@ mod misc;
 mod unary;
 
 pub use helpers::try_coerce_to;
+use tracing::instrument;
 use zrc_diagnostics::Diagnostic;
 use zrc_parser::ast::expr::{Expr, ExprKind};
 
@@ -21,6 +22,7 @@ use crate::tast::expr::TypedExpr;
 ///
 /// # Errors
 /// Errors if a type checker error is encountered.
+#[instrument(skip_all)]
 pub fn type_expr<'input>(
 	scope: &mut Scope<'input>,
 	expr: Expr<'input>,

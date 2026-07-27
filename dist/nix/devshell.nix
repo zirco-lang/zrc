@@ -21,5 +21,11 @@
     ];
 
     LLVM_SYS_221_PREFIX = llvm.llvm.dev;
+    LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+      pkgs.stdenv.cc.cc.lib
+      pkgs.libffi
+      pkgs.libxml2
+      pkgs.zlib
+    ];
   };
 }

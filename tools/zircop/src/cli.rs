@@ -8,7 +8,7 @@ use std::{
 use clap::Parser;
 
 /// The official Zirco linter
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(version=None)]
 pub struct Cli {
 	/// See what version of zircop you are using
