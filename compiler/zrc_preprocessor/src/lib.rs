@@ -62,6 +62,7 @@ use std::{
 	path::{Path, PathBuf},
 };
 
+use tracing::{debug, instrument, warn};
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, NoteKind, diagnostic::GenericLabel};
 use zrc_utils::span::{Span, Spannable};
 
@@ -175,6 +176,7 @@ fn is_path_within_allowed_dirs(resolved_path: &Path, search_paths: &[PathBuf]) -
 ///
 /// Panics if the file name cannot be converted to a static string.
 #[expect(clippy::result_large_err)]
+#[instrument(skip_all)]
 pub fn preprocess<'input>(
 	base_path: &'input Path,
 	search_paths: Vec<PathBuf>,
@@ -183,6 +185,13 @@ pub fn preprocess<'input>(
 	forbid_unlisted_includes: bool,
 ) -> Result<Vec<SourceChunk>, Diagnostic> {
 	let mut ctx = PreprocessorCtx::new(search_paths, forbid_unlisted_includes);
+
+	debug!(
+		base_path = ?base_path,
+		file_name = file_name,
+		search_paths = ?ctx.search_paths,
+		"starting preprocessing"
+	);
 
 	// Trim off a leading shebang line if present
 	let content = if content.starts_with("#!") {
@@ -211,6 +220,8 @@ pub fn preprocess<'input>(
 				.with_note(NoteKind::ShebangMustEndWithNewline));
 		}
 
+		debug!("skipping leading shebang");
+
 		&content[shebang_len..]
 	} else {
 		content
@@ -222,6 +233,7 @@ pub fn preprocess<'input>(
 
 /// Internal recursive preprocessing function
 #[expect(clippy::too_many_lines, clippy::result_large_err)]
+#[instrument(skip(base_path, content, ctx))]
 fn preprocess_internal(
 	base_path: &Path,
 	file_name: &str,
@@ -259,6 +271,7 @@ fn preprocess_internal(
 				.is_some_and(|suffix| suffix.trim() == "once")
 			{
 				has_pragma_once = true;
+				debug!(line_num, "found #pragma once directive");
 				// Flush current chunk if it has content before the pragma directive
 				if !current_chunk_lines.is_empty() {
 					ctx.chunks.push(SourceChunk::new(
@@ -339,7 +352,7 @@ fn preprocess_internal(
 					};
 
 				// Resolve the include file path
-
+				debug!(line_num, include_file = ?include_file, do_search_path, "processing #include directive");
 				if do_search_path {
 					include_file = find_include_file(ctx, &include_file)
 						.ok_or_else(|| {
@@ -388,6 +401,8 @@ fn preprocess_internal(
 					}
 				};
 
+				debug!(line_num, canonical_path = ?canonical_path, "resolved include path");
+
 				// Check if the resolved path is within allowed directories
 				if ctx.forbid_unlisted_includes
 					&& !is_path_within_allowed_dirs(&canonical_path, ctx.search_paths.as_ref())
@@ -416,6 +431,7 @@ fn preprocess_internal(
 
 				// Check if already included with pragma once
 				if ctx.pragma_once_files.contains(&canonical_path) {
+					debug!(line_num, canonical_path = ?canonical_path, "skipping already included file due to #pragma once");
 					chunk_start_line = line_num + 1;
 					chunk_start_byte = current_byte + line.len() + 1; // +1 for newline
 					continue;
@@ -442,6 +458,8 @@ fn preprocess_internal(
 				let include_base = canonical_path
 					.parent()
 					.expect("included file has no parent?");
+
+				debug!(line_num, include_file = ?include_file, "recursively preprocessing included file");
 
 				preprocess_internal(include_base, &include_file, &included_content, ctx)?;
 
@@ -487,6 +505,8 @@ fn preprocess_internal(
 			current_chunk_lines.join("\n"),
 		));
 	}
+
+	debug!("emitted {} chunks", ctx.chunks.len());
 
 	Ok(())
 }

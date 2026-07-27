@@ -9,7 +9,7 @@ use clap::Parser;
 use zrc_codegen::OptimizationLevel;
 
 /// The Zirco JIT execution CLI
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(version=None)]
 pub struct Cli {
 	/// See what version of zrx you are using

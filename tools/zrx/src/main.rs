@@ -67,6 +67,8 @@ use inkwell::{
 	support::{load_library_permanently, load_visible_symbols},
 	targets::{CodeModel, InitializationConfig, RelocMode, Target},
 };
+use tracing::{debug, debug_span};
+use tracing_subscriber::EnvFilter;
 use zrc_codegen::{cg_program, get_native_triple};
 use zrc_parser::parser;
 use zrc_typeck::typeck;
@@ -133,7 +135,12 @@ fn resolve_library(name: &str, search_paths: &[PathBuf]) -> Option<PathBuf> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+	let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
+	tracing_subscriber::fmt().with_env_filter(filter).init();
+
 	let cli = Cli::parse();
+
+	debug!(parsed_args = ?cli, "finished parsing command line arguments");
 
 	if cli.version {
 		println!("{}", version_string());
@@ -145,6 +152,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	};
 
 	// Initialize LLVM
+	debug!("initializing LLVM JIT");
 	let ctx = Context::create();
 	Target::initialize_native(&InitializationConfig::default())?;
 	let triple = get_native_triple();
@@ -172,6 +180,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 	all_files.extend(cli.extra_files.iter().cloned());
 
 	for path in all_files {
+		let _span = debug_span!("jit_file", path = ?path).entered();
+
 		let (directory_name, file_name, mut input) = io::open_input(&path)?;
 
 		let mut source_content = String::new();
@@ -207,6 +217,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 			typed_ast,
 		);
 
+		debug!("linking module into JIT");
 		jit_module.link_in_module(file_module)?;
 	}
 
@@ -218,6 +229,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 	// use inkwell::support::load_library_permanently to load each library
 	for lib in &cli.libraries {
 		if let Some(lib_path) = resolve_library(lib, &library_paths) {
+			debug!(library = ?lib_path, "loading library");
 			load_library_permanently(&lib_path)?;
 		} else {
 			return Err(Box::new(CliError(format!(
@@ -227,8 +239,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 	}
 
 	// Load all other symbols visible to the current process into the JIT
+	debug!("loading visible symbols into JIT");
 	load_visible_symbols();
 
+	debug!("finalizing JIT module");
 	let ee = jit_module.create_jit_execution_engine(cli.opt_level.into())?;
 
 	// Main expects (usize, **u8) -> i32 so we must prep the extra args for it
@@ -247,6 +261,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let main = unsafe {
 		ee.get_function::<unsafe extern "C" fn(usize, *const *const c_char) -> i32>("main")?
 	};
+
+	debug!(
+		program_args = ?cli.program_args,
+		"calling JIT-compiled main function"
+	);
 
 	// SAFETY: We are calling a JIT-compiled function with the correct signature as
 	// asserted by typeck

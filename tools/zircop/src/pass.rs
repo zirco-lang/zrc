@@ -1,5 +1,6 @@
 //! Lint pass tooling for Zircop
 
+use tracing::{debug, debug_span, instrument};
 use zrc_parser::ast::stmt::Declaration;
 use zrc_typeck::tast::stmt::TypedDeclaration;
 use zrc_utils::span::Spanned;
@@ -20,9 +21,12 @@ impl PassList {
 	/// Invoke all lints in this passlist on the given AST. This clones the
 	/// program for each lint to allow multiple lints to consume it.
 	#[must_use]
+	#[instrument(skip_all)]
 	pub fn lint_ast(&self, program: &[Spanned<Declaration>]) -> Vec<LintDiagnostic> {
 		let mut diagnostics = vec![];
 		for lint in &self.0 {
+			let _span = debug_span!("lint_ast", lint = lint.name()).entered();
+			debug!("running lint on AST");
 			// Clone to allow multiple lints to consume the program
 			diagnostics.extend(lint.lint_ast(program.to_vec()));
 		}
@@ -35,6 +39,8 @@ impl PassList {
 	pub fn lint_tast(&self, program: &[Spanned<TypedDeclaration<'_>>]) -> Vec<LintDiagnostic> {
 		let mut diagnostics = vec![];
 		for lint in &self.0 {
+			let _span = debug_span!("lint_tast", lint = lint.name()).entered();
+			debug!("running lint on TAST");
 			// Clone to allow multiple lints to consume the program
 			diagnostics.extend(lint.lint_tast(program.to_vec()));
 		}

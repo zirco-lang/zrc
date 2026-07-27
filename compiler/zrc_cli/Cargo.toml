@@ -12,3 +12,5 @@ zrc = { path = "../zrc" }
 clap = { version = "4.5.4", features = ["derive"] }
 mimalloc = "0.1.48"
 zrc_buildinfo = { path = "../../common/zrc_buildinfo" }
+tracing = { version = "0.1.44", features = ["release_max_level_warn"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

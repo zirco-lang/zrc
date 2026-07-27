@@ -14,6 +14,8 @@ zrc_utils = { path = "../../compiler/zrc_utils" }
 thiserror = "2.0.17"
 clap = { version = "4.5.52", features = ["derive"] }
 zrc_buildinfo = { path = "../../common/zrc_buildinfo" }
+tracing = { version = "0.1.44", features = ["release_max_level_warn"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [dev-dependencies]
 indoc = "2.0.7"

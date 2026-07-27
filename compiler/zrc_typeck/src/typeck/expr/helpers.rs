@@ -1,5 +1,6 @@
 //! helper tools used in the type-checking of expressions
 
+use tracing::{debug, instrument};
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, SpanExt, diagnostic::GenericLabel};
 use zrc_parser::ast::expr::{Assignment, Expr, ExprKind};
 use zrc_utils::span::{Span, Spannable};
@@ -182,6 +183,7 @@ pub fn expect_is_signed_integer(
 /// If the expression type is `{int}`, it will be resolved to the target type.
 /// Returns the coerced expression if successful, or the original if types
 /// already match.
+#[instrument(skip_all, fields(src_ty = %expr.inferred_type, target_ty = %target_type))]
 pub fn try_coerce_to<'input>(
 	expr: TypedExpr<'input>,
 	target_type: &TastType<'input>,
@@ -189,11 +191,13 @@ pub fn try_coerce_to<'input>(
 	if expr.inferred_type == *target_type {
 		expr
 	} else if expr.inferred_type.can_implicitly_cast_to(target_type) {
+		debug!("coercing expression");
 		TypedExpr {
 			inferred_type: target_type.clone(),
 			kind: expr.kind,
 		}
 	} else {
+		debug!("coercion impossible");
 		expr
 	}
 }

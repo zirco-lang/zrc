@@ -11,6 +11,8 @@ use std::{
 	path::PathBuf,
 };
 
+use tracing::{debug, instrument};
+
 /// Opens the input file and returns a reader
 ///
 /// If the path is "-", it reads from standard input.
@@ -25,8 +27,10 @@ use std::{
 /// # Panics
 ///
 /// If the file name or directory name cannot be converted to a valid string.
+#[instrument]
 pub fn open_input(path: &PathBuf) -> Result<(String, String, Box<dyn Read>), io::Error> {
 	if path.as_os_str() == "-" {
+		debug!("reading from standard input");
 		Ok((
 			"/dev".to_string(),
 			"<stdin>".to_string(),
@@ -35,6 +39,7 @@ pub fn open_input(path: &PathBuf) -> Result<(String, String, Box<dyn Read>), io:
 	} else {
 		let file = fs::File::open(path)?;
 		let mut canonical = fs::canonicalize(path)?;
+		debug!(canonical_path = ?canonical, "opening input");
 		let file_name = canonical
 			.file_name()
 			.expect("file name should exist")
@@ -61,10 +66,13 @@ pub fn open_input(path: &PathBuf) -> Result<(String, String, Box<dyn Read>), io:
 /// # Errors
 ///
 /// If the file cannot be opened or created, an error is returned.
+#[instrument]
 pub fn open_output(path: &PathBuf) -> Result<Box<dyn io::Write>, io::Error> {
 	Ok(if path.as_os_str() == "-" {
+		debug!("writing to standard output");
 		Box::new(io::stdout())
 	} else {
+		debug!(path = ?path, "opening output file");
 		Box::new(
 			fs::OpenOptions::new()
 				.write(true)

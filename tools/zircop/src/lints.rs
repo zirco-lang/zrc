@@ -8,11 +8,14 @@ mod unreachable_code;
 mod unused_statement;
 mod unused_variables;
 
+use tracing::debug;
+
 use crate::pass::PassList;
 
 /// Returns the default set of lints provided by Zircop
 #[must_use]
 pub fn get_default_lints() -> PassList {
+	debug!("initializing default lints");
 	PassList::new(vec![
 		empty_struct_used::EmptyStructUsedLint::init(),
 		underscore_variable_used::UnderscoreVariableUsedLint::init(),

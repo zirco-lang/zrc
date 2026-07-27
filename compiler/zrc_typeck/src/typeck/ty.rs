@@ -1,5 +1,6 @@
 //! for types
 
+use tracing::{debug, instrument};
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, NoteKind, diagnostic::GenericLabel};
 use zrc_parser::ast::{
 	stmt::ArgumentDeclarationList as AstADL,
@@ -144,6 +145,7 @@ fn resolve_type_with_opaque<'input>(
 	Ok(match ty.0.into_value() {
 		ParserTypeKind::Identifier(x) => {
 			if x == opaque_name {
+				debug!("inserting opaque reference into self-referential type");
 				TastType::Opaque(x)
 			} else if let Some(ty) = scope.types.resolve(x) {
 				ty.clone()
@@ -276,6 +278,7 @@ fn check_opaque_behind_pointer<'input>(
 /// # Errors
 /// Errors if the type contains self-references not behind pointers or other
 /// type resolution errors.
+#[instrument(skip(scope, ty))]
 pub fn resolve_type_with_self_reference<'input>(
 	scope: &Scope<'input>,
 	ty: ParserType<'input>,

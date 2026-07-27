@@ -62,6 +62,7 @@ use std::{
 
 use clap::Parser;
 use repline::{Response, prebaked::read_and_mut};
+use tracing_subscriber::EnvFilter;
 use zrc_parser::{lexer, parser};
 use zrc_typeck::typeck::{self, GlobalScope};
 
@@ -335,6 +336,9 @@ fn handle_include(line: &str, include_paths: Vec<PathBuf>, gs: &mut GlobalScope)
 
 #[expect(clippy::too_many_lines)]
 fn main() -> Result<(), Box<dyn Error>> {
+	let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
+	tracing_subscriber::fmt().with_env_filter(filter).init();
+
 	let cli = Cli::parse();
 
 	if cli.version {

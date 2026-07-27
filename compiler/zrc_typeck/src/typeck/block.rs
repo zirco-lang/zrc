@@ -10,6 +10,7 @@ use std::fmt::Display;
 
 pub use block_utils::{coerce_stmt_into_block, has_duplicates};
 pub use cfa::{BlockReturnAbility, BlockReturnActuality};
+use tracing::instrument;
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, diagnostic::GenericLabel};
 use zrc_parser::ast::stmt::{Stmt, StmtKind};
 use zrc_utils::span::{Span, Spannable, Spanned};
@@ -77,6 +78,7 @@ impl Display for BlockMetadata<'_> {
 /// # Panics
 /// Panics in some internal state failures.
 #[expect(clippy::too_many_lines)]
+#[instrument(skip_all)]
 pub fn type_block<'input>(
 	parent_scope: &Scope<'input>,
 	input_block: Spanned<Vec<Stmt<'input>>>,
