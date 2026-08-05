@@ -807,9 +807,9 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
 name = "repline"
-version = "0.0.14"
+version = "0.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0214891cca8e6d774109f5d45dc6c5674058e95d991705cdbcea163828116f4"
+checksum = "9f21fdc2f83a4034f3fd50a5d7dd6632707576bce4891621a71b1a93e940edfa"
 dependencies = [
  "crossterm",
 ]
