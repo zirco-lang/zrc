@@ -13,10 +13,10 @@
 
 use zrc_diagnostics::diagnostic::GenericLabel;
 use zrc_typeck::{
-	tast::{stmt::TypedDeclaration, ty::Type},
-	typeck::BlockMetadata,
+	tast::ty::Type,
+	typeck::{BlockMetadata, TastRoot},
 };
-use zrc_utils::span::{Spannable, Spanned};
+use zrc_utils::span::Spannable;
 
 use crate::{
 	diagnostic::{LintDiagnostic, LintDiagnosticKind, LintHelpKind, LintLabelKind},
@@ -39,7 +39,7 @@ impl UnderscoreVariableUsedLint {
 	}
 }
 impl Lint for UnderscoreVariableUsedLint {
-	fn lint_tast(&self, program: Vec<Spanned<TypedDeclaration<'_>>>) -> Vec<LintDiagnostic> {
+	fn lint_tast(&self, program: TastRoot<'_>) -> Vec<LintDiagnostic> {
 		let mut vis = Visit {
 			diagnostics: vec![],
 			reported_vars: vec![],

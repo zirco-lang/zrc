@@ -7,11 +7,8 @@
 //! unreachable statements to improve code clarity.
 
 use zrc_diagnostics::diagnostic::GenericLabel;
-use zrc_typeck::{
-	tast::stmt::TypedDeclaration,
-	typeck::{BlockMetadata, BlockReturnActuality},
-};
-use zrc_utils::span::{Span, Spannable, Spanned};
+use zrc_typeck::typeck::{BlockMetadata, BlockReturnActuality, TastRoot};
+use zrc_utils::span::{Span, Spannable};
 
 use crate::{
 	diagnostic::{LintDiagnostic, LintDiagnosticKind, LintLabelKind},
@@ -32,7 +29,7 @@ impl UnreachableCodeLint {
 	}
 }
 impl Lint for UnreachableCodeLint {
-	fn lint_tast(&self, program: Vec<Spanned<TypedDeclaration<'_>>>) -> Vec<LintDiagnostic> {
+	fn lint_tast(&self, program: TastRoot<'_>) -> Vec<LintDiagnostic> {
 		let mut vis = Visit {
 			diagnostics: vec![],
 		};

@@ -12,10 +12,7 @@ zrc_typeck = { path = "../../compiler/zrc_typeck" }
 zrc_diagnostics = { path = "../../compiler/zrc_diagnostics" }
 zrc_utils = { path = "../../compiler/zrc_utils" }
 zrc_codegen = { path = "../../compiler/zrc_codegen" }
-inkwell = { version = "0.10.0", features = [
-    "llvm22-1",
-    "llvm22-1-prefer-static",
-] }
+zrc_jit = { path = "../../compiler/zrc_jit" }
 clap = { version = "4.5.52", features = ["derive"] }
 zrc_buildinfo = { path = "../../common/zrc_buildinfo" }
 tracing = { version = "0.1.44", features = ["release_max_level_warn"] }

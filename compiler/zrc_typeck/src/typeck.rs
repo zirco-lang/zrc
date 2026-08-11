@@ -22,13 +22,16 @@ use zrc_utils::span::Spanned;
 
 use crate::tast::stmt::TypedDeclaration;
 
+/// The root program TAST.
+pub type TastRoot<'input> = Vec<Spanned<TypedDeclaration<'input>>>;
+
 /// # Errors
 /// Errors with type checker errors.
 #[instrument(skip_all)]
 pub fn type_program<'input, 'gs>(
 	global_scope: &'gs mut GlobalScope<'input>,
 	program: Vec<Spanned<AstDeclaration<'input>>>,
-) -> Result<Vec<Spanned<TypedDeclaration<'input>>>, zrc_diagnostics::Diagnostic> {
+) -> Result<TastRoot<'input>, zrc_diagnostics::Diagnostic> {
 	debug!("pre-registering {} declarations", program.len());
 	let pre_register_start = Instant::now();
 	// Phase 1: register all declarations (mutating the global scope)

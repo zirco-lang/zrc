@@ -6,6 +6,7 @@ members = [
     "compiler/zrc_cli",
     "compiler/zrc_utils",
     "compiler/zrc_diagnostics",
+    "compiler/zrc_jit",
     "compiler/zrc_parser",
     "compiler/zrc_typeck",
     "compiler/zrc_codegen",

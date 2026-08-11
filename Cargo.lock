@@ -1414,6 +1414,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "zrc_jit"
+version = "0.2.0"
+dependencies = [
+ "inkwell",
+ "tracing",
+ "zrc_codegen",
+ "zrc_typeck",
+ "zrc_utils",
+]
+
+[[package]]
 name = "zrc_parser"
 version = "0.2.0"
 dependencies = [
@@ -1476,12 +1487,12 @@ name = "zrx"
 version = "0.2.0"
 dependencies = [
  "clap",
- "inkwell",
  "tracing",
  "tracing-subscriber",
  "zrc_buildinfo",
  "zrc_codegen",
  "zrc_diagnostics",
+ "zrc_jit",
  "zrc_parser",
  "zrc_preprocessor",
  "zrc_typeck",

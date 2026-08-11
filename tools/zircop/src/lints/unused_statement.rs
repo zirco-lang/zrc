@@ -7,10 +7,10 @@
 
 use zrc_diagnostics::diagnostic::GenericLabel;
 use zrc_typeck::{
-	tast::{expr::TypedExprKind, stmt::TypedDeclaration},
-	typeck::BlockMetadata,
+	tast::expr::TypedExprKind,
+	typeck::{BlockMetadata, TastRoot},
 };
-use zrc_utils::span::{Spannable, Spanned};
+use zrc_utils::span::Spannable;
 
 use crate::{
 	diagnostic::{LintDiagnostic, LintDiagnosticKind, LintLabelKind, LintNoteKind},
@@ -31,7 +31,7 @@ impl UnusedStatementLint {
 	}
 }
 impl Lint for UnusedStatementLint {
-	fn lint_tast(&self, program: Vec<Spanned<TypedDeclaration<'_>>>) -> Vec<LintDiagnostic> {
+	fn lint_tast(&self, program: TastRoot<'_>) -> Vec<LintDiagnostic> {
 		let mut vis = Visit {
 			diagnostics: vec![],
 		};

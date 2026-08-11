@@ -6,11 +6,11 @@
 
 use zrc_diagnostics::diagnostic::GenericLabel;
 use zrc_parser::{ast::expr::Arithmetic, lexer::NumberLiteral};
-use zrc_typeck::tast::{
-	expr::{TypedExpr, TypedExpr as TcExpr, TypedExprKind, TypedExprKind as TcExprKind},
-	stmt::TypedDeclaration,
+use zrc_typeck::{
+	tast::expr::{TypedExpr, TypedExpr as TcExpr, TypedExprKind, TypedExprKind as TcExprKind},
+	typeck::TastRoot,
 };
-use zrc_utils::span::{Spannable, Spanned};
+use zrc_utils::span::Spannable;
 
 use crate::{
 	diagnostic::{LintDiagnostic, LintDiagnosticKind, LintLabelKind, LintNoteKind},
@@ -32,7 +32,7 @@ impl DivisionByConstantZero {
 }
 
 impl Lint for DivisionByConstantZero {
-	fn lint_tast(&self, program: Vec<Spanned<TypedDeclaration<'_>>>) -> Vec<LintDiagnostic> {
+	fn lint_tast(&self, program: TastRoot<'_>) -> Vec<LintDiagnostic> {
 		let mut vis = Visit {
 			diagnostics: Vec::new(),
 		};

@@ -55,24 +55,18 @@
 use std::{
 	env,
 	error::Error,
-	ffi::{CString, c_char},
-	fmt, iter,
+	fmt,
 	path::{Path, PathBuf},
 	process,
 };
 
 use clap::Parser;
-use inkwell::{
-	context::Context,
-	support::{load_library_permanently, load_visible_symbols},
-	targets::{CodeModel, InitializationConfig, RelocMode, Target},
-};
 use tracing::{debug, debug_span};
 use tracing_subscriber::EnvFilter;
-use zrc_codegen::{cg_program, get_native_triple};
+use zrc_jit::engine::JitEngine;
 use zrc_parser::parser;
 use zrc_typeck::typeck;
-use zrc_utils::{io, line_finder::LineLookup};
+use zrc_utils::io;
 
 use crate::cli::Cli;
 
@@ -93,47 +87,6 @@ impl fmt::Display for CliError {
 }
 impl Error for CliError {}
 
-/// Split an environment variable containing paths into a vector of [`PathBuf`]s
-fn split_paths(var: &str) -> Vec<PathBuf> {
-	env::var_os(var)
-		.map(|val| env::split_paths(&val).collect())
-		.unwrap_or_default()
-}
-
-/// Get the possible library filenames for a given library name on this platform
-fn library_filenames(name: &str) -> Vec<String> {
-	#[cfg(target_os = "linux")]
-	{
-		vec![format!("lib{name}.so")]
-	}
-
-	#[cfg(target_os = "macos")]
-	{
-		vec![format!("lib{name}.so"), format!("lib{name}.dylib")]
-	}
-
-	#[cfg(target_os = "windows")]
-	{
-		vec![format!("{name}.dll")]
-	}
-}
-
-/// Resolve a library name to a full path by searching in the given search paths
-fn resolve_library(name: &str, search_paths: &[PathBuf]) -> Option<PathBuf> {
-	let candidates = library_filenames(name);
-
-	for dir in search_paths {
-		for file in &candidates {
-			let path = dir.join(file);
-			if path.exists() {
-				return Some(path);
-			}
-		}
-	}
-
-	None
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
 	let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
 	tracing_subscriber::fmt().with_env_filter(filter).init();
@@ -151,29 +104,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 		return Err(Box::new(CliError("No input file specified.".into())));
 	};
 
-	// Initialize LLVM
-	debug!("initializing LLVM JIT");
-	let ctx = Context::create();
-	Target::initialize_native(&InitializationConfig::default())?;
-	let triple = get_native_triple();
-	let target = Target::from_triple(&triple)?;
-
-	let target_machine = target
-		.create_target_machine(
-			&triple,
-			"",
-			"",
-			cli.opt_level.into(),
-			RelocMode::PIC,
-			CodeModel::JITDefault,
-		)
-		.expect("target machine should be created successfully");
-
 	let include_paths = cli::get_include_paths(&cli);
-	let version_string = version_string();
-	let cli_args = env::args().collect::<Vec<_>>().join(" ");
+	let version_string: &'static str = Box::leak(Box::new(version_string()));
+	let cli_args: &'static str = Box::leak(Box::new(env::args().collect::<Vec<_>>().join(" ")));
 
-	let jit_module = ctx.create_module("zrxroot");
+	debug!("initializing Zirco JIT");
+	let engine = JitEngine::init(version_string, cli_args, cli.lib_paths);
+	let module = engine.create_module();
 
 	let mut all_files: Vec<PathBuf> = Vec::with_capacity(1 + cli.extra_files.len());
 	all_files.push(path.clone());
@@ -204,72 +141,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 		let mut global_scope = typeck::GlobalScope::new();
 		let typed_ast = typeck::type_program(&mut global_scope, ast)?;
 
-		let file_module = cg_program(
-			&version_string,
-			&cli_args,
-			&ctx,
-			&target_machine,
-			cli.opt_level.into(),
-			zrc_codegen::DebugLevel::None,
-			&directory_name,
-			&file_name,
-			&LineLookup::new(&source_content),
-			typed_ast,
-		);
-
-		debug!("linking module into JIT");
-		jit_module.link_in_module(file_module)?;
+		module.cg_program_and_link(&directory_name, &file_name, &source_content, typed_ast);
 	}
 
-	// Load any libraries specified on the command line into this process
-	let mut library_paths = split_paths("LD_LIBRARY_PATH");
-	library_paths.extend(split_paths("DYLD_LIBRARY_PATH"));
-	library_paths.extend(cli.lib_paths);
-
-	// use inkwell::support::load_library_permanently to load each library
 	for lib in &cli.libraries {
-		if let Some(lib_path) = resolve_library(lib, &library_paths) {
-			debug!(library = ?lib_path, "loading library");
-			load_library_permanently(&lib_path)?;
-		} else {
-			return Err(Box::new(CliError(format!(
-				"Could not find library '{lib}' in specified library paths."
-			))));
-		}
+		module.load_library(lib)?;
 	}
+	module.load_visible_symbols();
 
-	// Load all other symbols visible to the current process into the JIT
-	debug!("loading visible symbols into JIT");
-	load_visible_symbols();
-
-	debug!("finalizing JIT module");
-	let ee = jit_module.create_jit_execution_engine(cli.opt_level.into())?;
-
-	// Main expects (usize, **u8) -> i32 so we must prep the extra args for it
-	// Obtain the **u8 from the cli.program_args
-	let c_strings: Vec<CString> =
-		iter::once(CString::new("zrx-script").expect("program name contained null byte"))
-			.chain(cli.program_args.iter().map(|arg| {
-				CString::new(arg.as_str()).expect("program argument contained null byte")
-			}))
-			.collect();
-
-	let c_ptrs: Vec<*const c_char> = c_strings.iter().map(|cstr| cstr.as_ptr()).collect();
-
-	// SAFETY: The Zirco type checker ensures any function named "main" has the
-	// correct signature
-	let main = unsafe {
-		ee.get_function::<unsafe extern "C" fn(usize, *const *const c_char) -> i32>("main")?
-	};
-
-	debug!(
-		program_args = ?cli.program_args,
-		"calling JIT-compiled main function"
-	);
-
-	// SAFETY: We are calling a JIT-compiled function with the correct signature as
-	// asserted by typeck
-	let exit_code = unsafe { main.call(c_ptrs.len(), c_ptrs.as_ptr()) };
+	debug!("running main function");
+	let exit_code = module.run_main(cli.program_args)?;
 
 	process::exit(exit_code);
 }
