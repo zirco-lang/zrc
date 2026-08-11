@@ -109,7 +109,7 @@ mod tests {
 
 		let (dir, file, mut reader) = result.expect("should succeed");
 		assert_eq!(file, "test_input.zrc");
-		assert!(!dir.is_empty());
+		assert_ne!(dir, "");
 
 		let mut content = String::new();
 		reader.read_to_string(&mut content).expect("should read");
