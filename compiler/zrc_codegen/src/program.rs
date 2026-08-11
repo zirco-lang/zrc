@@ -26,11 +26,14 @@ use inkwell::{
 	values::{AsValueRef, BasicValue, BasicValueEnum, FunctionValue, PointerValue},
 };
 use tracing::{debug, debug_span, instrument};
-use zrc_typeck::tast::{
-	stmt::{ArgumentDeclaration, TypedDeclaration},
-	ty::Type,
+use zrc_typeck::{
+	tast::{
+		stmt::{ArgumentDeclaration, TypedDeclaration},
+		ty::Type,
+	},
+	typeck::TastRoot,
 };
-use zrc_utils::{line_finder::LineLookup, span::Spanned};
+use zrc_utils::line_finder::LineLookup;
 
 use super::stmt::cg_block;
 use crate::{
@@ -295,7 +298,7 @@ fn cg_program_without_optimization<'ctx>(
 	parent_directory: &str,
 	file_name: &str,
 	line_lookup: &LineLookup,
-	program: Vec<Spanned<TypedDeclaration<'_>>>,
+	program: TastRoot<'_>,
 ) -> Module<'ctx> {
 	let builder = ctx.create_builder();
 	let module = ctx.create_module(file_name);
@@ -611,7 +614,7 @@ pub fn cg_program<'ctx>(
 	parent_directory: &str,
 	file_name: &str,
 	line_lookup: &LineLookup,
-	program: Vec<Spanned<TypedDeclaration<'_>>>,
+	program: TastRoot<'_>,
 ) -> Module<'ctx> {
 	let cg_start = Instant::now();
 	debug!("starting code generator");
@@ -654,7 +657,7 @@ pub fn cg_program_to_string(
 	file_name: &str,
 	cli_args: &str,
 	source: &str,
-	program: Vec<Spanned<TypedDeclaration<'_>>>,
+	program: TastRoot<'_>,
 	optimization_level: OptimizationLevel,
 	debug_level: DWARFEmissionKind,
 	triple: &TargetTriple,
@@ -716,7 +719,7 @@ pub fn cg_program_to_string_without_optimization(
 	file_name: &str,
 	cli_args: &str,
 	source: &str,
-	program: Vec<Spanned<TypedDeclaration<'_>>>,
+	program: TastRoot<'_>,
 	debug_level: DWARFEmissionKind,
 	triple: &TargetTriple,
 	cpu: &str,
@@ -766,7 +769,7 @@ pub fn cg_program_to_buffer(
 	file_name: &str,
 	cli_args: &str,
 	source: &str,
-	program: Vec<Spanned<TypedDeclaration<'_>>>,
+	program: TastRoot<'_>,
 	file_type: FileType,
 	optimization_level: OptimizationLevel,
 	debug_level: DWARFEmissionKind,

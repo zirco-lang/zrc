@@ -3,7 +3,7 @@
 use std::any::type_name;
 
 use zrc_parser::ast::stmt::Declaration as AstDecl;
-use zrc_typeck::tast::stmt::TypedDeclaration;
+use zrc_typeck::typeck::TastRoot;
 use zrc_utils::span::Spanned;
 
 use crate::diagnostic::LintDiagnostic;
@@ -22,7 +22,7 @@ pub trait Lint {
 	}
 
 	/// Run a semantic lint on a program.
-	fn lint_tast(&self, _program: Vec<Spanned<TypedDeclaration<'_>>>) -> Vec<LintDiagnostic> {
+	fn lint_tast(&self, _program: TastRoot<'_>) -> Vec<LintDiagnostic> {
 		vec![]
 	}
 }
