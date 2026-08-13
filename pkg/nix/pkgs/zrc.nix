@@ -19,6 +19,10 @@ naerskLib.buildPackage {
   doCheck = true;
   copyLibs = true;
 
+  nativeBuildInputs = with pkgs; [
+    autoPatchelfHook
+  ];
+
   buildInputs = with pkgs; [
     llvm.llvm
     llvm.libllvm
@@ -44,8 +48,6 @@ naerskLib.buildPackage {
     cp -r $src/include/* $out/include/
     cp $src/compiler/libzrc/zrc.h $out/include/
   '';
-
-  setupHook = ../hooks/zrc.sh;
 
   LLVM_SYS_221_PREFIX = llvm.llvm.dev;
 }

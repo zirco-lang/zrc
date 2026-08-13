@@ -21,10 +21,10 @@
       naersk,
     }:
     let
-      inherit (import ./dist/nix/lib.nix { inherit nixpkgs fenix; }) forAllSystems;
+      inherit (import ./pkg/nix/lib.nix { inherit nixpkgs fenix; }) forAllSystems;
     in
     {
-      devShells = forAllSystems (args: import ./dist/nix/devshell.nix (inputs // args));
-      packages = forAllSystems (args: import ./dist/nix/pkgs/default.nix (inputs // args));
+      devShells = forAllSystems (args: import ./pkg/nix/devshell.nix (inputs // args));
+      packages = forAllSystems (args: import ./pkg/nix/pkgs/default.nix (inputs // args));
     };
 }

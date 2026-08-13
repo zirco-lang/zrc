@@ -14,6 +14,7 @@ pkgs.stdenv.mkDerivation {
   pname = "libzr";
   version = "0.2.0";
   src = ../../../libzr;
+
   buildInputs = with pkgs; [
     zpkgs.zrc
     llvm.clang
@@ -38,6 +39,4 @@ pkgs.stdenv.mkDerivation {
     mkdir -p $out/include
     cp -r include/* $out/include/
   '';
-
-  setupHook = ../hooks/libzr.sh;
 }
