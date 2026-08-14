@@ -25,6 +25,7 @@ pkgs.stdenv.mkDerivation {
       pkgs.stdenv.cc.cc.lib
       pkgs.zlib
     ];
+    ZIRCO_INCLUDE_PATH = "${zpkgs.zrc}/include";
   };
 
   buildPhase = ''
