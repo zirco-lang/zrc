@@ -31,7 +31,7 @@ ARCH=$(dpkg --print-architecture)
 PKG_DIR="zrc-0.2.0+${COMMIT}_$ARCH"
 
 mkdir -p "$DEB_OUTPUT/$PKG_DIR/DEBIAN"
-sed "s/{COMMIT}/$COMMIT/g; s/{ARCH}/$ARCH/g" dist/debian/control > "$DEB_OUTPUT/$PKG_DIR/DEBIAN/control"
+sed "s/{COMMIT}/$COMMIT/g; s/{ARCH}/$ARCH/g" pkg/debian/control > "$DEB_OUTPUT/$PKG_DIR/DEBIAN/control"
 
 cp -r "$SYSROOT"/* "$DEB_OUTPUT/$PKG_DIR/"
 

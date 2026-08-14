@@ -30,7 +30,7 @@ cp -r include/* "$ZIRCON_INCLUDE_DIR/"
 cp compiler/libzrc/zrc.h "$ZIRCON_INCLUDE_DIR/"
 
 # build std using the fresh compiler
-make -C libzr all-opt ZRC="$ZIRCON_BIN_DIR/zrc"
+make -C libzr all-opt ZRC="$(realpath $ZIRCON_BIN_DIR/zrc)"
 
 cp libzr/dist/libzr.a "$ZIRCON_LIBZR_DIR/lib/"
 find libzr/dist -maxdepth 1 -type f \( -name "libzr.so" -o -name "libzr.dylib" \) -exec cp {} "$ZIRCON_LIBZR_DIR/lib/" \;

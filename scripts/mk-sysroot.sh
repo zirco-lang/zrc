@@ -24,6 +24,7 @@ mkdir -p "$SYSROOT/etc/profile.d"
 
 cp "$ZIRCON_TOOLCHAIN_DIR/bin/"* "$SYSROOT/usr/bin/"
 cp -r "$ZIRCON_TOOLCHAIN_DIR/include/"* "$SYSROOT/usr/include/"
+cp -r "$ZIRCON_TOOLCHAIN_DIR/lib/"* "$SYSROOT/usr/lib/"
 cp -r "$ZIRCON_TOOLCHAIN_DIR/libzr/lib/"* "$SYSROOT/usr/lib/"
 cp -r "$ZIRCON_TOOLCHAIN_DIR/libzr/include/"* "$SYSROOT/usr/include/"
 cp "./scripts/sysroot-env.sh" "$SYSROOT/etc/profile.d/zircon-env.sh"
