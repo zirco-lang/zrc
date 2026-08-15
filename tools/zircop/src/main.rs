@@ -114,13 +114,27 @@ fn main() -> Result<(), Box<dyn Error>> {
 	debug!(elapsed = ?start.elapsed(), "zircop finished");
 
 	match diagnostics {
-		Err(diagnostic) => {
-			if cli.diagnostic_format == cli::DiagFormat::Json {
-				eprintln!("{}", diagnostic.print_json());
-			} else {
-				eprintln!("{}", diagnostic.print(Some(&source_content)));
-			}
+		Err(diagnostic) if cli.diagnostic_format == cli::DiagFormat::Json => {
+			eprintln!("{}", diagnostic.print_json());
 			process::exit(1);
+		}
+		Err(diagnostic) => {
+			eprintln!("{}", diagnostic.print(Some(&source_content)));
+			process::exit(1);
+		}
+		Ok(diagnostics) if cli.diagnostic_format == cli::DiagFormat::Json => {
+			eprintln!("[");
+			for (i, diag) in diagnostics.iter().enumerate() {
+				if i > 0 {
+					eprintln!(",");
+				}
+				eprint!("{}", diag.print_json());
+			}
+			eprintln!("\n]");
+
+			if !diagnostics.is_empty() {
+				process::exit(1);
+			}
 		}
 		Ok(diagnostics) => {
 			for diag in &diagnostics {
