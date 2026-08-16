@@ -12,11 +12,11 @@ use zrc_parser::ast::{
 	ty::{Type, TypeKind},
 };
 use zrc_utils::span::{Spannable, Spanned};
+use zrc_visitor::ast::SyntacticVisit;
 
 use crate::{
 	diagnostic::{LintDiagnostic, LintDiagnosticKind, LintHelpKind, LintLabelKind},
 	lint::Lint,
-	visit::SyntacticVisit,
 };
 
 /// `empty_struct_used`: Empty struct used where `void` would be more

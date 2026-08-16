@@ -10,11 +10,11 @@
 use zrc_diagnostics::diagnostic::GenericLabel;
 use zrc_parser::ast::stmt::{Declaration, Stmt, StmtKind};
 use zrc_utils::span::{Spannable, Spanned};
+use zrc_visitor::ast::SyntacticVisit;
 
 use crate::{
 	diagnostic::{LintDiagnostic, LintDiagnosticKind, LintHelpKind, LintLabelKind},
 	lint::Lint,
-	visit::SyntacticVisit,
 };
 
 /// `bad_control_flow`: Bad control flow practices

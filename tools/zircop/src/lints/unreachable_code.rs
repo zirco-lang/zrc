@@ -9,11 +9,11 @@
 use zrc_diagnostics::diagnostic::GenericLabel;
 use zrc_typeck::typeck::{BlockMetadata, BlockReturnActuality, TastRoot};
 use zrc_utils::span::{Span, Spannable};
+use zrc_visitor::tast::SemanticVisit;
 
 use crate::{
 	diagnostic::{LintDiagnostic, LintDiagnosticKind, LintLabelKind},
 	lint::Lint,
-	visit::SemanticVisit,
 };
 
 /// `unreachable_code`: Unreachable code detection

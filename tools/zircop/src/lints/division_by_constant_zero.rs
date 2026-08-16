@@ -11,11 +11,11 @@ use zrc_typeck::{
 	typeck::TastRoot,
 };
 use zrc_utils::span::Spannable;
+use zrc_visitor::tast::SemanticVisit;
 
 use crate::{
 	diagnostic::{LintDiagnostic, LintDiagnosticKind, LintLabelKind, LintNoteKind},
 	lint::Lint,
-	visit::SemanticVisit,
 };
 
 /// `division_by_constant_zero`: Division by constant zero detected
