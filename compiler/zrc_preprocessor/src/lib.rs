@@ -99,20 +99,20 @@ impl SourceChunk {
 
 /// Context for preprocessing operations
 #[derive(Debug)]
-struct PreprocessorCtx {
+struct PreprocessorCtx<'a> {
 	/// Set of files that have been included with `#pragma once`
 	pragma_once_files: HashSet<PathBuf>,
 	/// Collected source chunks
 	chunks: Vec<SourceChunk>,
 	/// The paths to search for bracket includes
-	search_paths: Vec<PathBuf>,
+	search_paths: &'a Vec<PathBuf>,
 	/// Whether to forbid includes outside of listed search paths
 	forbid_unlisted_includes: bool,
 }
 
-impl PreprocessorCtx {
+impl<'a> PreprocessorCtx<'a> {
 	/// Create a new preprocessor context
-	fn new(search_paths: Vec<PathBuf>, forbid_unlisted_includes: bool) -> Self {
+	fn new(search_paths: &'a Vec<PathBuf>, forbid_unlisted_includes: bool) -> Self {
 		Self {
 			pragma_once_files: HashSet::new(),
 			chunks: Vec::new(),
@@ -124,7 +124,7 @@ impl PreprocessorCtx {
 
 /// Search for an include file in the provided search paths
 fn find_include_file(ctx: &PreprocessorCtx, include_file: &str) -> Option<PathBuf> {
-	for search_path in &ctx.search_paths {
+	for search_path in ctx.search_paths {
 		let candidate = search_path.join(include_file);
 		if candidate.exists() {
 			return Some(candidate);
@@ -154,15 +154,20 @@ fn is_path_within_allowed_dirs(resolved_path: &Path, search_paths: &[PathBuf]) -
 	false
 }
 
+/// The inputs to the Zirco preprocessor.
+#[derive(Debug)]
+pub struct PreprocessInputs<'a> {
+	/// The path of the source file.
+	pub path: &'a PathBuf,
+	/// The content of the source file.
+	pub content: &'a str,
+	/// All search paths for global `#include` directives
+	pub include_paths: &'a Vec<PathBuf>,
+	/// Whether to restrict includes to search paths only.
+	pub forbid_unlisted_includes: bool,
+}
+
 /// Process a Zirco source file with preprocessing directives
-///
-/// # Arguments
-/// * `base_path` - The directory to resolve relative includes from
-/// * `search_paths` - The list of directories to search for includes
-/// * `file_name` - The name of the file being processed
-/// * `content` - The content of the file to preprocess
-/// * `forbid_unlisted_includes` - Whether to restrict includes to search paths
-///   only
 ///
 /// # Errors
 /// Returns an error if:
@@ -177,21 +182,22 @@ fn is_path_within_allowed_dirs(resolved_path: &Path, search_paths: &[PathBuf]) -
 /// Panics if the file name cannot be converted to a static string.
 #[expect(clippy::result_large_err)]
 #[instrument(skip_all)]
-pub fn preprocess<'input>(
-	base_path: &'input Path,
-	search_paths: Vec<PathBuf>,
-	file_name: &'input str,
-	content: &'input str,
-	forbid_unlisted_includes: bool,
+pub fn preprocess(
+	PreprocessInputs {
+		path,
+		content,
+		include_paths,
+		forbid_unlisted_includes,
+	}: PreprocessInputs<'_>,
 ) -> Result<Vec<SourceChunk>, Diagnostic> {
-	let mut ctx = PreprocessorCtx::new(search_paths, forbid_unlisted_includes);
-
 	debug!(
-		base_path = ?base_path,
-		file_name = file_name,
-		search_paths = ?ctx.search_paths,
+		base_path = ?path.parent().unwrap_or_else(|| Path::new("")),
+		file_name = path.to_str(),
+		include_paths = ?include_paths,
 		"starting preprocessing"
 	);
+
+	let mut ctx = PreprocessorCtx::new(include_paths, forbid_unlisted_includes);
 
 	// Trim off a leading shebang line if present
 	let content = if content.starts_with("#!") {
@@ -204,13 +210,7 @@ pub fn preprocess<'input>(
 			let sp = Span::from_positions_and_file(
 				0,
 				shebang_len,
-				Box::leak(
-					base_path
-						.join(file_name)
-						.to_string_lossy()
-						.into_owned()
-						.into_boxed_str(),
-				),
+				Box::leak(path.to_str().expect("path should be valid").into()),
 			);
 			return Err(DiagnosticKind::PreprocessorInvalidShebang
 				.error_in(sp)
@@ -227,7 +227,15 @@ pub fn preprocess<'input>(
 		content
 	};
 
-	preprocess_internal(base_path, file_name, content, &mut ctx)?;
+	preprocess_internal(
+		path.parent().unwrap_or_else(|| Path::new("")),
+		path.file_name()
+			.expect("should have a file name")
+			.to_str()
+			.expect("should be valid"),
+		content,
+		&mut ctx,
+	)?;
 	Ok(ctx.chunks)
 }
 
@@ -518,8 +526,13 @@ mod tests {
 	#[test]
 	fn preprocess_simple_file_without_directives() {
 		let content = "fn main() {\n    printf(\"Hello\");\n}";
-		let chunks = preprocess(Path::new("."), vec![], "test.zr", content, false)
-			.expect("preprocessing failed");
+		let chunks = preprocess(PreprocessInputs {
+			include_paths: &vec![],
+			path: &PathBuf::from("./test.zr"),
+			content,
+			forbid_unlisted_includes: false,
+		})
+		.expect("preprocessing failed");
 
 		assert_eq!(chunks.len(), 1);
 		assert_eq!(chunks[0].file_name, "./test.zr");
@@ -531,8 +544,13 @@ mod tests {
 	#[test]
 	fn preprocess_with_pragma_once() {
 		let content = "#pragma once\nfn test() {}";
-		let chunks = preprocess(Path::new("."), vec![], "test.zr", content, false)
-			.expect("preprocessing failed");
+		let chunks = preprocess(PreprocessInputs {
+			include_paths: &vec![],
+			path: &PathBuf::from("./test.zr"),
+			content,
+			forbid_unlisted_includes: false,
+		})
+		.expect("preprocessing failed");
 
 		assert_eq!(chunks.len(), 1);
 		assert_eq!(chunks[0].start_line, 2);
@@ -543,8 +561,13 @@ mod tests {
 	#[test]
 	fn preprocess_pragma_once_with_multiple_lines() {
 		let content = "#pragma once\n\nfn first() {}\nfn second() {}";
-		let chunks = preprocess(Path::new("."), vec![], "test.zr", content, false)
-			.expect("preprocessing failed");
+		let chunks = preprocess(PreprocessInputs {
+			include_paths: &vec![],
+			path: &PathBuf::from("./test.zr"),
+			content,
+			forbid_unlisted_includes: false,
+		})
+		.expect("preprocessing failed");
 
 		assert_eq!(chunks.len(), 1);
 		assert_eq!(chunks[0].start_line, 2);
@@ -556,8 +579,13 @@ mod tests {
 	fn preprocess_tracks_byte_offsets_correctly() {
 		// Test that byte offsets are correctly calculated
 		let content = "line1\n#pragma once\nline3";
-		let chunks = preprocess(Path::new("."), vec![], "test.zr", content, false)
-			.expect("preprocessing failed");
+		let chunks = preprocess(PreprocessInputs {
+			include_paths: &vec![],
+			path: &PathBuf::from("./test.zr"),
+			content,
+			forbid_unlisted_includes: false,
+		})
+		.expect("preprocessing failed");
 
 		// First chunk: "line1" (before pragma)
 		assert_eq!(chunks.len(), 2);

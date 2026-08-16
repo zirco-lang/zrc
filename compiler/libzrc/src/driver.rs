@@ -8,7 +8,7 @@ use std::{
 	process, ptr, slice,
 };
 
-use zrc::{OutputFormat, codegen};
+use zrc::{OutputFormat, codegen, compile::CompileInputs};
 
 use crate::diagnostics::ZrcDiagnostic;
 
@@ -104,8 +104,7 @@ pub struct ZrcCompileResult {
 ///   frontend.
 /// * `include_paths` - The list of directories to search for includes.
 /// * `emit` - The desired output format.
-/// * `parent_directory` - The parent directory of the source file.
-/// * `file_name` - The name of the source file.
+/// * `path` - The path of the source file.
 /// * `cli_args` - The command line arguments passed to the compiler.
 /// * `content` - The source code content to be compiled.
 /// * `optimization_level` - The optimization level for code generation.
@@ -131,8 +130,7 @@ pub unsafe extern "C" fn zrc_compile(
 	include_paths: *const *const c_char,
 	include_paths_len: usize,
 	emit: ZrcOutputFormat,
-	parent_directory: *const c_char,
-	file_name: *const c_char,
+	path: *const c_char,
 	cli_args: *const c_char,
 	content: *const c_char,
 	optimization_level: ZrcOptimizationLevel,
@@ -155,12 +153,7 @@ pub unsafe extern "C" fn zrc_compile(
 			)
 		})
 		.collect::<Vec<PathBuf>>();
-	let parent_directory = unsafe { CStr::from_ptr(parent_directory) }
-		.to_string_lossy()
-		.into_owned();
-	let file_name = unsafe { CStr::from_ptr(file_name) }
-		.to_string_lossy()
-		.into_owned();
+	let path = unsafe { PathBuf::from(CStr::from_ptr(path).to_string_lossy().into_owned()) };
 	let cli_args = unsafe { CStr::from_ptr(cli_args) }
 		.to_string_lossy()
 		.into_owned();
@@ -174,22 +167,21 @@ pub unsafe extern "C" fn zrc_compile(
 		.to_string_lossy()
 		.into_owned();
 
-	let result = catch_unwind(|| {
-		zrc::compile(
-			&frontend_version_string,
-			include_paths,
-			&emit.into(),
-			&parent_directory,
-			&file_name,
-			&cli_args,
-			&content,
-			optimization_level.into(),
-			debug_mode.into(),
-			&codegen::TargetTriple::create(&triple),
-			&cpu,
-			forbid_unlisted_includes,
-		)
-	});
+	let compile_inputs = CompileInputs {
+		frontend_version_string: &frontend_version_string,
+		cli_args: &cli_args,
+		include_paths: &include_paths,
+		emit: emit.into(),
+		path: &path,
+		optimization_level: optimization_level.into(),
+		debug_mode: debug_mode.into(),
+		triple: &codegen::TargetTriple::create(&triple),
+		cpu: &cpu,
+		forbid_unlisted_includes,
+		content: &content,
+	};
+
+	let result = catch_unwind(|| zrc::compile(compile_inputs));
 
 	match result {
 		Ok(Ok(output)) => {

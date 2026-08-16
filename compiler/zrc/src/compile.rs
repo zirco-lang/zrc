@@ -3,20 +3,16 @@
 //! This module contains the main driver function for the Zirco compiler,
 //! which orchestrates the parsing, type checking, and code generation phases.
 
-use std::{
-	path::{Path, PathBuf},
-	time::Instant,
-};
+use std::{path::PathBuf, time::Instant};
 
 use tracing::{debug, debug_span, info};
-use zrc_codegen::{DebugLevel, OptimizationLevel};
+use zrc_codegen::{CgProgramInputs, DebugLevel, OptimizationLevel};
 use zrc_parser::parser;
+use zrc_preprocessor::PreprocessInputs;
 use zrc_typeck::typeck;
 
-/// The list of possible outputs `zrc` can emit in
-///
-/// Usually you will want to use `llvm`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// The list of possible output file types `zrc` can emit
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
 	/// LLVM IR
 	Llvm,
@@ -42,6 +38,65 @@ pub enum OutputFormat {
 	Object,
 }
 
+/// The inputs to the Zirco [`compile`] compilation driver.
+#[derive(Debug)]
+pub struct CompileInputs<'a> {
+	/// A version string for the frontend, used in debug info.
+	pub frontend_version_string: &'a str,
+	/// The CLI arguments passed to the compiler, used in debug info.
+	pub cli_args: &'a str,
+	/// All search paths for global `#include` directives
+	pub include_paths: &'a Vec<PathBuf>,
+	/// The desired output format.
+	pub emit: OutputFormat,
+	/// The path of the source file.
+	pub path: &'a PathBuf,
+	/// The optimization level for code generation.
+	pub optimization_level: OptimizationLevel,
+	/// The debug level for code generation.
+	pub debug_mode: DebugLevel,
+	/// The target triple for code generation.
+	pub triple: &'a zrc_codegen::TargetTriple,
+	/// The target CPU for code generation.
+	pub cpu: &'a str,
+	/// Whether to restrict includes to search paths only.
+	pub forbid_unlisted_includes: bool,
+	/// The content of the source file.
+	pub content: &'a str,
+}
+
+impl<'a> From<&CompileInputs<'a>> for PreprocessInputs<'a> {
+	fn from(val: &CompileInputs<'a>) -> Self {
+		PreprocessInputs {
+			path: val.path,
+			content: val.content,
+			include_paths: val.include_paths,
+			forbid_unlisted_includes: val.forbid_unlisted_includes,
+		}
+	}
+}
+
+impl<'a> From<CompileInputs<'a>> for CgProgramInputs<'a> {
+	fn from(val: CompileInputs<'a>) -> Self {
+		CgProgramInputs {
+			frontend_version_string: val.frontend_version_string,
+			cli_args: val.cli_args,
+			path: val.path,
+			source: val.content,
+			optimization_level: val.optimization_level,
+			debug_level: val.debug_mode,
+			triple: val.triple,
+			cpu: val.cpu,
+			#[expect(clippy::wildcard_enum_match_arm)]
+			file_type: match val.emit {
+				OutputFormat::Asm => zrc_codegen::FileType::Assembly,
+				OutputFormat::Object => zrc_codegen::FileType::Object,
+				_ => unreachable!("file type should only be used for assembly or object"),
+			},
+		}
+	}
+}
+
 /// Drive the compilation process.
 ///
 /// This function takes the source code as input and processes it through
@@ -49,62 +104,18 @@ pub enum OutputFormat {
 /// generation. Depending on the specified output format, it can return the AST,
 /// TAST, LLVM IR, assembly, or object code.
 ///
-/// # Arguments
-///
-/// * `frontend_version_string` - A string representing the version of the
-///   frontend.
-/// * `include_paths` - The list of directories to search for includes.
-/// * `emit` - The desired output format.
-/// * `parent_directory` - The parent directory of the source file.
-/// * `file_name` - The name of the source file.
-/// * `cli_args` - The command line arguments passed to the compiler.
-/// * `content` - The source code content to be compiled.
-/// * `optimization_level` - The optimization level for code generation.
-/// * `debug_mode` - The debug level for code generation.
-/// * `triple` - The target triple for code generation.
-/// * `cpu` - The target CPU for code generation.
-/// * `forbid_unlisted_includes` - Whether to restrict includes to search paths
-///   only.
-///
 /// # Errors
 ///
 /// Err variant contains a [`zrc_diagnostics::Diagnostic`] if any phase of the
 /// compilation fails.
-#[expect(
-	clippy::too_many_arguments,
-	clippy::wildcard_enum_match_arm,
-	clippy::result_large_err,
-	clippy::too_many_lines
-)]
+#[expect(clippy::wildcard_enum_match_arm, clippy::result_large_err)]
 pub fn compile(
-	frontend_version_string: &str,
-	include_paths: Vec<PathBuf>,
-	emit: &OutputFormat,
-	parent_directory: &str,
-	file_name: &str,
-	cli_args: &str,
-	content: &str,
-	optimization_level: OptimizationLevel,
-	debug_mode: DebugLevel,
-	triple: &zrc_codegen::TargetTriple,
-	cpu: &str,
-	forbid_unlisted_includes: bool,
+	inputs @ CompileInputs { emit, .. }: CompileInputs<'_>,
 ) -> Result<Box<[u8]>, zrc_diagnostics::Diagnostic> {
 	// === PREPROCESSOR ===
-	info!(
-		include_paths = ?include_paths,
-		parent_directory = parent_directory,
-		file_name = file_name,
-		"running preprocessor"
-	);
+	info!("running preprocessor");
 	let preprocessor_start = Instant::now();
-	let chunks = zrc_preprocessor::preprocess(
-		Path::new(parent_directory),
-		include_paths,
-		file_name,
-		content,
-		forbid_unlisted_includes,
-	)?;
+	let chunks = zrc_preprocessor::preprocess((&inputs).into())?;
 	debug!(
 		elapsed = ?preprocessor_start.elapsed(),
 		chunk_count = chunks.len(),
@@ -134,7 +145,7 @@ pub fn compile(
 		emit,
 		OutputFormat::Ast | OutputFormat::AstDebug | OutputFormat::AstDebugPretty,
 	) {
-		return Ok(match *emit {
+		return Ok(match emit {
 			OutputFormat::Ast => ast
 				.into_iter()
 				.map(|x| x.to_string())
@@ -163,7 +174,7 @@ pub fn compile(
 		emit,
 		OutputFormat::TastDebug | OutputFormat::TastDebugPretty | OutputFormat::Tast,
 	) {
-		return Ok(match *emit {
+		return Ok(match emit {
 			OutputFormat::TastDebug => format!("{typed_ast:?}"),
 			OutputFormat::TastDebugPretty => format!("{typed_ast:#?}"),
 			OutputFormat::Tast => typed_ast
@@ -183,59 +194,17 @@ pub fn compile(
 	// === CODE GENERATOR ===
 
 	let cg_start = Instant::now();
-	info!(
-		optimization_level = ?optimization_level,
-		debug_mode = ?debug_mode,
-		triple = ?triple,
-		cpu = cpu,
-		"generating code"
-	);
-	let output: Box<[u8]> = match *emit {
-		OutputFormat::Asm => zrc_codegen::cg_program_to_buffer(
-			frontend_version_string,
-			parent_directory,
-			file_name,
-			cli_args,
-			content,
-			typed_ast,
-			zrc_codegen::FileType::Assembly,
-			optimization_level,
-			debug_mode,
-			triple,
-			cpu,
-		)
-		.as_slice()
-		.into(),
-		OutputFormat::Object => zrc_codegen::cg_program_to_buffer(
-			frontend_version_string,
-			parent_directory,
-			file_name,
-			cli_args,
-			content,
-			typed_ast,
-			zrc_codegen::FileType::Object,
-			optimization_level,
-			debug_mode,
-			triple,
-			cpu,
-		)
-		.as_slice()
-		.into(),
+	info!("generating code");
+	let output: Box<[u8]> = match emit {
+		OutputFormat::Asm | OutputFormat::Object => {
+			zrc_codegen::cg_program_to_buffer(inputs.into(), typed_ast)
+				.as_slice()
+				.into()
+		}
 
-		OutputFormat::Llvm => zrc_codegen::cg_program_to_string(
-			frontend_version_string,
-			parent_directory,
-			file_name,
-			cli_args,
-			content,
-			typed_ast,
-			optimization_level,
-			debug_mode,
-			triple,
-			cpu,
-		)
-		.as_bytes()
-		.into(),
+		OutputFormat::Llvm => zrc_codegen::cg_program_to_string(inputs.into(), typed_ast)
+			.as_bytes()
+			.into(),
 
 		// unreachable because we return in the above cases
 		_ => {

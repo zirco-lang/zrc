@@ -54,7 +54,7 @@
 
 mod cli;
 
-use std::{error::Error, fmt, path::Path, process, time::Instant};
+use std::{error::Error, fmt, process, time::Instant};
 
 use clap::Parser;
 use cli::Cli;
@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		return Err(Box::new(CliError("No input file specified.".into())));
 	};
 
-	let (directory_name, file_name, mut input) = io::open_input(path)?;
+	let mut input = io::open_input(path)?;
 
 	let mut source_content = String::new();
 	input.read_to_string(&mut source_content)?;
@@ -105,9 +105,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 	let start = Instant::now();
 	debug!("running linter");
 	let diagnostics = runner::run_with_default_passes(
-		cli::get_include_paths(&cli),
-		Path::new(&directory_name),
-		&file_name,
+		&cli::get_include_paths(&cli),
+		path,
 		&source_content,
 		cli.forbid_unlisted_includes,
 	);

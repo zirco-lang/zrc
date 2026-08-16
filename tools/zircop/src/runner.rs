@@ -1,13 +1,11 @@
 //! Execute a list of lints on a program.
 
-use std::{
-	path::{Path, PathBuf},
-	time::Instant,
-};
+use std::{path::PathBuf, time::Instant};
 
 use tracing::{debug, info};
 use zrc_diagnostics::Diagnostic;
 use zrc_parser::parser;
+use zrc_preprocessor::PreprocessInputs;
 use zrc_typeck::typeck;
 
 use crate::{diagnostic::LintDiagnostic, lints, pass::PassList};
@@ -15,9 +13,8 @@ use crate::{diagnostic::LintDiagnostic, lints, pass::PassList};
 /// Lint a program with a list of [`crate::lint::Lint`]s.
 #[expect(clippy::result_large_err)]
 pub fn run(
-	include_paths: Vec<PathBuf>,
-	parent_directory: &Path,
-	file_name: &str,
+	include_paths: &Vec<PathBuf>,
+	path: &PathBuf,
 	content: &str,
 	forbid_unlisted_includes: bool,
 	passes: &PassList,
@@ -29,13 +26,13 @@ pub fn run(
 
 	// === PREPROCESSOR ===
 	info!("running preprocessor");
-	let chunks = zrc_preprocessor::preprocess(
-		parent_directory,
-		include_paths,
-		file_name,
+
+	let chunks = zrc_preprocessor::preprocess(PreprocessInputs {
+		path,
 		content,
+		include_paths,
 		forbid_unlisted_includes,
-	)?;
+	})?;
 
 	// === PARSER ===
 	info!("parsing source code");
@@ -69,17 +66,15 @@ pub fn run(
 /// [`crate::lints::get_default_lints`].
 #[expect(clippy::result_large_err)]
 pub fn run_with_default_passes(
-	include_paths: Vec<PathBuf>,
-	parent_directory: &Path,
-	file_name: &str,
+	include_paths: &Vec<PathBuf>,
+	path: &PathBuf,
 	content: &str,
 	forbid_unlisted_includes: bool,
 ) -> Result<Vec<LintDiagnostic>, Diagnostic> {
 	let passes = lints::get_default_lints();
 	run(
 		include_paths,
-		parent_directory,
-		file_name,
+		path,
 		content,
 		forbid_unlisted_includes,
 		&passes,

@@ -52,19 +52,14 @@
 	clippy::missing_errors_doc
 )]
 
-use std::{
-	env,
-	error::Error,
-	fmt,
-	path::{Path, PathBuf},
-	process,
-};
+use std::{env, error::Error, fmt, path::PathBuf, process};
 
 use clap::Parser;
 use tracing::{debug, debug_span};
 use tracing_subscriber::EnvFilter;
 use zrc_jit::engine::JitEngine;
 use zrc_parser::parser;
+use zrc_preprocessor::PreprocessInputs;
 use zrc_typeck::typeck;
 use zrc_utils::io;
 
@@ -119,18 +114,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 	for path in all_files {
 		let _span = debug_span!("jit_file", path = ?path).entered();
 
-		let (directory_name, file_name, mut input) = io::open_input(&path)?;
+		let mut input = io::open_input(&path)?;
 
 		let mut source_content = String::new();
 		input.read_to_string(&mut source_content)?;
 
-		let chunks = zrc_preprocessor::preprocess(
-			Path::new(&directory_name),
-			include_paths.clone(),
-			&file_name,
-			&source_content,
-			false,
-		)?;
+		let zpp_inputs = PreprocessInputs {
+			path: &path,
+			content: &source_content,
+			include_paths: &include_paths,
+			forbid_unlisted_includes: false,
+		};
+		let chunks = zrc_preprocessor::preprocess(zpp_inputs)?;
 
 		let mut ast = Vec::new();
 		for chunk in &chunks {
@@ -141,7 +136,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		let mut global_scope = typeck::GlobalScope::new();
 		let typed_ast = typeck::type_program(&mut global_scope, ast)?;
 
-		module.cg_program_and_link(&directory_name, &file_name, &source_content, typed_ast);
+		module.cg_program_and_link(&path, &source_content, typed_ast);
 	}
 
 	for lib in &cli.libraries {

@@ -5,7 +5,10 @@
 //! intermediate representation (IR), which can then be optimized and compiled
 //! to machine code.
 
-use std::time::Instant;
+use std::{
+	path::{Path, PathBuf},
+	time::Instant,
+};
 
 use inkwell::{
 	OptimizationLevel,
@@ -295,11 +298,22 @@ fn cg_program_without_optimization<'ctx>(
 	ctx: &'ctx Context,
 	target_machine: &TargetMachine,
 	debug_level: DWARFEmissionKind,
-	parent_directory: &str,
-	file_name: &str,
+	path: &Path,
 	line_lookup: &LineLookup,
 	program: TastRoot<'_>,
 ) -> Module<'ctx> {
+	let parent_directory = path
+		.parent()
+		.expect("source file should have a parent directory")
+		.to_str()
+		.expect("parent directory should be valid UTF-8");
+
+	let file_name = path
+		.file_name()
+		.expect("source file should have a file name")
+		.to_str()
+		.expect("file name should be valid UTF-8");
+
 	let builder = ctx.create_builder();
 	let module = ctx.create_module(file_name);
 
@@ -611,8 +625,7 @@ pub fn cg_program<'ctx>(
 	target_machine: &TargetMachine,
 	optimization_level: OptimizationLevel,
 	debug_level: DWARFEmissionKind,
-	parent_directory: &str,
-	file_name: &str,
+	path: &Path,
 	line_lookup: &LineLookup,
 	program: TastRoot<'_>,
 ) -> Module<'ctx> {
@@ -624,8 +637,7 @@ pub fn cg_program<'ctx>(
 		ctx,
 		target_machine,
 		debug_level,
-		parent_directory,
-		file_name,
+		path,
 		line_lookup,
 		program,
 	);
@@ -645,23 +657,47 @@ pub fn cg_program<'ctx>(
 	module
 }
 
+/// The inputs to [`cg_program_to_buffer`] or [`cg_program_to_string`].
+#[derive(Debug)]
+pub struct CgProgramInputs<'a> {
+	/// A version string for the frontend, used in debug info.
+	pub frontend_version_string: &'a str,
+	/// The CLI arguments passed to the compiler, used in debug info.
+	pub cli_args: &'a str,
+	/// The path of the source file.
+	pub path: &'a PathBuf,
+	/// The source code of the file.
+	pub source: &'a str,
+	/// The optimization level for code generation.
+	pub optimization_level: OptimizationLevel,
+	/// The debug info emission level for code generation.
+	pub debug_level: DWARFEmissionKind,
+	/// The target triple for code generation.
+	pub triple: &'a TargetTriple,
+	/// The target CPU for code generation.
+	pub cpu: &'a str,
+	/// The type of file to generate (e.g., object file, assembly, etc.).
+	pub file_type: FileType,
+}
+
 /// Code generate a LLVM program to a string.
 ///
 /// # Panics
 /// Panics on internal code generation failure.
 #[must_use]
-#[expect(clippy::too_many_arguments)]
 pub fn cg_program_to_string(
-	frontend_version_string: &str,
-	parent_directory: &str,
-	file_name: &str,
-	cli_args: &str,
-	source: &str,
+	CgProgramInputs {
+		frontend_version_string,
+		cli_args,
+		path,
+		source,
+		optimization_level,
+		debug_level,
+		triple,
+		cpu,
+		..
+	}: CgProgramInputs<'_>,
 	program: TastRoot<'_>,
-	optimization_level: OptimizationLevel,
-	debug_level: DWARFEmissionKind,
-	triple: &TargetTriple,
-	cpu: &str,
 ) -> String {
 	let ctx = Context::create();
 
@@ -693,8 +729,7 @@ pub fn cg_program_to_string(
 		&target_machine,
 		optimization_level,
 		debug_level,
-		parent_directory,
-		file_name,
+		path,
 		&LineLookup::new(source),
 		program,
 	);
@@ -709,20 +744,21 @@ pub fn cg_program_to_string(
 /// # Panics
 /// Panics on internal code generation failure.
 #[must_use]
-#[expect(clippy::too_many_arguments)]
 // this function is currently only used in tests because the LLVM optimizer
 // doesn't handle well when multithreaded.
 #[cfg(test)]
 pub fn cg_program_to_string_without_optimization(
-	frontend_version_string: &str,
-	parent_directory: &str,
-	file_name: &str,
-	cli_args: &str,
-	source: &str,
+	CgProgramInputs {
+		frontend_version_string,
+		cli_args,
+		path,
+		source,
+		debug_level,
+		triple,
+		cpu,
+		..
+	}: CgProgramInputs<'_>,
 	program: TastRoot<'_>,
-	debug_level: DWARFEmissionKind,
-	triple: &TargetTriple,
-	cpu: &str,
 ) -> String {
 	let ctx = Context::create();
 
@@ -746,8 +782,7 @@ pub fn cg_program_to_string_without_optimization(
 		&ctx,
 		&target_machine,
 		debug_level,
-		parent_directory,
-		file_name,
+		path,
 		&LineLookup::new(source),
 		program,
 	);
@@ -761,20 +796,20 @@ pub fn cg_program_to_string_without_optimization(
 /// # Panics
 /// Panics on internal code generation failure.
 #[must_use]
-#[expect(clippy::too_many_arguments)]
 #[instrument(skip_all)]
 pub fn cg_program_to_buffer(
-	frontend_version_string: &str,
-	parent_directory: &str,
-	file_name: &str,
-	cli_args: &str,
-	source: &str,
+	CgProgramInputs {
+		frontend_version_string,
+		cli_args,
+		path,
+		source,
+		optimization_level,
+		debug_level,
+		triple,
+		cpu,
+		file_type,
+	}: CgProgramInputs<'_>,
 	program: TastRoot<'_>,
-	file_type: FileType,
-	optimization_level: OptimizationLevel,
-	debug_level: DWARFEmissionKind,
-	triple: &TargetTriple,
-	cpu: &str,
 ) -> MemoryBuffer<'static> {
 	let ctx = Context::create();
 
@@ -806,8 +841,7 @@ pub fn cg_program_to_buffer(
 		&target_machine,
 		optimization_level,
 		debug_level,
-		parent_directory,
-		file_name,
+		path,
 		&LineLookup::new(source),
 		program,
 	);

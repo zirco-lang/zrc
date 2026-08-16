@@ -32,18 +32,21 @@ macro_rules! cg_snapshot_test {
         )
         .expect("typeck should succeed");
 
+        let __zrc_codegen_inputs = $crate::program::CgProgramInputs {
+            frontend_version_string: "zrc test runner",
+            cli_args: "zrc --fake-args",
+            path: &::std::path::PathBuf::from("/fake/path/test.zr"),
+            source: $source,
+            optimization_level: $crate::OptimizationLevel::None,
+            debug_level: ::inkwell::debug_info::DWARFEmissionKind::Full,
+            triple: &$crate::get_native_triple(),
+            cpu: "",
+            file_type: ::inkwell::targets::FileType::Assembly,
+        };
+
         let resulting_ir = $crate::program::cg_program_to_string_without_optimization(
-            "zrc test runner",
-            "/fake/path",
-            "test.zr",
-            // do not use real args because the text executables have a hash in their name and
-            // this would mess up snapshots
-            "zrc --fake-args",
-            $source,
+            __zrc_codegen_inputs,
             __zrc_codegen_typed,
-            ::inkwell::debug_info::DWARFEmissionKind::Full,
-            &$crate::get_native_triple(),
-            "",
         );
 
         insta::with_settings!({
