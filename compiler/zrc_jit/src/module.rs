@@ -5,6 +5,7 @@ use std::{
 	ffi::CString,
 	io::{self, ErrorKind},
 	os::raw::c_char,
+	path::Path,
 };
 
 use inkwell::{
@@ -56,13 +57,7 @@ impl<'ctx> JitModule<'ctx> {
 	/// # Panics
 	///
 	/// Panics during internal LLVM failures.
-	pub fn cg_program_and_link(
-		&self,
-		parent_directory: &str,
-		file_name: &str,
-		source_content: &str,
-		typed_ast: TastRoot<'_>,
-	) {
+	pub fn cg_program_and_link(&self, path: &Path, source_content: &str, typed_ast: TastRoot<'_>) {
 		let file_module = cg_program(
 			self.engine.frontend_version_string,
 			self.engine.cli_args,
@@ -70,8 +65,7 @@ impl<'ctx> JitModule<'ctx> {
 			&self.engine.target_machine,
 			OptimizationLevel::Default,
 			zrc_codegen::DebugLevel::None,
-			parent_directory,
-			file_name,
+			path,
 			&LineLookup::new(source_content),
 			typed_ast,
 		);

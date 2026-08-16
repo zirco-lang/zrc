@@ -67,7 +67,11 @@ use clap::Parser;
 use cli::Cli;
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
-use zrc::{codegen::DebugLevel, compile, utils::io};
+use zrc::{
+	codegen::DebugLevel,
+	compile::{CompileInputs, compile},
+	utils::io,
+};
 
 use crate::cli::{DiagFormat, FrontendOutputFormat};
 
@@ -108,9 +112,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 		return Err(Box::new(CliError("No input file provided".into())));
 	};
 
-	let (directory_name, file_name, mut input) = io::open_input(path)?;
+	let mut input = io::open_input(path)?;
 
-	debug!(directory_name, file_name, "opened input file");
+	debug!("opened input file");
 
 	let mut source_content = String::new();
 	input.read_to_string(&mut source_content)?;
@@ -146,7 +150,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 			out => {
 				info!(
 					out,
-					"emit type not specified and output file extension not matched, assuming LLVM"
+					"emit type not specified and output file extension not known"
 				);
 				FrontendOutputFormat::Llvm
 			}
@@ -176,20 +180,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 	let start = Instant::now();
 
-	let result = compile(
-		&version_string(),
-		include_paths,
-		&emit.into(),
-		&directory_name,
-		&file_name,
-		&std::env::args().collect::<Vec<_>>().join(" "),
-		&source_content,
-		cli.opt_level.into(),
-		debug_level,
-		&target,
-		&cli.cpu,
-		cli.forbid_unlisted_includes,
-	);
+	let inputs = CompileInputs {
+		frontend_version_string: &version_string(),
+		cli_args: &std::env::args().collect::<Vec<_>>().join(" "),
+		include_paths: &include_paths,
+		emit: emit.into(),
+		path,
+		optimization_level: cli.opt_level.into(),
+		debug_mode: debug_level,
+		triple: &target,
+		cpu: &cli.cpu,
+		forbid_unlisted_includes: cli.forbid_unlisted_includes,
+		content: &source_content,
+	};
+
+	let result = compile(inputs);
 
 	match result {
 		Err(diagnostic) => {

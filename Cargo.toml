@@ -1,5 +1,4 @@
 [workspace]
-name = "zrc"
 resolver = "2"
 members = [
     "common/zrc_buildinfo",

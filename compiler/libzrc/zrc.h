@@ -232,8 +232,7 @@ void zrc_diag_free(struct ZrcDiagnostic *diag);
  *   frontend.
  * * `include_paths` - The list of directories to search for includes.
  * * `emit` - The desired output format.
- * * `parent_directory` - The parent directory of the source file.
- * * `file_name` - The name of the source file.
+ * * `path` - The path of the source file.
  * * `cli_args` - The command line arguments passed to the compiler.
  * * `content` - The source code content to be compiled.
  * * `optimization_level` - The optimization level for code generation.
@@ -257,8 +256,7 @@ struct ZrcCompileResult zrc_compile(const char *frontend_version_string,
                                     const char *const *include_paths,
                                     size_t include_paths_len,
                                     ZrcOutputFormat emit,
-                                    const char *parent_directory,
-                                    const char *file_name,
+                                    const char *path,
                                     const char *cli_args,
                                     const char *content,
                                     ZrcOptimizationLevel optimization_level,

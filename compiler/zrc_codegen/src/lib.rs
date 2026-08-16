@@ -75,7 +75,7 @@ pub use inkwell::{
 	debug_info::DWARFEmissionKind as DebugLevel,
 	targets::{FileType, TargetTriple},
 };
-pub use program::{cg_program, cg_program_to_buffer, cg_program_to_string};
+pub use program::{CgProgramInputs, cg_program, cg_program_to_buffer, cg_program_to_string};
 
 /// Gets the native [`TargetTriple`].
 #[must_use]

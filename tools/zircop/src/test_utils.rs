@@ -18,17 +18,11 @@ macro_rules! zircop_lint_test {
 		#[test]
 		fn $name() {
 			let include_paths = vec![];
-			let parent_directory = std::path::Path::new("");
-			let file_name = "<test>";
+			let path = ::std::path::PathBuf::from("<test>");
 
-			let lint_result = $crate::runner::run_with_default_passes(
-				include_paths,
-				parent_directory,
-				file_name,
-				$source,
-				false,
-			)
-			.expect("Compilation should succeed");
+			let lint_result =
+				$crate::runner::run_with_default_passes(&include_paths, &path, $source, false)
+					.expect("Compilation should succeed");
 
 			assert_eq!(
 				lint_result, $diagnostics,

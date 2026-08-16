@@ -55,15 +55,13 @@
 
 mod cli;
 
-use std::{
-	error::Error,
-	path::{Path, PathBuf},
-};
+use std::{error::Error, path::PathBuf};
 
 use clap::Parser;
 use repline::{Response, prebaked::read_and_mut};
 use tracing_subscriber::EnvFilter;
 use zrc_parser::{lexer, parser};
+use zrc_preprocessor::PreprocessInputs;
 use zrc_typeck::typeck::{self, GlobalScope};
 
 use crate::cli::Cli;
@@ -295,12 +293,15 @@ fn handle_help() -> Response {
 }
 
 /// Call the #include cmd (zpp)
-fn handle_include(line: &str, include_paths: Vec<PathBuf>, gs: &mut GlobalScope) -> Response {
+fn handle_include(line: &str, include_paths: &Vec<PathBuf>, gs: &mut GlobalScope) -> Response {
 	// feed it to the preprocessor
-	let chunks = diag_wrapper(
-		|| zrc_preprocessor::preprocess(Path::new("/dev"), include_paths, "<stdin>", line, false),
-		Some(line),
-	);
+	let zpp_inputs = PreprocessInputs {
+		path: &PathBuf::from("/dev/<stdin>"),
+		content: line,
+		include_paths,
+		forbid_unlisted_includes: false,
+	};
+	let chunks = diag_wrapper(|| zrc_preprocessor::preprocess(zpp_inputs), Some(line));
 	let Ok(chunks) = chunks else {
 		// Repline does not like it when you Continue or Reject after printing
 		return Response::Accept;
@@ -429,7 +430,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 					Ok(Response::Accept)
 				}
 				(Mode::Decl, line) if line == "#include" || line.starts_with("#include ") => {
-					Ok(handle_include(line, include_paths.clone(), &mut gs))
+					Ok(handle_include(line, &include_paths, &mut gs))
 				}
 				(_, line) if line == "#include" || line.starts_with("#include ") => {
 					println!("The #include command is only available in declaration mode.");
