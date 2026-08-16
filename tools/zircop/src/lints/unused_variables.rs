@@ -13,11 +13,11 @@ use zrc_typeck::{
 	typeck::{BlockMetadata, TastRoot},
 };
 use zrc_utils::span::Spannable;
+use zrc_visitor::tast::SemanticVisit;
 
 use crate::{
 	diagnostic::{LintDiagnostic, LintDiagnosticKind, LintHelpKind, LintLabelKind, LintNoteKind},
 	lint::Lint,
-	visit::SemanticVisit,
 };
 
 /// `unused_variables`: Unused variable declarations

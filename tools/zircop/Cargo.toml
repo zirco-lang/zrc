@@ -11,6 +11,7 @@ zrc_parser = { path = "../../compiler/zrc_parser" }
 zrc_typeck = { path = "../../compiler/zrc_typeck" }
 zrc_diagnostics = { path = "../../compiler/zrc_diagnostics" }
 zrc_utils = { path = "../../compiler/zrc_utils" }
+zrc_visitor = { path = "../../compiler/zrc_visitor" }
 thiserror = "2.0.17"
 clap = { version = "4.5.52", features = ["derive"] }
 zrc_buildinfo = { path = "../../common/zrc_buildinfo" }

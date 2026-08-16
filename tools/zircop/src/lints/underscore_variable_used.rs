@@ -17,11 +17,11 @@ use zrc_typeck::{
 	typeck::{BlockMetadata, TastRoot},
 };
 use zrc_utils::span::Spannable;
+use zrc_visitor::tast::SemanticVisit;
 
 use crate::{
 	diagnostic::{LintDiagnostic, LintDiagnosticKind, LintHelpKind, LintLabelKind},
 	lint::Lint,
-	visit::SemanticVisit,
 };
 
 /// `underscore_variable_used`: Variable starting with an underscore is used

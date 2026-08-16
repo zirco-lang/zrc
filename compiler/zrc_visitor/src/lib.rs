@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+#![doc=include_str!("../README.md")]
 #![allow(unknown_lints)] // in case you use non-nightly clippy
 #![warn(
     clippy::cargo,
@@ -33,13 +33,6 @@
     clippy::unimplemented,
     clippy::unneeded_field_pattern,
     clippy::wildcard_enum_match_arm,
-    let_underscore_drop,
-    macro_use_extern_crate,
-    missing_debug_implementations,
-    non_exhaustive_omitted_patterns,
-    unsafe_op_in_unsafe_fn,
-    unused_crate_dependencies,
-    variant_size_differences,
     unused_qualifications,
     clippy::unwrap_used,
 
@@ -55,14 +48,7 @@
 	clippy::doc_comment_double_space_linebreaks
 )]
 
-pub mod compile;
-pub use compile::{OutputFormat, compile};
-pub use zrc_codegen as codegen;
-pub use zrc_diagnostics as diagnostics;
-#[cfg(feature = "jit")]
-pub use zrc_jit as jit;
-pub use zrc_parser as parser;
-pub use zrc_preprocessor as preprocessor;
-pub use zrc_typeck as typeck;
-pub use zrc_utils as utils;
-pub use zrc_visitor as visitor;
+#[cfg(feature = "ast")]
+pub mod ast;
+#[cfg(feature = "tast")]
+pub mod tast;

@@ -1353,6 +1353,7 @@ dependencies = [
  "zrc_preprocessor",
  "zrc_typeck",
  "zrc_utils",
+ "zrc_visitor",
 ]
 
 [[package]]
@@ -1368,10 +1369,12 @@ dependencies = [
  "tracing",
  "zrc_codegen",
  "zrc_diagnostics",
+ "zrc_jit",
  "zrc_parser",
  "zrc_preprocessor",
  "zrc_typeck",
  "zrc_utils",
+ "zrc_visitor",
 ]
 
 [[package]]
@@ -1463,6 +1466,15 @@ name = "zrc_utils"
 version = "0.2.0"
 dependencies = [
  "tracing",
+]
+
+[[package]]
+name = "zrc_visitor"
+version = "0.2.0"
+dependencies = [
+ "zrc_parser",
+ "zrc_typeck",
+ "zrc_utils",
 ]
 
 [[package]]

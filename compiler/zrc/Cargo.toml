@@ -10,4 +10,10 @@ zrc_utils = { path = "../zrc_utils" }
 zrc_typeck = { path = "../zrc_typeck" }
 zrc_codegen = { path = "../zrc_codegen" }
 zrc_diagnostics = { path = "../zrc_diagnostics" }
+zrc_visitor = { path = "../zrc_visitor" }
+zrc_jit = { path = "../zrc_jit", optional = true }
 tracing = { version = "0.1.44", features = ["release_max_level_warn"] }
+
+[features]
+default = ["jit"]
+jit = ["zrc_jit"]
