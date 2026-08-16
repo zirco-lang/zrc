@@ -14,8 +14,8 @@ let
   };
 in
 naerskLib.buildPackage {
-  pname = "zrc";
   name = "zrc";
+  version = "0.2.0";
   src = ../../..;
   doCheck = true;
   copyLibs = true;
