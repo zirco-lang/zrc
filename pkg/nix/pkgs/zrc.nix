@@ -20,10 +20,6 @@ naerskLib.buildPackage {
   doCheck = true;
   copyLibs = true;
 
-  nativeBuildInputs = with pkgs; [
-    autoPatchelfHook
-  ];
-
   buildInputs = with pkgs; [
     llvm.llvm
     llvm.libllvm
@@ -38,6 +34,7 @@ naerskLib.buildPackage {
   env = {
     LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
       pkgs.stdenv.cc.cc.lib
+      llvm.libllvm
       pkgs.libffi
       pkgs.libxml2
       pkgs.zlib
