@@ -6,7 +6,7 @@
 use std::{path::PathBuf, time::Instant};
 
 use tracing::{debug, debug_span, info};
-use zrc_codegen::{CgProgramInputs, DebugLevel, OptimizationLevel};
+use zrc_codegen::{CgProgramInputs, DebugLevel, FileType, OptimizationLevel};
 use zrc_parser::parser;
 use zrc_preprocessor::PreprocessInputs;
 use zrc_typeck::typeck;
@@ -87,11 +87,12 @@ impl<'a> From<CompileInputs<'a>> for CgProgramInputs<'a> {
 			debug_level: val.debug_mode,
 			triple: val.triple,
 			cpu: val.cpu,
-			#[expect(clippy::wildcard_enum_match_arm)]
+			#[expect(clippy::wildcard_enum_match_arm, clippy::match_same_arms)]
 			file_type: match val.emit {
-				OutputFormat::Asm => zrc_codegen::FileType::Assembly,
-				OutputFormat::Object => zrc_codegen::FileType::Object,
-				_ => unreachable!("file type should only be used for assembly or object"),
+				OutputFormat::Asm => FileType::Assembly,
+				OutputFormat::Object => FileType::Object,
+				// this value will luckily never be needed but is still required
+				_ => FileType::Assembly,
 			},
 		}
 	}
