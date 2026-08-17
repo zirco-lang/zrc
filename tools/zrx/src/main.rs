@@ -140,9 +140,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 	}
 
 	for lib in &cli.libraries {
-		module.load_library(lib)?;
+		engine.load_library(lib)?;
 	}
-	module.load_visible_symbols();
+	engine.load_visible_symbols();
 
 	debug!("running main function");
 	let exit_code = module.run_main(cli.program_args)?;

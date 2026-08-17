@@ -11,12 +11,8 @@ use zrc::diagnostics::{Diagnostic, Severity};
 /// Opaque struct representing a diagnostic in the C API. It is only a handle to
 /// pass diagnostics between Rust and C.
 // the actual backing value is a type-punned heap Diagnostic
-#[repr(C)]
 #[derive(Debug)]
-pub struct ZrcDiagnostic {
-	/// opaque
-	_private: [u8; 0],
-}
+pub struct ZrcDiagnostic;
 
 /// Levels of diagnostic severity in the C API.
 #[repr(u8)]

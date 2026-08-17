@@ -59,6 +59,9 @@ pub use diagnostics::*;
 pub mod driver;
 pub use driver::*;
 
+pub mod jit;
+pub use jit::*;
+
 /// Free a string returned by the zrc C API.
 ///
 /// # Safety

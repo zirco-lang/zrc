@@ -96,23 +96,37 @@ pub struct ZrcCompileResult {
 	pub diagnostic: *mut ZrcDiagnostic,
 }
 
+/// Inputs for the compilation driver.
+#[repr(C)]
+#[derive(Debug)]
+pub struct ZrcCompileInputs {
+	/// The version string of the frontend.
+	pub frontend_version_string: *const c_char,
+	/// The list of include paths.
+	pub include_paths: *const *const c_char,
+	/// The number of include paths.
+	pub include_paths_len: usize,
+	/// The desired output format.
+	pub emit: ZrcOutputFormat,
+	/// The path of the source file.
+	pub path: *const c_char,
+	/// The command line arguments passed to the compiler.
+	pub cli_args: *const c_char,
+	/// The source code content to be compiled.
+	pub content: *const c_char,
+	/// The optimization level for code generation.
+	pub optimization_level: ZrcOptimizationLevel,
+	/// The debug level for code generation.
+	pub debug_mode: ZrcDebugLevel,
+	/// The target triple for code generation.
+	pub triple: *const c_char,
+	/// The target CPU for code generation.
+	pub cpu: *const c_char,
+	/// Whether to restrict includes to search paths only.
+	pub forbid_unlisted_includes: bool,
+}
+
 /// Drive the compilation process.
-///
-/// # Arguments
-///
-/// * `frontend_version_string` - A string representing the version of the
-///   frontend.
-/// * `include_paths` - The list of directories to search for includes.
-/// * `emit` - The desired output format.
-/// * `path` - The path of the source file.
-/// * `cli_args` - The command line arguments passed to the compiler.
-/// * `content` - The source code content to be compiled.
-/// * `optimization_level` - The optimization level for code generation.
-/// * `debug_mode` - The debug level for code generation.
-/// * `triple` - The target triple for code generation.
-/// * `cpu` - The target CPU for code generation.
-/// * `forbid_unlisted_includes` - Whether to restrict includes to search paths
-///   only.
 ///
 /// # Errors
 ///
@@ -125,20 +139,22 @@ pub struct ZrcCompileResult {
 /// passed to this function are valid for the duration of the call.
 #[unsafe(no_mangle)]
 #[expect(clippy::undocumented_unsafe_blocks, clippy::result_large_err)]
-pub unsafe extern "C" fn zrc_compile(
-	frontend_version_string: *const c_char,
-	include_paths: *const *const c_char,
-	include_paths_len: usize,
-	emit: ZrcOutputFormat,
-	path: *const c_char,
-	cli_args: *const c_char,
-	content: *const c_char,
-	optimization_level: ZrcOptimizationLevel,
-	debug_mode: ZrcDebugLevel,
-	triple: *const c_char,
-	cpu: *const c_char,
-	forbid_unlisted_includes: bool,
-) -> ZrcCompileResult {
+pub unsafe extern "C" fn zrc_compile(inputs: ZrcCompileInputs) -> ZrcCompileResult {
+	let ZrcCompileInputs {
+		frontend_version_string,
+		include_paths,
+		include_paths_len,
+		emit,
+		path,
+		cli_args,
+		content,
+		optimization_level,
+		debug_mode,
+		triple,
+		cpu,
+		forbid_unlisted_includes,
+	} = inputs;
+
 	// SAFETY: the caller guarantees that all C strings are valid
 	let frontend_version_string = unsafe { CStr::from_ptr(frontend_version_string) }
 		.to_string_lossy()

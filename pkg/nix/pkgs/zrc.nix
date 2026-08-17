@@ -45,6 +45,7 @@ naerskLib.buildPackage {
     mkdir -p $out/include
     cp -r $src/include/* $out/include/
     cp $src/compiler/libzrc/zrc.h $out/include/
+    cp $src/compiler/libzrc/zrc.zh $out/include/
   '';
 
   LLVM_SYS_221_PREFIX = llvm.llvm.dev;

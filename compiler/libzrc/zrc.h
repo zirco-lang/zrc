@@ -119,12 +119,17 @@ typedef uint8_t ZrcDebugLevel;
  * Opaque struct representing a diagnostic in the C API. It is only a handle to
  * pass diagnostics between Rust and C.
  */
-typedef struct ZrcDiagnostic {
-  /**
-   * opaque
-   */
-  uint8_t _private[0];
-} ZrcDiagnostic;
+typedef struct ZrcDiagnostic ZrcDiagnostic;
+
+/**
+ * Opaque struct representing the Zirco JIT engine.
+ */
+typedef struct ZrcJitEngine ZrcJitEngine;
+
+/**
+ * Opaque struct representing a Zirco JIT module.
+ */
+typedef struct ZrcJitModule ZrcJitModule;
 
 /**
  * The results of a compilation attempt, including either the output data or
@@ -151,6 +156,60 @@ typedef struct ZrcCompileResult {
    */
   struct ZrcDiagnostic *diagnostic;
 } ZrcCompileResult;
+
+/**
+ * Inputs for the compilation driver.
+ */
+typedef struct ZrcCompileInputs {
+  /**
+   * The version string of the frontend.
+   */
+  const char *frontend_version_string;
+  /**
+   * The list of include paths.
+   */
+  const char *const *include_paths;
+  /**
+   * The number of include paths.
+   */
+  size_t include_paths_len;
+  /**
+   * The desired output format.
+   */
+  ZrcOutputFormat emit;
+  /**
+   * The path of the source file.
+   */
+  const char *path;
+  /**
+   * The command line arguments passed to the compiler.
+   */
+  const char *cli_args;
+  /**
+   * The source code content to be compiled.
+   */
+  const char *content;
+  /**
+   * The optimization level for code generation.
+   */
+  ZrcOptimizationLevel optimization_level;
+  /**
+   * The debug level for code generation.
+   */
+  ZrcDebugLevel debug_mode;
+  /**
+   * The target triple for code generation.
+   */
+  const char *triple;
+  /**
+   * The target CPU for code generation.
+   */
+  const char *cpu;
+  /**
+   * Whether to restrict includes to search paths only.
+   */
+  bool forbid_unlisted_includes;
+} ZrcCompileInputs;
 
 /**
  * Free a string returned by the zrc C API.
@@ -226,22 +285,6 @@ void zrc_diag_free(struct ZrcDiagnostic *diag);
 /**
  * Drive the compilation process.
  *
- * # Arguments
- *
- * * `frontend_version_string` - A string representing the version of the
- *   frontend.
- * * `include_paths` - The list of directories to search for includes.
- * * `emit` - The desired output format.
- * * `path` - The path of the source file.
- * * `cli_args` - The command line arguments passed to the compiler.
- * * `content` - The source code content to be compiled.
- * * `optimization_level` - The optimization level for code generation.
- * * `debug_mode` - The debug level for code generation.
- * * `triple` - The target triple for code generation.
- * * `cpu` - The target CPU for code generation.
- * * `forbid_unlisted_includes` - Whether to restrict includes to search paths
- *   only.
- *
  * # Errors
  *
  * If compilation fails, a `ZrcDiagnostic` will be returned describing the
@@ -252,17 +295,108 @@ void zrc_diag_free(struct ZrcDiagnostic *diag);
  * The caller must guarantee that all C strings are valid and that the pointers
  * passed to this function are valid for the duration of the call.
  */
-struct ZrcCompileResult zrc_compile(const char *frontend_version_string,
-                                    const char *const *include_paths,
-                                    size_t include_paths_len,
-                                    ZrcOutputFormat emit,
-                                    const char *path,
-                                    const char *cli_args,
-                                    const char *content,
-                                    ZrcOptimizationLevel optimization_level,
-                                    ZrcDebugLevel debug_mode,
-                                    const char *triple,
-                                    const char *cpu,
-                                    bool forbid_unlisted_includes);
+struct ZrcCompileResult zrc_compile(struct ZrcCompileInputs inputs);
+
+/**
+ * Initialize the Zirco JIT for the current thread.
+ *
+ * This function must only be called once per thread.
+ *
+ * # Arguments
+ * * `frontend_version_string` - The frontend version string.
+ * * `cli_args` - The command line arguments passed to the compiler.
+ * * `lib_paths` - The paths to search for libraries.
+ *
+ * # Safety
+ * The caller must guarantee that all C strings are valid and that the pointers
+ * passed to this function are valid for the duration of the call.
+ */
+const struct ZrcJitEngine *zrc_jit_init(const char *frontend_version_string,
+                                        const char *cli_args,
+                                        const char *const *lib_paths,
+                                        size_t lib_paths_len);
+
+/**
+ * Load a library by name into the given JIT engine.
+ *
+ * Returns `true` if the library was loaded successfully, or `false` if the
+ * load failed.
+ *
+ * # Safety
+ *
+ * The caller must guarantee that the engine pointer is valid, and that the
+ * library name is a valid C string.
+ */
+bool zrc_jit_load_library(const struct ZrcJitEngine *engine, const char *lib_name);
+
+/**
+ * Load all symbols visible to the current process into the given JIT engine.
+ *
+ * # Safety
+ *
+ * The caller must guarantee that the engine pointer is valid.
+ */
+void zrc_jit_load_visible_symbols(const struct ZrcJitEngine *engine);
+
+/**
+ * Create a new JIT module within the given engine.
+ *
+ * # Safety
+ *
+ * The caller must guarantee that the engine pointer is valid.
+ */
+const struct ZrcJitModule *zrc_jit_create_module(const struct ZrcJitEngine *engine);
+
+/**
+ * Set a global symbol in the given JIT module to a given pointer.
+ *
+ * Returns `true` if the symbol was set successfully, or `false` if the set
+ * failed.
+ *
+ * # Safety
+ *
+ * The caller must guarantee that the module pointer is valid, and that the
+ * pointer is valid, lives for the lifetime of the JIT module, and is of the
+ * correct type for the symbol.
+ */
+bool zrc_jit_set_global_symbol(const struct ZrcJitModule *module,
+                               const char *symbol_name,
+                               const void *ptr);
+
+/**
+ * Try to load a function from the given JIT module.
+ *
+ * Returns NULL if the function is not found, or a pointer to the function if
+ * it is found.
+ *
+ * # Safety
+ *
+ * The caller must guarantee that the module pointer is valid, and that the
+ * function signature matches the expected signature. The caller must also
+ * ensure that the module, and hence the JIT engine, is kept alive for the
+ * lifetime of the function pointer.
+ */
+const void *zrc_jit_get_function(const struct ZrcJitModule *module, const char *name);
+
+/**
+ * Destroy the given JIT module.
+ *
+ * # Safety
+ *
+ * The caller must guarantee that the module pointer is valid and that the
+ * module is no longer in use.
+ */
+void zrc_jit_destroy_module(const struct ZrcJitModule *module);
+
+/**
+ * Compile and link a Zirco program into the given JIT module.
+ *
+ * # Safety
+ *
+ * The caller must guarantee that the module pointer is valid and that the
+ * values within `inputs` are valid for the duration of the call.
+ */
+struct ZrcCompileResult zrc_jit_compile_and_link(const struct ZrcJitModule *module,
+                                                 struct ZrcCompileInputs inputs);
 
 #endif  /* ZRC_H */

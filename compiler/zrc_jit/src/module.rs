@@ -1,25 +1,18 @@
 //! An individual compilation unit within the JIT.
 
-use std::{
-	error::Error,
-	ffi::CString,
-	io::{self, ErrorKind},
-	os::raw::c_char,
-	path::Path,
-};
+use std::{ffi::CString, os::raw::c_char, path::Path};
 
 use inkwell::{
 	OptimizationLevel,
 	execution_engine::{ExecutionEngine, FunctionLookupError, JitFunction, UnsafeFunctionPointer},
 	module::Module,
-	support::{load_library_permanently, load_visible_symbols},
 };
 use tracing::debug;
 use zrc_codegen::cg_program;
 use zrc_typeck::typeck::TastRoot;
 use zrc_utils::line_finder::LineLookup;
 
-use crate::{engine::JitEngine, utils::resolve_library};
+use crate::engine::JitEngine;
 
 /// A [`JitModule`] represents a single compilation unit within the JIT. It is
 /// responsible for managing the LLVM [`Module`] and state for JIT execution.
@@ -75,28 +68,25 @@ impl<'ctx> JitModule<'ctx> {
 			.expect("linking module into JIT should succeed");
 	}
 
-	/// Load a library by name.
+	/// Set a global symbol in this JIT module to a given pointer.
 	///
-	/// # Errors
+	/// # Safety
 	///
-	/// Errors if the library cannot be found or loaded.
-	pub fn load_library(&self, lib_name: &str) -> Result<(), Box<dyn Error>> {
-		if let Some(lib_path) = resolve_library(lib_name, &self.engine.lib_paths) {
-			debug!(library = ?lib_path, "loading library");
-			load_library_permanently(&lib_path)?;
-			Ok(())
-		} else {
-			Err(Box::new(io::Error::new(
-				ErrorKind::NotFound,
-				format!("Could not find library '{lib_name}' in specified library paths."),
-			)))
-		}
-	}
-
-	/// Load all symbols visible to the current process into the JIT.
-	pub fn load_visible_symbols(&self) {
-		debug!("loading visible symbols into JIT");
-		load_visible_symbols();
+	/// The caller must ensure that the pointer is valid, lives for the lifetime
+	/// of the JIT module, and is of the correct type for the symbol.
+	///
+	/// # Panics
+	///
+	/// Can panic if the symbol does not exist in the module.
+	pub fn set_global_symbol(&self, symbol_name: &str, ptr: *const ()) {
+		debug!(symbol = symbol_name, "setting global symbol");
+		self.ee.add_global_mapping(
+			&self
+				.module
+				.get_global(symbol_name)
+				.expect("global should exist"),
+			ptr.addr(),
+		);
 	}
 
 	/// Try to load a function from the JIT.

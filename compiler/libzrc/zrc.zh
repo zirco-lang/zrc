@@ -1,0 +1,65 @@
+#pragma once
+// This file is manually updated based on zrc.h.
+
+type ZrcDiagnosticSeverity = u8;
+let ZRC_DIAG_ERROR:   ZrcDiagnosticSeverity = 0;
+let ZRC_DIAG_WARNING: ZrcDiagnosticSeverity = 1;
+
+type ZrcOutputFormat = u8;
+let ZRC_OUTPUT_LLVM: ZrcOutputFormat = 0;
+let ZRC_OUTPUT_ASM:  ZrcOutputFormat = 1;
+let ZRC_OUTPUT_OBJ:  ZrcOutputFormat = 2;
+
+type ZrcOptimizationLevel = u8;
+let ZRC_OPTIMIZE_NONE:       ZrcOptimizationLevel = 0;
+let ZRC_OPTIMIZE_LESS:       ZrcOptimizationLevel = 1;
+let ZRC_OPTIMIZE_DEFAULT:    ZrcOptimizationLevel = 2;
+let ZRC_OPTIMIZE_AGGRESSIVE: ZrcOptimizationLevel = 3;
+
+type ZrcDebugLevel = u8;
+let ZRC_DI_NONE:  ZrcDebugLevel = 0;
+let ZRC_DI_BASIC: ZrcDebugLevel = 1;
+let ZRC_DI_FULL:  ZrcDebugLevel = 2;
+
+struct ZrcJitEngine {}
+struct ZrcJitModule {}
+struct ZrcDiagnostic {}
+
+struct ZrcCompileResult {
+    success: bool,
+    data: *void,
+    size: usize,
+    diagnostic: *ZrcDiagnostic,
+}
+
+struct ZrcCompileInputs {
+    frontend_version_string: *u8,
+    include_paths: **u8,
+    include_paths_len: usize,
+    emit: ZrcOutputFormat,
+    path: *u8,
+    cli_args: *u8,
+    content: *u8,
+    optimization_level: ZrcOptimizationLevel,
+    debug_mode: ZrcDebugLevel,
+    triple: *u8,
+    cpu: *u8,
+    forbid_unlisted_includes: bool,
+}
+
+fn zrc_free_string(str: *u8);
+fn zrc_free_buffer(data: *void, size: usize);
+fn zrc_diag_severity(diag: *ZrcDiagnostic) -> ZrcDiagnosticSeverity;
+fn zrc_diag_fmt_primary_line(diag: *ZrcDiagnostic) -> *u8;
+fn zrc_diag_fmt(diag: *ZrcDiagnostic, source: *u8) -> *u8;
+fn zrc_diag_fmt_json(diag: *ZrcDiagnostic) -> *u8;
+fn zrc_diag_free(diag: *ZrcDiagnostic);
+fn zrc_compile(inputs: ZrcCompileInputs) -> ZrcCompileResult;
+fn zrc_jit_init(frontend_version_string: *u8, cli_args: *u8, lib_paths: **u8, lib_paths_len: usize) -> *ZrcJitEngine;
+fn zrc_jit_load_library(engine: *ZrcJitEngine, lib_name: *u8) -> bool;
+fn zrc_jit_load_visible_symbols(engine: *ZrcJitEngine);
+fn zrc_jit_create_module(engine: *ZrcJitEngine) -> *ZrcJitModule;
+fn zrc_jit_set_global_symbol(module: *ZrcJitModule, symbol_name: *u8, ptr: *void) -> bool;
+fn zrc_jit_get_function(module: *ZrcJitModule, name: *u8) -> *void;
+fn zrc_jit_destroy_module(module: *ZrcJitModule);
+fn zrc_jit_compile_and_link(module: *ZrcJitModule, inputs: ZrcCompileInputs) -> ZrcCompileResult;

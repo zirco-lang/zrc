@@ -28,6 +28,7 @@ cp target/release/libzrc.a "$ZIRCON_LIB_DIR/"
 find target/release -maxdepth 1 -type f \( -name "libzrc.so" -o -name "libzrc.dylib" \) -exec cp {} "$ZIRCON_LIB_DIR/" \;
 cp -r include/* "$ZIRCON_INCLUDE_DIR/"
 cp compiler/libzrc/zrc.h "$ZIRCON_INCLUDE_DIR/"
+cp compiler/libzrc/zrc.zh "$ZIRCON_INCLUDE_DIR/"
 
 # build std using the fresh compiler
 make -C libzr all-opt ZRC="$(realpath $ZIRCON_BIN_DIR/zrc)"

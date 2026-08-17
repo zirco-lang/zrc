@@ -56,6 +56,8 @@
 )]
 
 pub mod compile;
+#[cfg(feature = "jit")]
+pub mod jit_driver;
 pub use compile::{OutputFormat, compile};
 pub use zrc_codegen as codegen;
 pub use zrc_diagnostics as diagnostics;

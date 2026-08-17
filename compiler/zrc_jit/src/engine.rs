@@ -1,16 +1,24 @@
 //! [`JitEngine`] go vroom
 
-use std::path::PathBuf;
+use std::{
+	error::Error,
+	io::{self, ErrorKind},
+	path::PathBuf,
+};
 
 use inkwell::{
 	OptimizationLevel,
 	context::Context,
+	support::{load_library_permanently, load_visible_symbols},
 	targets::{CodeModel, InitializationConfig, RelocMode, Target, TargetMachine},
 };
 use tracing::debug;
 use zrc_codegen::get_native_triple;
 
-use crate::{module::JitModule, utils::split_paths};
+use crate::{
+	module::JitModule,
+	utils::{resolve_library, split_paths},
+};
 
 /// The Zirco JIT engine. There must only be one per thread.
 #[derive(Debug)]
@@ -77,5 +85,29 @@ impl JitEngine {
 	#[must_use]
 	pub fn create_module(&self) -> JitModule<'_> {
 		JitModule::new(self, "zrc_jit_module")
+	}
+
+	/// Load a library by name.
+	///
+	/// # Errors
+	///
+	/// Errors if the library cannot be found or loaded.
+	pub fn load_library(&self, lib_name: &str) -> Result<(), Box<dyn Error>> {
+		if let Some(lib_path) = resolve_library(lib_name, &self.lib_paths) {
+			debug!(library = ?lib_path, "loading library");
+			load_library_permanently(&lib_path)?;
+			Ok(())
+		} else {
+			Err(Box::new(io::Error::new(
+				ErrorKind::NotFound,
+				format!("Could not find library '{lib_name}' in specified library paths."),
+			)))
+		}
+	}
+
+	/// Load all symbols visible to the current process into the JIT.
+	pub fn load_visible_symbols(&self) {
+		debug!("loading visible symbols into JIT");
+		load_visible_symbols();
 	}
 }
