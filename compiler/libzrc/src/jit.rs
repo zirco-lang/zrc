@@ -231,34 +231,70 @@ pub unsafe extern "C" fn zrc_jit_compile_and_link(
 
 	// SAFETY: the caller guarantees that the module pointer is valid
 	let module = unsafe { &*module.cast::<JitModule>() };
+	eprintln!("A");
 
-	// SAFETY: the caller guarantees that all C strings are valid
 	let frontend_version_string = unsafe { CStr::from_ptr(frontend_version_string) }
 		.to_string_lossy()
 		.into_owned();
-	let include_paths = unsafe { slice::from_raw_parts(include_paths, include_paths_len) }
+
+	eprintln!("B");
+
+	eprintln!("include_paths = {include_paths:p}");
+	eprintln!("include_paths_len = {include_paths_len}");
+
+	let include_paths = unsafe { slice::from_raw_parts(include_paths, include_paths_len) };
+
+	eprintln!("C");
+
+	eprintln!("include_paths = {include_paths:p}");
+	eprintln!("include_paths_len = {include_paths_len}");
+
+	let include_paths = include_paths
 		.iter()
 		.map(|&ptr| {
-			Into::<PathBuf>::into(
-				unsafe { CStr::from_ptr(ptr) }
-					.to_string_lossy()
-					.into_owned(),
-			)
+			eprintln!("D: ptr={ptr:p}");
+
+			let s = unsafe { CStr::from_ptr(ptr) }
+				.to_string_lossy()
+				.into_owned();
+
+			eprintln!("E: {s:?}");
+
+			PathBuf::from(s)
 		})
 		.collect::<Vec<PathBuf>>();
+
+	eprintln!("F");
+
 	let path = unsafe { PathBuf::from(CStr::from_ptr(path).to_string_lossy().into_owned()) };
+
+	eprintln!("G");
+
 	let cli_args = unsafe { CStr::from_ptr(cli_args) }
 		.to_string_lossy()
 		.into_owned();
+
+	eprintln!("H");
+
 	let content = unsafe { CStr::from_ptr(content) }
 		.to_string_lossy()
 		.into_owned();
+
+	eprintln!("I");
+
 	let triple = unsafe { CStr::from_ptr(triple) }
 		.to_string_lossy()
 		.into_owned();
+
+	eprintln!("J");
+
 	let cpu = unsafe { CStr::from_ptr(cpu) }
 		.to_string_lossy()
 		.into_owned();
+
+	eprintln!("K");
+
+	eprintln!("L: constructing CompileInputs");
 
 	let compile_inputs = CompileInputs {
 		frontend_version_string: &frontend_version_string,
@@ -273,10 +309,16 @@ pub unsafe extern "C" fn zrc_jit_compile_and_link(
 		forbid_unlisted_includes,
 		content: &content,
 	};
+	eprintln!("L: constructing CompileInputs");
+
+	eprintln!("M: entering jit_compile_and_link");
 
 	let result = catch_unwind(AssertUnwindSafe(|| {
+		eprintln!("N: inside jit_compile_and_link");
 		jit_compile_and_link(module, compile_inputs)
 	}));
+
+	eprintln!("O: returned");
 
 	match result {
 		Ok(Ok(())) => ZrcCompileResult {
