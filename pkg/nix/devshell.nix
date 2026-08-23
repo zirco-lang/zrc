@@ -13,6 +13,7 @@
       llvm.libllvm
       llvm.clang
       llvm.lld
+      llvm.bolt
       pkg-config
       libffi
       libxml2

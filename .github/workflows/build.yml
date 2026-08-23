@@ -32,8 +32,9 @@ jobs:
               run: |
                   wget https://apt.llvm.org/llvm.sh
                   chmod +x llvm.sh
-                  sudo ./llvm.sh 22
-                  sudo apt install libpolly-22-dev
+                  sudo ./llvm.sh 22 all
+                  sudo apt install libpolly-22-dev libbolt-22-dev bolt-22
+                  echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
             - name: Install LLVM dependencies from Homebrew (macOS)
               if: runner.os == 'macOS'
               run: |
@@ -44,11 +45,17 @@ jobs:
               with:
                   toolchain: stable
                   override: true
+                  components: llvm-tools-preview
             - name: Use dependency cache
               uses: Swatinem/rust-cache@v2
-            - name: Build project
+            - name: Build project (PGO + BOLT)
+              if: runner.os == 'Linux'
               run: |
-                  mkdir outputs
+                  ZIRCON_TOOLCHAIN_DIR=$(pwd)/outputs BOLT=1 \
+                    bash scripts/build.sh
+            - name: Build project (PGO only)
+              if: runner.os == 'macOS'
+              run: |
                   ZIRCON_TOOLCHAIN_DIR=$(pwd)/outputs \
                     bash scripts/build.sh
             - name: Upload build artifacts

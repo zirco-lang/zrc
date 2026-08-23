@@ -41,6 +41,10 @@ $(OUTDIR)/%.o: %.zr
 	$(ECHO) "  ZRC    $<"
 	$(Q)$(ZRC) $(ZRFLAGS) -o $@ $<
 
+# used for PGO profiling
+.PHONY: zrc-only
+zrc-only: $(ZR_OUTPUTS)
+
 .PHONY: clean
 clean:
 	$(Q)rm -rf $(OUTDIR)
