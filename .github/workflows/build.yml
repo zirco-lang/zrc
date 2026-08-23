@@ -16,7 +16,6 @@ jobs:
                     - ubuntu-24.04
                     - ubuntu-24.04-arm
                     - macos-latest
-                    - macos-15-intel
         env:
             LLVM_SYS_221_PREFIX: /usr/lib/llvm-22
 
@@ -209,7 +208,6 @@ jobs:
                       - **Linux x64**: \`zrc-Linux-X64-release\`
                       - **Linux ARM64**: \`zrc-Linux-ARM64-release\`
                       - **macOS ARM64**: \`zrc-macOS-ARM64-release\`
-                      - **macOS x64**: \`zrc-macOS-X64-release\`
 
                       If you use the [Zircon toolchain manager](https://github.com/zirco-lang/zircon), you can easily install the built artifacts using these downloaded packages:
                       \`\`\`bash
@@ -223,8 +221,8 @@ jobs:
                           repo: context.repo.repo,
                       });
 
-                      const botComment = comments.data.find(comment => 
-                          comment.user.type === 'Bot' && 
+                      const botComment = comments.data.find(comment =>
+                          comment.user.type === 'Bot' &&
                           comment.body.includes('🚀 **Build Artifacts**')
                       );
 
@@ -296,11 +294,6 @@ jobs:
               with:
                   name: zrc-Linux-ARM64-release
                   path: Linux-ARM64
-            - name: Download X86 macOS build artifact
-              uses: actions/download-artifact@v8
-              with:
-                  name: zrc-macOS-X64-release
-                  path: macOS-X64
             - name: Download ARM64 macOS build artifact
               uses: actions/download-artifact@v8
               with:
@@ -320,13 +313,11 @@ jobs:
               run: |
                   chmod +x Linux-X64/bin/*
                   chmod +x Linux-ARM64/bin/*
-                  chmod +x macOS-X64/bin/*
                   chmod +x macOS-ARM64/bin/*
             - name: Create tar archives
               run: |
                   tar -czf zrc-linux-x64.tar.gz -C Linux-X64 .
                   tar -czf zrc-linux-arm64.tar.gz -C Linux-ARM64 .
-                  tar -czf zrc-macos-x64.tar.gz -C macOS-X64 .
                   tar -czf zrc-macos-arm64.tar.gz -C macOS-ARM64 .
                   mv Debian-X64/* .
                   mv Debian-ARM64/* .
@@ -351,7 +342,6 @@ jobs:
                   files: |
                       zrc-linux-x64.tar.gz
                       zrc-linux-arm64.tar.gz
-                      zrc-macos-x64.tar.gz
                       zrc-macos-arm64.tar.gz
                       *.deb
 

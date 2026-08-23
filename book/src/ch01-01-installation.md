@@ -12,14 +12,17 @@ The toolchain has host support for the following targets:
 **Tier 2 targets** (built, but not tested in CI):
 
 - `aarch64-unknown-linux-gnu` (Linux on ARM64, prebuilt binaries available)
-- `x86_64-apple-darwin` (macOS on x86_64, prebuilt binaries available, **deprecated**)
 - `aarch64-apple-darwin` (macOS on Apple Silicon, prebuilt binaries available)
+- Nix `aarch64-linux`
 
-> [!NOTE]
-> Nix support for all targets (including Tier 1 targets) is considered Tier 2.
+**Tier 3 targets** (not tested in CI, but theoretically there):
+
+- `x86_64-apple-darwin` (macOS on Intel)
+- Nix `aarch64-darwin`
+- Nix `x86_64-linux`
 
 Other platforms may be supported via cross-compilation or by building Zirco with a custom LLVM
-build, but this is not currently documented.
+toolchain, but this is not currently documented.
 
 Zirco does not support Windows, but the compiler runs normally on Windows via WSL. This guide also
 assumes your system has a C toolchain installed (for linking).
