@@ -48,16 +48,12 @@ jobs:
                   components: llvm-tools-preview
             - name: Use dependency cache
               uses: Swatinem/rust-cache@v2
-            - name: Build project (PGO + BOLT)
-              if: runner.os == 'Linux'
-              run: |
-                  ZIRCON_TOOLCHAIN_DIR=$(pwd)/outputs BOLT=1 \
-                    bash scripts/build.sh
-            - name: Build project (PGO only)
-              if: runner.os == 'macOS'
-              run: |
-                  ZIRCON_TOOLCHAIN_DIR=$(pwd)/outputs \
-                    bash scripts/build.sh
+            - name: Build Zirco
+              env:
+                  ZIRCON_TOOLCHAIN_DIR: ${{ github.workspace }}/outputs
+                  PGO: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
+                  BOLT: ${{ runner.os == 'Linux' && '1' || '0' }}
+              run: bash scripts/build.sh
             - name: Upload build artifacts
               uses: actions/upload-artifact@v7
               with:

@@ -20,30 +20,46 @@ mkdir -p "$ZIRCON_LIB_DIR"
 mkdir -p "$ZIRCON_LIBZR_DIR/lib"
 mkdir -p "$ZIRCON_LIBZR_DIR/include"
 
-mkdir -p target/tools
-cargo install cargo-pgo --root target/tools
-target/tools/bin/cargo-pgo pgo instrument build
-target/tools/bin/cargo-pgo pgo instrument test
-BIN="target/$TRIPLE/release/" BOLT=0 ./scripts/pgo-profiling.sh
+if [ "$PGO" = "1" ]; then
 
-if [ "$BOLT" = "1" ]; then
-    target/tools/bin/cargo-pgo pgo bolt build --with-pgo
-    BIN="target/$TRIPLE/release/" BOLT=1 ./scripts/pgo-profiling.sh
-    target/tools/bin/cargo-pgo pgo bolt optimize --with-pgo
-    BOLT_SUFFIX="-bolt-optimized"
+    mkdir -p target/tools
+    cargo install cargo-pgo --root target/tools
+    target/tools/bin/cargo-pgo pgo instrument build
+    target/tools/bin/cargo-pgo pgo instrument test
+    BIN="target/$TRIPLE/release/" BOLT=0 ./scripts/pgo-profiling.sh
+
+    if [ "$BOLT" = "1" ]; then
+        target/tools/bin/cargo-pgo pgo bolt build --with-pgo
+        BIN="target/$TRIPLE/release/" BOLT=1 ./scripts/pgo-profiling.sh
+        target/tools/bin/cargo-pgo pgo bolt optimize --with-pgo
+        BOLT_SUFFIX="-bolt-optimized"
+    else
+        target/tools/bin/cargo-pgo pgo optimize build
+        BOLT_SUFFIX=""
+    fi
+
+    rm -f compiler/zrc_parser/default.profraw
+
+    cp target/$TRIPLE/release/zrc$BOLT_SUFFIX "$ZIRCON_BIN_DIR/zrc"
+    cp target/$TRIPLE/release/zircop$BOLT_SUFFIX "$ZIRCON_BIN_DIR/zircop"
+    cp target/$TRIPLE/release/zrx$BOLT_SUFFIX "$ZIRCON_BIN_DIR/zrx"
+    cp target/$TRIPLE/release/zrepl$BOLT_SUFFIX "$ZIRCON_BIN_DIR/zrepl"
+    cp target/$TRIPLE/release/libzrc.a "$ZIRCON_LIB_DIR/"
+    find target/$TRIPLE/release -maxdepth 1 -type f \( -name "libzrc.so" -o -name "libzrc.dylib" \) -exec cp {} "$ZIRCON_LIB_DIR/" \;
+
 else
-    target/tools/bin/cargo-pgo pgo optimize build
-    BOLT_SUFFIX=""
+
+    cargo build --release
+
+    cp target/release/zrc "$ZIRCON_BIN_DIR/"
+    cp target/release/zircop "$ZIRCON_BIN_DIR/"
+    cp target/release/zrx "$ZIRCON_BIN_DIR/"
+    cp target/release/zrepl "$ZIRCON_BIN_DIR/"
+    cp target/release/libzrc.a "$ZIRCON_LIB_DIR/"
+    find target/release -maxdepth 1 -type f \( -name "libzrc.so" -o -name "libzrc.dylib" \) -exec cp {} "$ZIRCON_LIB_DIR/" \;
+
 fi
 
-rm -f compiler/zrc_parser/default.profraw
-
-cp target/$TRIPLE/release/zrc$BOLT_SUFFIX "$ZIRCON_BIN_DIR/zrc"
-cp target/$TRIPLE/release/zircop$BOLT_SUFFIX "$ZIRCON_BIN_DIR/zircop"
-cp target/$TRIPLE/release/zrx$BOLT_SUFFIX "$ZIRCON_BIN_DIR/zrx"
-cp target/$TRIPLE/release/zrepl$BOLT_SUFFIX "$ZIRCON_BIN_DIR/zrepl"
-cp target/$TRIPLE/release/libzrc.a "$ZIRCON_LIB_DIR/"
-find target/$TRIPLE/release -maxdepth 1 -type f \( -name "libzrc.so" -o -name "libzrc.dylib" \) -exec cp {} "$ZIRCON_LIB_DIR/" \;
 cp -r include/* "$ZIRCON_INCLUDE_DIR/"
 cp compiler/libzrc/zrc.h "$ZIRCON_INCLUDE_DIR/"
 
