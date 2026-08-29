@@ -284,11 +284,7 @@ impl<'input> Type<'input> {
 		}
 
 		// Allow {int} to implicitly cast to any concrete integer type
-		if matches!(self, Type::Int) && target.is_integer() && !matches!(target, Type::Int) {
-			return true;
-		}
-
-		false
+		matches!(self, Type::Int) && target.is_integer() && !matches!(target, Type::Int)
 	}
 }
 
