@@ -151,16 +151,16 @@ enum Precedence {
 	LogicalOr = 4,
 	/// Logical AND
 	LogicalAnd = 5,
-	/// Bitwise OR
-	BitwiseOr = 6,
-	/// Bitwise XOR
-	BitwiseXor = 7,
-	/// Bitwise AND
-	BitwiseAnd = 8,
 	/// Equality operators
-	Equality = 9,
+	Equality = 6,
 	/// Comparison operators
-	Comparison = 10,
+	Comparison = 7,
+	/// Bitwise OR
+	BitwiseOr = 8,
+	/// Bitwise XOR
+	BitwiseXor = 9,
+	/// Bitwise AND
+	BitwiseAnd = 10,
 	/// Addition and subtraction
 	Term = 11,
 	/// Multiplication, division, modulo
@@ -345,10 +345,11 @@ impl std::fmt::Display for ExprKind<'_> {
 				Self::fmt_child(f, rhs, prec, true)
 			}
 			Self::Assignment(op, lhs, rhs) => {
+				// Reverse `is_right` for right-associative assignment
 				let prec = self.precedence();
-				Self::fmt_child(f, lhs, prec, false)?;
+				Self::fmt_child(f, lhs, prec, true)?;
 				write!(f, " {op} ")?;
-				Self::fmt_child(f, rhs, prec, true)
+				Self::fmt_child(f, rhs, prec, false)
 			}
 			Self::BinaryBitwise(op, lhs, rhs) => {
 				let prec = self.precedence();
@@ -889,6 +890,9 @@ mod tests {
 			"a >= b",
 			"a < b",
 			"a <= b",
+			"a | b",
+			"a ^ b",
+			"a & b",
 			"a + b",
 			"a - b",
 			"a * b",
@@ -936,6 +940,16 @@ mod tests {
 			("a + b * c", "a + b * c"),
 			("(a + b) * c", "(a + b) * c"),
 			("a * (b + c)", "a * (b + c)"),
+			// Bitwise AND binds tighter than XOR binds tighter than OR
+			("a & b ^ c | d", "a & b ^ c | d"),
+			("((a & b) ^ c) | d", "a & b ^ c | d"),
+			("a & (b ^ (c | d))", "a & (b ^ (c | d))"),
+			("a | b ^ c & d", "a | b ^ c & d"),
+			("a | (b ^ (c & d))", "a | b ^ c & d"),
+			("((a | b) ^ c) & d", "((a | b) ^ c) & d"),
+			// Bitwise OR binds tighter than Equality
+			("(a | b) == (c | d)", "a | b == c | d"),
+			("a | (b == c) | d", "a | (b == c) | d"),
 			// Comparison binds tighter than logical
 			("a < b && c > d", "a < b && c > d"),
 			("(a < b) && (c > d)", "a < b && c > d"), // Extra parens removed
@@ -950,6 +964,9 @@ mod tests {
 			// Multiple operators of same precedence (left associative)
 			("a - b - c", "a - b - c"),
 			("a - (b - c)", "a - (b - c)"),
+			// Multiple operators of same precedence (right associative)
+			("a = b = c", "a = b = c"),
+			("(a = b) = c", "(a = b) = c"),
 			// Unary operators
 			("!a && b", "!a && b"),
 			("!(a && b)", "!(a && b)"),
@@ -962,6 +979,15 @@ mod tests {
 			("a + b.c", "a + b.c"),
 			("a++ + b", "a++ + b"),
 			("a + b++", "a + b++"),
+			// Mostly-full integration, due to a rustc 1.100 nightly ICE
+			(
+				"a, b = c ? d : e || f && g == h > i | j ^ k & l + m * -n.o as P",
+				"a, b = c ? d : e || f && g == h > i | j ^ k & l + m * -n.o as P",
+			),
+			(
+				"((((((((((b = c) ? d : e) || f) && g) == h) > i) | j) ^ k) & l) + m) * (-n).o",
+				"((((((((((b = c) ? d : e) || f) && g) == h) > i) | j) ^ k) & l) + m) * (-n).o",
+			),
 		];
 
 		for (input, expected) in test_cases {

@@ -143,16 +143,16 @@ enum Precedence {
 	LogicalOr = 4,
 	/// Logical AND
 	LogicalAnd = 5,
-	/// Bitwise OR
-	BitwiseOr = 6,
-	/// Bitwise XOR
-	BitwiseXor = 7,
-	/// Bitwise AND
-	BitwiseAnd = 8,
 	/// Equality operators
-	Equality = 9,
+	Equality = 6,
 	/// Comparison operators
-	Comparison = 10,
+	Comparison = 7,
+	/// Bitwise OR
+	BitwiseOr = 8,
+	/// Bitwise XOR
+	BitwiseXor = 9,
+	/// Bitwise AND
+	BitwiseAnd = 10,
 	/// Addition and subtraction
 	Term = 11,
 	/// Multiplication, division, modulo
