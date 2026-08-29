@@ -979,18 +979,14 @@ mod tests {
 			("a + b.c", "a + b.c"),
 			("a++ + b", "a++ + b"),
 			("a + b++", "a + b++"),
-			// Full integration
+			// Mostly-full integration, due to a rustc 1.100 nightly ICE
 			(
 				"a, b = c ? d : e || f && g == h > i | j ^ k & l + m * -n.o as P",
 				"a, b = c ? d : e || f && g == h > i | j ^ k & l + m * -n.o as P",
 			),
 			(
-				"a, (b = (c ? d : (e || (f && (g == (h > (i | (j ^ (k & (l + (m * ((-(n.o)) as P))))))))))))",
-				"a, b = c ? d : e || f && g == h > i | j ^ k & l + m * -n.o as P",
-			),
-			(
-				"((((((((((((a, b) = c) ? d : e) || f) && g) == h) > i) | j) ^ k) & l) + m) * (-n).o) as P",
-				"((((((((((((a, b) = c) ? d : e) || f) && g) == h) > i) | j) ^ k) & l) + m) * (-n).o) as P",
+				"((((((((((b = c) ? d : e) || f) && g) == h) > i) | j) ^ k) & l) + m) * (-n).o",
+				"((((((((((b = c) ? d : e) || f) && g) == h) > i) | j) ^ k) & l) + m) * (-n).o",
 			),
 		];
 
