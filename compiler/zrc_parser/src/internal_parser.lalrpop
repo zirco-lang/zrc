@@ -333,7 +333,21 @@ LogicalOr = ExprPrecedenceTier<_LogicalOr, LogicalAnd>;
 _LogicalAnd: ExprKind<'input> = {
     <l:LogicalAnd> "&&" <r:Equality> => ExprKind::Logical(Logical::And, Box::new(l), Box::new(r)),
 };
-LogicalAnd = ExprPrecedenceTier<_LogicalAnd, Bitwise>;
+LogicalAnd = ExprPrecedenceTier<_LogicalAnd, Equality>;
+
+_Equality: ExprKind<'input> = {
+    <l:Equality> "==" <r:Comparison> => ExprKind::Equality(Equality::Eq, Box::new(l), Box::new(r)),
+    <l:Equality> "!=" <r:Comparison> => ExprKind::Equality(Equality::Neq, Box::new(l), Box::new(r)),
+};
+Equality: Expr<'input> = ExprPrecedenceTier<_Equality, Comparison>;
+
+_Comparison: ExprKind<'input> = {
+    <l:Comparison> ">" <r:Bitwise> => ExprKind::Comparison(Comparison::Gt, Box::new(l), Box::new(r)),
+    <l:Comparison> ">=" <r:Bitwise> => ExprKind::Comparison(Comparison::Gte, Box::new(l), Box::new(r)),
+    <l:Comparison> "<" <r:Bitwise> => ExprKind::Comparison(Comparison::Lt, Box::new(l), Box::new(r)),
+    <l:Comparison> "<=" <r:Bitwise> => ExprKind::Comparison(Comparison::Lte, Box::new(l), Box::new(r)),
+};
+Comparison: Expr<'input> = ExprPrecedenceTier<_Comparison, Bitwise>;
 
 Bitwise: Expr<'input> = BitwiseOr;
 _BitwiseOr: ExprKind<'input> = {
@@ -345,23 +359,9 @@ _BitwiseXor: ExprKind<'input> = {
 };
 BitwiseXor: Expr<'input> = ExprPrecedenceTier<_BitwiseXor, BitwiseAnd>;
 _BitwiseAnd: ExprKind<'input> = {
-    <l:BitwiseAnd> "&" <r:Equality> => ExprKind::BinaryBitwise(BinaryBitwise::And, Box::new(l), Box::new(r)),
+    <l:BitwiseAnd> "&" <r:Term> => ExprKind::BinaryBitwise(BinaryBitwise::And, Box::new(l), Box::new(r)),
 }
-BitwiseAnd: Expr<'input> = ExprPrecedenceTier<_BitwiseAnd, Equality>;
-
-_Equality: ExprKind<'input> = {
-    <l:Equality> "==" <r:Comparison> => ExprKind::Equality(Equality::Eq, Box::new(l), Box::new(r)),
-    <l:Equality> "!=" <r:Comparison> => ExprKind::Equality(Equality::Neq, Box::new(l), Box::new(r)),
-};
-Equality: Expr<'input> = ExprPrecedenceTier<_Equality, Comparison>;
-
-_Comparison: ExprKind<'input> = {
-    <l:Comparison> ">" <r:Term> => ExprKind::Comparison(Comparison::Gt, Box::new(l), Box::new(r)),
-    <l:Comparison> ">=" <r:Term> => ExprKind::Comparison(Comparison::Gte, Box::new(l), Box::new(r)),
-    <l:Comparison> "<" <r:Term> => ExprKind::Comparison(Comparison::Lt, Box::new(l), Box::new(r)),
-    <l:Comparison> "<=" <r:Term> => ExprKind::Comparison(Comparison::Lte, Box::new(l), Box::new(r)),
-};
-Comparison: Expr<'input> = ExprPrecedenceTier<_Comparison, Term>;
+BitwiseAnd: Expr<'input> = ExprPrecedenceTier<_BitwiseAnd, Term>;
 
 _Term: ExprKind<'input> = {
     <l:Term> "+" <r:Factor> => ExprKind::Arithmetic(Arithmetic::Addition, Box::new(l), Box::new(r)),
