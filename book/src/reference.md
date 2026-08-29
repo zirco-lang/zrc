@@ -459,11 +459,11 @@ Operators are listed from highest to lowest precedence:
 | 3          | `as`                                         | Type cast                                                              | Left-to-right |
 | 4          | `*` `/` `%`                                  | Multiplication, division, modulo                                       | Left-to-right |
 | 5          | `+` `-`                                      | Addition, subtraction                                                  | Left-to-right |
-| 6          | `<` `<=` `>` `>=`                            | Comparison                                                             | Left-to-right |
-| 7          | `==` `!=`                                    | Equality                                                               | Left-to-right |
-| 8          | `&`                                          | Bitwise AND                                                            | Left-to-right |
-| 9          | `^`                                          | Bitwise XOR                                                            | Left-to-right |
-| 10         | `\|`                                         | Bitwise OR                                                             | Left-to-right |
+| 6          | `&`                                          | Bitwise AND                                                            | Left-to-right |
+| 7          | `^`                                          | Bitwise XOR                                                            | Left-to-right |
+| 8          | `\|`                                         | Bitwise OR                                                             | Left-to-right |
+| 9          | `<` `<=` `>` `>=`                            | Comparison                                                             | Left-to-right |
+| 10         | `==` `!=`                                    | Equality                                                               | Left-to-right |
 | 11         | `&&`                                         | Logical AND                                                            | Left-to-right |
 | 12         | `\|\|`                                       | Logical OR                                                             | Left-to-right |
 | 13         | `? :`                                        | Ternary conditional                                                    | Right-to-left |
