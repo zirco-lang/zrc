@@ -386,37 +386,103 @@ fn cg_program_without_optimization<'ctx>(
 
 	let mut global_scope = CgScope::new();
 
-	for declaration in program {
+	// Pass 1: Register all functions and process all globals
+	for declaration in &program {
 		let span = declaration.span();
 
-		match declaration.into_value() {
+		match declaration.value() {
 			TypedDeclaration::FunctionDeclaration {
 				name,
 				parameters,
 				return_type,
+				body,
+			} => {
+				let _span = debug_span!("reg_fn_decl", name = name.value()).entered();
+				let arg_types = parameters
+					.value()
+					.as_arguments()
+					.iter()
+					.map(|ArgumentDeclaration { ty, .. }| ty.value())
+					.collect::<Vec<_>>();
+				let is_variadic = parameters.value().is_variadic();
+
+				let fn_value = if body.is_some() {
+					cg_init_fn(
+						&unit,
+						name.value(),
+						line_lookup.lookup_from_index(span.start()).line,
+						return_type.value(),
+						&arg_types,
+						is_variadic,
+					)
+					.0
+				} else {
+					cg_init_extern_fn(
+						&unit,
+						name.value(),
+						return_type.value(),
+						&arg_types,
+						is_variadic,
+					)
+				};
+
+				global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
+			}
+
+			TypedDeclaration::GlobalLetDeclaration(declarations) => {
+				for let_decl in declarations {
+					let let_declaration = let_decl.value();
+					let _span =
+						debug_span!("let_decl", name = let_declaration.name.value()).entered();
+					let (llvm_ty, _) = llvm_basic_type(&unit, &let_declaration.ty);
+
+					let global = module.add_global(llvm_ty, None, let_declaration.name.value());
+
+					// Evaluate constant expression or use zero initializer
+					let initializer = let_declaration.value.as_ref().map_or_else(
+						|| llvm_ty.const_zero(),
+						|value| eval_const_expr(&unit, value, &let_declaration.ty),
+					);
+					global.set_initializer(&initializer);
+
+					global_scope.insert(let_declaration.name.value(), global.as_pointer_value());
+
+					debug!(
+						name = let_declaration.name.value(),
+						ty = ?llvm_ty,
+						"prepared global variable"
+					);
+				}
+			}
+		}
+	}
+
+	// Pass 2: Generate code for all function bodies
+	for declaration in program {
+		match declaration.into_value() {
+			TypedDeclaration::FunctionDeclaration {
+				name,
+				parameters,
 				body: Some(body),
+				..
 			} => {
 				let _span = debug_span!("fn_decl", name = name.value()).entered();
 
 				let body_span = body.span();
 
-				let (fn_value, fn_subprogram) = cg_init_fn(
-					&unit,
-					name.value(),
-					line_lookup.lookup_from_index(span.start()).line,
-					return_type.value(),
-					parameters
-						.value()
-						.as_arguments()
-						.iter()
-						.map(|ArgumentDeclaration { ty, .. }| ty.value())
-						.collect::<Vec<_>>()
-						.as_slice(),
-					parameters.value().is_variadic(),
-				);
-				global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
+				let fn_value = module
+					.get_function(name.value())
+					.expect("Function should've been declared in registration pass");
+
 				// must come after the insert call so that recursion is valid
 				let mut fn_scope = global_scope.clone();
+
+				let fn_subprogram = match debug_level {
+					DWARFEmissionKind::None => None,
+					DWARFEmissionKind::Full | DWARFEmissionKind::LineTablesOnly => {
+						fn_value.get_subprogram()
+					}
+				};
 
 				let entry = ctx.append_basic_block(fn_value, "entry");
 				builder.position_at_end(entry);
@@ -531,54 +597,10 @@ fn cg_program_without_optimization<'ctx>(
 					&None,
 				);
 			}
-			// We do not attach debugging information to extern functions, this is clang's behavior
-			// so I assume it's correct.
-			TypedDeclaration::FunctionDeclaration {
-				name,
-				parameters,
-				return_type,
-				body: None,
-			} => {
-				let _span = debug_span!("fn_decl", name = name.value(), extern = true).entered();
-				let fn_value = cg_init_extern_fn(
-					&unit,
-					name.value(),
-					return_type.value(),
-					parameters
-						.value()
-						.as_arguments()
-						.iter()
-						.map(|ArgumentDeclaration { ty, .. }| ty.value())
-						.collect::<Vec<_>>()
-						.as_slice(),
-					parameters.value().is_variadic(),
-				);
-				global_scope.insert(name.value(), fn_value.as_global_value().as_pointer_value());
-			}
-			TypedDeclaration::GlobalLetDeclaration(declarations) => {
-				for let_decl in declarations {
-					let let_declaration = let_decl.value();
-					let _span =
-						debug_span!("let_decl", name = let_declaration.name.value()).entered();
-					let (llvm_ty, _) = llvm_basic_type(&unit, &let_declaration.ty);
 
-					let global = module.add_global(llvm_ty, None, let_declaration.name.value());
-
-					// Evaluate constant expression or use zero initializer
-					let initializer = let_declaration.value.as_ref().map_or_else(
-						|| llvm_ty.const_zero(),
-						|value| eval_const_expr(&unit, value, &let_declaration.ty),
-					);
-					global.set_initializer(&initializer);
-
-					global_scope.insert(let_declaration.name.value(), global.as_pointer_value());
-
-					debug!(
-						name = let_declaration.name.value(),
-						ty = ?llvm_ty,
-						"prepared global variable"
-					);
-				}
+			TypedDeclaration::FunctionDeclaration { body: None, .. }
+			| TypedDeclaration::GlobalLetDeclaration(_) => {
+				// nothing to do, pass 1 handled these
 			}
 		}
 	}
@@ -892,5 +914,20 @@ mod tests {
                 return 0;
             }
         "#});
+	}
+
+	/// Regression test for <https://github.com/zirco-lang/zrc/issues/552>
+	/// Two pass generation should work in codegen
+	#[test]
+	fn two_pass_generation_works() {
+		cg_snapshot_test!(indoc! {r"
+			fn bar() -> i32 {
+				return foo();
+			}
+
+			fn foo() -> i32 {
+				return 42;
+			}
+		"});
 	}
 }
