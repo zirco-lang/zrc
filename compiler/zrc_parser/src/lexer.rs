@@ -8,6 +8,7 @@
 
 pub mod token;
 
+#[allow(clippy::enum_glob_use)]
 use token::{
 	Token,
 	TokenKind::{self, *},
@@ -28,6 +29,9 @@ pub struct ZircoLexer<'input> {
 	file_name: &'static str,
 	/// The current offset in the input string.
 	offset: usize,
+	/// An additional offset to add to spans, used for lexing source chunks that
+	/// are not at the start of a file.
+	span_offset: usize,
 }
 
 impl<'input> ZircoLexer<'input> {
@@ -40,11 +44,12 @@ impl<'input> ZircoLexer<'input> {
 	/// assert_eq!(token.kind, TokenKind::Fn);
 	/// ```
 	#[must_use]
-	pub const fn new(input: &'input str, file_name: &'static str) -> Self {
+	pub const fn new(input: &'input str, file_name: &'static str, span_offset: usize) -> Self {
 		Self {
 			input,
 			file_name,
 			offset: 0,
+			span_offset,
 		}
 	}
 
@@ -99,8 +104,8 @@ impl<'input> ZircoLexer<'input> {
 
 			ch => {
 				let span = Span::from_positions_and_file(
-					start,
-					self.offset + ch.len_utf8(),
+					start + self.span_offset,
+					self.offset + ch.len_utf8() + self.span_offset,
 					self.file_name,
 				);
 				return Err(DiagnosticKind::UnknownToken(ch.to_string())
@@ -111,11 +116,103 @@ impl<'input> ZircoLexer<'input> {
 			}
 		};
 
+		assert!(
+			self.offset > start,
+			"lexer made no progress: offset={start}, char={ch:?}"
+		);
+
 		Ok(Some(Token {
 			kind,
-			span: Span::from_positions_and_file(start, self.offset, self.file_name),
+			span: Span::from_positions_and_file(
+				start + self.span_offset,
+				self.offset + self.span_offset,
+				self.file_name,
+			),
 			literal: &self.input[start..self.offset],
 		}))
+	}
+
+	/// Obtain the next token, returning an unexpected EOF diagnostic if the end
+	/// of the input is reached.
+	///
+	/// # Errors
+	///
+	/// Returns [`Err`] if a lexical error is encountered while peeking the next
+	/// token, or if the end of the input is reached.
+	#[expect(clippy::result_large_err)]
+	pub fn next_token_or_eof(&mut self) -> Result<Token<'input>, Diagnostic> {
+		match self.next_token()? {
+			Some(token) => Ok(token),
+			None => {
+				let span = Span::from_positions_and_file(
+					self.offset + self.span_offset,
+					self.offset + self.span_offset,
+					self.file_name,
+				);
+				Err(DiagnosticKind::UnexpectedEof
+					.error_in(span)
+					.with_label(GenericLabel::error(LabelKind::UnexpectedEof.in_span(span))))
+			}
+		}
+	}
+
+	/// Peek at the next token without consuming it.
+	///
+	/// # Errors
+	///
+	/// Returns [`Err`] if a lexical error is encountered while peeking the next
+	/// token.
+	#[expect(clippy::result_large_err)]
+	pub fn peek_token(&mut self) -> Result<Option<Token<'input>>, Diagnostic> {
+		let saved_offset = self.offset;
+		let token = self.next_token();
+		self.offset = saved_offset;
+		token
+	}
+
+	/// Peek at the next token, returning an unexpected EOF diagnostic if the
+	/// end of the input is reached.
+	///
+	/// # Errors
+	///
+	/// Returns [`Err`] if a lexical error is encountered while peeking the next
+	/// token, or if the end of the input is reached.
+	#[expect(clippy::result_large_err)]
+	pub fn peek_token_or_eof(&mut self) -> Result<Token<'input>, Diagnostic> {
+		match self.peek_token()? {
+			Some(token) => Ok(token),
+			None => {
+				let span = Span::from_positions_and_file(
+					self.offset + self.span_offset,
+					self.offset + self.span_offset,
+					self.file_name,
+				);
+				Err(DiagnosticKind::UnexpectedEof
+					.error_in(span)
+					.with_label(GenericLabel::error(LabelKind::UnexpectedEof.in_span(span))))
+			}
+		}
+	}
+
+	/// Consume the next token if it matches the given [`TokenKind`].
+	///
+	/// Returns `true` if the token was consumed, or `false` if it did not
+	/// match.
+	///
+	/// # Errors
+	///
+	/// Returns [`Err`] if a lexical error is encountered while peeking the next
+	/// token.
+	#[expect(clippy::result_large_err)]
+	pub fn eat_token(&mut self, kind: TokenKind) -> Result<bool, Diagnostic> {
+		if let Some(token) = self.peek_token()?
+			&& token.kind == kind
+		{
+			self.next_token()?;
+			Ok(true)
+		} else {
+			Ok(false)
+		}
 	}
 
 	/// Look at the next character in the input without consuming it.
@@ -154,9 +251,9 @@ impl<'input> ZircoLexer<'input> {
 	///
 	/// Returns `true` if the string was consumed, or `false` if it did not
 	/// match.
-	fn eat_str(&mut self, s: &str) -> bool {
-		if self.input[self.offset..].starts_with(s) {
-			self.offset += s.len();
+	fn eat_str(&mut self, eat: &str) -> bool {
+		if self.input[self.offset..].starts_with(eat) {
+			self.offset += eat.len();
 			true
 		} else {
 			false
@@ -246,7 +343,11 @@ impl<'input> ZircoLexer<'input> {
 		self.bump();
 		if self.eat('=') {
 			if self.eat('=') {
-				let span = Span::from_positions_and_file(start, self.offset, self.file_name);
+				let span = Span::from_positions_and_file(
+					start + self.span_offset,
+					self.offset + self.span_offset,
+					self.file_name,
+				);
 				return Err(DiagnosticKind::JavascriptUserDetected
 					.error_in(span)
 					.with_label(GenericLabel::error(
@@ -268,8 +369,11 @@ impl<'input> ZircoLexer<'input> {
 		self.bump();
 		if self.eat('=') {
 			if self.eat('=') {
-				let span =
-					Span::from_positions_and_file(self.offset - 3, self.offset, self.file_name);
+				let span = Span::from_positions_and_file(
+					self.offset - 3 + self.span_offset,
+					self.offset + self.span_offset,
+					self.file_name,
+				);
 				return Err(DiagnosticKind::JavascriptUserDetected
 					.error_in(span)
 					.with_label(GenericLabel::error(
@@ -370,7 +474,11 @@ impl<'input> ZircoLexer<'input> {
 				self.bump();
 			}
 		}
-		let span = Span::from_positions_and_file(start, self.offset, self.file_name);
+		let span = Span::from_positions_and_file(
+			start + self.span_offset,
+			self.offset + self.span_offset,
+			self.file_name,
+		);
 		Err(DiagnosticKind::UnterminatedStringLiteral
 			.error_in(span)
 			.with_label(GenericLabel::error(
@@ -398,7 +506,11 @@ impl<'input> ZircoLexer<'input> {
 				self.bump();
 			}
 		}
-		let span = Span::from_positions_and_file(start, self.offset, self.file_name);
+		let span = Span::from_positions_and_file(
+			start + self.span_offset,
+			self.offset + self.span_offset,
+			self.file_name,
+		);
 		Err(DiagnosticKind::UnterminatedStringLiteral
 			.error_in(span)
 			.with_label(GenericLabel::error(

@@ -98,6 +98,24 @@ impl Span {
 			))
 		}
 	}
+
+	/// Creates a new [`Span`] containing the union of two passed spans
+	///
+	/// If the spans are disjoint, the union will include the gap between them.
+	/// If they are from different files, this will return [`None`].
+	#[must_use]
+	pub fn merge(span_a: Self, span_b: Self) -> Option<Self> {
+		// Can't union spans from different files
+		if span_a.file_name() != span_b.file_name() {
+			return None;
+		}
+
+		Some(Self::from_positions_and_file(
+			std::cmp::min(span_a.start(), span_b.start()),
+			std::cmp::max(span_a.end(), span_b.end()),
+			span_a.file_name(),
+		))
+	}
 }
 impl Display for Span {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
