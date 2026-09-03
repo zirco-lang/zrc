@@ -19,6 +19,10 @@ naersk'.buildPackage {
   doCheck = true;
   copyLibs = true;
 
+  nativeBuildInputs = with pkgs; [
+    patchelf
+  ];
+
   buildInputs = with pkgs; [
     llvm.llvm
     llvm.libllvm
