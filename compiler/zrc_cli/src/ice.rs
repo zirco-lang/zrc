@@ -69,8 +69,8 @@ pub fn setup_panic_hook() {
 
 	// Force RUST_BACKTRACE=1 if the user did not set RUST_BACKTRACE=full
 	if std::env::var("RUST_BACKTRACE").ok().as_deref() != Some("full") {
-		// SAFETY: We're setting an environment variable that only affects this process
-		// and we're doing it before any threads are spawned
+		// SAFETY: We're setting an environment variable that only affects this
+		// process and we're doing it before any threads are spawned
 		unsafe {
 			std::env::set_var("RUST_BACKTRACE", "1");
 		}

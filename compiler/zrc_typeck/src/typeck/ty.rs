@@ -301,16 +301,18 @@ fn replace_opaque_with_concrete<'input>(
 	match ty {
 		TastType::Opaque(name) if name == opaque_name => {
 			// This should never happen if check_opaque_behind_pointer succeeded
-			// but we handle it gracefully by replacing with empty struct (unit type)
+			// but we handle it gracefully by replacing with empty struct (unit
+			// type)
 			TastType::unit()
 		}
 		TastType::Ptr(pointee) => {
 			// For pointers to opaque types, we can safely replace the opaque
-			// with an empty struct placeholder. The pointer doesn't need to know
-			// the full layout of what it points to.
+			// with an empty struct placeholder. The pointer doesn't need to
+			// know the full layout of what it points to.
 			match *pointee {
 				TastType::Opaque(name) if name == opaque_name => {
-					// Replace *Opaque(name) with *struct{} (pointer to empty struct)
+					// Replace *Opaque(name) with *struct{} (pointer to empty
+					// struct)
 					TastType::Ptr(Box::new(TastType::unit()))
 				}
 				other => TastType::Ptr(Box::new(replace_opaque_with_concrete(other, opaque_name))),
@@ -669,7 +671,8 @@ mod tests {
 		if let TastType::Struct { fields, .. } = resolved_ty {
 			assert_eq!(fields.len(), 2);
 			assert_eq!(fields.get("value"), Some(&TastType::I32));
-			// The pointer to self should be replaced with pointer to empty struct
+			// The pointer to self should be replaced with pointer to empty
+			// struct
 			assert_eq!(
 				fields.get("next"),
 				Some(&TastType::Ptr(Box::new(TastType::unit())))

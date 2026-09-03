@@ -86,8 +86,8 @@ pub fn cg_arithmetic<'ctx, 'input>(
 	let rhs = unpack!(bb = cg_expr(cg, bb, *rhs));
 
 	if let Type::Ptr(pointee) = lhs_ty {
-		// Most languages make incrementing a pointer increase the address by the size
-		// of the pointee type, hence our use of `gep`.
+		// Most languages make incrementing a pointer increase the address by
+		// the size of the pointee type, hence our use of `gep`.
 		#[expect(clippy::wildcard_enum_match_arm)]
 		let reg = match op {
 			// SAFETY: This can segfault if indices are used incorrectly
@@ -108,8 +108,8 @@ pub fn cg_arithmetic<'ctx, 'input>(
 					.as_basic_value_enum();
 
 				// SAFETY: This can segfault if indices are used incorrectly
-				// This is only used for pointer arithmetic, so the indices should be
-				// correct
+				// This is only used for pointer arithmetic, so the indices
+				// should be correct
 				unsafe {
 					cg.builder.build_gep(
 						llvm_basic_type(&cg, &pointee).0,
@@ -170,8 +170,8 @@ pub fn cg_unary_minus<'ctx, 'input>(
 
 #[cfg(test)]
 mod tests {
-	// Please read the "Common patterns in tests" section of crate::test_utils for
-	// more information on how code generator tests are structured.
+	// Please read the "Common patterns in tests" section of crate::test_utils
+	// for more information on how code generator tests are structured.
 
 	use indoc::indoc;
 

@@ -157,17 +157,18 @@ fn handle_block_comment_start<'input>(
 	lex: &mut Lexer<'input, Tok<'input>>,
 ) -> logos::FilterResult<(), InternalLexicalError> {
 	let mut depth = 1;
-	// This contains all of the remaining tokens in our input except for the opening
-	// to this comment -- that's already been consumed.
+	// This contains all of the remaining tokens in our input except for the
+	// opening to this comment -- that's already been consumed.
 	let mut chars = lex.remainder().chars().peekable();
-	// Capture the span of the opening delimiter so we can report it if unterminated
+	// Capture the span of the opening delimiter so we can report it if
+	// unterminated
 	let opening_span = lex.span();
 
 	// We iterate over all of the remaining characters in the input...
 	while let Some(char) = chars.next() {
 		// ...tell the Lexer this token spans into this character...
-		// We use len_utf8() because char may actually be represented by multiple bytes
-		// (see #437)
+		// We use len_utf8() because char may actually be represented by
+		// multiple bytes (see #437)
 		lex.bump(char.len_utf8());
 
 		// and perform some action for each sequence of 2 characters:
@@ -198,8 +199,8 @@ fn handle_block_comment_start<'input>(
 		// We've reached the end of this block comment - because we attach the
 		// handle_block_comment_start callback to basically any token variant
 		// (to keep the Tok enum clean of useless variants), we should simply
-		// skip this token. This will skip from the beginning of our Span to the end
-		// that was given through all of the calls to lex.bump().
+		// skip this token. This will skip from the beginning of our Span to the
+		// end that was given through all of the calls to lex.bump().
 		logos::FilterResult::Skip
 	} else {
 		// This means we've reached the end of our input still in a comment.
@@ -1011,9 +1012,10 @@ mod tests {
 			);
 		}
 
-		// Issue #437 regression test: UTF-8 in block comments should not wreck havoc
-		// Originally the lexer did not handle multi-byte UTF-8 characters properly in
-		// block comments, causing an invalid lexer bump.
+		// Issue #437 regression test: UTF-8 in block comments should not wreck
+		// havoc Originally the lexer did not handle multi-byte UTF-8
+		// characters properly in block comments, causing an invalid lexer
+		// bump.
 		#[test]
 		fn regression_437_utf8_in_block_comments_does_not_wreak_havoc() {
 			let lexer = ZircoLexer::new("a /* \u{30b3}\u{30e1}\u{30f3}\u{30c8} */ b", "<test>");

@@ -68,8 +68,8 @@ pub use driver::*;
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn zrc_free_string(str: *mut c_char) {
 	if !str.is_null() {
-		// SAFETY: the caller guarantees that `str` is a valid pointer to a string we've
-		// allocated
+		// SAFETY: the caller guarantees that `str` is a valid pointer to a
+		// string we've allocated
 		unsafe {
 			drop(CString::from_raw(str));
 		}
@@ -85,8 +85,8 @@ pub unsafe extern "C" fn zrc_free_string(str: *mut c_char) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn zrc_free_buffer(data: *mut c_void, size: usize) {
 	if !data.is_null() {
-		// SAFETY: the caller guarantees that `data` and `size` describe a buffer we've
-		// allocated.
+		// SAFETY: the caller guarantees that `data` and `size` describe a
+		// buffer we've allocated.
 		unsafe {
 			#[expect(clippy::same_length_and_capacity)]
 			drop(Vec::from_raw_parts(data.cast::<u8>(), size, size));

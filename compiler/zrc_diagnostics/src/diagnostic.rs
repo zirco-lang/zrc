@@ -211,8 +211,8 @@ where
 		let span = self.kind.span();
 		let message = self.kind.to_string();
 
-		// read the source from the path inside of the span. if it is <stdin>, use
-		// the provided piped source.
+		// read the source from the path inside of the span. if it is <stdin>,
+		// use the provided piped source.
 		let (source, path) = match span.file_name() {
 			"/dev/<stdin>" => (
 				piped_source

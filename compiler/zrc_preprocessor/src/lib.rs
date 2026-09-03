@@ -280,7 +280,8 @@ fn preprocess_internal(
 			{
 				has_pragma_once = true;
 				debug!(line_num, "found #pragma once directive");
-				// Flush current chunk if it has content before the pragma directive
+				// Flush current chunk if it has content before the pragma
+				// directive
 				if !current_chunk_lines.is_empty() {
 					ctx.chunks.push(SourceChunk::new(
 						static_file_name.to_string(),

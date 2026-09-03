@@ -137,8 +137,8 @@ impl<'ctx> JitModule<'ctx> {
 
 		let c_ptrs: Vec<*const c_char> = c_strings.iter().map(|cstr| cstr.as_ptr()).collect();
 
-		// SAFETY: The Zirco type checker ensures any function named "main" has the
-		// correct signature
+		// SAFETY: The Zirco type checker ensures any function named "main" has
+		// the correct signature
 		let main = unsafe {
 			self.get_function::<unsafe extern "C" fn(usize, *const *const c_char) -> i32>("main")?
 		};

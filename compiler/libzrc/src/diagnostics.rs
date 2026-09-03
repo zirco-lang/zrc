@@ -125,8 +125,8 @@ pub unsafe extern "C" fn zrc_diag_fmt_json(diag: *const ZrcDiagnostic) -> *mut c
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn zrc_diag_free(diag: *mut ZrcDiagnostic) {
 	if !diag.is_null() {
-		// SAFETY: the caller guarantees that `diag` is a valid pointer to a diagnostic
-		// we've allocated
+		// SAFETY: the caller guarantees that `diag` is a valid pointer to a
+		// diagnostic we've allocated
 		unsafe {
 			drop(Box::from_raw(diag.cast::<Diagnostic>()));
 		}

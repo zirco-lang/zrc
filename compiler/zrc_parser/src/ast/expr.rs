@@ -383,7 +383,8 @@ impl std::fmt::Display for ExprKind<'_> {
 			}
 			Self::UnaryNot(expr) => {
 				write!(f, "!")?;
-				// Unary operators need parens on their operand if it's lower precedence
+				// Unary operators need parens on their operand if it's lower
+				// precedence
 				Self::fmt_child(f, expr, Precedence::Unary, true)
 			}
 			Self::UnaryBitwiseNot(expr) => {
@@ -413,8 +414,8 @@ impl std::fmt::Display for ExprKind<'_> {
 			Self::Index(lhs, rhs) => {
 				Self::fmt_child(f, lhs, Precedence::Postfix, false)?;
 				write!(f, "[")?;
-				// Inside brackets, we can use any expression without parens (like in function
-				// calls)
+				// Inside brackets, we can use any expression without parens
+				// (like in function calls)
 				write!(f, "{rhs}")?;
 				write!(f, "]")
 			}
@@ -450,7 +451,8 @@ impl std::fmt::Display for ExprKind<'_> {
 				let prec = self.precedence();
 				Self::fmt_child(f, cond, prec, false)?;
 				write!(f, " ? ")?;
-				// Middle expression in ternary can be any expression (like comma)
+				// Middle expression in ternary can be any expression (like
+				// comma)
 				write!(f, "{if_true}")?;
 				write!(f, " : ")?;
 				Self::fmt_child(f, if_false, prec, true)

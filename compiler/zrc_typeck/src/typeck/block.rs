@@ -269,7 +269,8 @@ pub fn type_block<'input>(
 										} else if inferred_return_type
 											.can_implicitly_cast_to(return_ty)
 										{
-											// Try to coerce the return value to the expected type
+											// Try to coerce the return value to
+											// the expected type
 											return_value.map(|val| try_coerce_to(val, return_ty))
 										} else {
 											return Err(DiagnosticKind::ReturnTypeMismatch {

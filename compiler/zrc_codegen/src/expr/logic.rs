@@ -104,8 +104,8 @@ pub fn cg_logical_and<'ctx, 'input>(
 	lhs: Box<TypedExpr<'input>>,
 	rhs: Box<TypedExpr<'input>>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
-	// Because Zirco short circuits logical expressions, we generate LLVM like this:
-	// Hence ensuring that rhs is only evaluated if lhs is true.
+	// Because Zirco short circuits logical expressions, we generate LLVM like
+	// this: Hence ensuring that rhs is only evaluated if lhs is true.
 	//
 	// %lhs = (cg_expr lhs)
 	// br i1 %lhs label %land_rhs, label %land_end
@@ -157,8 +157,8 @@ pub fn cg_logical_or<'ctx, 'input>(
 	lhs: Box<TypedExpr<'input>>,
 	rhs: Box<TypedExpr<'input>>,
 ) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
-	// Because Zirco short circuits logical expressions, we generate LLVM like this:
-	// Hence ensuring that rhs is only evaluated if lhs is false.
+	// Because Zirco short circuits logical expressions, we generate LLVM like
+	// this: Hence ensuring that rhs is only evaluated if lhs is false.
 	//
 	// %lhs = (cg_expr lhs)
 	// br i1 %lhs label %lor_end, label %lor_rhs
@@ -230,8 +230,8 @@ pub fn cg_unary_not<'ctx, 'input>(
 
 #[cfg(test)]
 mod tests {
-	// Please read the "Common patterns in tests" section of crate::test_utils for
-	// more information on how code generator tests are structured.
+	// Please read the "Common patterns in tests" section of crate::test_utils
+	// for more information on how code generator tests are structured.
 
 	use indoc::indoc;
 

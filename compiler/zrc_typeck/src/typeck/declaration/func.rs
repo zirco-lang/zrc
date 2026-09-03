@@ -443,7 +443,8 @@ mod tests {
 			},
 		);
 
-		// Should succeed because the types are the same, even though the spans differ
+		// Should succeed because the types are the same, even though the spans
+		// differ
 		assert!(result.is_ok());
 	}
 }

@@ -58,7 +58,8 @@ pub fn process_let_declaration<'input>(
 
 					// Explicitly typed with no value
 					(None, Some(ty)) => {
-						// Check if trying to declare a variable with function type
+						// Check if trying to declare a variable with function
+						// type
 						if matches!(ty, TastType::Fn(_)) {
 							return Err(DiagnosticKind::FunctionNotFirstClass
 								.error_in(let_decl_span)
