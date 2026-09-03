@@ -141,6 +141,15 @@ pub fn type_expr_identifier<'input>(
 	expr_span: Span,
 	i: &'input str,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
+	if i.starts_with('@') {
+		return Err(DiagnosticKind::CannotUseIntrinsicHere
+			.error_in(expr_span)
+			.with_label(GenericLabel::error(
+				LabelKind::CannotUseIntrinsicHere.in_span(expr_span),
+			))
+			.with_note(NoteKind::ReservedIntrinsicIdentifiers));
+	}
+
 	let ty_rc = scope.values.resolve_mut(i).ok_or_else(|| {
 		let base = DiagnosticKind::UnableToResolveIdentifier(i.to_string())
 			.error_in(expr_span)

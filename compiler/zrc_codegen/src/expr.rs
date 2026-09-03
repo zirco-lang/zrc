@@ -112,6 +112,9 @@ pub(crate) fn cg_expr<'ctx, 'input, 'a>(
 		TypedExprKind::Dot(place, key) => mem::cg_dot(ce, place, key),
 
 		TypedExprKind::Call(f, args) => control::cg_call(ce, *f, args),
+		TypedExprKind::IntrinsicCall(intrinsic, args) => {
+			control::cg_intrinsic_call(ce, intrinsic, args)
+		}
 
 		TypedExprKind::PostfixIncrement(place) => {
 			increment_decrement::cg_postfix_increment(ce, *place)

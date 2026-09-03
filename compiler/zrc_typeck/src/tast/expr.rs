@@ -95,6 +95,8 @@ pub enum TypedExprKind<'input> {
 	Dot(Box<Place<'input>>, Spanned<&'input str>),
 	/// `a(b, c, d, ...)`
 	Call(Box<Place<'input>>, Vec<TypedExpr<'input>>),
+	/// `@name(a, b, c, ...)` - intrinsic call
+	IntrinsicCall(&'input str, Vec<TypedExpr<'input>>),
 	/// `x++` - postfix increment (returns old value then increments)
 	PostfixIncrement(Box<Place<'input>>),
 	/// `x--` - postfix decrement (returns old value then decrements)
@@ -201,6 +203,7 @@ impl TypedExprKind<'_> {
 			Self::Index(_, _)
 			| Self::Dot(_, _)
 			| Self::Call(_, _)
+			| Self::IntrinsicCall(_, _)
 			| Self::PostfixIncrement(_)
 			| Self::PostfixDecrement(_) => Precedence::Postfix,
 			Self::NumberLiteral(_, _)
@@ -334,6 +337,14 @@ impl Display for TypedExprKind<'_> {
 			Self::Call(place, args) => write!(
 				f,
 				"{place}({})",
+				args.iter()
+					.map(ToString::to_string)
+					.collect::<Vec<String>>()
+					.join(", ")
+			),
+			Self::IntrinsicCall(name, args) => write!(
+				f,
+				"@{name}({})",
 				args.iter()
 					.map(ToString::to_string)
 					.collect::<Vec<String>>()

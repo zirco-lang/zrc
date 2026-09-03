@@ -1,7 +1,7 @@
 //! type checking for call expressions
 
 use zrc_diagnostics::{Diagnostic, DiagnosticKind, LabelKind, SpanExt, diagnostic::GenericLabel};
-use zrc_parser::ast::expr::Expr;
+use zrc_parser::ast::expr::{Expr, ExprKind};
 use zrc_utils::span::{Span, Spannable, Spanned};
 
 use super::{
@@ -9,10 +9,13 @@ use super::{
 	helpers::{expr_to_place, try_coerce_to},
 	type_expr,
 };
-use crate::tast::{
-	expr::{TypedExpr, TypedExprKind},
-	stmt::ArgumentDeclarationList,
-	ty::{Fn, Type as TastType},
+use crate::{
+	tast::{
+		expr::{TypedExpr, TypedExprKind},
+		stmt::ArgumentDeclarationList,
+		ty::{Fn, Type as TastType},
+	},
+	typeck::intrinsic::Intrinsic,
 };
 
 /// Typeck a call expr
@@ -24,6 +27,34 @@ pub fn type_expr_call<'input>(
 	args: Spanned<Vec<Expr<'input>>>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
 	let f_span = f.0.span();
+
+	if let ExprKind::Identifier(id) = &f.0.value()
+		&& let Some(intrinsic_name) = id.strip_prefix('@')
+	{
+		// I FUCKING LOVE LET CHAINS ARGHHHHH
+
+		let Some(intrinsic) = Intrinsic::from_name(intrinsic_name) else {
+			return Err(DiagnosticKind::UnknownIntrinsic(intrinsic_name.to_string())
+				.error_in(f_span)
+				.with_label(GenericLabel::error(
+					LabelKind::UnknownIntrinsic(intrinsic_name.to_string()).in_span(f_span),
+				)));
+		};
+
+		let args_t = args
+			.value()
+			.iter()
+			.map(|x| type_expr(scope, x.clone()))
+			.collect::<Result<Vec<TypedExpr>, Diagnostic>>()?;
+
+		let inferred_type = intrinsic.check(&args_t, expr_span)?;
+
+		return Ok(TypedExpr {
+			inferred_type,
+			kind: TypedExprKind::IntrinsicCall(intrinsic_name, args_t).in_span(expr_span),
+		});
+	}
+
 	let ft = type_expr(scope, f)?;
 	let args_span = args.span();
 	let args_t = args
