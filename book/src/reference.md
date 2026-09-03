@@ -106,12 +106,14 @@ type     switch   default  new      unreachable
 
 The `IDENTIFIER` terminal is used to represent user-provided identifiers.
 
-Form: `[a-zA-Z_][a-zA-Z0-9_]*`
+Form: `@?[a-zA-Z_][a-zA-Z0-9_]*`
+
+Identifiers beginning with `@` are reserved for standardized intrinsics.
 
 Implementations MAY reserve the following identifiers for their own use:
 
-- Identifiers beginning with `__` (two underscores)
-- Identifiers beginning with `_` (one underscore) followed by an uppercase letter (e.g. `_Z`)
+- Identifiers beginning with `__` or `@__` (two underscores)
+- Identifiers beginning with `_` or `@_` (one underscore) followed by an uppercase letter (e.g. `_Z`)
 
 #### 3.5.2. `NUMBER_LITERAL`
 
@@ -558,6 +560,11 @@ A function or function pointer `f` can be called with `f(a, b, c)`, where `a`, `
 arguments to the function. The number and types of the arguments must match. If the function has
 a variadic `...` trailing in its type, an infinite number of arbitrary arguments may be passed.
 
+#### 5.3.4.1. Intrinsic Function Calls
+
+[Intrinsic functions](#8-compiler-intrinsics) may be called using `@name(args)`. Intrinsic identifiers
+(`@name`) must be rejected in any other position.
+
 #### 5.3.5. Postfix Increment/Decrement
 
 The postfix increment `x++` and decrement `x--` operators increment or decrement the value of
@@ -834,9 +841,28 @@ fn foo(a: i32, b: i32) -> i32 {
 If the body is elided, it is assumed to be an extern declaration, using the C calling convention.
 If the body is elided, you may also include `...` to indicate that the function is variadic.
 
-## 8. Program Structure
+## 8. Compiler Intrinsics
 
-### 8.1. Entry Point
+Compiler intrinsics are used to provide special functionality the language does not directly provide.
+
+### 8.1. `@volatile_read`
+
+For any `T`, the intrinsic `@volatile_read(ptr: *T) -> T` provides a method of generating reads that
+the compiler MUST NOT optimize away. This is useful for MMIO, primarily.
+
+### 8.2. `@volatile_write`
+
+For any `T`, the intrinsic `@volatile_write(ptr: *T, val: T)` provides a method of generating memory
+writes that the compiler MUST NOT optimize away.
+
+### 8.3. `@shl` and `@shr`
+
+For any integer type (signed or unsigned) `N`, `@shl(val: N, bits: usize)` executes a binary leftwards
+shift by `bits` bits. `@shr` has an identical signature, instead performing a right shift.
+
+## 9. Program Structure
+
+### 9.1. Entry Point
 
 All Zirco programs follow the `crt0.S` entry point of either of the following signatures:
 
@@ -845,13 +871,13 @@ fn main() -> i32;
 fn main(argc: i32, argv: **u8) -> i32;
 ```
 
-### 8.2. Compilation Units
+### 9.2. Compilation Units
 
 The Zirco compiler compiles a single source file at a time, and each source file is a compilation
 unit. Each compilation unit has its own global scope, and the contents of one compilation unit are
 not visible to another compilation unit unless they are explicitly imported via `#include`.
 
-## 9. Standard Library
+## 10. Standard Library
 
 Zirco's standard library, `libzr`, is currently under development. The correct API surface is as is
 defined by the `libzr` project in the zrc monorepo.
