@@ -136,6 +136,10 @@ pub enum DiagnosticKind {
 	InvalidNumberLiteral(String),
 	#[error("multiple default cases found")]
 	MultipleDefaultCases,
+	#[error("cannot use an intrinsic here")]
+	CannotUseIntrinsicHere,
+	#[error("unknown intrinsic `@{0}`")]
+	UnknownIntrinsic(String),
 
 	// PREPROCESSOR ERRORS
 	#[error("unterminated include directive")]
@@ -232,6 +236,8 @@ impl ErrorCode for DiagnosticKind {
 			Self::FunctionNotFirstClass => "E3043",
 			Self::InvalidNumberLiteral(_) => "E3044",
 			Self::MultipleDefaultCases => "E3045",
+			Self::CannotUseIntrinsicHere => "E3046",
+			Self::UnknownIntrinsic(_) => "E3047",
 		}
 	}
 }
@@ -372,6 +378,10 @@ pub enum LabelKind {
 	MultipleDefaultCases,
 	#[error("invalid shebang")]
 	PreprocessorInvalidShebang,
+	#[error("cannot use an intrinsic here")]
+	CannotUseIntrinsicHere,
+	#[error("unknown intrinsic `@{0}`")]
+	UnknownIntrinsic(String),
 }
 
 /// The list of possible notes attached to a [`Diagnostic`]
@@ -412,6 +422,8 @@ pub enum NoteKind {
 	PointerArithmeticRequiresUsize,
 	#[error("a shebang must end in a linefeed")]
 	ShebangMustEndWithNewline,
+	#[error("identifiers beginning with `@` are reserved for zrc intrinsics")]
+	ReservedIntrinsicIdentifiers,
 }
 
 /// The list of possible help messages attached to a [`Diagnostic`]

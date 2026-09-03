@@ -81,6 +81,7 @@ fn has_side_effects(expr: &TypedExprKind<'_>) -> bool {
 		// Expressions with direct side effects
 		TypedExprKind::Assignment(_, _)
 		| TypedExprKind::Call(_, _)
+		| TypedExprKind::IntrinsicCall(_, _)
 		| TypedExprKind::PrefixIncrement(_)
 		| TypedExprKind::PrefixDecrement(_)
 		| TypedExprKind::PostfixIncrement(_)

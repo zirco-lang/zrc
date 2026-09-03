@@ -1,6 +1,6 @@
 //! code generation for control flow expressions
 
-use inkwell::values::{BasicValue, BasicValueEnum};
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum};
 use zrc_typeck::tast::expr::{Place, TypedExpr};
 
 use super::place::cg_place;
@@ -51,6 +51,93 @@ pub fn cg_call<'ctx, 'input>(
 	} else {
 		cg.ctx.i8_type().get_undef().as_basic_value_enum()
 	})
+}
+
+/// Code generate an intrinsic call
+pub fn cg_intrinsic_call<'ctx, 'input>(
+	CgExprArgs { cg, bb, .. }: CgExprArgs<'ctx, 'input, '_>,
+	intrinsic: &'input str,
+	args: Vec<TypedExpr<'input>>,
+) -> BasicBlockAnd<'ctx, BasicValueEnum<'ctx>> {
+	let mut bb = bb;
+	let old_args = args;
+	let mut args: Vec<BasicMetadataValueEnum> = vec![];
+	for arg in old_args.clone() {
+		let new_arg = unpack!(bb = cg_expr(cg, bb, arg));
+		args.push(new_arg.into());
+	}
+
+	match intrinsic {
+		"shl" | "shr" => {
+			// LLVM wants both operands to be of the same type, but Zirco uses
+			// `usize` for the RHS operand so we need to cast it to the same
+			// type as the LHS operand
+			let lhs_type = args[0].into_int_value().get_type();
+			let rhs_type = args[1].into_int_value().get_type();
+
+			// we trunc if usize > lhs_type, otherwise we extend
+			let rhs = if rhs_type.get_bit_width() > lhs_type.get_bit_width() {
+				cg.builder
+					.build_int_truncate(args[1].into_int_value(), lhs_type, "cast_rhs_to_lhs")
+					.expect("cast should have been created successfully")
+			} else {
+				cg.builder
+					.build_int_s_extend(args[1].into_int_value(), lhs_type, "cast_rhs_to_lhs")
+					.expect("cast should have been created successfully")
+			};
+
+			let ret = match intrinsic {
+				"shl" => cg
+					.builder
+					.build_left_shift(args[0].into_int_value(), rhs, "shl")
+					.expect("shl should have been created successfully"),
+				"shr" => cg
+					.builder
+					.build_right_shift(args[0].into_int_value(), rhs, false, "shr")
+					.expect("shr should have been created successfully"),
+				_ => unreachable!(),
+			};
+
+			bb.and(ret.as_basic_value_enum())
+		}
+		"volatile_write" => {
+			// args[0] is a pointer, args[1] is the value to write
+			cg.builder
+				.build_store(args[0].into_pointer_value(), args[1].into_int_value())
+				.expect("store should have been created successfully")
+				.set_volatile(true)
+				.expect("store should have been created successfully");
+
+			bb.and(
+				cg.ctx
+					.struct_type(&[], false)
+					.get_undef()
+					.as_basic_value_enum(),
+			)
+		}
+		"volatile_read" => {
+			// args[0] is a pointer
+			let ret = cg
+				.builder
+				.build_load(
+					llvm_basic_type(&cg, &old_args[0].inferred_type).0,
+					args[0].into_pointer_value(),
+					"volatile_read",
+				)
+				.expect("load should have been created successfully");
+			ret.as_instruction_value()
+				.expect("load should be an instruction")
+				.set_volatile(true)
+				.expect("load should have been created successfully");
+
+			bb.and(ret.as_basic_value_enum())
+		}
+
+		_ => unreachable!(
+			"intrinsic {} should have been rejected in typeck",
+			intrinsic
+		),
+	}
 }
 
 /// Code generate a ternary expression
@@ -159,5 +246,22 @@ mod tests {
                     take_int(num);
                 }
             "});
+	}
+
+	#[test]
+	fn intrinsics_generate() {
+		cg_snapshot_test!(indoc! {"
+			fn test() {
+				let nullptr = 0 as *i32;
+
+				// TEST: volatile read/write must generate
+				@volatile_write(nullptr, 42i32);
+				let x: i32 = @volatile_read(nullptr);
+
+				// TEST: shl/shr must generate
+				let y = @shl(x, 2usize);
+				let z = @shr(y, 1usize);
+			}
+		"});
 	}
 }

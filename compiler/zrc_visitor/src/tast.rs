@@ -67,6 +67,11 @@ pub trait SemanticVisit<'input, 'gs> {
 					self.visit_tc_expr(arg);
 				}
 			}
+			TcExprKind::IntrinsicCall(_, args) => {
+				for arg in args {
+					self.visit_tc_expr(arg);
+				}
+			}
 			TcExprKind::Ternary(cond, if_true, if_false) => {
 				self.visit_tc_expr(cond.as_ref());
 				self.visit_tc_expr(if_true.as_ref());

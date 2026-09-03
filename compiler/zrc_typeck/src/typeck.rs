@@ -3,6 +3,7 @@
 mod block;
 mod declaration;
 mod expr;
+mod intrinsic;
 mod scope;
 mod ty;
 
