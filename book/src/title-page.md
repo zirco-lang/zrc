@@ -8,5 +8,5 @@ compatibility with existing systems languages.
 
 Special thanks to all of the project's contributors, a comprehensive list of whom can be found
 [in the README](https://github.com/zirco-lang/zrc#contributors). Zirco is made possible by the
-brilliant minds in the PLD (Programming Language Development) Discord server, which you can
-participate in [on Discord](https://discord.gg/HDyqM2n) or [on Matrix](https://matrix.to/#/#langdev:zirco.dev).
+brilliant minds in the PLD (Programming Language Development) [Discord server](https://discord.gg/HDyqM2n)
+and [Matrix community](https://matrix.to/#/#langdev:zirco.dev).
