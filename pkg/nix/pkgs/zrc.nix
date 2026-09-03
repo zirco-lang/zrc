@@ -19,6 +19,10 @@ naersk'.buildPackage {
   doCheck = true;
   copyLibs = true;
 
+  nativeBuildInputs = with pkgs; [
+    patchelf
+  ];
+
   buildInputs = with pkgs; [
     llvm.llvm
     llvm.libllvm
@@ -49,7 +53,7 @@ naersk'.buildPackage {
     cp $src/compiler/libzrc/zrc.h $out/include/
   '';
 
-  postFixup = ''
+  postFixup = pkgs.lib.optionalString pkgs.stdenv.isLinux ''
     # don't run the patchelf if we're on a dependency phase
     if [ -e "$out/bin/zrc" ]; then
       patchelf \
