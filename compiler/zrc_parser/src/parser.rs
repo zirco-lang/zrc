@@ -514,7 +514,8 @@ mod tests {
 				);
 
 				let expr = result.expect("Should have parsed successfully");
-				// Verify it's a struct construction by checking the display output
+				// Verify it's a struct construction by checking the display
+				// output
 				let output = format!("{expr}");
 				assert!(
 					output.contains("Point"),

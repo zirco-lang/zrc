@@ -222,8 +222,8 @@ pub fn type_expr_arithmetic<'input>(
 			);
 		}
 
-		// For pointer arithmetic, rhs should be usize or {int} (which implicitly
-		// converts to usize)
+		// For pointer arithmetic, rhs should be usize or {int} (which
+		// implicitly converts to usize)
 		let final_rhs = if rhs_t.inferred_type == TastType::Usize {
 			rhs_t
 		} else if rhs_t.inferred_type.can_implicitly_cast_to(&TastType::Usize) {

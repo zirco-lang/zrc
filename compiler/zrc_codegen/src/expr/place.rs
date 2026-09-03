@@ -68,7 +68,8 @@ pub fn cg_place<'ctx>(
 			let idx = unpack!(bb = cg_expr(cg, bb, *idx));
 
 			// SAFETY: This can segfault if indices are used incorrectly
-			// This is only used for pointer arithmetic, so the indices should be correct
+			// This is only used for pointer arithmetic, so the indices should
+			// be correct
 			let reg = unsafe {
 				cg.builder.build_gep(
 					llvm_basic_type(&cg, &place.inferred_type).0,
@@ -108,8 +109,9 @@ pub fn cg_place<'ctx>(
 				bb.and(reg.as_basic_value_enum().into_pointer_value())
 			}
 			Type::Union(_) => {
-				// All we need to do is cast the pointer, but there's no `bitcast` anymore,
-				// so just return it and it'll take on the correct type
+				// All we need to do is cast the pointer, but there's no
+				// `bitcast` anymore, so just return it and it'll take on
+				// the correct type
 
 				let value = unpack!(bb = cg_place(cg, bb, *x));
 
@@ -122,15 +124,15 @@ pub fn cg_place<'ctx>(
 
 #[cfg(test)]
 mod tests {
-	// Please read the "Common patterns in tests" section of crate::test_utils for
-	// more information on how code generator tests are structured.
+	// Please read the "Common patterns in tests" section of crate::test_utils
+	// for more information on how code generator tests are structured.
 
 	use indoc::indoc;
 
 	use crate::cg_snapshot_test;
 
-	// Remember: In all of these tests, cg_place returns a *pointer* to the data in
-	// the place.
+	// Remember: In all of these tests, cg_place returns a *pointer* to the data
+	// in the place.
 
 	#[test]
 	fn basic_identifiers_in_place_position() {

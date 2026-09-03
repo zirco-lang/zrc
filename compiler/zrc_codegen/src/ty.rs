@@ -233,7 +233,8 @@ pub fn llvm_basic_type<'ctx: 'a, 'a>(
 			}),
 		),
 		Type::Union(fields) => {
-			// Determine which field has the largest size. This is what we will allocate.
+			// Determine which field has the largest size. This is what we will
+			// allocate.
 			let largest_field = fields
 				.iter()
 				.map(|(_, ty)| {
@@ -342,8 +343,8 @@ pub fn llvm_type<'ctx: 'a, 'a>(
 
 #[cfg(test)]
 mod tests {
-	// Please read the "Common patterns in tests" section of crate::test_utils for
-	// more information on how code generator tests are structured.
+	// Please read the "Common patterns in tests" section of crate::test_utils
+	// for more information on how code generator tests are structured.
 
 	use indoc::indoc;
 

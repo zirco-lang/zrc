@@ -31,16 +31,16 @@ pub fn cg_for_stmt<'ctx, 'input, 'a>(
 	// The preheader, where `init` runs. Breaks to the header.
 	// The header, where `cond` is checked and breaks to either the exit or the
 	// body. The body, where most of the body runs. Breaks to
-	// the latch. `break` transfers to the exit by force and `continue` transfers to
-	// the latch by force. The latch, where `post` runs and
+	// the latch. `break` transfers to the exit by force and `continue`
+	// transfers to the latch by force. The latch, where `post` runs and
 	// breaks back to the header The exit, which is the basic
 	// block we return.
 
 	// loops lie in an implicit subscope
 	let mut scope = scope.clone();
 
-	// The block we are currently in will become the preheader. Generate the `init`
-	// code if there is any.
+	// The block we are currently in will become the preheader. Generate the
+	// `init` code if there is any.
 	if let Some(init) = init {
 		super::let_decl::cg_let_declaration(cg, bb, &mut scope, lexical_block, *init);
 	}
@@ -233,8 +233,8 @@ pub fn cg_do_while_stmt<'ctx, 'input, 'a>(
 
 #[cfg(test)]
 mod tests {
-	// Please read the "Common patterns in tests" section of crate::test_utils for
-	// more information on how code generator tests are structured.
+	// Please read the "Common patterns in tests" section of crate::test_utils
+	// for more information on how code generator tests are structured.
 
 	use indoc::indoc;
 

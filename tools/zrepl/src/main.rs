@@ -112,8 +112,8 @@ impl Mode {
 
 /// Diff a scope, to recognize and render any newly added or changed items.
 fn diff_scope<'input>(old: &typeck::Scope<'input>, new: &typeck::Scope<'input>) -> String {
-	// For scope.values and scope.types, list any Created (green + lines) or Changed
-	// (minus and plus). They will never be deleted.
+	// For scope.values and scope.types, list any Created (green + lines) or
+	// Changed (minus and plus). They will never be deleted.
 
 	let mut output: Vec<String> = Vec::new();
 
@@ -314,7 +314,8 @@ fn handle_include(line: &str, include_paths: &Vec<PathBuf>, gs: &mut GlobalScope
 	for chunk in chunks {
 		let decls = diag_wrapper(|| parser::parse_source_chunk(chunk), None);
 		let Ok(decls) = decls else {
-			// Repline does not like it when you Continue or Reject after printing
+			// Repline does not like it when you Continue or Reject after
+			// printing
 			return Response::Accept;
 		};
 
@@ -369,7 +370,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 				(_, ".exit" | ".quit" | ".q") => Ok(Response::Break),
 				(_, "") => Ok(Response::Accept),
 				(Mode::Decl, ".d" | ".de" | ".decl") => {
-					// Don't do anything because diffing the scope would cause a None unwrap
+					// Don't do anything because diffing the scope would cause a
+					// None unwrap
 					Ok(Response::Accept)
 				}
 				(_, ".d" | ".de" | ".decl") => {

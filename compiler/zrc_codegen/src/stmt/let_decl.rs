@@ -47,8 +47,8 @@ pub fn cg_let_declaration<'ctx, 'input, 'a>(
 		}
 
 		// we create our own builder here because we need to insert the alloca
-		// at the beginning of the entry block, and that is easier than trying to
-		// somehow save our position.
+		// at the beginning of the entry block, and that is easier than trying
+		// to somehow save our position.
 
 		let entry_block_builder = cg.ctx.create_builder();
 		let first_bb = cg
@@ -86,7 +86,8 @@ pub fn cg_let_declaration<'ctx, 'input, 'a>(
 
 		// FIXME: Re-enable this when Inkwell resolves TheDan64/inkwell#613
 		// cg.dbg_builder
-		//     .insert_declare_at_end(ptr, Some(decl), None, debug_location, first_bb);
+		//     .insert_declare_at_end(ptr, Some(decl), None, debug_location,
+		// first_bb);
 
 		if let Some(value) = let_declaration.value {
 			let expr_cg = BlockCtx::new(cg, scope, dbg_scope);
@@ -115,8 +116,8 @@ pub fn cg_let_declaration<'ctx, 'input, 'a>(
 
 #[cfg(test)]
 mod tests {
-	// Please read the "Common patterns in tests" section of crate::test_utils for
-	// more information on how code generator tests are structured.
+	// Please read the "Common patterns in tests" section of crate::test_utils
+	// for more information on how code generator tests are structured.
 
 	use indoc::indoc;
 

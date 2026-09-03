@@ -322,7 +322,8 @@ mod tests {
 		// Void pointer should not implicitly cast to specific pointer
 		assert!(!void_ptr.can_implicitly_cast_to(&i32_ptr));
 
-		// Specific pointers should not implicitly cast to other specific pointers
+		// Specific pointers should not implicitly cast to other specific
+		// pointers
 		assert!(!i32_ptr.can_implicitly_cast_to(&bool_ptr));
 	}
 
@@ -567,7 +568,8 @@ mod tests {
 
 		use super::super::stmt::{ArgumentDeclaration, ArgumentDeclarationList};
 
-		// Create two function types with same types but different parameter names
+		// Create two function types with same types but different parameter
+		// names
 		let fn1 = Fn {
 			arguments: ArgumentDeclarationList::NonVariadic(vec![ArgumentDeclaration {
 				name: spanned_test!(5, "s", 6),
@@ -595,7 +597,8 @@ mod tests {
 
 		use super::super::stmt::{ArgumentDeclaration, ArgumentDeclarationList};
 
-		// Create two function types with same types but different parameter names
+		// Create two function types with same types but different parameter
+		// names
 		let type1 = Type::Fn(Fn {
 			arguments: ArgumentDeclarationList::NonVariadic(vec![ArgumentDeclaration {
 				name: spanned_test!(5, "s", 6),

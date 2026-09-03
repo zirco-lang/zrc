@@ -37,11 +37,13 @@ impl LineLookup {
 			// Strip trailing \r if present (for CRLF line endings)
 			let line_without_cr = line.strip_suffix('\r').unwrap_or(line);
 
-			// Calculate the end position of the actual line content (without line endings)
+			// Calculate the end position of the actual line content (without
+			// line endings)
 			let content_end = line_start + line_without_cr.len();
 
-			// For the searchable span, we need to include line endings so lookups work
-			// For non-last lines, include everything up to and including the \r and \n
+			// For the searchable span, we need to include line endings so
+			// lookups work For non-last lines, include everything up to and
+			// including the \r and \n
 			let span_end = if idx < lines.len() - 1 {
 				// Include the line ending characters (\r if present, and \n)
 				line_start + line.len() // This includes \r if present, but not \n
@@ -83,7 +85,8 @@ impl LineLookup {
 		let (line_start, content_end, _span_end) = self.line_spans[line];
 
 		// Calculate column position
-		// If the index is beyond the content (in the line ending), clamp to content end
+		// If the index is beyond the content (in the line ending), clamp to
+		// content end
 		let col_index = if index >= content_end {
 			content_end.saturating_sub(line_start)
 		} else {
@@ -148,7 +151,8 @@ mod tests {
 		assert_eq!(result.col, 3);
 
 		// The \r character at index 5 should be reported as part of line 1
-		// But the column should not make it seem like it's past the visible content
+		// But the column should not make it seem like it's past the visible
+		// content
 		let result = lookup.lookup_from_index(5);
 		assert_eq!(result.line, 1);
 		// This is the problem: it reports col=6, but there are only 5 visible

@@ -79,7 +79,8 @@ pub fn type_expr_number_literal<'input>(
 				let value_as_signed = parsed_value as i128;
 				value_as_signed >= min && value_as_signed <= max
 			} else {
-				// Value is too large to fit in any signed integer type we support
+				// Value is too large to fit in any signed integer type we
+				// support
 				false
 			}
 		});
@@ -154,8 +155,8 @@ pub fn type_expr_identifier<'input>(
 		base
 	})?;
 
-	// Mark as used by adding the reference span and clone the type to return. Use a
-	// short-lived borrow so we don't keep the RefCell borrow across the
+	// Mark as used by adding the reference span and clone the type to return.
+	// Use a short-lived borrow so we don't keep the RefCell borrow across the
 	// function return.
 	let inferred_type = {
 		let mut ty = ty_rc.borrow_mut();
@@ -344,7 +345,8 @@ mod tests {
 		}
 
 		// Test i32 default overflow - with {int} type, this no longer overflows
-		// The {int} type can hold any integer value and will be resolved at usage
+		// The {int} type can hold any integer value and will be resolved at
+		// usage
 		let result = type_expr_number_literal(
 			&scope,
 			span,

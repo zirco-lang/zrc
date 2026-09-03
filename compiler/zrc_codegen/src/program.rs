@@ -110,7 +110,8 @@ fn eval_const_expr<'ctx>(
 			.const_int(ch.as_byte().into(), false)
 			.as_basic_value_enum(),
 		_ => {
-			// This should never happen as the type checker validates constant expressions
+			// This should never happen as the type checker validates constant
+			// expressions
 			panic!(
 				"internal compiler error: non-constant expression in global initializer: {:?}",
 				expr.kind.value()
@@ -886,8 +887,8 @@ pub fn cg_program_to_buffer(
 
 #[cfg(test)]
 mod tests {
-	// Please read the "Common patterns in tests" section of crate::test_utils for
-	// more information on how code generator tests are structured.
+	// Please read the "Common patterns in tests" section of crate::test_utils
+	// for more information on how code generator tests are structured.
 
 	use indoc::indoc;
 

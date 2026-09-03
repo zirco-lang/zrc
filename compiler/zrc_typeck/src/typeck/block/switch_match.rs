@@ -207,7 +207,8 @@ pub fn type_match<'input>(
 	// Semantic invariants:
 	// * The scrutinee must be of an enum type
 	// * There must be exactly one case per variant of the enum
-	// * Each case introduces a new variable into scope with the type of the variant
+	// * Each case introduces a new variable into scope with the type of the
+	//   variant
 
 	// There is no TAST Enum type, it is simply represented as a Struct
 	// with a hidden discriminant field

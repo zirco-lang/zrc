@@ -71,7 +71,8 @@ impl<'input> SemanticVisit<'input, '_> for Visit<'input> {
 			let var_entry = var_entry_rc.borrow();
 			// Functions are also stored as variables in the scope, but
 			// we don't want to report them as underscore-prefixed functions
-			// are commonly used as private/internal helpers where usage is intentional
+			// are commonly used as private/internal helpers where usage is
+			// intentional
 			if let Some(first_use) = var_entry.referenced_spans.first()
 				&& var_name.starts_with('_')
 				&& !var_name.starts_with("__")

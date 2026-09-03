@@ -19,8 +19,8 @@ pub fn run(
 	forbid_unlisted_includes: bool,
 	passes: &PassList,
 ) -> Result<Vec<LintDiagnostic>, Diagnostic> {
-	// This function very closely mirrors the beginning of the `compile` function
-	// in `zrc/compiler/zrc/src/compile.rs`.
+	// This function very closely mirrors the beginning of the `compile`
+	// function in `zrc/compiler/zrc/src/compile.rs`.
 
 	let mut diagnostics = Vec::new();
 

@@ -158,8 +158,8 @@ mod tests {
 
 	#[test]
 	fn parenthesized_types_parse_correctly() {
-		// Parenthesized types should parse and normalize to their canonical form
-		// (without unnecessary parentheses)
+		// Parenthesized types should parse and normalize to their canonical
+		// form (without unnecessary parentheses)
 
 		let test_cases = vec![
 			("*(i32)", "*i32"),
@@ -186,7 +186,8 @@ mod tests {
 
 	#[test]
 	fn type_aliases_support_parenthesized_types() {
-		// Type aliases should support parenthesized types including nested parentheses
+		// Type aliases should support parenthesized types including nested
+		// parentheses
 		let test_cases = vec!["type x = (i32);", "type y = ((i32));", "type z = (*(i32));"];
 
 		for input in test_cases {

@@ -201,8 +201,8 @@ pub fn cg_struct_construction<'ctx, 'input>(
 					// Evaluate the field value
 					let field_value = unpack!(bb = cg_expr(cg, bb, field_expr.clone()));
 
-					// For unions, we need to bitcast the pointer to the field's type
-					// and then store the value
+					// For unions, we need to bitcast the pointer to the field's
+					// type and then store the value
 					let field_ptr = cg
 						.builder
 						.build_bit_cast(
@@ -254,8 +254,8 @@ pub fn cg_struct_construction<'ctx, 'input>(
 
 #[cfg(test)]
 mod tests {
-	// Please read the "Common patterns in tests" section of crate::test_utils for
-	// more information on how code generator tests are structured.
+	// Please read the "Common patterns in tests" section of crate::test_utils
+	// for more information on how code generator tests are structured.
 
 	use indoc::indoc;
 
@@ -263,9 +263,9 @@ mod tests {
 
 	#[test]
 	fn cast_truncation_generates_properly() {
-		// Regression test for issue: ICE when casting from larger int to smaller
-		// int (e.g., i32 to u8) Previously the compiler incorrectly used sext/zext
-		// instead of trunc
+		// Regression test for issue: ICE when casting from larger int to
+		// smaller int (e.g., i32 to u8) Previously the compiler incorrectly
+		// used sext/zext instead of trunc
 		cg_snapshot_test!(indoc! {"
             fn test_trunc_signed_to_unsigned() -> u8 {
                 let x: i32 = 65;

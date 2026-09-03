@@ -126,8 +126,8 @@ pub fn type_expr_cast<'input>(
 	// Handle {int} type resolution
 	if matches!(x_t.inferred_type, TastType::Int) {
 		if resolved_ty.is_integer() {
-			// {int} -> integer cast is just a type resolution, no runtime operation needed
-			// Preserve the original cast expression span
+			// {int} -> integer cast is just a type resolution, no runtime
+			// operation needed Preserve the original cast expression span
 			return Ok(TypedExpr {
 				inferred_type: resolved_ty,
 				kind: x_t.kind.into_value().in_span(expr_span),
@@ -205,8 +205,8 @@ pub fn type_expr_size_of_expr<'input>(
 	expr_span: Span,
 	x: Expr<'input>,
 ) -> Result<TypedExpr<'input>, Diagnostic> {
-	// resolve `sizeof(expr)` by finding `typeof expr` and then basically becoming
-	// "sizeof typeof expr"
+	// resolve `sizeof(expr)` by finding `typeof expr` and then basically
+	// becoming "sizeof typeof expr"
 	let x_ty = type_expr(scope, x)?;
 	Ok(TypedExpr {
 		inferred_type: TastType::Usize,
@@ -245,9 +245,10 @@ pub fn type_expr_struct_construction<'input>(
 
 	// Handle enum construction specially
 	if is_enum {
-		// Enums are desugared into: struct { __discriminant__: usize, __value__: union
-		// { ... } } We need to transform: { VariantName: value }
-		// Into: { __discriminant__: index, __value__: { VariantName: value } }
+		// Enums are desugared into: struct { __discriminant__: usize,
+		// __value__: union { ... } } We need to transform: { VariantName:
+		// value } Into: { __discriminant__: index, __value__: { VariantName:
+		// value } }
 
 		let TastType::Struct {
 			fields: enum_fields,
@@ -300,8 +301,8 @@ pub fn type_expr_struct_construction<'input>(
 		let variant_name_str = variant_name.value();
 
 		// Find the discriminant value using ALPHABETICAL ORDER
-		// Sort the variant names to match the discriminant assignment used in match
-		// statements
+		// Sort the variant names to match the discriminant assignment used in
+		// match statements
 		let mut sorted_variants: Vec<(&str, &TastType<'_>)> = variant_types.iter().collect();
 		sorted_variants.sort_unstable_by_key(|(name, _)| *name);
 
@@ -356,8 +357,8 @@ pub fn type_expr_struct_construction<'input>(
 
 		// Create the discriminant literal
 		// We need to create a proper NumberLiteral from the lexer
-		// Use Box::leak to create a string with 'static lifetime that can be cast to
-		// 'input
+		// Use Box::leak to create a string with 'static lifetime that can be
+		// cast to 'input
 		let discriminant_str: &'input str = Box::leak(discriminant.to_string().into_boxed_str());
 		let discriminant_expr = TypedExpr {
 			inferred_type: TastType::Usize,
