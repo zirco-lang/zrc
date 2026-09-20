@@ -4,9 +4,7 @@ use std::{env, path::PathBuf};
 
 /// Split an environment variable containing paths into a vector of [`PathBuf`]s
 pub fn split_paths(var: &str) -> Vec<PathBuf> {
-	env::var_os(var)
-		.map(|val| env::split_paths(&val).collect())
-		.unwrap_or_default()
+	env::var_os(var).map_or_default(|val| env::split_paths(&val).collect())
 }
 
 /// Get the possible library filenames for a given library name on this platform
