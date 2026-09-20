@@ -9,7 +9,7 @@ on:
 
 jobs:
   rustdoc:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       RUSTDOCFLAGS: "-D warnings"
       LLVM_SYS_231_PREFIX: /usr/lib/llvm-23
