@@ -14,7 +14,7 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
-        llvm = pkgs.llvmPackages_22;
+        llvm = pkgs.llvmPackages_23;
         rust = import ./rust.nix { inherit fenix system; };
       in
       f {

@@ -70,5 +70,5 @@ naersk'.buildPackage {
     fi
   '';
 
-  LLVM_SYS_221_PREFIX = llvm.llvm.dev;
+  LLVM_SYS_231_PREFIX = llvm.llvm.dev;
 }

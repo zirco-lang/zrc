@@ -39,36 +39,36 @@ For experienced developers who want to get running quickly:
 
 1. **Install prerequisites:**
 
-    ```bash
-    # Rust toolchain (if not already installed)
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```bash
+   # Rust toolchain (if not already installed)
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-    # LLVM 22 with Polly + other dependencies (Ubuntu/Debian)
-    sudo apt-get update
-    sudo apt-get install -y llvm-22 llvm-22-dev libpolly-22-dev clang-22 build-essential libssl-dev pkg-config libzstd-dev
-    ```
+   # LLVM 23 with Polly + other dependencies (Ubuntu/Debian)
+   sudo apt-get update
+   sudo apt-get install -y llvm-23 llvm-23-dev libpolly-23-dev clang-23 build-essential libssl-dev pkg-config libzstd-dev
+   ```
 
 2. **Clone and build:**
 
-    ```bash
-    git clone https://github.com/zirco-lang/zrc
-    cd zrc
-    cargo build
-    ```
+   ```bash
+   git clone https://github.com/zirco-lang/zrc
+   cd zrc
+   cargo build
+   ```
 
 3. **Install system-wide (optional):**
 
-    ```bash
-    cargo install --path compiler/zrc
-    ```
+   ```bash
+   cargo install --path compiler/zrc
+   ```
 
 4. **Compile your first program:**
-    ```bash
-    # Create hello.zr with your favorite editor, then:
-    zrc -o hello.o hello.zr
-    clang -o hello hello.o -lc
-    ./hello
-    ```
+   ```bash
+   # Create hello.zr with your favorite editor, then:
+   zrc -o hello.o hello.zr
+   clang -o hello hello.o -lc
+   ./hello
+   ```
 
 ## Language Specification
 
