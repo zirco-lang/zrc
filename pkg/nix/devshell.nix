@@ -21,7 +21,7 @@
       nixfmt
     ];
 
-    LLVM_SYS_221_PREFIX = llvm.llvm.dev;
+    LLVM_SYS_231_PREFIX = llvm.llvm.dev;
     LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
       pkgs.stdenv.cc.cc.lib
       pkgs.libffi

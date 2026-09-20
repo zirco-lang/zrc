@@ -6,13 +6,13 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-inkwell = { version = "0.10.0", features = [
-    "llvm22-1",
-    "llvm22-1-prefer-static",
-] }
 zrc_typeck = { path = "../zrc_typeck" }
 zrc_utils = { path = "../zrc_utils" }
 tracing = { version = "0.1.44", features = ["release_max_level_warn"] }
+
+[dependencies.inkwell]
+git = "https://github.com/TheDan64/inkwell"
+features = ["llvm23-1", "llvm23-1-prefer-static"]
 
 [dev-dependencies]
 indoc = "2.0.5"

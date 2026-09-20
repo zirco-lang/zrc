@@ -1,349 +1,349 @@
 name: "build"
 
 on:
-    push:
-        branches:
-            - main
-    pull_request:
-    merge_group:
+  push:
+    branches:
+      - main
+  pull_request:
+  merge_group:
 
 jobs:
-    build:
-        runs-on: ${{ matrix.os }}
-        strategy:
-            matrix:
-                os:
-                    - ubuntu-24.04
-                    - ubuntu-24.04-arm
-                    - macos-latest
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+          - macos-latest
+    env:
+      LLVM_SYS_231_PREFIX: /usr/lib/llvm-23
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Make sure the actual branch is checked out when running on pull requests
+          ref: ${{ github.head_ref }}
+          repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+      - name: Install LLVM dependencies from APT (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 23 all
+          sudo apt install libpolly-23-dev libbolt-23-dev bolt-23
+          echo "/usr/lib/llvm-23/bin" >> $GITHUB_PATH
+      - name: Install LLVM dependencies from Homebrew (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm@23
+          echo "LLVM_SYS_231_PREFIX=$(brew --prefix llvm@23)" >> $GITHUB_ENV
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: llvm-tools-preview
+      - name: Use dependency cache
+        uses: Swatinem/rust-cache@v2
+      - name: Build Zirco
         env:
-            LLVM_SYS_221_PREFIX: /usr/lib/llvm-22
+          ZIRCON_TOOLCHAIN_DIR: ${{ github.workspace }}/outputs
+          PGO: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
+          BOLT: ${{ runner.os == 'Linux' && '1' || '0' }}
+        run: bash scripts/build.sh
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          path: outputs
+          name: zrc-${{ runner.os }}-${{ runner.arch }}-release
+  build-nix:
+    runs-on: ubuntu-24.04
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v7
-              with:
-                  # Make sure the actual branch is checked out when running on pull requests
-                  ref: ${{ github.head_ref }}
-                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Install LLVM dependencies from APT (Linux)
-              if: runner.os == 'Linux'
-              run: |
-                  wget https://apt.llvm.org/llvm.sh
-                  chmod +x llvm.sh
-                  sudo ./llvm.sh 22 all
-                  sudo apt install libpolly-22-dev libbolt-22-dev bolt-22
-                  echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
-            - name: Install LLVM dependencies from Homebrew (macOS)
-              if: runner.os == 'macOS'
-              run: |
-                  brew install llvm@22
-                  echo "LLVM_SYS_221_PREFIX=$(brew --prefix llvm@22)" >> $GITHUB_ENV
-            - name: Set up Rust
-              uses: actions-rs/toolchain@v1
-              with:
-                  toolchain: stable
-                  override: true
-                  components: llvm-tools-preview
-            - name: Use dependency cache
-              uses: Swatinem/rust-cache@v2
-            - name: Build Zirco
-              env:
-                  ZIRCON_TOOLCHAIN_DIR: ${{ github.workspace }}/outputs
-                  PGO: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
-                  BOLT: ${{ runner.os == 'Linux' && '1' || '0' }}
-              run: bash scripts/build.sh
-            - name: Upload build artifacts
-              uses: actions/upload-artifact@v7
-              with:
-                  path: outputs
-                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
-    build-nix:
-        runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Make sure the actual branch is checked out when running on pull requests
+          ref: ${{ github.head_ref }}
+          repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+      - uses: nixbuild/nix-quick-install-action@v35
+        with:
+          nix_conf: |
+            keep-env-derivations = true
+            keep-outputs = true
+      - name: Restore cached Nix store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          purge: true
+          purge-prefixes: nix-${{ runner.os }}-
+          purge-created: 0
+          purge-last-accessed: P1DT12H
+          purge-primary-key: never
+      - name: Test Nix devshell
+        run: nix develop --command cargo --version
+      - name: Build with Nix
+        run: nix build .#zrc .#libzr
+      - name: Clean up Nix store
+        run: nix-collect-garbage -d
+  lint-std:
+    needs: build
+    runs-on: ubuntu-24.04
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v7
-              with:
-                  # Make sure the actual branch is checked out when running on pull requests
-                  ref: ${{ github.head_ref }}
-                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - uses: nixbuild/nix-quick-install-action@v35
-              with:
-                  nix_conf: |
-                      keep-env-derivations = true
-                      keep-outputs = true
-            - name: Restore cached Nix store
-              uses: nix-community/cache-nix-action@v7
-              with:
-                  primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
-                  restore-prefixes-first-match: nix-${{ runner.os }}-
-                  purge: true
-                  purge-prefixes: nix-${{ runner.os }}-
-                  purge-created: 0
-                  purge-last-accessed: P1DT12H
-                  purge-primary-key: never
-            - name: Test Nix devshell
-              run: nix develop --command cargo --version
-            - name: Build with Nix
-              run: nix build .#zrc .#libzr
-            - name: Clean up Nix store
-              run: nix-collect-garbage -d
-    lint-std:
-        needs: build
-        runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Make sure the actual branch is checked out when running on pull requests
+          ref: ${{ github.head_ref }}
+          repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+      - name: Download build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: zrc-${{ runner.os }}-${{ runner.arch }}-release
+          path: ./artifacts
+      - name: Set permissions for zrc and zircop
+        run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
+      - name: Add zrc and zircop to PATH
+        run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
+      - name: Lint source for libzr
+        run: make -j2 -C libzr lint ZIRCOP=zircop
+  verify-examples:
+    needs: build
+    runs-on: ubuntu-24.04
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v7
-              with:
-                  # Make sure the actual branch is checked out when running on pull requests
-                  ref: ${{ github.head_ref }}
-                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Download build artifact
-              uses: actions/download-artifact@v8
-              with:
-                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
-                  path: ./artifacts
-            - name: Set permissions for zrc and zircop
-              run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
-            - name: Add zrc and zircop to PATH
-              run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
-            - name: Lint source for libzr
-              run: make -j2 -C libzr lint ZIRCOP=zircop
-    verify-examples:
-        needs: build
-        runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Make sure the actual branch is checked out when running on pull requests
+          ref: ${{ github.head_ref }}
+          repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+      - name: Download build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: zrc-${{ runner.os }}-${{ runner.arch }}-release
+          path: ./artifacts
+      - name: Set permissions for zrc and zircop
+        run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
+      - name: Add zrc to PATH
+        run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
+      - name: Build and test all examples
+        run: make -j2 -C examples test ZRC=zrc LIBZR_DIR=$(pwd)/artifacts/libzr/lib/
+  lint-examples:
+    needs: build
+    runs-on: ubuntu-24.04
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v7
-              with:
-                  # Make sure the actual branch is checked out when running on pull requests
-                  ref: ${{ github.head_ref }}
-                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Download build artifact
-              uses: actions/download-artifact@v8
-              with:
-                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
-                  path: ./artifacts
-            - name: Set permissions for zrc and zircop
-              run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
-            - name: Add zrc to PATH
-              run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
-            - name: Build and test all examples
-              run: make -j2 -C examples test ZRC=zrc LIBZR_DIR=$(pwd)/artifacts/libzr/lib/
-    lint-examples:
-        needs: build
-        runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Make sure the actual branch is checked out when running on pull requests
+          ref: ${{ github.head_ref }}
+          repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+      - name: Download build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: zrc-${{ runner.os }}-${{ runner.arch }}-release
+          path: ./artifacts
+      - name: Set permissions for zrc and zircop
+        run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
+      - name: Add zrc and zircop to PATH
+        run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
+      - name: Lint all examples
+        run: make -j2 -C examples lint ZIRCOP=zircop
+  build-debs:
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Make sure the actual branch is checked out when running on pull requests
+          ref: ${{ github.head_ref }}
+          repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
+      - name: Download build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: zrc-${{ runner.os }}-${{ runner.arch }}-release
+          path: /tmp/artifacts
+      - name: Build sysroots
+        run: ZIRCON_TOOLCHAIN_DIR=/tmp/artifacts SYSROOT=/tmp/sysroot bash scripts/mk-sysroot.sh
+      - name: Build Debian package
+        run: SYSROOT=/tmp/sysroot DEB_OUTPUT=./debs bash scripts/mk-deb.sh
+      - name: Upload Debian package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          path: ./debs/*.deb
+          name: zrc-Debian-${{ runner.arch }}
+  comment-artifacts:
+    needs: [build, build-debs]
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v7
-              with:
-                  # Make sure the actual branch is checked out when running on pull requests
-                  ref: ${{ github.head_ref }}
-                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Download build artifact
-              uses: actions/download-artifact@v8
-              with:
-                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
-                  path: ./artifacts
-            - name: Set permissions for zrc and zircop
-              run: chmod +x ./artifacts/bin/zrc ./artifacts/bin/zircop
-            - name: Add zrc and zircop to PATH
-              run: echo "PATH=$(pwd)/artifacts/bin:$PATH" >> $GITHUB_ENV
-            - name: Lint all examples
-              run: make -j2 -C examples lint ZIRCOP=zircop
-    build-debs:
-        needs: build
-        runs-on: ${{ matrix.os }}
-        strategy:
-            matrix:
-                os:
-                    - ubuntu-24.04
-                    - ubuntu-24.04-arm
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v7
-              with:
-                  # Make sure the actual branch is checked out when running on pull requests
-                  ref: ${{ github.head_ref }}
-                  repository: ${{github.event.pull_request.head.repo.full_name || github.repository }}
-            - name: Download build artifact
-              uses: actions/download-artifact@v8
-              with:
-                  name: zrc-${{ runner.os }}-${{ runner.arch }}-release
-                  path: /tmp/artifacts
-            - name: Build sysroots
-              run: ZIRCON_TOOLCHAIN_DIR=/tmp/artifacts SYSROOT=/tmp/sysroot bash scripts/mk-sysroot.sh
-            - name: Build Debian package
-              run: SYSROOT=/tmp/sysroot DEB_OUTPUT=./debs bash scripts/mk-deb.sh
-            - name: Upload Debian package artifact
-              uses: actions/upload-artifact@v7
-              with:
-                  path: ./debs/*.deb
-                  name: zrc-Debian-${{ runner.arch }}
-    comment-artifacts:
-        needs: [build, build-debs]
-        runs-on: ubuntu-24.04
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Comment on PR with artifact links
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const runId = context.runId;
+            const repoOwner = context.repo.owner;
+            const repoName = context.repo.repo;
+            const artifactUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${runId}`;
 
-        steps:
-            - name: Comment on PR with artifact links
-              uses: actions/github-script@v9
-              with:
-                  script: |
-                      const runId = context.runId;
-                      const repoOwner = context.repo.owner;
-                      const repoName = context.repo.repo;
-                      const artifactUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${runId}`;
+            const message = `🚀 **Build Artifacts**
 
-                      const message = `🚀 **Build Artifacts**
+            Build artifacts have been generated for this PR across multiple platforms.
 
-                      Build artifacts have been generated for this PR across multiple platforms.
+            You can download the following artifacts from the [workflow run](${artifactUrl}):
 
-                      You can download the following artifacts from the [workflow run](${artifactUrl}):
+            - **Linux x64**: \`zrc-Linux-X64-release\`
+            - **Linux ARM64**: \`zrc-Linux-ARM64-release\`
+            - **macOS ARM64**: \`zrc-macOS-ARM64-release\`
 
-                      - **Linux x64**: \`zrc-Linux-X64-release\`
-                      - **Linux ARM64**: \`zrc-Linux-ARM64-release\`
-                      - **macOS ARM64**: \`zrc-macOS-ARM64-release\`
+            If you use the [Zircon toolchain manager](https://github.com/zirco-lang/zircon), you can easily install the built artifacts using these downloaded packages:
+            \`\`\`bash
+            zircon import ./zrc-Linux-X64-release.zip
+            \`\`\``;
 
-                      If you use the [Zircon toolchain manager](https://github.com/zirco-lang/zircon), you can easily install the built artifacts using these downloaded packages:
-                      \`\`\`bash
-                      zircon import ./zrc-Linux-X64-release.zip
-                      \`\`\``;
+            // Find existing comment
+            const comments = await github.rest.issues.listComments({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+            });
 
-                      // Find existing comment
-                      const comments = await github.rest.issues.listComments({
-                          issue_number: context.issue.number,
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                      });
+            const botComment = comments.data.find(comment =>
+                comment.user.type === 'Bot' &&
+                comment.body.includes('🚀 **Build Artifacts**')
+            );
 
-                      const botComment = comments.data.find(comment =>
-                          comment.user.type === 'Bot' &&
-                          comment.body.includes('🚀 **Build Artifacts**')
-                      );
+            if (botComment) {
+                // Update existing comment
+                await github.rest.issues.updateComment({
+                    comment_id: botComment.id,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    body: message
+                });
+            } else {
+                // Create new comment
+                await github.rest.issues.createComment({
+                    issue_number: context.issue.number,
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    body: message
+                });
+            }
+  release:
+    # only on commits to main
+    needs: [build, build-debs]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Delete existing nightly release
+        uses: actions/github-script@v9
+        with:
+          script: |
+            try {
+                const release = await github.rest.repos.getReleaseByTag({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    tag: 'nightly',
+                });
+                await github.rest.repos.deleteRelease({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    release_id: release.data.id,
+                });
+                console.log('Deleted existing nightly release.');
+            } catch (e) {
+                if (e.status === 404) {
+                    console.log('No nightly release found, nothing to delete.');
+                } else {
+                    throw e;
+                }
+            }
+      - name: Update nightly tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -d nightly || true
+          git push origin :refs/tags/nightly || true
+          git tag nightly
+          git push origin nightly
+      - name: Download X86 Linux build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: zrc-Linux-X64-release
+          path: Linux-X64
+      - name: Download ARM64 Linux build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: zrc-Linux-ARM64-release
+          path: Linux-ARM64
+      - name: Download ARM64 macOS build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: zrc-macOS-ARM64-release
+          path: macOS-ARM64
+      - name: Download X86 Debian package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: zrc-Debian-X64
+          path: Debian-X64
+      - name: Download ARM64 Debian package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: zrc-Debian-ARM64
+          path: Debian-ARM64
+      - name: Set executable permissions
+        run: |
+          chmod +x Linux-X64/bin/*
+          chmod +x Linux-ARM64/bin/*
+          chmod +x macOS-ARM64/bin/*
+      - name: Create tar archives
+        run: |
+          tar -czf zrc-linux-x64.tar.gz -C Linux-X64 .
+          tar -czf zrc-linux-arm64.tar.gz -C Linux-ARM64 .
+          tar -czf zrc-macos-arm64.tar.gz -C macOS-ARM64 .
+          mv Debian-X64/* .
+          mv Debian-ARM64/* .
+      - name: Update `nightly` release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: nightly
+          name: Latest Build
+          body: |
+            This is an automated build of the Zirco project from the `main` branch.
 
-                      if (botComment) {
-                          // Update existing comment
-                          await github.rest.issues.updateComment({
-                              comment_id: botComment.id,
-                              owner: context.repo.owner,
-                              repo: context.repo.repo,
-                              body: message
-                          });
-                      } else {
-                          // Create new comment
-                          await github.rest.issues.createComment({
-                              issue_number: context.issue.number,
-                              owner: context.repo.owner,
-                              repo: context.repo.repo,
-                              body: message
-                          });
-                      }
-    release:
-        # only on commits to main
-        needs: [build, build-debs]
-        if: github.ref == 'refs/heads/main'
-        runs-on: ubuntu-24.04
-        permissions:
-            contents: write
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v7
-            - name: Delete existing nightly release
-              uses: actions/github-script@v9
-              with:
-                  script: |
-                      try {
-                          const release = await github.rest.repos.getReleaseByTag({
-                              owner: context.repo.owner,
-                              repo: context.repo.repo,
-                              tag: 'nightly',
-                          });
-                          await github.rest.repos.deleteRelease({
-                              owner: context.repo.owner,
-                              repo: context.repo.repo,
-                              release_id: release.data.id,
-                          });
-                          console.log('Deleted existing nightly release.');
-                      } catch (e) {
-                          if (e.status === 404) {
-                              console.log('No nightly release found, nothing to delete.');
-                          } else {
-                              throw e;
-                          }
-                      }
-            - name: Update nightly tag
-              run: |
-                  git config user.name "github-actions[bot]"
-                  git config user.email "github-actions[bot]@users.noreply.github.com"
-                  git tag -d nightly || true
-                  git push origin :refs/tags/nightly || true
-                  git tag nightly
-                  git push origin nightly
-            - name: Download X86 Linux build artifact
-              uses: actions/download-artifact@v8
-              with:
-                  name: zrc-Linux-X64-release
-                  path: Linux-X64
-            - name: Download ARM64 Linux build artifact
-              uses: actions/download-artifact@v8
-              with:
-                  name: zrc-Linux-ARM64-release
-                  path: Linux-ARM64
-            - name: Download ARM64 macOS build artifact
-              uses: actions/download-artifact@v8
-              with:
-                  name: zrc-macOS-ARM64-release
-                  path: macOS-ARM64
-            - name: Download X86 Debian package artifact
-              uses: actions/download-artifact@v8
-              with:
-                  name: zrc-Debian-X64
-                  path: Debian-X64
-            - name: Download ARM64 Debian package artifact
-              uses: actions/download-artifact@v8
-              with:
-                  name: zrc-Debian-ARM64
-                  path: Debian-ARM64
-            - name: Set executable permissions
-              run: |
-                  chmod +x Linux-X64/bin/*
-                  chmod +x Linux-ARM64/bin/*
-                  chmod +x macOS-ARM64/bin/*
-            - name: Create tar archives
-              run: |
-                  tar -czf zrc-linux-x64.tar.gz -C Linux-X64 .
-                  tar -czf zrc-linux-arm64.tar.gz -C Linux-ARM64 .
-                  tar -czf zrc-macos-arm64.tar.gz -C macOS-ARM64 .
-                  mv Debian-X64/* .
-                  mv Debian-ARM64/* .
-            - name: Update `nightly` release
-              uses: softprops/action-gh-release@v3
-              with:
-                  tag_name: nightly
-                  name: Latest Build
-                  body: |
-                      This is an automated build of the Zirco project from the `main` branch.
+            Although we build Zirco for Debian and provide tarballs here,
+            the recommended installation method is always to use the
+            [Zircon toolchain manager](https://github.com/zirco-lang/zircon) to update and manage multiple versions of the toolchain.
 
-                      Although we build Zirco for Debian and provide tarballs here,
-                      the recommended installation method is always to use the
-                      [Zircon toolchain manager](https://github.com/zirco-lang/zircon) to update and manage multiple versions of the toolchain.
+            **Commit:** ${{ github.sha }}
+            **Date:** ${{ github.event.head_commit.timestamp }}
+          draft: false
+          prerelease: false
+          make_latest: false
+          fail_on_unmatched_files: true
+          files: |
+            zrc-linux-x64.tar.gz
+            zrc-linux-arm64.tar.gz
+            zrc-macos-arm64.tar.gz
+            *.deb
 
-                      **Commit:** ${{ github.sha }}
-                      **Date:** ${{ github.event.head_commit.timestamp }}
-                  draft: false
-                  prerelease: false
-                  make_latest: false
-                  fail_on_unmatched_files: true
-                  files: |
-                      zrc-linux-x64.tar.gz
-                      zrc-linux-arm64.tar.gz
-                      zrc-macos-arm64.tar.gz
-                      *.deb
-
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
