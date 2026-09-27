@@ -22,7 +22,7 @@ mkdir -p "$ZIRCON_LIBZR_DIR/include"
 
 if [ "$PGO" = "1" ]; then
 
-    export RUSTFLAGS="-C link-arg=--no-fix-cortex-a53-843419"
+    export RUSTFLAGS="-C link-arg=-mno-fix-cortex-a53-843419"
 
     mkdir -p target/tools
     cargo install cargo-pgo --root target/tools
