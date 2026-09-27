@@ -59,7 +59,7 @@ jobs:
           path: outputs
           name: zrc-${{ runner.os }}-${{ runner.arch }}-release
   build-nix:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout
@@ -91,7 +91,7 @@ jobs:
         run: nix-collect-garbage -d
   lint-std:
     needs: build
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout
@@ -113,7 +113,7 @@ jobs:
         run: make -j2 -C libzr lint ZIRCOP=zircop
   verify-examples:
     needs: build
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout
@@ -135,7 +135,7 @@ jobs:
         run: make -j2 -C examples test ZRC=zrc LIBZR_DIR=$(pwd)/artifacts/libzr/lib/
   lint-examples:
     needs: build
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout
@@ -186,7 +186,7 @@ jobs:
           name: zrc-Debian-${{ runner.arch }}
   comment-artifacts:
     needs: [build, build-debs]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
@@ -247,7 +247,7 @@ jobs:
     # only on commits to main
     needs: [build, build-debs]
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
