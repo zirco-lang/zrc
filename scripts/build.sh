@@ -24,22 +24,22 @@ if [ "$PGO" = "1" ]; then
 
     # if we're on aarch64:
     if [ "$TRIPLE" = "aarch64-unknown-linux-gnu" ]; then
-        export RUSTFLAGS="-C link-arg=-mno-fix-cortex-a53-843419"
+        extra_cargo_pgo_args="--bolt-args --drop-cortex-a53-843419-veneers"
     fi
 
     mkdir -p target/tools
     cargo install cargo-pgo --root target/tools
-    target/tools/bin/cargo-pgo pgo instrument build
-    target/tools/bin/cargo-pgo pgo instrument test
+    target/tools/bin/cargo-pgo pgo instrument build $extra_cargo_pgo_args
+    target/tools/bin/cargo-pgo pgo instrument test $extra_cargo_pgo_args
     BIN="target/$TRIPLE/release/" BOLT=0 ./scripts/pgo-profiling.sh
 
     if [ "$BOLT" = "1" ]; then
-        target/tools/bin/cargo-pgo pgo bolt build --with-pgo
+        target/tools/bin/cargo-pgo pgo bolt build --with-pgo $extra_cargo_pgo_args
         BIN="target/$TRIPLE/release/" BOLT=1 ./scripts/pgo-profiling.sh
-        target/tools/bin/cargo-pgo pgo bolt optimize --with-pgo
+        target/tools/bin/cargo-pgo pgo bolt optimize --with-pgo $extra_cargo_pgo_args
         BOLT_SUFFIX="-bolt-optimized"
     else
-        target/tools/bin/cargo-pgo pgo optimize build
+        target/tools/bin/cargo-pgo pgo optimize build $extra_cargo_pgo_args
         BOLT_SUFFIX=""
     fi
 
