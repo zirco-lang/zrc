@@ -50,8 +50,10 @@ jobs:
       - name: Build Zirco
         env:
           ZIRCON_TOOLCHAIN_DIR: ${{ github.workspace }}/outputs
-          PGO: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
-          BOLT: ${{ runner.os == 'Linux' && '1' || '0' }}
+          PGO: 1
+          BOLT: 1
+          #PGO: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
+          #BOLT: ${{ runner.os == 'Linux' && '1' || '0' }}
         run: bash scripts/build.sh
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
