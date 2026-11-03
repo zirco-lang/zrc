@@ -80,7 +80,14 @@ jobs:
           nix_conf: |
             keep-env-derivations = true
             keep-outputs = true
-      - name: Restore cached Nix store
+      - name: Setup Cachix (main only)
+        if: github.ref == 'refs/heads/main'
+        uses: cachix/cachix-action@v17
+        with:
+          name: zirco-lang
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+      - name: Restore cached Nix store (dev only)
+        if: github.ref != 'refs/heads/main'
         uses: nix-community/cache-nix-action@v7
         with:
           primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
@@ -94,8 +101,6 @@ jobs:
         run: nix develop --command cargo --version
       - name: Build with Nix
         run: nix build .#zrc .#libzr
-      - name: Clean up Nix store
-        run: nix-collect-garbage -d
   lint-std:
     needs: build
     runs-on: ubuntu-26.04

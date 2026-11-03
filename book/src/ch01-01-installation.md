@@ -150,6 +150,15 @@ You can add our package to your flake inputs as follows:
 > If you encounter issues with missing libraries or include paths, you may need to manually set the
 > `-I`/`-L` paths for headers and libzr.
 
+### Binary Cache
+
+We also cache built binaries from `main` to Cachix.
+
+```
+extra-substituters = https://zirco-lang.cachix.org
+extra-trusted-public-keys = zirco-lang.cachix.org-1:yOFfIeYLXiX1bw09I3WnPWOBlBajwH3wYsPHlzwYDgc=
+```
+
 ## Download Prebuilt Binaries
 
 Release tarballs are available on the [releases page](https://github.com/zirco-lang/zrc/releases/tag/nightly).
