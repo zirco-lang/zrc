@@ -60,7 +60,13 @@ jobs:
           path: outputs
           name: zrc-${{ runner.os }}-${{ runner.arch }}-release
   build-nix:
-    runs-on: ubuntu-26.04
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+          - macos-latest
 
     steps:
       - name: Checkout
@@ -77,10 +83,10 @@ jobs:
       - name: Restore cached Nix store
         uses: nix-community/cache-nix-action@v7
         with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
+          primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-${{ runner.arch }}-
           purge: true
-          purge-prefixes: nix-${{ runner.os }}-
+          purge-prefixes: nix-${{ runner.os }}-${{ runner.arch }}-
           purge-created: 0
           purge-last-accessed: P1DT12H
           purge-primary-key: never
