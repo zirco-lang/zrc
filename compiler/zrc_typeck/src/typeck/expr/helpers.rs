@@ -21,8 +21,8 @@ pub fn desugar_assignment<'input>(
 ) -> (Expr<'input>, Expr<'input>) {
 	match mode {
 		Assignment::Standard => (lhs, rhs),
-		// This makes the span of the generated 'a + b' in a += b the same span of 'b'. Do we want
-		// this?
+		// This makes the span of the generated 'a + b' in a += b the same span
+		// of 'b'. Do we want this?
 		Assignment::Arithmetic(op) => (
 			lhs.clone(),
 			Expr(

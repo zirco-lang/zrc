@@ -151,9 +151,9 @@ pub fn type_block<'input>(
 							StmtKind::UnreachableStmt => Ok(Some((
 								TypedStmt {
 									kind: TypedStmtKind::UnreachableStmt.in_span(stmt_span),
-									// this may create some weird UB if used incorrectly, but it's
-									// on the user to ensure
-									// they don't do that
+									// this may create some weird UB if used
+									// incorrectly, but it's on the user to
+									// ensure they don't do that
 									return_actuality: BlockReturnActuality::AlwaysReturns,
 								},
 								BlockReturnActuality::AlwaysReturns,
