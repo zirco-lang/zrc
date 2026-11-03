@@ -50,7 +50,8 @@ jobs:
       - name: Build Zirco
         env:
           ZIRCON_TOOLCHAIN_DIR: ${{ github.workspace }}/outputs
-          PGO: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
+          # temporarily restricting PGO to Linux x64 due to bugs in rustc
+          PGO: ${{ runner.os == 'Linux' && runner.arch == 'X64' && github.event_name == 'push' && github.ref == 'refs/heads/main' && '1' || '0' }}
           BOLT: ${{ runner.os == 'Linux' && '1' || '0' }}
         run: bash scripts/build.sh
       - name: Upload build artifacts
