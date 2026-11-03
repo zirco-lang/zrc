@@ -39,8 +39,8 @@ pub struct TypedStmt<'input> {
 /// after type checking
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypedStmtKind<'input> {
-	// all of the Box<Stmt>s for "possibly blocks" have been desugared into vec[single stmt] here
-	// (basically if (x) y has become if (x) {y})
+	// all of the Box<Stmt>s for "possibly blocks" have been desugared into
+	// vec[single stmt] here (basically if (x) y has become if (x) {y})
 	/// `if (x) y` or `if (x) y else z`
 	IfStmt(
 		TypedExpr<'input>,

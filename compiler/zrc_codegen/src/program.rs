@@ -338,8 +338,9 @@ fn cg_program_without_optimization<'ctx>(
 				parent_directory,
 				frontend_version_string,
 				false,
-				// We do not directly obtain the args here because the test executables have a path
-				// in them and that would change and mess up snapshotting
+				// We do not directly obtain the args here because the test
+				// executables have a path in them and that would change and
+				// mess up snapshotting
 				cli_args,
 				0,
 				"",

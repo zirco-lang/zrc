@@ -91,7 +91,8 @@ pub fn cg_arithmetic<'ctx, 'input>(
 		#[expect(clippy::wildcard_enum_match_arm)]
 		let reg = match op {
 			// SAFETY: This can segfault if indices are used incorrectly
-			// This is only used for pointer arithmetic, so the indices should be correct
+			// This is only used for pointer arithmetic, so the indices should
+			// be correct
 			Arithmetic::Addition => unsafe {
 				cg.builder.build_gep(
 					llvm_basic_type(&cg, &pointee).0,

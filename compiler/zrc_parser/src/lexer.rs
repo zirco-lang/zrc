@@ -173,7 +173,8 @@ fn handle_block_comment_start<'input>(
 
 		// and perform some action for each sequence of 2 characters:
 		match (char, chars.peek()) {
-			// If it's "/*", we're starting a new comment, consume the '*' and increase our depth...
+			// If it's "/*", we're starting a new comment, consume the '*' and
+			// increase our depth...
 			('/', Some(&'*')) => {
 				chars.next();
 				lex.bump(char.len_utf8());
@@ -255,10 +256,11 @@ impl<'input> NumberLiteral<'input> {
 )]
 #[logos(skip(r"//[^\r\n]*(\r\n|\n)?", allow_greedy = true))] // single-line comments
 pub enum Tok<'input> {
-	// Handle nested block comments -- this does not need its own token type and can be attached
-	// to whatever token is directly below this. The handle_block_comment_start will either Skip
-	// the matched characters or throw an error. It will never return a token.
-	// Read the doc comment above handle_block_comment_start for more information.
+	// Handle nested block comments -- this does not need its own token type and
+	// can be attached to whatever token is directly below this. The
+	// handle_block_comment_start will either Skip the matched characters or
+	// throw an error. It will never return a token. Read the doc comment above
+	// handle_block_comment_start for more information.
 	#[token("/*", handle_block_comment_start)]
 	// === ARITHMETIC OPERATORS ===
 	/// The token `++`
@@ -291,7 +293,8 @@ pub enum Tok<'input> {
 	Percent,
 
 	// === COMPARISON OPERATORS ===
-	// Silly little error we raise if JavaScript-like equality operators are used
+	// Silly little error we raise if JavaScript-like equality operators are
+	// used
 	#[token("===", |_| {
         Err::<Tok,InternalLexicalError>(InternalLexicalError::JavascriptUserDetected("=="))
     })]
